@@ -57,11 +57,7 @@ export interface Logger {
 }
 
 export function createLogger(defaultContext?: LogContext): Logger {
-  function log(
-    level: LogLevel,
-    message: string,
-    context?: LogContext,
-  ): void {
+  function log(level: LogLevel, message: string, context?: LogContext): void {
     if (!shouldLog(level)) {
       return;
     }

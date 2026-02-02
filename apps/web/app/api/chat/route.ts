@@ -1,22 +1,12 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { streamText } from "ai";
-
-function getAnthropicApiKey(): string {
-  // SST injects secrets as SST_RESOURCE_<Name> JSON env vars via `sst shell`
-  const raw = process.env.SST_RESOURCE_AnthropicApiKey;
-  if (raw) {
-    return JSON.parse(raw).value;
-  }
-  throw new Error(
-    "AnthropicApiKey not found. Start Next.js via: npx sst shell -- pnpm --filter @usopc/web dev",
-  );
-}
+import { Resource } from "sst";
 
 export async function POST(req: Request) {
   const { messages, userSport } = await req.json();
 
   const anthropic = createAnthropic({
-    apiKey: getAnthropicApiKey(),
+    apiKey: Resource.AnthropicApiKey.value,
   });
 
   const systemPrompt = `You are the USOPC Athlete Support Assistant, an AI designed to help U.S. Olympic and Paralympic athletes navigate governance, team selection, dispute resolution, SafeSport, anti-doping, eligibility, and athlete representation across all National Governing Bodies (NGBs) and USOPC-managed sports.

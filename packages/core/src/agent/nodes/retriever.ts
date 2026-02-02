@@ -47,9 +47,7 @@ function getLastUserMessage(state: AgentState): string {
  * the search to relevant document partitions. When neither is available,
  * returns `undefined` to perform an unfiltered search.
  */
-function buildFilter(
-  state: AgentState,
-): Record<string, unknown> | undefined {
+function buildFilter(state: AgentState): Record<string, unknown> | undefined {
   const conditions: Record<string, unknown> = {};
 
   if (state.detectedNgbIds.length > 0) {
@@ -136,10 +134,13 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
 
       // --- Phase 2: Broaden if narrow search yields too few results ---
       if (results.length < 2) {
-        log.info("Broadening retrieval (narrow returned insufficient results)", {
-          narrowCount: results.length,
-          topK: RETRIEVAL_CONFIG.broadenFilterTopK,
-        });
+        log.info(
+          "Broadening retrieval (narrow returned insufficient results)",
+          {
+            narrowCount: results.length,
+            topK: RETRIEVAL_CONFIG.broadenFilterTopK,
+          },
+        );
         const broadResults = await vectorStore.similaritySearchWithScore(
           query,
           RETRIEVAL_CONFIG.broadenFilterTopK,

@@ -16,9 +16,7 @@ const MAX_SEARCH_RESULTS = 5;
  * Allows injection of a real TavilySearch instance or a test double.
  */
 export interface TavilySearchLike {
-  invoke(
-    input: string | { query: string },
-  ): Promise<unknown>;
+  invoke(input: string | { query: string }): Promise<unknown>;
 }
 
 /**

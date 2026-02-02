@@ -34,7 +34,8 @@ export async function citationBuilderNode(
       documentType: doc.metadata.documentType ?? "document",
       section: doc.metadata.sectionTitle,
       effectiveDate: doc.metadata.effectiveDate,
-      snippet: doc.content.slice(0, 200) + (doc.content.length > 200 ? "..." : ""),
+      snippet:
+        doc.content.slice(0, 200) + (doc.content.length > 200 ? "..." : ""),
     });
   }
 

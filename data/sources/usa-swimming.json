@@ -6,7 +6,7 @@
       "title": "USA Swimming Rules and Regulations",
       "documentType": "rulebook",
       "topicDomains": ["team_selection", "eligibility", "governance"],
-      "url": "https://www.usaswimming.org/about-usas/governance/rules-regulations",
+      "url": "https://www.usaswimming.org/docs/default-source/governance/governance-lsc-website/rules_policies/rulebooks/2025-rulebook.pdf",
       "format": "pdf",
       "priority": "high",
       "description": "Complete USA Swimming rulebook including competition rules, athlete eligibility, and team selection criteria"
@@ -16,8 +16,8 @@
       "title": "USA Swimming Bylaws",
       "documentType": "bylaws",
       "topicDomains": ["governance", "athlete_rights"],
-      "url": "https://www.usaswimming.org/about-usas/governance",
-      "format": "pdf",
+      "url": "https://www.usaswimming.org/about-usas/governance/bylaws",
+      "format": "html",
       "priority": "high",
       "description": "USA Swimming organizational bylaws and governance structure"
     },
@@ -26,8 +26,8 @@
       "title": "USA Swimming Olympic/International Team Selection Procedures",
       "documentType": "selection_procedures",
       "topicDomains": ["team_selection"],
-      "url": "https://www.usaswimming.org/about-usas/governance/selection-procedures",
-      "format": "pdf",
+      "url": "https://www.usaswimming.org/about-usas/governance/rules-policies",
+      "format": "html",
       "priority": "high",
       "description": "Criteria and procedures for selecting athletes to represent the U.S. in international swimming competition"
     }

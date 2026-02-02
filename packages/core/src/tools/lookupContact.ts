@@ -50,7 +50,15 @@ let cachedContacts: ContactEntry[] | null = null;
 function getDataFilePath(): string {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
-  return resolve(__dirname, "..", "..", "..", "..", "data", "contact-directory.json");
+  return resolve(
+    __dirname,
+    "..",
+    "..",
+    "..",
+    "..",
+    "data",
+    "contact-directory.json",
+  );
 }
 
 async function loadContacts(): Promise<ContactEntry[]> {
@@ -106,9 +114,7 @@ export function createLookupContactTool() {
 
         // Filter by domain if specified
         if (domain) {
-          matches = matches.filter((c) =>
-            c.domains.includes(domain),
-          );
+          matches = matches.filter((c) => c.domains.includes(domain));
         }
 
         // Filter by organization name if specified (case-insensitive substring)

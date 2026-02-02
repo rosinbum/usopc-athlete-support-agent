@@ -1,12 +1,24 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { createLogger, getDatabaseUrl, getRequiredEnv } from "@usopc/shared";
+import { createLogger, getDatabaseUrl } from "@usopc/shared";
 import { Pool } from "pg";
 import { createHash } from "node:crypto";
-import { ingestSource } from "./pipeline.js";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { Resource } from "sst";
 import type { IngestionSource } from "./pipeline.js";
+import { getLastContentHash, upsertIngestionStatus } from "./db.js";
 
 const logger = createLogger({ service: "ingestion-cron" });
+
+// ---------------------------------------------------------------------------
+// Shared types (used by both coordinator and worker)
+// ---------------------------------------------------------------------------
+
+export interface IngestionMessage {
+  source: IngestionSource;
+  contentHash: string;
+  triggeredAt: string;
+}
 
 // ---------------------------------------------------------------------------
 // Source config loading
@@ -66,84 +78,32 @@ function hashContent(content: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Ingestion status helpers
-// ---------------------------------------------------------------------------
-
-async function getLastContentHash(
-  pool: Pool,
-  sourceId: string,
-): Promise<string | null> {
-  const result = await pool.query(
-    `SELECT content_hash FROM ingestion_status
-     WHERE source_id = $1 AND status = 'completed'
-     ORDER BY completed_at DESC LIMIT 1`,
-    [sourceId],
-  );
-  return result.rows[0]?.content_hash ?? null;
-}
-
-async function upsertIngestionStatus(
-  pool: Pool,
-  sourceId: string,
-  sourceUrl: string,
-  status: string,
-  fields: {
-    contentHash?: string;
-    chunksCount?: number;
-    errorMessage?: string;
-  } = {},
-): Promise<void> {
-  if (status === "ingesting") {
-    await pool.query(
-      `INSERT INTO ingestion_status (source_id, source_url, status, started_at)
-       VALUES ($1, $2, $3, NOW())`,
-      [sourceId, sourceUrl, status],
-    );
-  } else if (status === "completed") {
-    await pool.query(
-      `UPDATE ingestion_status
-       SET status = $1, content_hash = $2, chunks_count = $3, completed_at = NOW()
-       WHERE source_id = $4 AND status = 'ingesting'
-       ORDER BY started_at DESC LIMIT 1`,
-      [status, fields.contentHash, fields.chunksCount, sourceId],
-    );
-  } else if (status === "failed") {
-    await pool.query(
-      `UPDATE ingestion_status
-       SET status = $1, error_message = $2, completed_at = NOW()
-       WHERE source_id = $3 AND status = 'ingesting'
-       ORDER BY started_at DESC LIMIT 1`,
-      [status, fields.errorMessage, sourceId],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Lambda / cron handler
+// Coordinator Lambda handler
 // ---------------------------------------------------------------------------
 
 /**
- * EventBridge-triggered Lambda handler for weekly (or ad-hoc) ingestion.
+ * EventBridge-triggered coordinator Lambda.
  *
  * 1. Loads all source configs from `data/sources/`.
  * 2. For each source, fetches the content and computes a hash.
  * 3. Skips sources whose content hash has not changed since the last
  *    successful ingestion.
- * 4. Ingests changed sources and updates the `ingestion_status` table.
+ * 4. Enqueues changed sources to the SQS FIFO queue for the worker to process.
  */
 export async function handler(): Promise<void> {
   const databaseUrl = getDatabaseUrl();
-  const openaiApiKey = getRequiredEnv("OPENAI_API_KEY");
 
   const pool = new Pool({ connectionString: databaseUrl });
+  const sqs = new SQSClient({});
 
   try {
     const sources = await loadSourceConfigs();
     logger.info(`Loaded ${sources.length} source config(s)`);
 
-    let ingested = 0;
+    let enqueued = 0;
     let skipped = 0;
-    let failed = 0;
+
+    const triggeredAt = new Date().toISOString();
 
     for (const source of sources) {
       try {
@@ -171,42 +131,34 @@ export async function handler(): Promise<void> {
         // Mark as ingesting
         await upsertIngestionStatus(pool, source.id, source.url, "ingesting");
 
-        const result = await ingestSource(source, {
-          databaseUrl,
-          openaiApiKey,
-        });
+        // Enqueue for the worker
+        const message: IngestionMessage = {
+          source,
+          contentHash,
+          triggeredAt,
+        };
 
-        if (result.status === "completed") {
-          await upsertIngestionStatus(
-            pool,
-            source.id,
-            source.url,
-            "completed",
-            {
-              contentHash,
-              chunksCount: result.chunksCount,
-            },
-          );
-          ingested++;
-        } else {
-          await upsertIngestionStatus(pool, source.id, source.url, "failed", {
-            errorMessage: result.error,
-          });
-          failed++;
-        }
+        await sqs.send(
+          new SendMessageCommand({
+            QueueUrl: Resource.IngestionQueue.url,
+            MessageBody: JSON.stringify(message),
+            MessageGroupId: "ingestion",
+          }),
+        );
+
+        logger.info(`Enqueued ${source.id} for ingestion`);
+        enqueued++;
       } catch (error) {
-        const msg =
-          error instanceof Error ? error.message : "Unknown error";
-        logger.error(`Cron ingestion error for ${source.id}: ${msg}`);
+        const msg = error instanceof Error ? error.message : "Unknown error";
+        logger.error(`Coordinator error for ${source.id}: ${msg}`);
         await upsertIngestionStatus(pool, source.id, source.url, "failed", {
           errorMessage: msg,
         });
-        failed++;
       }
     }
 
     logger.info(
-      `Cron ingestion complete: ${ingested} ingested, ${skipped} skipped, ${failed} failed`,
+      `Coordinator complete: ${enqueued} enqueued, ${skipped} skipped`,
     );
   } finally {
     await pool.end();

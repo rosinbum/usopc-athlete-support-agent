@@ -120,8 +120,8 @@ export default function HomePage() {
 
       <footer className="border-t border-gray-200 mt-16">
         <div className="mx-auto max-w-5xl px-6 py-6 text-sm text-gray-500">
-          This tool provides educational information only and does not constitute
-          legal advice. For urgent safety concerns, contact the{" "}
+          This tool provides educational information only and does not
+          constitute legal advice. For urgent safety concerns, contact the{" "}
           <a
             href="https://uscenterforsafesport.org"
             className="underline"

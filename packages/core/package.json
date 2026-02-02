@@ -8,23 +8,24 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@usopc/shared": "workspace:*",
     "@langchain/anthropic": "^0.3.12",
     "@langchain/community": "^0.3.22",
     "@langchain/core": "^0.3.28",
     "@langchain/langgraph": "^0.2.38",
     "@langchain/openai": "^0.3.17",
     "@langchain/tavily": "^0.1.0",
+    "@usopc/shared": "workspace:*",
     "pg": "^8.13.1",
     "pgvector": "^0.2.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/pg": "^8.11.10",
+    "sst": "3.17.38",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   }

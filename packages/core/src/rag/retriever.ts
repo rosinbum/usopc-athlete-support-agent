@@ -23,12 +23,7 @@ export async function retrieve(
   query: string,
   options: RetrievalOptions = {},
 ): Promise<RetrievalResult> {
-  const {
-    ngbIds,
-    topicDomain,
-    topK = 10,
-    confidenceThreshold = 0.5,
-  } = options;
+  const { ngbIds, topicDomain, topK = 10, confidenceThreshold = 0.5 } = options;
 
   // Stage 1: Narrow search with filters
   let filter: Record<string, any> = {};

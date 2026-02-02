@@ -20,6 +20,7 @@ export {
   getRequiredEnv,
   getOptionalEnv,
   getDatabaseUrl,
+  getSecretValue,
   isProduction,
   isDevelopment,
 } from "./env.js";

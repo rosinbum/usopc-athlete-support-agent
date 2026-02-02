@@ -15,7 +15,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { Pool } from "pg";
-import { getDatabaseUrl, getRequiredEnv, createLogger } from "@usopc/shared";
+import { getDatabaseUrl, getSecretValue, createLogger } from "@usopc/shared";
 import { ingestAll } from "../pipeline.js";
 import type { IngestionSource } from "../pipeline.js";
 
@@ -26,10 +26,7 @@ const logger = createLogger({ service: "seed-db" });
 // ---------------------------------------------------------------------------
 
 function repoRoot(): string {
-  return resolve(
-    import.meta.dirname ?? __dirname,
-    "../../../../..",
-  );
+  return resolve(import.meta.dirname ?? __dirname, "../../../..");
 }
 
 /**
@@ -61,10 +58,7 @@ interface SourceFile {
 }
 
 function sourcesDir(): string {
-  return (
-    process.env.SOURCES_DIR ??
-    join(repoRoot(), "data", "sources")
-  );
+  return process.env.SOURCES_DIR ?? join(repoRoot(), "data", "sources");
 }
 
 async function loadAllSources(): Promise<IngestionSource[]> {
@@ -127,7 +121,7 @@ async function main(): Promise<void> {
       await clearDocuments(pool);
     }
 
-    const openaiApiKey = getRequiredEnv("OPENAI_API_KEY");
+    const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
     const sources = await loadAllSources();
     logger.info(`Loaded ${sources.length} source configuration(s)`);
 
@@ -154,6 +148,8 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  logger.error(`Fatal error: ${error instanceof Error ? error.message : String(error)}`);
+  logger.error(
+    `Fatal error: ${error instanceof Error ? error.message : String(error)}`,
+  );
   process.exit(1);
 });

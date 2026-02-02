@@ -2,7 +2,10 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { createLogger } from "@usopc/shared";
 import { dispatchEvent } from "./handlers/events.js";
-import { handleSlashCommand, type SlackSlashCommand } from "./handlers/slashCommand.js";
+import {
+  handleSlashCommand,
+  type SlackSlashCommand,
+} from "./handlers/slashCommand.js";
 
 const logger = createLogger({ service: "slack-dev" });
 

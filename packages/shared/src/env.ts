@@ -1,3 +1,5 @@
+import { Resource } from "sst";
+
 /**
  * Retrieves a required environment variable. Throws if the variable is not set
  * or is an empty string.
@@ -5,9 +7,7 @@
 export function getRequiredEnv(key: string): string {
   const value = process.env[key];
   if (value === undefined || value === "") {
-    throw new Error(
-      `Missing required environment variable: ${key}`,
-    );
+    throw new Error(`Missing required environment variable: ${key}`);
   }
   return value;
 }
@@ -32,9 +32,8 @@ export function getOptionalEnv(
  *
  * Resolution order:
  *   1. `DATABASE_URL` environment variable (set directly or via .env)
- *   2. SST Resource binding — constructs a URL from individual SST-injected vars
- *      (`SST_RESOURCE_Database` JSON with `host`, `port`, `username`, `password`,
- *       `database` fields).
+ *   2. SST Resource binding (`Resource.Database` with `host`, `port`,
+ *      `username`, `password`, `database` fields).
  *   3. Throws if neither source is available.
  */
 export function getDatabaseUrl(): string {
@@ -43,29 +42,49 @@ export function getDatabaseUrl(): string {
     return directUrl;
   }
 
-  // Attempt to construct from SST Resource binding
-  const sstRaw = process.env.SST_RESOURCE_Database;
-  if (sstRaw) {
+  // Attempt to use SST Resource binding (Database only exists in production stage)
+  try {
+    const db = (Resource as unknown as Record<string, Record<string, string>>)
+      .Database;
+    return `postgresql://${encodeURIComponent(db.username)}:${encodeURIComponent(db.password)}@${db.host}:${db.port}/${db.database}`;
+  } catch {
+    throw new Error(
+      "DATABASE_URL is not set and SST Database resource is not available. " +
+        "Provide DATABASE_URL or deploy with SST resource bindings.",
+    );
+  }
+}
+
+/**
+ * Resolve a secret value by checking a plain environment variable first, then
+ * falling back to an SST v3 Resource binding.
+ *
+ * This allows the same code to work both locally (with a plain env var) and
+ * under `sst shell` / SST-deployed Lambdas (with resource bindings).
+ */
+export function getSecretValue(
+  envKey: string,
+  sstResourceName?: string,
+): string {
+  // 1. Direct env var (highest priority)
+  const direct = process.env[envKey];
+  if (direct) return direct;
+
+  // 2. SST Resource binding
+  if (sstResourceName) {
     try {
-      const resource = JSON.parse(sstRaw) as {
-        host: string;
-        port: number | string;
-        username: string;
-        password: string;
-        database: string;
-      };
-      return `postgresql://${encodeURIComponent(resource.username)}:${encodeURIComponent(resource.password)}@${resource.host}:${resource.port}/${resource.database}`;
+      const resource = (
+        Resource as unknown as Record<string, { value?: string }>
+      )[sstResourceName];
+      if (resource?.value) return resource.value;
     } catch {
-      throw new Error(
-        "Failed to parse SST_RESOURCE_Database. Ensure it is valid JSON.",
-      );
+      // Resource not available — fall through to error
     }
   }
 
-  throw new Error(
-    "DATABASE_URL is not set and SST_RESOURCE_Database is not available. " +
-      "Provide DATABASE_URL or deploy with SST resource bindings.",
-  );
+  const sources = [envKey];
+  if (sstResourceName) sources.push(`Resource.${sstResourceName}`);
+  throw new Error(`Missing required secret. Checked: ${sources.join(", ")}`);
 }
 
 /**
@@ -80,7 +99,6 @@ export function isProduction(): boolean {
  */
 export function isDevelopment(): boolean {
   return (
-    process.env.NODE_ENV === "development" ||
-    process.env.NODE_ENV === undefined
+    process.env.NODE_ENV === "development" || process.env.NODE_ENV === undefined
   );
 }

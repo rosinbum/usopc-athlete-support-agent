@@ -57,6 +57,11 @@ export async function handleMention(event: SlackMentionEvent): Promise<void> {
     const blocks = buildErrorBlocks(
       "Sorry, I encountered an error processing your question. Please try again.",
     );
-    await postMessage(channel, "Error processing request", blocks, thread_ts ?? ts);
+    await postMessage(
+      channel,
+      "Error processing request",
+      blocks,
+      thread_ts ?? ts,
+    );
   }
 }

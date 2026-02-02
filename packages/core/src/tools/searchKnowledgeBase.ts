@@ -39,7 +39,12 @@ export function createSearchKnowledgeBaseTool(vectorStore: PGVectorStore) {
   return tool(
     async ({ query, ngbIds, topicDomain, topK }): Promise<string> => {
       const log = logger.child({ tool: "search_knowledge_base" });
-      log.debug("Searching knowledge base", { query, ngbIds, topicDomain, topK });
+      log.debug("Searching knowledge base", {
+        query,
+        ngbIds,
+        topicDomain,
+        topK,
+      });
 
       try {
         const k = topK ?? RETRIEVAL_CONFIG.narrowFilterTopK;
@@ -65,13 +70,11 @@ export function createSearchKnowledgeBaseTool(vectorStore: PGVectorStore) {
           return "No relevant documents found in the knowledge base for the given query. Try rephrasing or broadening your search terms.";
         }
 
-        const documents: RetrievedDocument[] = results.map(
-          ([doc, score]) => ({
-            content: doc.pageContent,
-            metadata: doc.metadata as DocumentMetadata,
-            score,
-          }),
-        );
+        const documents: RetrievedDocument[] = results.map(([doc, score]) => ({
+          content: doc.pageContent,
+          metadata: doc.metadata as DocumentMetadata,
+          score,
+        }));
 
         // Format results as a structured string for the LLM
         const formatted = documents

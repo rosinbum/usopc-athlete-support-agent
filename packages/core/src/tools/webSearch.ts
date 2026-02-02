@@ -42,9 +42,7 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}) {
 
       try {
         const searchDomains =
-          domains && domains.length > 0
-            ? domains
-            : [...TRUSTED_DOMAINS];
+          domains && domains.length > 0 ? domains : [...TRUSTED_DOMAINS];
 
         const maxResults = options.maxResults ?? 5;
 

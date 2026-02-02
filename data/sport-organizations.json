@@ -29,7 +29,13 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "Badminton World Federation",
     "aliases": ["US Badminton"],
-    "keywords": ["shuttlecock", "racquet", "singles", "doubles", "mixed doubles"],
+    "keywords": [
+      "shuttlecock",
+      "racquet",
+      "singles",
+      "doubles",
+      "mixed doubles"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -63,7 +69,14 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Biathlon Union (IBU)",
     "aliases": ["US Biathlon"],
-    "keywords": ["biathlon", "cross-country skiing", "rifle shooting", "sprint", "pursuit", "mass start"],
+    "keywords": [
+      "biathlon",
+      "cross-country skiing",
+      "rifle shooting",
+      "sprint",
+      "pursuit",
+      "mass start"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -80,7 +93,15 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Bobsleigh and Skeleton Federation (IBSF)",
     "aliases": ["USA Bobsled/Skeleton", "USBSF"],
-    "keywords": ["bobsled", "bobsleigh", "skeleton", "sliding", "two-man", "four-man", "monobob"],
+    "keywords": [
+      "bobsled",
+      "bobsleigh",
+      "skeleton",
+      "sliding",
+      "two-man",
+      "four-man",
+      "monobob"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -114,7 +135,17 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Canoe Federation (ICF)",
     "aliases": ["American Canoe Association", "USA Canoe Kayak"],
-    "keywords": ["canoe", "kayak", "sprint", "slalom", "paddle", "whitewater", "flatwater", "K1", "C1"],
+    "keywords": [
+      "canoe",
+      "kayak",
+      "sprint",
+      "slalom",
+      "paddle",
+      "whitewater",
+      "flatwater",
+      "K1",
+      "C1"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -131,7 +162,13 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Federation of Sport Climbing (IFSC)",
     "aliases": ["US Climbing"],
-    "keywords": ["sport climbing", "lead climbing", "bouldering", "speed climbing", "combined"],
+    "keywords": [
+      "sport climbing",
+      "lead climbing",
+      "bouldering",
+      "speed climbing",
+      "combined"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -165,7 +202,13 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "World Curling Federation (WCF)",
     "aliases": ["US Curling"],
-    "keywords": ["curling", "stone", "sheet", "mixed doubles", "wheelchair curling"],
+    "keywords": [
+      "curling",
+      "stone",
+      "sheet",
+      "mixed doubles",
+      "wheelchair curling"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -174,7 +217,12 @@
     "type": "ngb",
     "officialName": "USA Cycling",
     "abbreviation": "USAC",
-    "sports": ["cycling road", "cycling track", "cycling BMX", "cycling mountain bike"],
+    "sports": [
+      "cycling road",
+      "cycling track",
+      "cycling BMX",
+      "cycling mountain bike"
+    ],
     "olympicProgram": "summer",
     "paralympicManaged": true,
     "websiteUrl": "https://www.usacycling.org",
@@ -182,7 +230,18 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "Union Cycliste Internationale (UCI)",
     "aliases": ["US Cycling"],
-    "keywords": ["cycling", "road cycling", "track cycling", "BMX", "BMX racing", "BMX freestyle", "mountain bike", "velodrome", "criterium", "time trial"],
+    "keywords": [
+      "cycling",
+      "road cycling",
+      "track cycling",
+      "BMX",
+      "BMX racing",
+      "BMX freestyle",
+      "mountain bike",
+      "velodrome",
+      "criterium",
+      "time trial"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -199,7 +258,14 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "World Aquatics",
     "aliases": ["US Diving"],
-    "keywords": ["diving", "springboard", "platform", "synchronized diving", "10m", "3m"],
+    "keywords": [
+      "diving",
+      "springboard",
+      "platform",
+      "synchronized diving",
+      "10m",
+      "3m"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -208,7 +274,11 @@
     "type": "ngb",
     "officialName": "US Equestrian",
     "abbreviation": "USEF",
-    "sports": ["equestrian dressage", "equestrian eventing", "equestrian jumping"],
+    "sports": [
+      "equestrian dressage",
+      "equestrian eventing",
+      "equestrian jumping"
+    ],
     "olympicProgram": "summer",
     "paralympicManaged": true,
     "websiteUrl": "https://www.usef.org",
@@ -216,7 +286,14 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Federation for Equestrian Sports (FEI)",
     "aliases": ["US Equestrian Federation", "USEF"],
-    "keywords": ["equestrian", "dressage", "eventing", "show jumping", "horse", "para-dressage"],
+    "keywords": [
+      "equestrian",
+      "dressage",
+      "eventing",
+      "show jumping",
+      "horse",
+      "para-dressage"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -233,7 +310,15 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Fencing Federation (FIE)",
     "aliases": ["USA Fencing", "United States Fencing Association"],
-    "keywords": ["fencing", "foil", "epee", "sabre", "bout", "piste", "wheelchair fencing"],
+    "keywords": [
+      "fencing",
+      "foil",
+      "epee",
+      "sabre",
+      "bout",
+      "piste",
+      "wheelchair fencing"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -267,7 +352,16 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Skating Union (ISU)",
     "aliases": ["United States Figure Skating Association", "USFSA"],
-    "keywords": ["figure skating", "ice skating", "singles", "pairs", "ice dance", "team event", "free skate", "short program"],
+    "keywords": [
+      "figure skating",
+      "ice skating",
+      "singles",
+      "pairs",
+      "ice dance",
+      "team event",
+      "free skate",
+      "short program"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -318,7 +412,20 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Gymnastics Federation (FIG)",
     "aliases": ["US Gymnastics", "USAG"],
-    "keywords": ["gymnastics", "artistic", "rhythmic", "trampoline", "vault", "floor exercise", "balance beam", "uneven bars", "parallel bars", "pommel horse", "rings", "horizontal bar"],
+    "keywords": [
+      "gymnastics",
+      "artistic",
+      "rhythmic",
+      "trampoline",
+      "vault",
+      "floor exercise",
+      "balance beam",
+      "uneven bars",
+      "parallel bars",
+      "pommel horse",
+      "rings",
+      "horizontal bar"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -352,7 +459,14 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Judo Federation (IJF)",
     "aliases": ["US Judo"],
-    "keywords": ["judo", "ippon", "waza-ari", "throw", "grappling", "weight class"],
+    "keywords": [
+      "judo",
+      "ippon",
+      "waza-ari",
+      "throw",
+      "grappling",
+      "weight class"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -420,7 +534,14 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "Union Internationale de Pentathlon Moderne (UIPM)",
     "aliases": ["US Modern Pentathlon", "USA Pentathlon"],
-    "keywords": ["modern pentathlon", "fencing", "swimming", "riding", "laser run", "obstacle"],
+    "keywords": [
+      "modern pentathlon",
+      "fencing",
+      "swimming",
+      "riding",
+      "laser run",
+      "obstacle"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -437,7 +558,18 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "World Rowing (FISA)",
     "aliases": ["USRowing", "USA Rowing"],
-    "keywords": ["rowing", "crew", "sculling", "sweep", "single", "double", "quad", "eight", "coxswain", "para rowing"],
+    "keywords": [
+      "rowing",
+      "crew",
+      "sculling",
+      "sweep",
+      "single",
+      "double",
+      "quad",
+      "eight",
+      "coxswain",
+      "para rowing"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -471,7 +603,17 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "World Sailing",
     "aliases": ["USA Sailing", "United States Sailing Association"],
-    "keywords": ["sailing", "dinghy", "keelboat", "windsurfing", "kitefoiling", "49er", "ILCA", "470", "Nacra 17"],
+    "keywords": [
+      "sailing",
+      "dinghy",
+      "keelboat",
+      "windsurfing",
+      "kitefoiling",
+      "49er",
+      "ILCA",
+      "470",
+      "Nacra 17"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -488,7 +630,17 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Shooting Sport Federation (ISSF)",
     "aliases": ["USA Shooting"],
-    "keywords": ["shooting", "rifle", "pistol", "shotgun", "trap", "skeet", "air rifle", "air pistol", "para shooting"],
+    "keywords": [
+      "shooting",
+      "rifle",
+      "pistol",
+      "shotgun",
+      "trap",
+      "skeet",
+      "air rifle",
+      "air pistol",
+      "para shooting"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -497,7 +649,14 @@
     "type": "ngb",
     "officialName": "US Ski & Snowboard",
     "abbreviation": "USSS",
-    "sports": ["alpine skiing", "cross-country skiing", "freestyle skiing", "ski jumping", "nordic combined", "snowboard"],
+    "sports": [
+      "alpine skiing",
+      "cross-country skiing",
+      "freestyle skiing",
+      "ski jumping",
+      "nordic combined",
+      "snowboard"
+    ],
     "olympicProgram": "winter",
     "paralympicManaged": true,
     "websiteUrl": "https://www.usskiandsnowboard.org",
@@ -505,7 +664,27 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Ski and Snowboard Federation (FIS)",
     "aliases": ["USSA", "US Ski and Snowboard", "US Ski Team"],
-    "keywords": ["skiing", "snowboard", "alpine", "cross-country", "freestyle", "ski jumping", "nordic combined", "slalom", "giant slalom", "downhill", "super-G", "halfpipe", "slopestyle", "moguls", "aerials", "biathlon", "para alpine", "para cross-country", "para snowboard"],
+    "keywords": [
+      "skiing",
+      "snowboard",
+      "alpine",
+      "cross-country",
+      "freestyle",
+      "ski jumping",
+      "nordic combined",
+      "slalom",
+      "giant slalom",
+      "downhill",
+      "super-G",
+      "halfpipe",
+      "slopestyle",
+      "moguls",
+      "aerials",
+      "biathlon",
+      "para alpine",
+      "para cross-country",
+      "para snowboard"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -556,7 +735,19 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Skating Union (ISU)",
     "aliases": ["US Speed Skating", "USA Speedskating"],
-    "keywords": ["speed skating", "short track", "long track", "oval", "500m", "1000m", "1500m", "5000m", "10000m", "mass start", "relay"],
+    "keywords": [
+      "speed skating",
+      "short track",
+      "long track",
+      "oval",
+      "500m",
+      "1000m",
+      "1500m",
+      "5000m",
+      "10000m",
+      "mass start",
+      "relay"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -607,7 +798,18 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "World Aquatics",
     "aliases": ["US Swimming"],
-    "keywords": ["swimming", "freestyle", "backstroke", "breaststroke", "butterfly", "individual medley", "relay", "open water", "marathon swimming", "para swimming"],
+    "keywords": [
+      "swimming",
+      "freestyle",
+      "backstroke",
+      "breaststroke",
+      "butterfly",
+      "individual medley",
+      "relay",
+      "open water",
+      "marathon swimming",
+      "para swimming"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -624,7 +826,14 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Table Tennis Federation (ITTF)",
     "aliases": ["US Table Tennis", "USATT"],
-    "keywords": ["table tennis", "ping pong", "paddle", "singles", "doubles", "team"],
+    "keywords": [
+      "table tennis",
+      "ping pong",
+      "paddle",
+      "singles",
+      "doubles",
+      "team"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -641,7 +850,14 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "World Taekwondo (WT)",
     "aliases": ["US Taekwondo", "USAT"],
-    "keywords": ["taekwondo", "sparring", "poomsae", "kick", "weight class", "para taekwondo"],
+    "keywords": [
+      "taekwondo",
+      "sparring",
+      "poomsae",
+      "kick",
+      "weight class",
+      "para taekwondo"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -675,7 +891,13 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Tennis Federation (ITF)",
     "aliases": ["United States Tennis Association", "USTA"],
-    "keywords": ["tennis", "singles", "doubles", "mixed doubles", "wheelchair tennis"],
+    "keywords": [
+      "tennis",
+      "singles",
+      "doubles",
+      "mixed doubles",
+      "wheelchair tennis"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -692,7 +914,27 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "World Athletics",
     "aliases": ["USATF", "US Track and Field"],
-    "keywords": ["track and field", "athletics", "sprints", "distance running", "marathon", "hurdles", "relay", "long jump", "high jump", "pole vault", "triple jump", "shot put", "discus", "javelin", "hammer throw", "decathlon", "heptathlon", "race walk", "para athletics"],
+    "keywords": [
+      "track and field",
+      "athletics",
+      "sprints",
+      "distance running",
+      "marathon",
+      "hurdles",
+      "relay",
+      "long jump",
+      "high jump",
+      "pole vault",
+      "triple jump",
+      "shot put",
+      "discus",
+      "javelin",
+      "hammer throw",
+      "decathlon",
+      "heptathlon",
+      "race walk",
+      "para athletics"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -709,7 +951,14 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "World Triathlon",
     "aliases": ["US Triathlon", "USAT"],
-    "keywords": ["triathlon", "swim", "bike", "run", "mixed relay", "paratriathlon"],
+    "keywords": [
+      "triathlon",
+      "swim",
+      "bike",
+      "run",
+      "mixed relay",
+      "paratriathlon"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -726,7 +975,13 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "Federation Internationale de Volleyball (FIVB)",
     "aliases": ["US Volleyball", "USAV"],
-    "keywords": ["volleyball", "beach volleyball", "indoor volleyball", "sitting volleyball", "para volleyball"],
+    "keywords": [
+      "volleyball",
+      "beach volleyball",
+      "indoor volleyball",
+      "sitting volleyball",
+      "para volleyball"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -760,7 +1015,14 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "International Weightlifting Federation (IWF)",
     "aliases": ["US Weightlifting", "USAW"],
-    "keywords": ["weightlifting", "Olympic lifting", "snatch", "clean and jerk", "weight class", "para powerlifting"],
+    "keywords": [
+      "weightlifting",
+      "Olympic lifting",
+      "snatch",
+      "clean and jerk",
+      "weight class",
+      "para powerlifting"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -777,7 +1039,16 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "United World Wrestling (UWW)",
     "aliases": ["US Wrestling"],
-    "keywords": ["wrestling", "freestyle", "Greco-Roman", "folkstyle", "weight class", "mat", "pin", "takedown"],
+    "keywords": [
+      "wrestling",
+      "freestyle",
+      "Greco-Roman",
+      "folkstyle",
+      "weight class",
+      "mat",
+      "pin",
+      "takedown"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },
@@ -794,7 +1065,14 @@
     "selectionProceduresUrl": null,
     "internationalFederation": "World Skate",
     "aliases": ["USA Skateboarding"],
-    "keywords": ["skateboarding", "skateboard", "street", "park", "halfpipe", "trick"],
+    "keywords": [
+      "skateboarding",
+      "skateboard",
+      "street",
+      "park",
+      "halfpipe",
+      "trick"
+    ],
     "status": "active",
     "effectiveDate": "2025-01-01"
   },

@@ -3,7 +3,10 @@ import { handle } from "hono/aws-lambda";
 import { createLogger } from "@usopc/shared";
 import { verifySlackRequest } from "./middleware/verify.js";
 import { dispatchEvent } from "./handlers/events.js";
-import { handleSlashCommand, type SlackSlashCommand } from "./handlers/slashCommand.js";
+import {
+  handleSlashCommand,
+  type SlackSlashCommand,
+} from "./handlers/slashCommand.js";
 import { postMessage } from "./slack/client.js";
 import { buildErrorBlocks } from "./slack/blocks.js";
 
@@ -71,7 +74,10 @@ app.post("/slack/commands", async (c) => {
       error: error instanceof Error ? error.message : String(error),
     });
     return c.json(
-      { response_type: "ephemeral", text: "An error occurred. Please try again." },
+      {
+        response_type: "ephemeral",
+        text: "An error occurred. Please try again.",
+      },
       200,
     );
   }

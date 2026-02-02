@@ -1,12 +1,6 @@
 export { SYSTEM_PROMPT } from "./system.js";
-export {
-  CLASSIFIER_PROMPT,
-  buildClassifierPrompt,
-} from "./classifier.js";
-export {
-  SYNTHESIZER_PROMPT,
-  buildSynthesizerPrompt,
-} from "./synthesizer.js";
+export { CLASSIFIER_PROMPT, buildClassifierPrompt } from "./classifier.js";
+export { SYNTHESIZER_PROMPT, buildSynthesizerPrompt } from "./synthesizer.js";
 export {
   getDisclaimer,
   getAllDisclaimers,

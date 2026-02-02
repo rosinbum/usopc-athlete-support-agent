@@ -65,8 +65,7 @@ function buildEscalationBlocks(escalation: EscalationInfo): KnownBlock[] {
     contactParts.push(`🔗 <${escalation.contactUrl}|Website>`);
   }
 
-  const urgencyEmoji =
-    escalation.urgency === "immediate" ? "🚨" : "ℹ️";
+  const urgencyEmoji = escalation.urgency === "immediate" ? "🚨" : "ℹ️";
 
   return [
     {
