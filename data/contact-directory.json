@@ -1,0 +1,65 @@
+[
+  {
+    "id": "athlete-ombuds",
+    "organization": "Athlete Ombuds",
+    "role": "Independent advocate for athlete rights and dispute resolution",
+    "email": "ombudsman@usathlete.org",
+    "phone": "719-866-5000",
+    "url": "https://www.usathlete.org",
+    "domains": ["dispute_resolution", "governance", "athlete_rights", "team_selection", "eligibility"],
+    "description": "The Athlete Ombuds provides free, confidential advice to athletes regarding their rights under the Ted Stevens Act, USOPC Bylaws, and NGB rules. They can help with team selection disputes, governance issues, and understanding Section 9 arbitration."
+  },
+  {
+    "id": "safesport",
+    "organization": "U.S. Center for SafeSport",
+    "role": "Independent organization for abuse prevention and response",
+    "email": null,
+    "phone": "720-531-0340",
+    "url": "https://uscenterforsafesport.org",
+    "reportingUrl": "https://uscenterforsafesport.org/report-a-concern/",
+    "domains": ["safesport"],
+    "description": "The U.S. Center for SafeSport has exclusive jurisdiction over allegations of sexual abuse and misconduct in Olympic and Paralympic sports. They also handle emotional, physical abuse, bullying, hazing, and harassment."
+  },
+  {
+    "id": "usada",
+    "organization": "U.S. Anti-Doping Agency (USADA)",
+    "role": "National anti-doping organization",
+    "email": null,
+    "phone": "1-866-601-2632",
+    "url": "https://www.usada.org",
+    "tipLine": "https://www.usada.org/playclean/",
+    "domains": ["anti_doping"],
+    "description": "USADA is responsible for drug testing, education, and adjudication of anti-doping violations for U.S. Olympic and Paralympic athletes. Contact for TUE questions, whereabouts requirements, supplement checking, and reporting doping concerns."
+  },
+  {
+    "id": "athletes-commission",
+    "organization": "Team USA Athletes' Commission",
+    "role": "Athlete representation in USOPC governance",
+    "email": null,
+    "phone": null,
+    "url": "https://www.usopc.org/voice-and-representation",
+    "domains": ["governance", "athlete_rights"],
+    "description": "The Team USA Athletes' Commission represents athlete interests in USOPC governance. They advocate for athlete rights, benefits, and representation on NGB boards and committees."
+  },
+  {
+    "id": "athlete-legal-aid",
+    "organization": "Athlete Legal Aid Program",
+    "role": "Legal assistance for athletes",
+    "email": null,
+    "phone": null,
+    "url": null,
+    "accessVia": "Contact through Athlete Ombuds",
+    "domains": ["dispute_resolution", "governance"],
+    "description": "The Athlete Legal Aid Program provides legal assistance to athletes who need representation in disputes. Access is typically arranged through the Athlete Ombuds."
+  },
+  {
+    "id": "cas",
+    "organization": "Court of Arbitration for Sport (CAS)",
+    "role": "International sports arbitration tribunal",
+    "email": null,
+    "phone": null,
+    "url": "https://www.tas-cas.org",
+    "domains": ["dispute_resolution", "anti_doping"],
+    "description": "CAS is the international arbitration body for sport-related disputes. Athletes may appeal certain decisions to CAS, particularly anti-doping violations and international eligibility disputes."
+  }
+]

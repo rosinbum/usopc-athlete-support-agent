@@ -1,0 +1,33 @@
+{
+  "name": "usopc-athlete-support-agent",
+  "private": true,
+  "version": "0.0.1",
+  "description": "USOPC Athlete Support Agent - AI-powered governance and compliance assistant for U.S. Olympic and Paralympic athletes",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "clean": "turbo clean",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @usopc/api db:migrate",
+    "ingest": "pnpm --filter @usopc/ingestion ingest",
+    "seed": "pnpm --filter @usopc/ingestion seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3",
+    "@types/node": "^22.10.5",
+    "vitest": "^2.1.8",
+    "prettier": "^3.4.2"
+  },
+  "pnpm": {
+    "overrides": {}
+  }
+}

@@ -1,0 +1,70 @@
+import { BaseMessage } from "@langchain/core/messages";
+
+export type TopicDomain =
+  | "team_selection"
+  | "dispute_resolution"
+  | "safesport"
+  | "anti_doping"
+  | "eligibility"
+  | "governance"
+  | "athlete_rights";
+
+export type QueryIntent =
+  | "factual"
+  | "procedural"
+  | "deadline"
+  | "escalation"
+  | "general";
+
+export interface Citation {
+  title: string;
+  url?: string;
+  documentType: string;
+  section?: string;
+  effectiveDate?: string;
+  snippet: string;
+}
+
+export interface EscalationInfo {
+  target: string;
+  organization: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  contactUrl?: string;
+  reason: string;
+  urgency: "immediate" | "standard";
+}
+
+export interface RetrievedDocument {
+  content: string;
+  metadata: DocumentMetadata;
+  score: number;
+}
+
+export interface DocumentMetadata {
+  ngbId?: string;
+  topicDomain?: TopicDomain;
+  documentType?: string;
+  sourceUrl?: string;
+  documentTitle?: string;
+  sectionTitle?: string;
+  effectiveDate?: string;
+  ingestedAt?: string;
+}
+
+export interface AgentState {
+  messages: BaseMessage[];
+  topicDomain?: TopicDomain;
+  detectedNgbIds: string[];
+  queryIntent?: QueryIntent;
+  retrievedDocuments: RetrievedDocument[];
+  webSearchResults: string[];
+  retrievalConfidence: number;
+  citations: Citation[];
+  answer?: string;
+  escalation?: EscalationInfo;
+  disclaimerRequired: boolean;
+  hasTimeConstraint: boolean;
+  conversationId?: string;
+  userSport?: string;
+}
