@@ -89,13 +89,19 @@ npx prettier --check .                   # Check entire repo
 
 For any implementation task:
 
-1. Create a GitHub issue describing the work (`gh issue create`)
+1. Create a GitHub issue describing the planned work **before starting** (`gh issue create`). The issue should cover all implementation, not just tests or cleanup.
 2. Create a feature branch off `main` (e.g., `feat/short-description` or `fix/short-description`)
 3. Write or update the corresponding `*.test.ts` file alongside the source (tests are co-located in `src/`)
 4. Run the relevant tests: `pnpm --filter @usopc/<package> test`
 5. Format changed files: `npx prettier --write <files>`
 6. Type-check: `pnpm --filter @usopc/<package> typecheck`
 7. Commit, push, and open a PR referencing the issue (`gh pr create`)
+
+**Keeping issues and PRs accurate:**
+
+- Issue and PR descriptions must reflect the full scope of work — new features, architectural changes, bug fixes, tests, and any other modifications. Do not omit implementation work.
+- If the plan changes during implementation (additional fixes, scope adjustments, new files added), update the GitHub issue to match (`gh issue edit`).
+- PR descriptions should clearly separate categories of changes (e.g., "Implementation", "Tests", "Formatting") so reviewers can understand what was built vs. what was cleaned up.
 
 ## Key Conventions
 
