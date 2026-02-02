@@ -34,7 +34,8 @@ const DEADLINE_RULES: Record<DeadlineType, DeadlineDefinition> = {
     durationDays: 180,
     description:
       "Deadline to file for arbitration under Section 9 of the Ted Stevens Olympic and Amateur Sports Act. An athlete or member who alleges a violation of their rights by an NGB or the USOPC may file for binding arbitration.",
-    sourceReference: "Ted Stevens Olympic and Amateur Sports Act, 36 U.S.C. \u00A7220529",
+    sourceReference:
+      "Ted Stevens Olympic and Amateur Sports Act, 36 U.S.C. \u00A7220529",
     notes: [
       "The 180-day period runs from the date of the alleged violation or the date the complainant knew or should have known of the violation.",
       "Filing is done through the American Arbitration Association (AAA) or another designated arbitration body.",
@@ -59,7 +60,8 @@ const DEADLINE_RULES: Record<DeadlineType, DeadlineDefinition> = {
     durationDays: 0,
     description:
       "There is no fixed deadline for reporting SafeSport violations to the U.S. Center for SafeSport. Reports should be made as soon as possible, but the Center accepts reports at any time regardless of when the alleged conduct occurred.",
-    sourceReference: "SafeSport Code for the U.S. Olympic and Paralympic Movement",
+    sourceReference:
+      "SafeSport Code for the U.S. Olympic and Paralympic Movement",
     notes: [
       "There is no statute of limitations on reporting to the U.S. Center for SafeSport.",
       "Mandatory reporters (coaches, officials, staff) must report immediately upon learning of a potential violation.",
@@ -73,7 +75,8 @@ const DEADLINE_RULES: Record<DeadlineType, DeadlineDefinition> = {
     durationDays: 15,
     description:
       "Athletes in the USADA Registered Testing Pool (RTP) must file quarterly whereabouts information by the 15th of the month preceding the start of the quarter.",
-    sourceReference: "USADA Protocol for Olympic and Paralympic Movement Testing, WADA International Standard for Testing and Investigations (ISTI)",
+    sourceReference:
+      "USADA Protocol for Olympic and Paralympic Movement Testing, WADA International Standard for Testing and Investigations (ISTI)",
     notes: [
       "Q1 (Jan-Mar): due by December 15",
       "Q2 (Apr-Jun): due by March 15",
@@ -89,7 +92,8 @@ const DEADLINE_RULES: Record<DeadlineType, DeadlineDefinition> = {
     durationDays: 3,
     description:
       "Deadline to file a protest or grievance regarding team selection decisions. Most NGB selection procedures require protests to be filed within a short window after the announcement of the selection decision.",
-    sourceReference: "USOPC Team Selection Procedures Requirements; individual NGB selection procedures",
+    sourceReference:
+      "USOPC Team Selection Procedures Requirements; individual NGB selection procedures",
     notes: [
       "The typical window is 3 days (72 hours) from the announcement of the selection decision, but this varies by NGB and event.",
       "Always check the specific NGB's published Selection Procedures for the exact deadline.",
@@ -162,7 +166,9 @@ export function createCalculateDeadlineTool() {
 
         if (rule.durationDays === 0) {
           // Special case: no fixed deadline (e.g. SafeSport)
-          lines.push("Deadline: No fixed deadline -- report as soon as possible.");
+          lines.push(
+            "Deadline: No fixed deadline -- report as soon as possible.",
+          );
         } else {
           const deadline = addDays(start, rule.durationDays);
           const today = new Date();
@@ -189,7 +195,9 @@ export function createCalculateDeadlineTool() {
 
           if (remainingDays >= 0 && remainingDays <= 7) {
             lines.push("");
-            lines.push("WARNING: This deadline is approaching soon. Take action promptly.");
+            lines.push(
+              "WARNING: This deadline is approaching soon. Take action promptly.",
+            );
           }
         }
 

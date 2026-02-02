@@ -8,7 +8,11 @@ export function shouldEscalate(state: AgentState): boolean {
   if (state.queryIntent === "escalation") return true;
 
   const urgentDomains = ["safesport", "anti_doping"];
-  if (state.topicDomain && urgentDomains.includes(state.topicDomain) && state.hasTimeConstraint) {
+  if (
+    state.topicDomain &&
+    urgentDomains.includes(state.topicDomain) &&
+    state.hasTimeConstraint
+  ) {
     return true;
   }
 

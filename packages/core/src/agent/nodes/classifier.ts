@@ -95,9 +95,7 @@ function parseClassifierResponse(raw: string): ClassifierOutput {
       : false;
 
   const shouldEscalate =
-    typeof parsed.shouldEscalate === "boolean"
-      ? parsed.shouldEscalate
-      : false;
+    typeof parsed.shouldEscalate === "boolean" ? parsed.shouldEscalate : false;
 
   const escalationReason =
     typeof parsed.escalationReason === "string"

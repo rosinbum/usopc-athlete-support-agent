@@ -10,7 +10,15 @@ import type { SportOrganization } from "../types/sport-org.js";
 function getDataFilePath(): string {
   // Navigate from packages/core/src/knowledge/ up to the project root
   const currentDir = dirname(fileURLToPath(import.meta.url));
-  return join(currentDir, "..", "..", "..", "..", "data", "sport-organizations.json");
+  return join(
+    currentDir,
+    "..",
+    "..",
+    "..",
+    "..",
+    "data",
+    "sport-organizations.json",
+  );
 }
 
 /**
@@ -100,8 +108,7 @@ export function findSportOrg(query: string): SportOrganization | undefined {
   // Priority 2: Exact abbreviation match
   const abbrevMatch = cachedOrganizations.find(
     (org) =>
-      org.abbreviation &&
-      normalize(org.abbreviation) === normalizedQuery,
+      org.abbreviation && normalize(org.abbreviation) === normalizedQuery,
   );
   if (abbrevMatch) return abbrevMatch;
 

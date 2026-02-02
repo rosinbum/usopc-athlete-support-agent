@@ -191,7 +191,8 @@ export async function escalateNode(
         contactEmail: "ombudsman@usathlete.org",
         contactPhone: "719-866-5000",
         contactUrl: "https://www.usathlete.org",
-        reason: "Query requires human assistance and no specific escalation target was identified",
+        reason:
+          "Query requires human assistance and no specific escalation target was identified",
         urgency: "standard",
       };
 

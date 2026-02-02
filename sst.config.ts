@@ -25,11 +25,7 @@ export default $config({
     // Database
     // Production: Aurora Serverless v2 with pgvector
     // Dev stages: Use local Docker postgres via DATABASE_URL env var
-    const linkables: sst.Linkable<any>[] = [
-      anthropicKey,
-      openaiKey,
-      tavilyKey,
-    ];
+    const linkables: sst.Linkable<any>[] = [anthropicKey, openaiKey, tavilyKey];
 
     let databaseUrl: string | undefined;
 
@@ -81,15 +77,46 @@ export default $config({
       },
     });
 
-    // Document ingestion cron (weekly) - production only
+    // Document ingestion (weekly) - production only
     if (isProd) {
+      // Dead-letter queue (must also be FIFO to match main queue)
+      const ingestionDlq = new sst.aws.Queue("IngestionDLQ", {
+        fifo: true,
+      });
+
+      // Main ingestion queue
+      const ingestionQueue = new sst.aws.Queue("IngestionQueue", {
+        fifo: {
+          contentBasedDeduplication: true,
+        },
+        visibilityTimeout: "15 minutes",
+        dlq: {
+          queue: ingestionDlq.arn,
+          retry: 2,
+        },
+      });
+
+      // Worker: processes one source per SQS message
+      ingestionQueue.subscribe(
+        {
+          handler: "packages/ingestion/src/worker.handler",
+          link: [...linkables, database],
+          timeout: "15 minutes",
+          memory: "1024 MB",
+        },
+        {
+          batch: { size: 1 },
+        },
+      );
+
+      // Coordinator: cron checks for changes, enqueues to SQS
       new sst.aws.Cron("IngestionCron", {
         schedule: "rate(7 days)",
         job: {
           handler: "packages/ingestion/src/cron.handler",
-          link: linkables,
-          timeout: "15 minutes",
-          memory: "1024 MB",
+          link: [...linkables, database, ingestionQueue],
+          timeout: "5 minutes",
+          memory: "512 MB",
         },
       });
     }

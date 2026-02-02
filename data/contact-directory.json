@@ -6,7 +6,13 @@
     "email": "ombudsman@usathlete.org",
     "phone": "719-866-5000",
     "url": "https://www.usathlete.org",
-    "domains": ["dispute_resolution", "governance", "athlete_rights", "team_selection", "eligibility"],
+    "domains": [
+      "dispute_resolution",
+      "governance",
+      "athlete_rights",
+      "team_selection",
+      "eligibility"
+    ],
     "description": "The Athlete Ombuds provides free, confidential advice to athletes regarding their rights under the Ted Stevens Act, USOPC Bylaws, and NGB rules. They can help with team selection disputes, governance issues, and understanding Section 9 arbitration."
   },
   {

@@ -25,7 +25,15 @@ function getDataFilePath(): string {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
   // From packages/core/src/tools -> project root is ../../../../
-  return resolve(__dirname, "..", "..", "..", "..", "data", "sport-organizations.json");
+  return resolve(
+    __dirname,
+    "..",
+    "..",
+    "..",
+    "..",
+    "data",
+    "sport-organizations.json",
+  );
 }
 
 async function loadOrganizations(): Promise<SportOrganization[]> {
@@ -106,15 +114,15 @@ function scoreMatch(org: SportOrganization, queryLower: string): number {
 }
 
 function formatOrgResult(org: SportOrganization): string {
-  const lines: string[] = [
-    `Official Name: ${org.officialName}`,
-  ];
+  const lines: string[] = [`Official Name: ${org.officialName}`];
 
   if (org.abbreviation) {
     lines.push(`Abbreviation: ${org.abbreviation}`);
   }
 
-  lines.push(`Type: ${org.type === "ngb" ? "National Governing Body (NGB)" : "USOPC-Managed Organization"}`);
+  lines.push(
+    `Type: ${org.type === "ngb" ? "National Governing Body (NGB)" : "USOPC-Managed Organization"}`,
+  );
   lines.push(`Sports: ${org.sports.join(", ")}`);
 
   if (org.olympicProgram) {
@@ -193,7 +201,10 @@ export function createLookupSportOrgTool() {
           result +=
             "\n\n--- Other possible matches ---\n" +
             runnersUp
-              .map(({ org }) => `- ${org.officialName}${org.abbreviation ? ` (${org.abbreviation})` : ""}`)
+              .map(
+                ({ org }) =>
+                  `- ${org.officialName}${org.abbreviation ? ` (${org.abbreviation})` : ""}`,
+              )
               .join("\n");
         }
 

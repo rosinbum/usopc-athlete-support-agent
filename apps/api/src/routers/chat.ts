@@ -19,7 +19,11 @@ export const chatRouter = router({
           role: "assistant" as const,
           content:
             "I'm the USOPC Athlete Support Assistant. I can help you with questions about team selection, dispute resolution, SafeSport, anti-doping, eligibility, governance, and athlete rights. What would you like to know?",
-          citations: [] as Array<{ title: string; url?: string; documentType: string }>,
+          citations: [] as Array<{
+            title: string;
+            url?: string;
+            documentType: string;
+          }>,
           disclaimer:
             "This information is for educational purposes only and does not constitute legal advice.",
         },
@@ -41,7 +45,11 @@ export const chatRouter = router({
           id: crypto.randomUUID(),
           role: "assistant" as const,
           content: "Streaming response placeholder",
-          citations: [] as Array<{ title: string; url?: string; documentType: string }>,
+          citations: [] as Array<{
+            title: string;
+            url?: string;
+            documentType: string;
+          }>,
           disclaimer:
             "This information is for educational purposes only and does not constitute legal advice.",
         },

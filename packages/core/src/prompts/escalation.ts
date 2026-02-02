@@ -96,9 +96,7 @@ export const ESCALATION_TARGETS: EscalationTarget[] = [
  * Returns the escalation targets appropriate for a given topic domain.
  */
 export function getEscalationTargets(domain: TopicDomain): EscalationTarget[] {
-  return ESCALATION_TARGETS.filter((target) =>
-    target.domains.includes(domain),
-  );
+  return ESCALATION_TARGETS.filter((target) => target.domains.includes(domain));
 }
 
 /**

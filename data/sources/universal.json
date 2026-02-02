@@ -4,8 +4,14 @@
       "id": "usopc-bylaws",
       "title": "USOPC Bylaws",
       "documentType": "bylaws",
-      "topicDomains": ["governance", "athlete_rights", "dispute_resolution", "eligibility", "team_selection"],
-      "url": "https://www.usopc.org/bylaws",
+      "topicDomains": [
+        "governance",
+        "athlete_rights",
+        "dispute_resolution",
+        "eligibility",
+        "team_selection"
+      ],
+      "url": "https://assets.contentstack.io/v3/assets/blt9e58afd92a18a0fc/blt31b49bb2e4dbb55e/660d9afa0713755b25c43567/USOPC_Bylaws_Effective_April_1_2024.pdf",
       "format": "pdf",
       "ngbId": null,
       "priority": "high",
@@ -15,8 +21,13 @@
       "id": "ted-stevens-act",
       "title": "Ted Stevens Olympic and Amateur Sports Act (36 USC Ch. 2205)",
       "documentType": "legislation",
-      "topicDomains": ["governance", "athlete_rights", "dispute_resolution", "eligibility"],
-      "url": "https://uscode.house.gov/view.xhtml?path=/prelim@title36/subtitleII/partB/chapter2205&edition=prelim",
+      "topicDomains": [
+        "governance",
+        "athlete_rights",
+        "dispute_resolution",
+        "eligibility"
+      ],
+      "url": "https://www.law.cornell.edu/uscode/text/36/subtitle-II/part-B/chapter-2205",
       "format": "html",
       "ngbId": null,
       "priority": "high",
@@ -27,7 +38,7 @@
       "title": "SafeSport Code",
       "documentType": "code",
       "topicDomains": ["safesport"],
-      "url": "https://uscenterforsafesport.org/safesport-code/",
+      "url": "https://uscenterforsafesport.org/wp-content/uploads/2025/12/2026-Safesport-Code_1225.pdf",
       "format": "pdf",
       "ngbId": null,
       "priority": "high",
@@ -38,8 +49,8 @@
       "title": "USADA Protocol for Olympic and Paralympic Movement Testing",
       "documentType": "protocol",
       "topicDomains": ["anti_doping"],
-      "url": "https://www.usada.org/athletes/protocol/",
-      "format": "html",
+      "url": "https://www.usada.org/wp-content/uploads/USADA_protocol.pdf",
+      "format": "pdf",
       "ngbId": null,
       "priority": "high",
       "description": "USADA's testing protocol including testing procedures, athlete whereabouts, TUEs, and sanctions"
@@ -49,7 +60,7 @@
       "title": "World Anti-Doping Code",
       "documentType": "code",
       "topicDomains": ["anti_doping"],
-      "url": "https://www.wada-ama.org/en/what-we-do/world-anti-doping-code",
+      "url": "https://www.wada-ama.org/sites/default/files/resources/files/2021_wada_code.pdf",
       "format": "pdf",
       "ngbId": null,
       "priority": "medium",
@@ -60,8 +71,8 @@
       "title": "Section 9 Arbitration Procedures",
       "documentType": "procedure",
       "topicDomains": ["dispute_resolution", "team_selection"],
-      "url": "https://www.usopc.org/section-9",
-      "format": "pdf",
+      "url": "https://www.usopc.org/governance/dispute-resolution",
+      "format": "html",
       "ngbId": null,
       "priority": "high",
       "description": "Procedures for Section 9 arbitration under the Ted Stevens Act for resolving disputes about opportunity to compete"
@@ -71,11 +82,22 @@
       "title": "Athlete Rights and Responsibilities",
       "documentType": "policy",
       "topicDomains": ["athlete_rights", "governance"],
-      "url": "https://www.usopc.org/athlete-rights",
+      "url": "https://www.usopc.org/athlete-rights-and-responsibilities",
       "format": "html",
       "ngbId": null,
       "priority": "high",
       "description": "Statement of athlete rights and responsibilities within the U.S. Olympic and Paralympic movement"
+    },
+    {
+      "id": "aac-bylaws",
+      "title": "Team USA Athletes' Commission (AAC) Bylaws",
+      "documentType": "bylaws",
+      "topicDomains": ["governance", "athlete_rights"],
+      "url": "https://www.usopc.org/team-usa-athletes-commission-governance",
+      "format": "html",
+      "ngbId": null,
+      "priority": "high",
+      "description": "Bylaws of the Team USA Athletes' Commission governing athlete representation within the USOPC"
     }
   ]
 }

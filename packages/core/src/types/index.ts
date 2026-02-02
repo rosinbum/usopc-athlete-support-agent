@@ -16,8 +16,4 @@ export type {
   SportOrganization,
 } from "./sport-org.js";
 
-export type {
-  DomainCategory,
-  ContactInfo,
-  DeadlineRule,
-} from "./domain.js";
+export type { DomainCategory, ContactInfo, DeadlineRule } from "./domain.js";

@@ -8,9 +8,7 @@ import type { AgentState } from "../state.js";
  * - High confidence (>= threshold) -> synthesizer
  * - Low confidence (< threshold) -> researcher (web search fallback)
  */
-export function needsMoreInfo(
-  state: AgentState,
-): "synthesizer" | "researcher" {
+export function needsMoreInfo(state: AgentState): "synthesizer" | "researcher" {
   if (state.retrievalConfidence >= RETRIEVAL_CONFIG.confidenceThreshold) {
     return "synthesizer";
   }

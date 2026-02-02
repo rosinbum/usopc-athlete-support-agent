@@ -1,0 +1,234 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { SQSEvent } from "aws-lambda";
+
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
+const mockIngestSource = vi.fn();
+
+vi.mock("./pipeline.js", async () => {
+  const QuotaExhaustedError = class extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "QuotaExhaustedError";
+    }
+  };
+  return {
+    ingestSource: (...args: unknown[]) => mockIngestSource(...args),
+    QuotaExhaustedError,
+  };
+});
+
+const mockUpsertIngestionStatus = vi.fn();
+vi.mock("./db.js", () => ({
+  upsertIngestionStatus: (...args: unknown[]) =>
+    mockUpsertIngestionStatus(...args),
+}));
+
+const mockSend = vi.fn();
+vi.mock("@aws-sdk/client-sqs", () => ({
+  SQSClient: vi.fn(() => ({ send: mockSend })),
+  PurgeQueueCommand: vi.fn((input: unknown) => ({ input })),
+}));
+
+vi.mock("sst", () => ({
+  Resource: {
+    IngestionQueue: {
+      url: "https://sqs.us-east-1.amazonaws.com/123/queue.fifo",
+    },
+  },
+}));
+
+const mockPoolEnd = vi.fn();
+vi.mock("pg", () => ({
+  Pool: vi.fn(() => ({
+    query: vi.fn(),
+    end: mockPoolEnd,
+  })),
+}));
+
+vi.mock("@usopc/shared", () => ({
+  getDatabaseUrl: () => "postgresql://localhost/test",
+  getSecretValue: () => "sk-test-key",
+  createLogger: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: vi.fn(),
+  }),
+}));
+
+// Import after mocks
+import { handler } from "./worker.js";
+import { QuotaExhaustedError } from "./pipeline.js";
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+function makeSQSEvent(
+  body: Record<string, unknown>,
+  messageId = "msg-1",
+): SQSEvent {
+  return {
+    Records: [
+      {
+        messageId,
+        receiptHandle: "receipt-1",
+        body: JSON.stringify(body),
+        attributes: {
+          ApproximateReceiveCount: "1",
+          SentTimestamp: "0",
+          SenderId: "sender",
+          ApproximateFirstReceiveTimestamp: "0",
+        },
+        messageAttributes: {},
+        md5OfBody: "md5",
+        eventSource: "aws:sqs",
+        eventSourceARN: "arn:aws:sqs:us-east-1:123:queue",
+        awsRegion: "us-east-1",
+      },
+    ],
+  };
+}
+
+const MESSAGE_BODY = {
+  source: {
+    id: "src-1",
+    title: "Test",
+    documentType: "policy",
+    topicDomains: ["testing"],
+    url: "https://example.com/doc.pdf",
+    format: "pdf",
+    ngbId: null,
+    priority: "medium",
+    description: "desc",
+  },
+  contentHash: "abc123",
+  triggeredAt: "2025-01-01T00:00:00.000Z",
+};
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("worker handler", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPoolEnd.mockResolvedValue(undefined);
+    mockUpsertIngestionStatus.mockResolvedValue(undefined);
+    mockSend.mockResolvedValue({});
+  });
+
+  it("upserts completed status and returns empty failures on success", async () => {
+    mockIngestSource.mockResolvedValueOnce({
+      sourceId: "src-1",
+      status: "completed",
+      chunksCount: 10,
+    });
+
+    const result = await handler(makeSQSEvent(MESSAGE_BODY));
+
+    expect(result).toEqual({ batchItemFailures: [] });
+    expect(mockUpsertIngestionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      "src-1",
+      "https://example.com/doc.pdf",
+      "completed",
+      { contentHash: "abc123", chunksCount: 10 },
+    );
+  });
+
+  it("upserts failed status and returns empty failures on graceful failure", async () => {
+    mockIngestSource.mockResolvedValueOnce({
+      sourceId: "src-1",
+      status: "failed",
+      chunksCount: 0,
+      error: "load error",
+    });
+
+    const result = await handler(makeSQSEvent(MESSAGE_BODY));
+
+    expect(result).toEqual({ batchItemFailures: [] });
+    expect(mockUpsertIngestionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      "src-1",
+      "https://example.com/doc.pdf",
+      "failed",
+      { errorMessage: "load error" },
+    );
+  });
+
+  it("upserts quota_exceeded, purges queue, and returns empty failures on QuotaExhaustedError", async () => {
+    mockIngestSource.mockRejectedValueOnce(
+      new QuotaExhaustedError("insufficient_quota"),
+    );
+
+    const result = await handler(makeSQSEvent(MESSAGE_BODY));
+
+    expect(result).toEqual({ batchItemFailures: [] });
+    expect(mockUpsertIngestionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      "src-1",
+      "https://example.com/doc.pdf",
+      "quota_exceeded",
+      { errorMessage: "insufficient_quota" },
+    );
+    expect(mockSend).toHaveBeenCalledOnce();
+  });
+
+  it("returns batchItemFailures with messageId on unexpected error", async () => {
+    mockIngestSource.mockRejectedValueOnce(new Error("kaboom"));
+
+    const result = await handler(makeSQSEvent(MESSAGE_BODY, "msg-42"));
+
+    expect(result).toEqual({
+      batchItemFailures: [{ itemIdentifier: "msg-42" }],
+    });
+  });
+
+  it("always calls pool.end()", async () => {
+    // Success
+    mockIngestSource.mockResolvedValueOnce({
+      status: "completed",
+      chunksCount: 1,
+      sourceId: "src-1",
+    });
+    await handler(makeSQSEvent(MESSAGE_BODY));
+    expect(mockPoolEnd).toHaveBeenCalledTimes(1);
+
+    vi.clearAllMocks();
+    mockPoolEnd.mockResolvedValue(undefined);
+    mockUpsertIngestionStatus.mockResolvedValue(undefined);
+
+    // Failure
+    mockIngestSource.mockResolvedValueOnce({
+      status: "failed",
+      chunksCount: 0,
+      sourceId: "src-1",
+      error: "err",
+    });
+    await handler(makeSQSEvent(MESSAGE_BODY));
+    expect(mockPoolEnd).toHaveBeenCalledTimes(1);
+
+    vi.clearAllMocks();
+    mockPoolEnd.mockResolvedValue(undefined);
+    mockUpsertIngestionStatus.mockResolvedValue(undefined);
+    mockSend.mockResolvedValue({});
+
+    // Quota error
+    mockIngestSource.mockRejectedValueOnce(new QuotaExhaustedError("quota"));
+    await handler(makeSQSEvent(MESSAGE_BODY));
+    expect(mockPoolEnd).toHaveBeenCalledTimes(1);
+
+    vi.clearAllMocks();
+    mockPoolEnd.mockResolvedValue(undefined);
+
+    // Unexpected error
+    mockIngestSource.mockRejectedValueOnce(new Error("unexpected"));
+    await handler(makeSQSEvent(MESSAGE_BODY));
+    expect(mockPoolEnd).toHaveBeenCalledTimes(1);
+  });
+});

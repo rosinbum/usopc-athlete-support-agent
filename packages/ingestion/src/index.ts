@@ -2,12 +2,17 @@
 export {
   ingestSource,
   ingestAll,
+  QuotaExhaustedError,
   type IngestionSource,
   type IngestionResult,
 } from "./pipeline.js";
 
-// Cron / Lambda handler
-export { handler as cronHandler } from "./cron.js";
+// DB helpers
+export { getLastContentHash, upsertIngestionStatus } from "./db.js";
+
+// Cron / Lambda handlers
+export { handler as cronHandler, type IngestionMessage } from "./cron.js";
+export { handler as workerHandler } from "./worker.js";
 
 // Loaders
 export { loadPdf } from "./loaders/pdfLoader.js";
