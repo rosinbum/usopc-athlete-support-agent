@@ -1,4 +1,5 @@
 import type { Message } from "ai";
+import { MarkdownMessage } from "./MarkdownMessage.js";
 
 interface MessageBubbleProps {
   message: Message;
@@ -16,9 +17,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           isUser ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
         }`}
       >
-        <div className="whitespace-pre-wrap text-sm leading-relaxed">
-          {message.content}
-        </div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap text-sm leading-relaxed">
+            {message.content}
+          </div>
+        ) : (
+          <MarkdownMessage content={message.content} />
+        )}
       </div>
     </div>
   );
