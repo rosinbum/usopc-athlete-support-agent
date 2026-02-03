@@ -15,7 +15,8 @@
       "format": "pdf",
       "ngbId": null,
       "priority": "high",
-      "description": "USOPC governing bylaws including Section 9 dispute resolution, athlete representation requirements, NGB certification requirements"
+      "description": "USOPC governing bylaws including Section 9 dispute resolution, athlete representation requirements, NGB certification requirements",
+      "authorityLevel": "usopc_governance"
     },
     {
       "id": "ted-stevens-act",
@@ -31,7 +32,8 @@
       "format": "html",
       "ngbId": null,
       "priority": "high",
-      "description": "Federal legislation governing the USOPC and NGBs, including athlete rights, NGB obligations, and dispute resolution procedures"
+      "description": "Federal legislation governing the USOPC and NGBs, including athlete rights, NGB obligations, and dispute resolution procedures",
+      "authorityLevel": "law"
     },
     {
       "id": "safesport-code",
@@ -42,7 +44,8 @@
       "format": "pdf",
       "ngbId": null,
       "priority": "high",
-      "description": "The SafeSport Code governing abuse prevention and response in Olympic and Paralympic sports"
+      "description": "The SafeSport Code governing abuse prevention and response in Olympic and Paralympic sports",
+      "authorityLevel": "independent_office"
     },
     {
       "id": "usada-protocol",
@@ -53,7 +56,8 @@
       "format": "pdf",
       "ngbId": null,
       "priority": "high",
-      "description": "USADA's testing protocol including testing procedures, athlete whereabouts, TUEs, and sanctions"
+      "description": "USADA's testing protocol including testing procedures, athlete whereabouts, TUEs, and sanctions",
+      "authorityLevel": "anti_doping_national"
     },
     {
       "id": "wada-code",
@@ -64,7 +68,8 @@
       "format": "pdf",
       "ngbId": null,
       "priority": "medium",
-      "description": "International anti-doping rules that USADA implements domestically"
+      "description": "International anti-doping rules that USADA implements domestically",
+      "authorityLevel": "international_rule"
     },
     {
       "id": "section-9-procedures",
@@ -75,7 +80,8 @@
       "format": "html",
       "ngbId": null,
       "priority": "high",
-      "description": "Procedures for Section 9 arbitration under the Ted Stevens Act for resolving disputes about opportunity to compete"
+      "description": "Procedures for Section 9 arbitration under the Ted Stevens Act for resolving disputes about opportunity to compete",
+      "authorityLevel": "usopc_policy_procedure"
     },
     {
       "id": "athlete-rights-responsibilities",
@@ -86,7 +92,8 @@
       "format": "html",
       "ngbId": null,
       "priority": "high",
-      "description": "Statement of athlete rights and responsibilities within the U.S. Olympic and Paralympic movement"
+      "description": "Statement of athlete rights and responsibilities within the U.S. Olympic and Paralympic movement",
+      "authorityLevel": "usopc_policy_procedure"
     },
     {
       "id": "aac-bylaws",
@@ -97,7 +104,8 @@
       "format": "html",
       "ngbId": null,
       "priority": "high",
-      "description": "Bylaws of the Team USA Athletes' Commission governing athlete representation within the USOPC"
+      "description": "Bylaws of the Team USA Athletes' Commission governing athlete representation within the USOPC",
+      "authorityLevel": "usopc_governance"
     }
   ]
 }

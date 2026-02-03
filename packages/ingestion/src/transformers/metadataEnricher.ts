@@ -23,6 +23,7 @@ export function enrichMetadata(
       source_id: source.id,
       chunk_index: index,
       ingested_at: new Date().toISOString(),
+      authority_level: source.authorityLevel,
     },
   }));
 }

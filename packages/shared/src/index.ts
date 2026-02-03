@@ -39,4 +39,7 @@ export {
   CHANNELS,
   channelSchema,
   type Channel,
+  AUTHORITY_LEVELS,
+  authorityLevelSchema,
+  type AuthorityLevel,
 } from "./validation.js";
