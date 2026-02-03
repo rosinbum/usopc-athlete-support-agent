@@ -55,7 +55,7 @@ export default $config({
     const api = new sst.aws.ApiGatewayV2("Api");
     api.route("$default", {
       handler: "apps/api/src/lambda.handler",
-      link: linkables,
+      link: [...linkables, conversationMaxTurns],
       timeout: "120 seconds",
       memory: "512 MB",
       environment: {
