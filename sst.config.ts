@@ -22,7 +22,6 @@ export default $config({
     const langchainKey = new sst.Secret("LangchainApiKey");
     const slackBotToken = new sst.Secret("SlackBotToken");
     const slackSigningSecret = new sst.Secret("SlackSigningSecret");
-    const conversationMaxTurns = new sst.Secret("ConversationMaxTurns");
 
     // Database
     // Production: Aurora Serverless v2 with pgvector
@@ -77,7 +76,7 @@ export default $config({
     // Next.js web app
     const web = new sst.aws.Nextjs("Web", {
       path: "apps/web",
-      link: [...linkables, api, conversationMaxTurns],
+      link: [...linkables, api],
       environment: {
         NEXT_PUBLIC_API_URL: api.url,
         ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
