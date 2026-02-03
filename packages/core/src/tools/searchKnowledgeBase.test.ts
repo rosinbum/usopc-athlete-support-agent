@@ -100,7 +100,7 @@ describe("createSearchKnowledgeBaseTool", () => {
       expect(mockVectorStore.similaritySearchWithScore).toHaveBeenCalledWith(
         "eligibility requirements",
         expect.any(Number),
-        { ngbId: { in: ["usa_swimming", "us_rowing"] } },
+        { ngb_id: { $in: ["usa_swimming", "us_rowing"] } },
       );
     });
 
@@ -130,7 +130,7 @@ describe("createSearchKnowledgeBaseTool", () => {
       expect(mockVectorStore.similaritySearchWithScore).toHaveBeenCalledWith(
         "how to file a complaint",
         expect.any(Number),
-        { topicDomain: "safesport" },
+        { topic_domain: "safesport" },
       );
     });
   });
@@ -149,8 +149,8 @@ describe("createSearchKnowledgeBaseTool", () => {
         "anti-doping rules",
         expect.any(Number),
         {
-          ngbId: { in: ["usa_track_field"] },
-          topicDomain: "anti_doping",
+          ngb_id: { $in: ["usa_track_field"] },
+          topic_domain: "anti_doping",
         },
       );
     });

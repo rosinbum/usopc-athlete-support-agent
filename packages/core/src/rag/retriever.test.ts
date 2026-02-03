@@ -330,8 +330,8 @@ describe("retrieve", () => {
         { ngbIds: ["test"], topK: 10, confidenceThreshold: 0.5 },
       );
 
-      // Should be limited to topK=10
-      expect(result.documents.length).toBeLessThanOrEqual(10);
+      // Should be limited to exactly topK=10
+      expect(result.documents.length).toBe(10);
     });
   });
 });

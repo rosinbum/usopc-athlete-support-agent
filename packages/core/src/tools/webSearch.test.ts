@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createWebSearchTool } from "./webSearch.js";
 
-const mockInvoke = vi.fn();
+const { mockInvoke, mockTavilySearch } = vi.hoisted(() => {
+  const mockInvoke = vi.fn();
+  const mockTavilySearch = vi.fn().mockImplementation(() => ({
+    invoke: mockInvoke,
+  }));
+  return { mockInvoke, mockTavilySearch };
+});
 
 vi.mock("@langchain/tavily", () => ({
-  TavilySearch: vi.fn().mockImplementation(() => ({
-    invoke: mockInvoke,
-  })),
+  TavilySearch: mockTavilySearch,
 }));
 
 vi.mock("../config/index.js", () => ({
@@ -17,6 +20,8 @@ vi.mock("../config/index.js", () => ({
     "safesport.org",
   ],
 }));
+
+import { createWebSearchTool } from "./webSearch.js";
 
 describe("createWebSearchTool", () => {
   beforeEach(() => {
@@ -85,11 +90,10 @@ describe("createWebSearchTool", () => {
     it("should use trusted domains by default", async () => {
       mockInvoke.mockResolvedValue({ results: [] });
 
-      const { TavilySearch } = await import("@langchain/tavily");
       const tool = createWebSearchTool();
       await tool.invoke({ query: "test" });
 
-      expect(TavilySearch).toHaveBeenCalledWith(
+      expect(mockTavilySearch).toHaveBeenCalledWith(
         expect.objectContaining({
           includeDomains: [
             "usopc.org",
@@ -104,14 +108,13 @@ describe("createWebSearchTool", () => {
     it("should use custom domains when provided", async () => {
       mockInvoke.mockResolvedValue({ results: [] });
 
-      const { TavilySearch } = await import("@langchain/tavily");
       const tool = createWebSearchTool();
       await tool.invoke({
         query: "test",
         domains: ["custom-domain.com", "another.org"],
       });
 
-      expect(TavilySearch).toHaveBeenCalledWith(
+      expect(mockTavilySearch).toHaveBeenCalledWith(
         expect.objectContaining({
           includeDomains: ["custom-domain.com", "another.org"],
         }),
@@ -121,11 +124,10 @@ describe("createWebSearchTool", () => {
     it("should use trusted domains for empty domains array", async () => {
       mockInvoke.mockResolvedValue({ results: [] });
 
-      const { TavilySearch } = await import("@langchain/tavily");
       const tool = createWebSearchTool();
       await tool.invoke({ query: "test", domains: [] });
 
-      expect(TavilySearch).toHaveBeenCalledWith(
+      expect(mockTavilySearch).toHaveBeenCalledWith(
         expect.objectContaining({
           includeDomains: [
             "usopc.org",
@@ -142,11 +144,10 @@ describe("createWebSearchTool", () => {
     it("should use default maxResults of 5", async () => {
       mockInvoke.mockResolvedValue({ results: [] });
 
-      const { TavilySearch } = await import("@langchain/tavily");
       const tool = createWebSearchTool();
       await tool.invoke({ query: "test" });
 
-      expect(TavilySearch).toHaveBeenCalledWith(
+      expect(mockTavilySearch).toHaveBeenCalledWith(
         expect.objectContaining({
           maxResults: 5,
         }),
@@ -156,11 +157,10 @@ describe("createWebSearchTool", () => {
     it("should respect custom maxResults option", async () => {
       mockInvoke.mockResolvedValue({ results: [] });
 
-      const { TavilySearch } = await import("@langchain/tavily");
       const tool = createWebSearchTool({ maxResults: 10 });
       await tool.invoke({ query: "test" });
 
-      expect(TavilySearch).toHaveBeenCalledWith(
+      expect(mockTavilySearch).toHaveBeenCalledWith(
         expect.objectContaining({
           maxResults: 10,
         }),
@@ -170,11 +170,10 @@ describe("createWebSearchTool", () => {
     it("should pass API key to Tavily when provided", async () => {
       mockInvoke.mockResolvedValue({ results: [] });
 
-      const { TavilySearch } = await import("@langchain/tavily");
       const tool = createWebSearchTool({ apiKey: "test-api-key" });
       await tool.invoke({ query: "test" });
 
-      expect(TavilySearch).toHaveBeenCalledWith(
+      expect(mockTavilySearch).toHaveBeenCalledWith(
         expect.objectContaining({
           tavilyApiKey: "test-api-key",
         }),
