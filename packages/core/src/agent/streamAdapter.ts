@@ -41,7 +41,8 @@ function extractTextFromContent(
  * Converts a LangGraph dual-mode stream into a sequence of AgentStreamEvents.
  *
  * Handles two stream modes:
- * - "values": Full state after each node. Used for citations and escalation events.
+ * - "values": Full state after each node. Used for citations, escalation,
+ *   and answer from non-LLM nodes (like clarify).
  * - "messages": Token-by-token LLM output. Used for real-time text streaming.
  *
  * Only emits tokens from the synthesizer node to avoid showing
@@ -52,6 +53,12 @@ export async function* agentStreamToEvents(
 ): AsyncGenerator<AgentStreamEvent> {
   let citationsEmitted = false;
   let escalationEmitted = false;
+  // Track answer from values mode for nodes that don't use LLM streaming
+  // (like clarify, escalate fallbacks, error handlers)
+  let previousAnswerFromValues = "";
+  // Track if we've seen any messages from synthesizer - if so, don't emit
+  // answer from values to avoid duplication
+  let seenSynthesizerTokens = false;
 
   for await (const chunk of stream) {
     const [mode, data] = chunk;
@@ -66,6 +73,7 @@ export async function* agentStreamToEvents(
       // Only stream tokens from specific nodes (synthesizer)
       const nodeName = metadata?.langgraph_node;
       if (nodeName && STREAMING_NODES.has(nodeName)) {
+        seenSynthesizerTokens = true;
         const text = extractTextFromContent(messageChunk.content);
         if (text) {
           yield { type: "text-delta", textDelta: text };
@@ -74,6 +82,19 @@ export async function* agentStreamToEvents(
     } else if (mode === "values") {
       // State update after a node completes
       const state = data as Partial<AgentState>;
+
+      // Emit answer changes from nodes that don't use LLM streaming
+      // (clarify, escalate, error handlers). Only if we haven't seen
+      // synthesizer tokens to avoid duplication.
+      if (
+        !seenSynthesizerTokens &&
+        state.answer !== undefined &&
+        state.answer.length > previousAnswerFromValues.length
+      ) {
+        const delta = state.answer.slice(previousAnswerFromValues.length);
+        previousAnswerFromValues = state.answer;
+        yield { type: "text-delta", textDelta: delta };
+      }
 
       // Emit citations once when they first appear (non-empty)
       if (!citationsEmitted && state.citations && state.citations.length > 0) {

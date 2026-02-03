@@ -254,6 +254,55 @@ describe("agentStreamToEvents (dual-mode)", () => {
     expect(textDeltas).toHaveLength(1);
     expect(textDeltas[0].textDelta).toBe("With node");
   });
+
+  it("emits answer from values mode when no synthesizer tokens (clarify node)", async () => {
+    // This simulates the clarify node path where answer is set directly
+    // without going through the synthesizer LLM
+    const events = await collectEvents(
+      mockDualStream([
+        ["values", { topicDomain: "team_selection", needsClarification: true }],
+        ["values", { answer: "Which sport are you asking about?" }],
+      ]),
+    );
+
+    const textDeltas = events.filter((e) => e.type === "text-delta");
+    expect(textDeltas).toHaveLength(1);
+    expect(textDeltas[0].textDelta).toBe("Which sport are you asking about?");
+  });
+
+  it("does not duplicate answer when synthesizer tokens are present", async () => {
+    // When synthesizer streams tokens, don't also emit from values mode
+    const events = await collectEvents(
+      mockDualStream([
+        ["messages", [{ content: "Hello" }, { langgraph_node: "synthesizer" }]],
+        [
+          "messages",
+          [{ content: " world" }, { langgraph_node: "synthesizer" }],
+        ],
+        ["values", { answer: "Hello world" }], // This should be ignored
+      ]),
+    );
+
+    const textDeltas = events.filter((e) => e.type === "text-delta");
+    expect(textDeltas).toHaveLength(2);
+    expect(textDeltas[0].textDelta).toBe("Hello");
+    expect(textDeltas[1].textDelta).toBe(" world");
+  });
+
+  it("emits incremental answer changes from values mode", async () => {
+    // Test that answer changes are emitted incrementally (like escalate node)
+    const events = await collectEvents(
+      mockDualStream([
+        ["values", { answer: "Please contact " }],
+        ["values", { answer: "Please contact SafeSport" }],
+      ]),
+    );
+
+    const textDeltas = events.filter((e) => e.type === "text-delta");
+    expect(textDeltas).toHaveLength(2);
+    expect(textDeltas[0].textDelta).toBe("Please contact ");
+    expect(textDeltas[1].textDelta).toBe("SafeSport");
+  });
 });
 
 // ---------------------------------------------------------------------------
