@@ -69,7 +69,7 @@ export class AgentRunner {
     });
 
     const tavilySearch: TavilySearchLike = config.tavilyApiKey
-      ? (createTavilySearchTool() as TavilySearchLike)
+      ? (createTavilySearchTool(config.tavilyApiKey) as TavilySearchLike)
       : { invoke: async () => "" };
 
     const graph = createAgentGraph({ vectorStore, tavilySearch });

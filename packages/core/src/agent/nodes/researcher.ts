@@ -144,8 +144,9 @@ export function createResearcherNode(tavilySearch: TavilySearchLike) {
  * This is a convenience helper; callers can also construct their own
  * TavilySearch and pass it to `createResearcherNode` directly.
  */
-export function createTavilySearchTool(): TavilySearch {
+export function createTavilySearchTool(tavilyApiKey: string): TavilySearch {
   return new TavilySearch({
+    tavilyApiKey,
     maxResults: MAX_SEARCH_RESULTS,
     includeDomains: [...TRUSTED_DOMAINS],
   });
