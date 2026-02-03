@@ -50,12 +50,13 @@ export function createSearchKnowledgeBaseTool(vectorStore: PGVectorStore) {
         const k = topK ?? RETRIEVAL_CONFIG.narrowFilterTopK;
 
         // Build metadata filter if NGB or topic domain constraints are provided
+        // Uses snake_case field names and $in operator to match pgvector schema
         const filter: Record<string, unknown> = {};
         if (ngbIds && ngbIds.length > 0) {
-          filter.ngbId = { in: ngbIds };
+          filter.ngb_id = { $in: ngbIds };
         }
         if (topicDomain) {
-          filter.topicDomain = topicDomain;
+          filter.topic_domain = topicDomain;
         }
 
         const hasFilter = Object.keys(filter).length > 0;
