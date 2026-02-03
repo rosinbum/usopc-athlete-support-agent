@@ -7,6 +7,12 @@ let runnerPromise: Promise<AgentRunner> | null = null;
 
 function getRunner(): Promise<AgentRunner> {
   if (!runnerPromise) {
+    // Set env vars for SDKs that read from process.env (e.g., @langchain/anthropic)
+    process.env.ANTHROPIC_API_KEY = getSecretValue(
+      "ANTHROPIC_API_KEY",
+      "AnthropicApiKey",
+    );
+
     runnerPromise = AgentRunner.create({
       databaseUrl: getDatabaseUrl(),
       openaiApiKey: getSecretValue("OPENAI_API_KEY", "OpenaiApiKey"),
@@ -34,6 +40,10 @@ export async function POST(req: Request) {
           writer.write(formatDataStreamPart("text", event.textDelta));
         }
       }
+    },
+    onError: (error) => {
+      console.error("Chat stream error:", error);
+      return error instanceof Error ? error.message : "An error occurred";
     },
   });
 }
