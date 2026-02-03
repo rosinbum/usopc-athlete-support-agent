@@ -8,6 +8,21 @@ import { createAgentGraph } from "./graph.js";
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
 
+/**
+ * Stream chunk types from dual-mode streaming.
+ * - "values" mode yields full state after each node
+ * - "messages" mode yields [AIMessageChunk, metadata] tuples for token streaming
+ */
+export type StreamChunk =
+  | ["values", Partial<AgentState>]
+  | [
+      "messages",
+      [
+        { content: string | Array<{ type: string; text?: string }> },
+        { langgraph_node?: string },
+      ],
+    ];
+
 export interface AgentRunnerConfig {
   databaseUrl: string;
   openaiApiKey?: string;
@@ -92,19 +107,30 @@ export class AgentRunner {
   }
 
   /**
-   * Stream graph execution — yields full state after each node.
+   * Stream chunk types from dual-mode streaming.
+   * - "values" mode yields full state after each node
+   * - "messages" mode yields [AIMessageChunk, metadata] tuples for token streaming
    */
-  async *stream(input: AgentInput): AsyncGenerator<Partial<AgentState>> {
+  static StreamChunkTypes = {
+    VALUES: "values" as const,
+    MESSAGES: "messages" as const,
+  };
+
+  /**
+   * Stream graph execution with token-level streaming.
+   * Uses dual stream mode to get both state updates and token-by-token LLM output.
+   */
+  async *stream(input: AgentInput): AsyncGenerator<StreamChunk> {
     const initialState = this.buildInitialState(input);
 
-    // Use streamMode: "values" to get full state after each step
-    // (default "updates" mode returns { nodeName: nodeOutput } which doesn't match our adapter)
+    // Dual stream mode: "values" for state after each node, "messages" for token streaming
     const stream = await this.graph.stream(initialState, {
-      streamMode: "values",
+      streamMode: ["values", "messages"],
     });
 
-    for await (const state of stream) {
-      yield state as Partial<AgentState>;
+    for await (const chunk of stream) {
+      // LangGraph emits [mode, data] tuples when using array streamMode
+      yield chunk as StreamChunk;
     }
   }
 

@@ -1,15 +1,9 @@
-export const SYNTHESIZER_PROMPT = `You are the response synthesizer for the USOPC Athlete Support Assistant. \
-Your job is to produce an accurate, well-cited answer based on the retrieved context documents provided below.
+import type { QueryIntent } from "../types/index.js";
 
-## Retrieved Context
-
-{{context}}
-
-## User Question
-
-{{userQuestion}}
-
-## Instructions
+/**
+ * Base instructions that apply to all response formats.
+ */
+const BASE_INSTRUCTIONS = `## Instructions
 
 1. **Synthesize an accurate answer** using ONLY the information present in the retrieved context above. Do not introduce facts, rules, procedures, or provisions that are not supported by the provided documents.
 
@@ -27,11 +21,57 @@ Your job is to produce an accurate, well-cited answer based on the retrieved con
 
 6. **Never fabricate.** If the context is insufficient to answer the question, say so. Do not guess, speculate, or generate plausible-sounding but unsupported information.
 
-7. **Include deadlines and time-sensitive details** prominently when relevant. Highlight filing windows, appeal periods, and response deadlines.
+7. **Use clear, accessible language.** Athletes may not have legal or governance expertise. Explain technical terms and acronyms on first use.`;
 
-8. **Use clear, accessible language.** Athletes may not have legal or governance expertise. Explain technical terms and acronyms on first use.
+/**
+ * Response format for factual queries (simple lookups).
+ * Concise: 1-3 sentences, under 150 words.
+ */
+const FACTUAL_FORMAT = `## Response Format
 
-## Response Format
+This is a **factual** question seeking a specific piece of information. Keep your response concise and direct.
+
+Structure your response as follows:
+- **Answer**: 1-3 sentences directly answering the question
+- **Source**: Document title and section
+
+**Keep your response under 150 words.** Do not include unnecessary elaboration.`;
+
+/**
+ * Response format for procedural queries (how-to questions).
+ * Overview + numbered steps, under 300 words.
+ */
+const PROCEDURAL_FORMAT = `## Response Format
+
+This is a **procedural** question asking how to do something. Provide clear, actionable steps.
+
+Structure your response as follows:
+- **Overview**: Brief summary (1-2 sentences)
+- **Steps**: Numbered list of actions the athlete should take
+- **Source**: Document title and section
+
+**Keep your response under 300 words.** Focus on the essential steps.`;
+
+/**
+ * Response format for deadline queries (time-sensitive questions).
+ * Specific dates/timeframes, under 100 words.
+ */
+const DEADLINE_FORMAT = `## Response Format
+
+This is a **deadline** question asking about timing or time constraints. Be precise about dates and timeframes.
+
+Structure your response as follows:
+- **Deadline**: The specific date or timeframe
+- **Key Dates**: Any related dates (filing windows, notice periods)
+- **Source**: Document title and section
+
+**Keep your response under 100 words.** Lead with the most critical date.`;
+
+/**
+ * Response format for general or complex queries.
+ * Full 5-section format for comprehensive answers.
+ */
+const GENERAL_FORMAT = `## Response Format
 
 Structure your response as follows:
 - **Direct Answer**: Lead with a concise answer to the question.
@@ -41,14 +81,70 @@ Structure your response as follows:
 - **Sources**: List the documents and sections cited.`;
 
 /**
- * Fills the synthesizer prompt template with retrieved context and the user question.
+ * Maps query intent to the appropriate response format.
+ */
+function getResponseFormat(intent: QueryIntent | undefined): string {
+  switch (intent) {
+    case "factual":
+      return FACTUAL_FORMAT;
+    case "procedural":
+      return PROCEDURAL_FORMAT;
+    case "deadline":
+      return DEADLINE_FORMAT;
+    default:
+      // "general", "escalation", or undefined all use the full format
+      return GENERAL_FORMAT;
+  }
+}
+
+/**
+ * Legacy synthesizer prompt (full format).
+ * @deprecated Use buildSynthesizerPrompt with queryIntent for adaptive responses.
+ */
+export const SYNTHESIZER_PROMPT = `You are the response synthesizer for the USOPC Athlete Support Assistant. \
+Your job is to produce an accurate, well-cited answer based on the retrieved context documents provided below.
+
+## Retrieved Context
+
+{{context}}
+
+## User Question
+
+{{userQuestion}}
+
+${BASE_INSTRUCTIONS}
+
+${GENERAL_FORMAT}`;
+
+/**
+ * Fills the synthesizer prompt template with retrieved context, user question,
+ * and optionally adapts the response format based on query intent.
+ *
+ * @param context - The retrieved documents formatted as text
+ * @param userQuestion - The user's question
+ * @param queryIntent - Optional intent to adapt response format (factual, procedural, deadline, general)
  */
 export function buildSynthesizerPrompt(
   context: string,
   userQuestion: string,
+  queryIntent?: QueryIntent,
 ): string {
-  return SYNTHESIZER_PROMPT.replace("{{context}}", context).replace(
-    "{{userQuestion}}",
-    userQuestion,
-  );
+  const responseFormat = getResponseFormat(queryIntent);
+
+  const prompt = `You are the response synthesizer for the USOPC Athlete Support Assistant. \
+Your job is to produce an accurate, well-cited answer based on the retrieved context documents provided below.
+
+## Retrieved Context
+
+${context}
+
+## User Question
+
+${userQuestion}
+
+${BASE_INSTRUCTIONS}
+
+${responseFormat}`;
+
+  return prompt;
 }

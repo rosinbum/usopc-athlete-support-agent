@@ -50,6 +50,8 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     hasTimeConstraint: false,
     conversationId: undefined,
     userSport: undefined,
+    needsClarification: false,
+    clarificationQuestion: undefined,
     ...overrides,
   };
 }

@@ -18,11 +18,26 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     hasTimeConstraint: false,
     conversationId: undefined,
     userSport: undefined,
+    needsClarification: false,
+    clarificationQuestion: undefined,
     ...overrides,
   };
 }
 
 describe("routeByDomain", () => {
+  it('returns "clarify" when needsClarification is true', () => {
+    const state = makeState({ needsClarification: true });
+    expect(routeByDomain(state)).toBe("clarify");
+  });
+
+  it('returns "clarify" even if escalation intent when clarification needed', () => {
+    const state = makeState({
+      queryIntent: "escalation",
+      needsClarification: true,
+    });
+    expect(routeByDomain(state)).toBe("clarify");
+  });
+
   it('returns "escalate" when queryIntent is escalation', () => {
     const state = makeState({ queryIntent: "escalation" });
     expect(routeByDomain(state)).toBe("escalate");

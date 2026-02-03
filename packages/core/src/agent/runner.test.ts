@@ -261,7 +261,7 @@ describe("AgentRunner", () => {
         expect.objectContaining({
           userSport: "track",
         }),
-        { streamMode: "values" },
+        { streamMode: ["values", "messages"] },
       );
     });
 

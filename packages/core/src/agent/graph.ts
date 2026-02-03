@@ -2,6 +2,7 @@ import { StateGraph } from "@langchain/langgraph";
 import { AgentStateAnnotation } from "./state.js";
 import {
   classifierNode,
+  clarifyNode,
   createRetrieverNode,
   createResearcherNode,
   synthesizerNode,
@@ -23,7 +24,8 @@ export interface GraphDependencies {
  * Creates and compiles the full LangGraph agent.
  *
  * Graph flow:
- *   START -> classifier -> (routeByDomain) -> retriever | escalate
+ *   START -> classifier -> (routeByDomain) -> clarify | retriever | escalate
+ *     clarify -> END
  *     retriever -> (needsMoreInfo) -> synthesizer | researcher
  *     researcher -> synthesizer
  *     synthesizer -> citationBuilder -> disclaimerGuard -> END
@@ -32,6 +34,7 @@ export interface GraphDependencies {
 export function createAgentGraph(deps: GraphDependencies) {
   const compiled = new StateGraph(AgentStateAnnotation)
     .addNode("classifier", classifierNode)
+    .addNode("clarify", clarifyNode)
     .addNode("retriever", createRetrieverNode(deps.vectorStore))
     .addNode("researcher", createResearcherNode(deps.tavilySearch))
     .addNode("synthesizer", synthesizerNode)
@@ -40,6 +43,7 @@ export function createAgentGraph(deps: GraphDependencies) {
     .addNode("disclaimerGuard", disclaimerGuardNode)
     .addEdge("__start__", "classifier")
     .addConditionalEdges("classifier", routeByDomain)
+    .addEdge("clarify", "__end__")
     .addConditionalEdges("retriever", needsMoreInfo)
     .addEdge("researcher", "synthesizer")
     .addEdge("synthesizer", "citationBuilder")

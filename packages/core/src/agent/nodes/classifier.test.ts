@@ -47,6 +47,8 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     hasTimeConstraint: false,
     conversationId: undefined,
     userSport: undefined,
+    needsClarification: false,
+    clarificationQuestion: undefined,
     ...overrides,
   };
 }
@@ -228,5 +230,58 @@ describe("classifierNode", () => {
     });
     const result = await classifierNode(state);
     expect(result.topicDomain).toBe("eligibility");
+  });
+
+  it("sets needsClarification when query is ambiguous", async () => {
+    mockInvoke.mockResolvedValueOnce(
+      classifierResponse({
+        topicDomain: "team_selection",
+        detectedNgbIds: [],
+        queryIntent: "factual",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+        needsClarification: true,
+        clarificationQuestion: "Which sport are you asking about?",
+      }),
+    );
+
+    const state = makeState({
+      messages: [new HumanMessage("What are the selection criteria?")],
+    });
+    const result = await classifierNode(state);
+
+    expect(result.needsClarification).toBe(true);
+    expect(result.clarificationQuestion).toBe(
+      "Which sport are you asking about?",
+    );
+  });
+
+  it("defaults needsClarification to false when not provided", async () => {
+    mockInvoke.mockResolvedValueOnce(
+      classifierResponse({
+        topicDomain: "team_selection",
+        detectedNgbIds: ["usa_swimming"],
+        queryIntent: "factual",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+      }),
+    );
+
+    const state = makeState({
+      messages: [new HumanMessage("What are USA Swimming selection criteria?")],
+    });
+    const result = await classifierNode(state);
+
+    expect(result.needsClarification).toBe(false);
+    expect(result.clarificationQuestion).toBeUndefined();
+  });
+
+  it("returns needsClarification false on error", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("API error"));
+
+    const state = makeState();
+    const result = await classifierNode(state);
+
+    expect(result.needsClarification).toBe(false);
   });
 });

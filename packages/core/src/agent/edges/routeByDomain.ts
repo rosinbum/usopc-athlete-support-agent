@@ -3,16 +3,24 @@ import type { AgentState } from "../state.js";
 /**
  * Conditional edge after CLASSIFIER.
  *
- * Routes based on the classified query intent:
- * - "escalation" -> escalate node (SafeSport, urgent disputes, etc.)
- * - "factual" | "procedural" | "deadline" | "general" -> retriever node
+ * Routes based on classification results:
+ * - needsClarification=true -> clarify node (ask user for more info)
+ * - "escalation" intent -> escalate node (SafeSport, urgent disputes, etc.)
+ * - other intents -> retriever node
  */
 export function routeByDomain(
   state: AgentState,
-): "retriever" | "escalate" | "researcher" {
+): "clarify" | "retriever" | "escalate" {
+  // First check if clarification is needed
+  if (state.needsClarification) {
+    return "clarify";
+  }
+
+  // Then check for escalation
   if (state.queryIntent === "escalation") {
     return "escalate";
   }
 
+  // Default to retrieval
   return "retriever";
 }

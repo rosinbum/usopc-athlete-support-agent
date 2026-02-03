@@ -132,6 +132,24 @@ export const AgentStateAnnotation = Annotation.Root({
     reducer: (_prev, next) => next,
     default: () => undefined,
   }),
+
+  /**
+   * Whether the query is too ambiguous to answer accurately.
+   * Set by the classifier node when clarification is needed.
+   */
+  needsClarification: Annotation<boolean>({
+    reducer: (_prev, next) => next,
+    default: () => false,
+  }),
+
+  /**
+   * A clarifying question to ask the user when needsClarification is true.
+   * Set by the classifier node.
+   */
+  clarificationQuestion: Annotation<string | undefined>({
+    reducer: (_prev, next) => next,
+    default: () => undefined,
+  }),
 });
 
 /**

@@ -127,7 +127,12 @@ export async function synthesizerNode(
   }
 
   const context = buildContext(state);
-  const prompt = buildSynthesizerPrompt(context, userQuestion);
+  // Pass queryIntent to adapt response format (concise for factual/deadline, detailed for general)
+  const prompt = buildSynthesizerPrompt(
+    context,
+    userQuestion,
+    state.queryIntent,
+  );
 
   const model = new ChatAnthropic({
     model: MODEL_CONFIG.agent.model,
@@ -140,6 +145,7 @@ export async function synthesizerNode(
       documentCount: state.retrievedDocuments.length,
       webResultCount: state.webSearchResults.length,
       topicDomain: state.topicDomain,
+      queryIntent: state.queryIntent,
     });
 
     const response = await model.invoke([
