@@ -55,13 +55,15 @@ apps/
 The core agent is a compiled LangGraph state machine in `packages/core/src/agent/graph.ts`:
 
 ```
-START → classifier → (routeByDomain) → retriever | escalate
+START → classifier → (routeByDomain) → clarify | retriever | escalate
+  clarify → END
   retriever → (needsMoreInfo) → synthesizer | researcher
   researcher → synthesizer
   synthesizer → citationBuilder → disclaimerGuard → END
+  escalate → citationBuilder → disclaimerGuard → END
 ```
 
-Key nodes: classifier, retriever (pgvector RAG), researcher (Tavily web search), synthesizer (Anthropic), citationBuilder, disclaimerGuard. Agent tools are in `packages/core/src/tools/`.
+Key nodes: classifier (query analysis + clarification detection), clarify (asks for more info on ambiguous queries), retriever (pgvector RAG), researcher (Tavily web search), synthesizer (Anthropic, with intent-based response formatting), citationBuilder, disclaimerGuard, escalate. Agent tools are in `packages/core/src/tools/`.
 
 ### Ingestion Pipeline
 
