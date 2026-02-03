@@ -10,27 +10,35 @@ interface MarkdownMessageProps {
 }
 
 const components: Components = {
-  // Style links to be recognizable
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-blue-600 hover:text-blue-800 underline"
-    >
-      {children}
-    </a>
-  ),
+  // Style links - only allow safe protocols (http, https, mailto)
+  a: ({ href, children }) => {
+    const isSafeUrl = href?.match(/^(https?:|mailto:)/i);
+    if (!isSafeUrl) {
+      // Render unsafe URLs as plain text
+      return <span className="text-gray-500">{children}</span>;
+    }
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:text-blue-800 underline"
+      >
+        {children}
+      </a>
+    );
+  },
   // Style code blocks
   pre: ({ children }) => (
     <pre className="bg-gray-800 text-gray-100 rounded-md p-3 overflow-x-auto text-xs my-2">
       {children}
     </pre>
   ),
-  // Style inline code
+  // Style inline code vs code blocks
   code: ({ className, children }) => {
-    // If it has a className, it's a code block (handled by pre)
-    if (className) {
+    // Code blocks have a language-* class from rehype-highlight
+    const isCodeBlock = className?.includes("language-");
+    if (isCodeBlock) {
       return <code className={className}>{children}</code>;
     }
     // Inline code
@@ -86,6 +94,8 @@ const components: Components = {
 export function MarkdownMessage({ content }: MarkdownMessageProps) {
   return (
     <div className="text-sm leading-relaxed markdown-content">
+      {/* Security: raw HTML is disabled by default in react-markdown.
+          Do NOT add rehype-raw plugin as it would allow XSS attacks. */}
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}

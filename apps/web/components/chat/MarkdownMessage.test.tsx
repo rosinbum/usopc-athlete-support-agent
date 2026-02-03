@@ -30,6 +30,38 @@ describe("MarkdownMessage", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
+  it("renders http links as clickable", () => {
+    render(<MarkdownMessage content="[http link](http://example.com)" />);
+    const link = screen.getByRole("link", { name: "http link" });
+    expect(link).toHaveAttribute("href", "http://example.com");
+  });
+
+  it("renders mailto links as clickable", () => {
+    render(<MarkdownMessage content="[email](mailto:test@example.com)" />);
+    const link = screen.getByRole("link", { name: "email" });
+    expect(link).toHaveAttribute("href", "mailto:test@example.com");
+  });
+
+  it("renders javascript: URLs as plain text for security", () => {
+    render(<MarkdownMessage content="[click me](javascript:alert('xss'))" />);
+    // Should not render as a link
+    expect(
+      screen.queryByRole("link", { name: "click me" }),
+    ).not.toBeInTheDocument();
+    // Should render as plain text
+    expect(screen.getByText("click me")).toBeInTheDocument();
+  });
+
+  it("renders data: URLs as plain text for security", () => {
+    render(
+      <MarkdownMessage content="[data link](data:text/html,<script>alert('xss')</script>)" />,
+    );
+    expect(
+      screen.queryByRole("link", { name: "data link" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("data link")).toBeInTheDocument();
+  });
+
   it("renders unordered lists", () => {
     const content = `- Item 1
 - Item 2
