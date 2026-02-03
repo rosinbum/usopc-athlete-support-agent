@@ -87,15 +87,44 @@ npx prettier --check .                   # Check entire repo
 
 **Never commit directly to `main`.** Always create a feature branch and open a pull request.
 
+**Prefer git worktrees** for parallel development. Worktrees allow multiple branches to be checked out simultaneously in separate directories, enabling work on multiple issues without stashing or switching branches.
+
+### Git Worktrees
+
+```bash
+# Create a worktree for a new feature branch
+git worktree add ../usopc-issue-<number> -b feat/short-description
+
+# Create a worktree for an existing branch
+git worktree add ../usopc-issue-<number> existing-branch-name
+
+# List all worktrees
+git worktree list
+
+# Remove a worktree (after merging)
+git worktree remove ../usopc-issue-<number>
+
+# Prune stale worktree references
+git worktree prune
+```
+
+Worktree naming convention: `../usopc-issue-<number>` (e.g., `../usopc-issue-23`). This keeps worktrees at the same directory level as the main repo for easy navigation.
+
+**Important**: After creating a worktree, run `pnpm install` in the new directory to set up `node_modules`.
+
+### Implementation Steps
+
 For any implementation task:
 
 1. Create a GitHub issue describing the planned work **before starting** (`gh issue create`). The issue should cover all implementation, not just tests or cleanup.
-2. Create a feature branch off `main` (e.g., `feat/short-description` or `fix/short-description`)
-3. Write or update the corresponding `*.test.ts` file alongside the source (tests are co-located in `src/`)
-4. Run the relevant tests: `pnpm --filter @usopc/<package> test`
-5. Format changed files: `npx prettier --write <files>`
-6. Type-check: `pnpm --filter @usopc/<package> typecheck`
-7. Commit, push, and open a PR referencing the issue (`gh pr create`)
+2. Create a git worktree with a feature branch off `main` (e.g., `git worktree add ../usopc-issue-<number> -b feat/short-description`)
+3. Navigate to the worktree directory and run `pnpm install`
+4. Write or update the corresponding `*.test.ts` file alongside the source (tests are co-located in `src/`)
+5. Run the relevant tests: `pnpm --filter @usopc/<package> test`
+6. Format changed files: `npx prettier --write <files>`
+7. Type-check: `pnpm --filter @usopc/<package> typecheck`
+8. Commit, push, and open a PR referencing the issue (`gh pr create`)
+9. After PR is merged, remove the worktree: `git worktree remove ../usopc-issue-<number>`
 
 **Keeping issues and PRs accurate:**
 
