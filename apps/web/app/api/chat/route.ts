@@ -1,42 +1,13 @@
 import { AgentRunner, agentStreamToEvents } from "@usopc/core";
-import { getDatabaseUrl, getSecretValue, getOptionalEnv } from "@usopc/shared";
+import { getDatabaseUrl, getSecretValue } from "@usopc/shared";
 import { createDataStreamResponse, formatDataStreamPart } from "ai";
 
-// Configure LangSmith tracing (optional - enable if LANGCHAIN_API_KEY is set)
-function configureLangSmith() {
-  const langchainApiKey =
-    getOptionalEnv("LANGCHAIN_API_KEY") ??
-    (() => {
-      try {
-        return getSecretValue("LANGCHAIN_API_KEY", "LangchainApiKey");
-      } catch {
-        return undefined;
-      }
-    })();
-
-  if (langchainApiKey) {
-    process.env.LANGCHAIN_TRACING_V2 = "true";
-    process.env.LANGCHAIN_API_KEY = langchainApiKey;
-    process.env.LANGCHAIN_PROJECT =
-      getOptionalEnv("LANGCHAIN_PROJECT") ?? "usopc-athlete-support";
-    console.log("LangSmith tracing enabled");
-  }
-}
-
 // Cache a single runner instance per Lambda cold start
+// Note: Env vars (ANTHROPIC_API_KEY, LANGCHAIN_*) are set in instrumentation.ts
 let runnerPromise: Promise<AgentRunner> | null = null;
 
 function getRunner(): Promise<AgentRunner> {
   if (!runnerPromise) {
-    // Set env vars for SDKs that read from process.env
-    process.env.ANTHROPIC_API_KEY = getSecretValue(
-      "ANTHROPIC_API_KEY",
-      "AnthropicApiKey",
-    );
-
-    // Configure LangSmith tracing if API key is available
-    configureLangSmith();
-
     runnerPromise = AgentRunner.create({
       databaseUrl: getDatabaseUrl(),
       openaiApiKey: getSecretValue("OPENAI_API_KEY", "OpenaiApiKey"),
