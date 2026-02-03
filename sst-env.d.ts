@@ -14,6 +14,10 @@ declare module "sst" {
       "type": "sst.aws.ApiGatewayV2"
       "url": string
     }
+    "LangchainApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "OpenaiApiKey": {
       "type": "sst.sst.Secret"
       "value": string
