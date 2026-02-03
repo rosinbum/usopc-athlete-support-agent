@@ -17,15 +17,17 @@ async function getRunner() {
     );
 
     // LangSmith tracing (optional)
-    const langchainApiKey =
-      getOptionalEnv("LANGCHAIN_API_KEY") ??
-      (() => {
-        try {
-          return getSecretValue("LANGCHAIN_API_KEY", "LangchainApiKey");
-        } catch {
-          return undefined;
-        }
-      })();
+    let langchainApiKey: string | undefined;
+    try {
+      langchainApiKey = getSecretValue("LANGCHAIN_API_KEY", "LangchainApiKey");
+      console.log("Found LangSmith API key from SST secret");
+    } catch (e) {
+      console.log("LangSmith API key not found in SST secrets:", e);
+      langchainApiKey = getOptionalEnv("LANGCHAIN_API_KEY");
+      if (langchainApiKey) {
+        console.log("Found LangSmith API key from env var");
+      }
+    }
 
     if (langchainApiKey) {
       process.env.LANGCHAIN_TRACING_V2 = "true";
@@ -33,9 +35,11 @@ async function getRunner() {
       process.env.LANGCHAIN_PROJECT =
         getOptionalEnv("LANGCHAIN_PROJECT") ?? "usopc-athlete-support";
       console.log(
-        "LangSmith tracing enabled for project:",
+        "LangSmith tracing ENABLED for project:",
         process.env.LANGCHAIN_PROJECT,
       );
+    } else {
+      console.log("LangSmith tracing DISABLED - no API key found");
     }
 
     // Now import the agent (which loads LangChain with env vars set)
@@ -51,8 +55,10 @@ async function getRunner() {
 }
 
 export async function POST(req: Request) {
+  console.log("POST /api/chat called");
   const { messages, userSport } = await req.json();
   const runner = await getRunner();
+  console.log("Runner initialized, LANGCHAIN_TRACING_V2:", process.env.LANGCHAIN_TRACING_V2);
 
   // Dynamic import to ensure env vars are set first
   const { AgentRunner, agentStreamToEvents } = await import("@usopc/core");
