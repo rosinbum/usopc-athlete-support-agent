@@ -5,6 +5,13 @@ An AI-powered governance and compliance assistant for U.S. Olympic and Paralympi
 ## Features
 
 - **Intelligent Q&A**: Natural language interface powered by Claude (Anthropic) with retrieval-augmented generation (RAG)
+- **Real-Time Streaming**: Responses appear token-by-token as they're generated, so you see answers immediately
+- **Adaptive Response Formats**: Concise answers for simple questions, detailed responses for complex ones
+  - Factual queries: 1-3 sentences with source citation
+  - Procedural queries: Overview + numbered steps
+  - Deadline queries: Specific dates and timeframes
+  - Complex queries: Full 5-section format with details, deadlines, and next steps
+- **Smart Clarification**: When your question is ambiguous, the agent asks for clarification rather than guessing
 - **Document Search**: Vector similarity search across USOPC governance documents using pgvector
 - **Web Research**: Falls back to Tavily web search when local documents don't contain sufficient information
 - **Citation Tracking**: Every answer includes source citations so athletes can verify information
@@ -35,25 +42,27 @@ packages/
 The core agent is a compiled [LangGraph](https://langchain-ai.github.io/langgraph/) state machine:
 
 ```
-START → classifier → retriever | escalate
-           ↓
-      needsMoreInfo?
-        ↓       ↓
-   synthesizer  researcher
-        ↓           ↓
-        └─────┬─────┘
-              ↓
-       citationBuilder → disclaimerGuard → END
+START → classifier → clarify | retriever | escalate
+             ↓            ↓          ↓
+        needsClarification?      needsMoreInfo?
+             ↓                  ↓       ↓
+            END          synthesizer  researcher
+                              ↓           ↓
+                              └─────┬─────┘
+                                    ↓
+                             citationBuilder → disclaimerGuard → END
 ```
 
 **Nodes**:
 
-- `classifier`: Determines query domain and whether it's in-scope
+- `classifier`: Analyzes query to determine domain, intent, and whether clarification is needed
+- `clarify`: Returns a clarifying question when the query is ambiguous
 - `retriever`: Performs pgvector similarity search on embedded documents
 - `researcher`: Queries Tavily for additional web context
-- `synthesizer`: Generates the final response via Claude
+- `synthesizer`: Generates the response via Claude (with adaptive formatting based on query intent)
 - `citationBuilder`: Extracts and formats source citations
 - `disclaimerGuard`: Adds disclaimers for sensitive topics
+- `escalate`: Routes urgent matters (abuse reports, imminent deadlines) to appropriate authorities
 
 ### Ingestion Pipeline
 

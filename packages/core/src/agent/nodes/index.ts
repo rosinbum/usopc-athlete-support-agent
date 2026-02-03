@@ -1,4 +1,5 @@
 export { classifierNode } from "./classifier.js";
+export { clarifyNode } from "./clarify.js";
 export { createRetrieverNode } from "./retriever.js";
 export type { VectorStoreLike } from "./retriever.js";
 export { createResearcherNode, createTavilySearchTool } from "./researcher.js";

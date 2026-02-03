@@ -42,6 +42,8 @@ interface ClassifierOutput {
   hasTimeConstraint: boolean;
   shouldEscalate: boolean;
   escalationReason?: string;
+  needsClarification: boolean;
+  clarificationQuestion?: string;
 }
 
 /**
@@ -102,6 +104,16 @@ function parseClassifierResponse(raw: string): ClassifierOutput {
       ? parsed.escalationReason
       : undefined;
 
+  const needsClarification =
+    typeof parsed.needsClarification === "boolean"
+      ? parsed.needsClarification
+      : false;
+
+  const clarificationQuestion =
+    typeof parsed.clarificationQuestion === "string"
+      ? parsed.clarificationQuestion
+      : undefined;
+
   return {
     topicDomain: topicDomain ?? "team_selection", // fallback handled below
     detectedNgbIds,
@@ -109,6 +121,8 @@ function parseClassifierResponse(raw: string): ClassifierOutput {
     hasTimeConstraint,
     shouldEscalate,
     escalationReason,
+    needsClarification,
+    clarificationQuestion,
   };
 }
 
@@ -120,6 +134,8 @@ function parseClassifierResponse(raw: string): ClassifierOutput {
  * - detectedNgbIds: any NGB identifiers mentioned or implied
  * - queryIntent: what kind of answer the user is looking for
  * - hasTimeConstraint: whether urgency signals are present
+ * - needsClarification: whether the query is too ambiguous
+ * - clarificationQuestion: what to ask to clarify
  *
  * The `shouldEscalate` flag from the classifier output is encoded into
  * the state as `queryIntent === "escalation"` so downstream conditional
@@ -134,6 +150,7 @@ export async function classifierNode(
     log.warn("Classifier received empty user message; defaulting state");
     return {
       queryIntent: "general",
+      needsClarification: false,
     };
   }
 
@@ -172,6 +189,7 @@ export async function classifierNode(
       detectedNgbIds: result.detectedNgbIds,
       hasTimeConstraint: result.hasTimeConstraint,
       shouldEscalate: result.shouldEscalate,
+      needsClarification: result.needsClarification,
     });
 
     return {
@@ -179,6 +197,8 @@ export async function classifierNode(
       detectedNgbIds: result.detectedNgbIds,
       queryIntent: result.shouldEscalate ? "escalation" : result.queryIntent,
       hasTimeConstraint: result.hasTimeConstraint,
+      needsClarification: result.needsClarification,
+      clarificationQuestion: result.clarificationQuestion,
     };
   } catch (error) {
     log.error("Classifier failed; falling back to defaults", {
@@ -192,6 +212,7 @@ export async function classifierNode(
       detectedNgbIds: [],
       queryIntent: "general",
       hasTimeConstraint: false,
+      needsClarification: false,
     };
   }
 }

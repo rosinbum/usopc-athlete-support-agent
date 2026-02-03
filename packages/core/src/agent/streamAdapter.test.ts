@@ -1,12 +1,30 @@
 import { describe, it, expect } from "vitest";
-import { agentStreamToEvents } from "./streamAdapter.js";
+import {
+  agentStreamToEvents,
+  legacyStateStreamToEvents,
+} from "./streamAdapter.js";
 import type { AgentStreamEvent } from "./streamAdapter.js";
 import type { AgentState } from "./state.js";
+import type { StreamChunk } from "./runner.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Creates a mock dual-mode stream with both "values" and "messages" chunks.
+ */
+async function* mockDualStream(
+  chunks: StreamChunk[],
+): AsyncGenerator<StreamChunk> {
+  for (const chunk of chunks) {
+    yield chunk;
+  }
+}
+
+/**
+ * Creates a mock state-only stream for legacy adapter testing.
+ */
 async function* mockStateStream(
   updates: Array<Partial<AgentState>>,
 ): AsyncGenerator<Partial<AgentState>> {
@@ -16,7 +34,7 @@ async function* mockStateStream(
 }
 
 async function collectEvents(
-  stream: AsyncIterable<Partial<AgentState>>,
+  stream: AsyncIterable<StreamChunk>,
 ): Promise<AgentStreamEvent[]> {
   const events: AgentStreamEvent[] = [];
   for await (const event of agentStreamToEvents(stream)) {
@@ -25,13 +43,226 @@ async function collectEvents(
   return events;
 }
 
+async function collectLegacyEvents(
+  stream: AsyncIterable<Partial<AgentState>>,
+): Promise<AgentStreamEvent[]> {
+  const events: AgentStreamEvent[] = [];
+  for await (const event of legacyStateStreamToEvents(stream)) {
+    events.push(event);
+  }
+  return events;
+}
+
 // ---------------------------------------------------------------------------
-// Tests
+// Tests for dual-mode streaming (new)
 // ---------------------------------------------------------------------------
 
-describe("agentStreamToEvents", () => {
-  it("emits text deltas for new answer text", async () => {
+describe("agentStreamToEvents (dual-mode)", () => {
+  it("emits text deltas from synthesizer messages", async () => {
     const events = await collectEvents(
+      mockDualStream([
+        ["messages", [{ content: "Hello" }, { langgraph_node: "synthesizer" }]],
+        [
+          "messages",
+          [{ content: " world" }, { langgraph_node: "synthesizer" }],
+        ],
+        ["messages", [{ content: "!" }, { langgraph_node: "synthesizer" }]],
+      ]),
+    );
+
+    const textDeltas = events.filter((e) => e.type === "text-delta");
+    expect(textDeltas).toHaveLength(3);
+    expect(textDeltas[0].textDelta).toBe("Hello");
+    expect(textDeltas[1].textDelta).toBe(" world");
+    expect(textDeltas[2].textDelta).toBe("!");
+  });
+
+  it("filters out messages from non-synthesizer nodes", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        [
+          "messages",
+          [
+            { content: '{"topicDomain":"safesport"}' },
+            { langgraph_node: "classifier" },
+          ],
+        ],
+        [
+          "messages",
+          [{ content: "Actual answer" }, { langgraph_node: "synthesizer" }],
+        ],
+      ]),
+    );
+
+    const textDeltas = events.filter((e) => e.type === "text-delta");
+    expect(textDeltas).toHaveLength(1);
+    expect(textDeltas[0].textDelta).toBe("Actual answer");
+  });
+
+  it("handles array content format from messages", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        [
+          "messages",
+          [
+            {
+              content: [
+                { type: "text", text: "Part 1" },
+                { type: "text", text: "Part 2" },
+              ],
+            },
+            { langgraph_node: "synthesizer" },
+          ],
+        ],
+      ]),
+    );
+
+    const textDeltas = events.filter((e) => e.type === "text-delta");
+    expect(textDeltas).toHaveLength(1);
+    expect(textDeltas[0].textDelta).toBe("Part 1Part 2");
+  });
+
+  it("emits citations from values mode", async () => {
+    const citations = [
+      {
+        title: "Selection Procedures",
+        documentType: "policy",
+        snippet: "Athletes are selected...",
+      },
+    ];
+
+    const events = await collectEvents(
+      mockDualStream([["values", { citations }]]),
+    );
+
+    const citationEvents = events.filter((e) => e.type === "citations");
+    expect(citationEvents).toHaveLength(1);
+    expect(citationEvents[0].citations).toEqual(citations);
+  });
+
+  it("does not emit citations event for empty citations array", async () => {
+    const events = await collectEvents(
+      mockDualStream([["values", { citations: [] }]]),
+    );
+
+    const citationEvents = events.filter((e) => e.type === "citations");
+    expect(citationEvents).toHaveLength(0);
+  });
+
+  it("emits escalation from values mode", async () => {
+    const escalation = {
+      target: "U.S. Center for SafeSport",
+      organization: "SafeSport",
+      reason: "abuse report",
+      urgency: "immediate" as const,
+    };
+
+    const events = await collectEvents(
+      mockDualStream([["values", { escalation }]]),
+    );
+
+    const escalationEvents = events.filter((e) => e.type === "escalation");
+    expect(escalationEvents).toHaveLength(1);
+    expect(escalationEvents[0].escalation).toEqual(escalation);
+  });
+
+  it("emits done event at end of stream", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        ["messages", [{ content: "Hi" }, { langgraph_node: "synthesizer" }]],
+      ]),
+    );
+
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent.type).toBe("done");
+  });
+
+  it("emits done even for empty stream", async () => {
+    const events = await collectEvents(mockDualStream([]));
+
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("done");
+  });
+
+  it("handles interleaved messages and values", async () => {
+    const citations = [
+      { title: "Doc", documentType: "policy", snippet: "..." },
+    ];
+
+    const events = await collectEvents(
+      mockDualStream([
+        ["messages", [{ content: "First" }, { langgraph_node: "synthesizer" }]],
+        ["values", { citations }],
+        [
+          "messages",
+          [{ content: " second" }, { langgraph_node: "synthesizer" }],
+        ],
+      ]),
+    );
+
+    const types = events.map((e) => e.type);
+    expect(types).toContain("text-delta");
+    expect(types).toContain("citations");
+    expect(types).toContain("done");
+    expect(events.filter((e) => e.type === "text-delta")).toHaveLength(2);
+  });
+
+  it("does not emit duplicate citations events", async () => {
+    const citations = [
+      { title: "Doc", documentType: "policy", snippet: "..." },
+    ];
+
+    const events = await collectEvents(
+      mockDualStream([
+        ["values", { citations }],
+        ["values", { citations }],
+      ]),
+    );
+
+    const citationEvents = events.filter((e) => e.type === "citations");
+    expect(citationEvents).toHaveLength(1);
+  });
+
+  it("skips messages with empty content", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        ["messages", [{ content: "" }, { langgraph_node: "synthesizer" }]],
+        [
+          "messages",
+          [{ content: "Real content" }, { langgraph_node: "synthesizer" }],
+        ],
+      ]),
+    );
+
+    const textDeltas = events.filter((e) => e.type === "text-delta");
+    expect(textDeltas).toHaveLength(1);
+    expect(textDeltas[0].textDelta).toBe("Real content");
+  });
+
+  it("skips messages without node metadata", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        ["messages", [{ content: "No node" }, {}]],
+        [
+          "messages",
+          [{ content: "With node" }, { langgraph_node: "synthesizer" }],
+        ],
+      ]),
+    );
+
+    const textDeltas = events.filter((e) => e.type === "text-delta");
+    expect(textDeltas).toHaveLength(1);
+    expect(textDeltas[0].textDelta).toBe("With node");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests for legacy state-only streaming
+// ---------------------------------------------------------------------------
+
+describe("legacyStateStreamToEvents", () => {
+  it("emits text deltas for new answer text", async () => {
+    const events = await collectLegacyEvents(
       mockStateStream([
         { answer: "Hello" },
         { answer: "Hello world" },
@@ -47,11 +278,11 @@ describe("agentStreamToEvents", () => {
   });
 
   it("skips text-delta when answer does not change", async () => {
-    const events = await collectEvents(
+    const events = await collectLegacyEvents(
       mockStateStream([
         { answer: "Hello" },
-        { retrievalConfidence: 0.8 }, // no answer field
-        { answer: "Hello" }, // same answer, no change
+        { retrievalConfidence: 0.8 },
+        { answer: "Hello" },
       ]),
     );
 
@@ -69,7 +300,7 @@ describe("agentStreamToEvents", () => {
       },
     ];
 
-    const events = await collectEvents(
+    const events = await collectLegacyEvents(
       mockStateStream([{ answer: "Response", citations }]),
     );
 
@@ -79,7 +310,7 @@ describe("agentStreamToEvents", () => {
   });
 
   it("does not emit citations event for empty citations array", async () => {
-    const events = await collectEvents(
+    const events = await collectLegacyEvents(
       mockStateStream([{ answer: "Response", citations: [] }]),
     );
 
@@ -95,7 +326,7 @@ describe("agentStreamToEvents", () => {
       urgency: "immediate" as const,
     };
 
-    const events = await collectEvents(
+    const events = await collectLegacyEvents(
       mockStateStream([{ answer: "Contact SafeSport.", escalation }]),
     );
 
@@ -105,14 +336,16 @@ describe("agentStreamToEvents", () => {
   });
 
   it("emits done event at end of stream", async () => {
-    const events = await collectEvents(mockStateStream([{ answer: "Hello" }]));
+    const events = await collectLegacyEvents(
+      mockStateStream([{ answer: "Hello" }]),
+    );
 
     const lastEvent = events[events.length - 1];
     expect(lastEvent.type).toBe("done");
   });
 
   it("emits done even for empty stream", async () => {
-    const events = await collectEvents(mockStateStream([]));
+    const events = await collectLegacyEvents(mockStateStream([]));
 
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe("done");
@@ -129,7 +362,7 @@ describe("agentStreamToEvents", () => {
       urgency: "immediate" as const,
     };
 
-    const events = await collectEvents(
+    const events = await collectLegacyEvents(
       mockStateStream([{ answer: "Answer", citations, escalation }]),
     );
 
@@ -145,15 +378,14 @@ describe("agentStreamToEvents", () => {
       { title: "Doc", documentType: "policy", snippet: "..." },
     ];
 
-    const events = await collectEvents(
+    const events = await collectLegacyEvents(
       mockStateStream([
         { answer: "Hello", citations },
-        { answer: "Hello world", citations }, // same citations again
+        { answer: "Hello world", citations },
       ]),
     );
 
     const citationEvents = events.filter((e) => e.type === "citations");
-    // Should only emit once since citations didn't change
     expect(citationEvents).toHaveLength(1);
   });
 
@@ -165,19 +397,18 @@ describe("agentStreamToEvents", () => {
 
     const events: AgentStreamEvent[] = [];
     await expect(async () => {
-      for await (const event of agentStreamToEvents(failingStream())) {
+      for await (const event of legacyStateStreamToEvents(failingStream())) {
         events.push(event);
       }
     }).rejects.toThrow("Source stream failed");
 
-    // Should have collected the text-delta before the error
     expect(events.some((e) => e.type === "text-delta")).toBe(true);
   });
 
   it("handles answer going from undefined to a value", async () => {
-    const events = await collectEvents(
+    const events = await collectLegacyEvents(
       mockStateStream([
-        { topicDomain: "safesport" }, // no answer
+        { topicDomain: "safesport" },
         { answer: "SafeSport info" },
       ]),
     );
