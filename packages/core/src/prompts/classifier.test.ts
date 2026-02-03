@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildClassifierPrompt, CLASSIFIER_PROMPT } from "./classifier.js";
+import {
+  buildClassifierPrompt,
+  buildClassifierPromptWithHistory,
+  CLASSIFIER_PROMPT,
+} from "./classifier.js";
 
 describe("buildClassifierPrompt", () => {
   it("replaces the {{userMessage}} placeholder", () => {
@@ -17,6 +21,65 @@ describe("buildClassifierPrompt", () => {
     expect(result).toContain("detectedNgbIds");
     expect(result).toContain("hasTimeConstraint");
     expect(result).toContain("shouldEscalate");
+  });
+});
+
+describe("buildClassifierPromptWithHistory", () => {
+  it("includes conversation context section when history is provided", () => {
+    const result = buildClassifierPromptWithHistory(
+      "What about alternates?",
+      "User: What are the team selection criteria for swimming?\nAssistant: USA Swimming selects athletes based on time standards.",
+    );
+
+    expect(result).toContain("## Conversation History");
+    expect(result).toContain("team selection criteria for swimming");
+    expect(result).toContain("What about alternates?");
+  });
+
+  it("omits conversation context section when history is empty", () => {
+    const result = buildClassifierPromptWithHistory(
+      "What are the selection criteria?",
+      "",
+    );
+
+    expect(result).not.toContain("## Conversation History");
+    expect(result).toContain("What are the selection criteria?");
+  });
+
+  it("includes instruction to use context for ambiguity resolution", () => {
+    const result = buildClassifierPromptWithHistory(
+      "What about alternates?",
+      "User: What are the team selection criteria for swimming?",
+    );
+
+    expect(result).toContain(
+      "Use this context to resolve pronouns and references",
+    );
+  });
+
+  it("places conversation history before user message", () => {
+    const result = buildClassifierPromptWithHistory(
+      "Current question",
+      "User: Previous question\nAssistant: Previous answer",
+    );
+
+    const historyIndex = result.indexOf("## Conversation History");
+    const messageIndex = result.indexOf("## User Message");
+    expect(historyIndex).toBeLessThan(messageIndex);
+  });
+
+  it("includes all required classification fields", () => {
+    const result = buildClassifierPromptWithHistory(
+      "Test message",
+      "User: Prior\nAssistant: Response",
+    );
+
+    expect(result).toContain("topicDomain");
+    expect(result).toContain("queryIntent");
+    expect(result).toContain("detectedNgbIds");
+    expect(result).toContain("hasTimeConstraint");
+    expect(result).toContain("shouldEscalate");
+    expect(result).toContain("needsClarification");
   });
 });
 

@@ -138,3 +138,73 @@ describe("SYNTHESIZER_PROMPT (legacy)", () => {
     expect(SYNTHESIZER_PROMPT).toContain("**Sources**");
   });
 });
+
+describe("buildSynthesizerPrompt with conversation history", () => {
+  const context = "[Document 1]\nTest context about swimming selection";
+  const userQuestion = "What about alternates?";
+  const conversationHistory =
+    "User: What are the team selection criteria for swimming?\nAssistant: USA Swimming selects athletes based on time standards at Olympic Trials.";
+
+  it("includes conversation history section when provided", () => {
+    const prompt = buildSynthesizerPrompt(
+      context,
+      userQuestion,
+      "general",
+      conversationHistory,
+    );
+
+    expect(prompt).toContain("## Conversation History");
+    expect(prompt).toContain("team selection criteria for swimming");
+  });
+
+  it("omits conversation history section when not provided", () => {
+    const prompt = buildSynthesizerPrompt(context, userQuestion, "general");
+
+    expect(prompt).not.toContain("## Conversation History");
+  });
+
+  it("omits conversation history section when empty string", () => {
+    const prompt = buildSynthesizerPrompt(context, userQuestion, "general", "");
+
+    expect(prompt).not.toContain("## Conversation History");
+  });
+
+  it("includes instruction to use context for coherent response", () => {
+    const prompt = buildSynthesizerPrompt(
+      context,
+      userQuestion,
+      "general",
+      conversationHistory,
+    );
+
+    expect(prompt).toContain("prior exchanges");
+  });
+
+  it("places conversation history before user question", () => {
+    const prompt = buildSynthesizerPrompt(
+      context,
+      userQuestion,
+      "general",
+      conversationHistory,
+    );
+
+    const historyIndex = prompt.indexOf("## Conversation History");
+    const questionIndex = prompt.indexOf("## User Question");
+    expect(historyIndex).toBeLessThan(questionIndex);
+  });
+
+  it("works with all query intents", () => {
+    const intents = ["factual", "procedural", "deadline", "general"] as const;
+
+    for (const intent of intents) {
+      const prompt = buildSynthesizerPrompt(
+        context,
+        userQuestion,
+        intent,
+        conversationHistory,
+      );
+      expect(prompt).toContain("## Conversation History");
+      expect(prompt).toContain(conversationHistory);
+    }
+  });
+});

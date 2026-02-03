@@ -9,10 +9,11 @@ vi.mock("@usopc/shared", () => ({
       debug: vi.fn(),
     }),
   },
+  getOptionalEnv: vi.fn().mockReturnValue(undefined),
 }));
 
 import { createRetrieverNode, type VectorStoreLike } from "./retriever.js";
-import { HumanMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import type { AgentState } from "../state.js";
 
 // ---------------------------------------------------------------------------
@@ -277,5 +278,94 @@ describe("createRetrieverNode", () => {
         ngbId: { $in: ["usa_swimming", "usa_track_field"] },
       }),
     );
+  });
+
+  describe("conversation context", () => {
+    it("enriches search query with context from prior messages", async () => {
+      const store = makeMockVectorStore([
+        [
+          makeSearchResult("Alternates selection procedures", 0.1),
+          makeSearchResult("Team selection doc", 0.15),
+        ],
+      ]);
+
+      const node = createRetrieverNode(store);
+      const state = makeState({
+        messages: [
+          new HumanMessage(
+            "What are the team selection criteria for swimming?",
+          ),
+          new AIMessage(
+            "USA Swimming selects athletes based on time standards.",
+          ),
+          new HumanMessage("What about alternates?"),
+        ],
+        topicDomain: "team_selection",
+        detectedNgbIds: ["usa_swimming"],
+      });
+
+      await node(state);
+
+      // The query should be enriched with context
+      const mockFn = store.similaritySearchWithScore as ReturnType<
+        typeof vi.fn
+      >;
+      const searchQuery = mockFn.mock.calls[0][0] as string;
+      // Query should include the current message
+      expect(searchQuery).toContain("alternates");
+      // Query should include relevant context
+      expect(searchQuery.toLowerCase()).toContain("swimming");
+    });
+
+    it("keeps enriched query concise (not full verbatim history)", async () => {
+      const longAssistantResponse = "A".repeat(1000);
+      const store = makeMockVectorStore([
+        [makeSearchResult("doc1", 0.1), makeSearchResult("doc2", 0.15)],
+      ]);
+
+      const node = createRetrieverNode(store);
+      const state = makeState({
+        messages: [
+          new HumanMessage("Initial question about swimming"),
+          new AIMessage(longAssistantResponse),
+          new HumanMessage("Follow up question"),
+        ],
+        topicDomain: "team_selection",
+      });
+
+      await node(state);
+
+      // Query should be enriched but not include the full verbatim history
+      const mockFn = store.similaritySearchWithScore as ReturnType<
+        typeof vi.fn
+      >;
+      const searchQuery = mockFn.mock.calls[0][0] as string;
+      expect(searchQuery.length).toBeLessThan(longAssistantResponse.length);
+    });
+
+    it("works correctly with single message (no prior context)", async () => {
+      const store = makeMockVectorStore([
+        [
+          makeSearchResult("doc1", 0.1),
+          makeSearchResult("doc2", 0.15),
+          makeSearchResult("doc3", 0.2),
+        ],
+      ]);
+
+      const node = createRetrieverNode(store);
+      const state = makeState({
+        messages: [new HumanMessage("What are the eligibility requirements?")],
+        topicDomain: "eligibility",
+      });
+
+      await node(state);
+
+      // Should use the single message as the query
+      const mockFn = store.similaritySearchWithScore as ReturnType<
+        typeof vi.fn
+      >;
+      const searchQuery = mockFn.mock.calls[0][0] as string;
+      expect(searchQuery).toContain("eligibility requirements");
+    });
   });
 });

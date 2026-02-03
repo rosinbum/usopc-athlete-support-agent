@@ -1,5 +1,6 @@
 import { logger } from "@usopc/shared";
 import { RETRIEVAL_CONFIG } from "../../config/index.js";
+import { buildContextualQuery } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 
@@ -23,21 +24,49 @@ export interface VectorStoreLike {
 }
 
 /**
- * Extracts the text content from the last user message.
+ * Maximum length for context portion of enriched query.
  */
-function getLastUserMessage(state: AgentState): string {
-  for (let i = state.messages.length - 1; i >= 0; i--) {
-    const msg = state.messages[i];
-    if (
-      msg._getType() === "human" ||
-      (msg as unknown as Record<string, unknown>).role === "user"
-    ) {
-      return typeof msg.content === "string"
-        ? msg.content
-        : JSON.stringify(msg.content);
-    }
+const MAX_CONTEXT_LENGTH = 200;
+
+/**
+ * Extracts key terms from conversation context for query enrichment.
+ * Keeps it concise to avoid diluting the search query.
+ */
+function extractContextTerms(conversationContext: string): string {
+  if (!conversationContext) return "";
+
+  // Truncate to keep query focused
+  const truncated = conversationContext.slice(0, MAX_CONTEXT_LENGTH);
+
+  // Extract just the key content, removing role prefixes
+  const cleaned = truncated
+    .replace(/^(User|Assistant):\s*/gim, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return cleaned;
+}
+
+/**
+ * Builds an enriched search query using conversation context.
+ * TODO: Consider dedicated query reformulation node (#37)
+ */
+function buildEnrichedQuery(state: AgentState): string {
+  const { currentMessage, conversationContext } = buildContextualQuery(
+    state.messages,
+    { maxTurns: 2 }, // Keep context focused for retrieval
+  );
+
+  if (!currentMessage) return "";
+
+  const contextTerms = extractContextTerms(conversationContext);
+
+  if (!contextTerms) {
+    return currentMessage;
   }
-  return "";
+
+  // Combine current message with context for better retrieval
+  return `${currentMessage.toLowerCase()} ${contextTerms.toLowerCase()}`;
 }
 
 /**
@@ -106,7 +135,7 @@ function computeConfidence(scores: number[]): number {
  */
 export function createRetrieverNode(vectorStore: VectorStoreLike) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
-    const query = getLastUserMessage(state);
+    const query = buildEnrichedQuery(state);
 
     if (!query) {
       log.warn("Retriever received empty query");

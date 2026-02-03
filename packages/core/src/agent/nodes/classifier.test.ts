@@ -21,10 +21,11 @@ vi.mock("@usopc/shared", () => ({
       debug: vi.fn(),
     }),
   },
+  getOptionalEnv: vi.fn().mockReturnValue(undefined),
 }));
 
 import { classifierNode } from "./classifier.js";
-import { HumanMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import type { AgentState } from "../state.js";
 
 // ---------------------------------------------------------------------------
@@ -283,5 +284,92 @@ describe("classifierNode", () => {
     const result = await classifierNode(state);
 
     expect(result.needsClarification).toBe(false);
+  });
+
+  describe("conversation context", () => {
+    it("uses conversation history to resolve follow-up questions", async () => {
+      // First exchange about swimming team selection
+      // Second question is a follow-up referencing prior context
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "team_selection",
+          detectedNgbIds: ["usa_swimming"],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage(
+            "What are the team selection criteria for swimming?",
+          ),
+          new AIMessage(
+            "USA Swimming selects athletes based on time standards at Olympic Trials...",
+          ),
+          new HumanMessage("What about alternates?"),
+        ],
+      });
+
+      const result = await classifierNode(state);
+
+      // The classifier should understand "alternates" refers to swimming team selection
+      expect(result.topicDomain).toBe("team_selection");
+      expect(result.detectedNgbIds).toEqual(["usa_swimming"]);
+    });
+
+    it("carries forward sport context for pronoun resolution", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "dispute_resolution",
+          detectedNgbIds: ["usa_swimming"],
+          queryIntent: "procedural",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage("I compete in swimming."),
+          new AIMessage("Great! I can help with swimming-related questions."),
+          new HumanMessage("How do I appeal that decision?"),
+        ],
+      });
+
+      const result = await classifierNode(state);
+
+      // Should carry forward the swimming context
+      expect(result.detectedNgbIds).toEqual(["usa_swimming"]);
+    });
+
+    it("works correctly with single message (no prior context)", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "eligibility",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: true,
+          clarificationQuestion: "Which sport are you asking about?",
+        }),
+      );
+
+      const state = makeState({
+        messages: [new HumanMessage("What are the age requirements?")],
+      });
+
+      const result = await classifierNode(state);
+
+      // Without context, classifier should ask for clarification
+      expect(result.needsClarification).toBe(true);
+      expect(result.clarificationQuestion).toBe(
+        "Which sport are you asking about?",
+      );
+    });
   });
 });
