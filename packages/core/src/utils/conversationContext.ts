@@ -1,10 +1,10 @@
 import type { BaseMessage } from "@langchain/core/messages";
-import { getOptionalEnv } from "@usopc/shared";
+import { getOptionalSecretValue } from "@usopc/shared";
 
 /**
  * Default number of conversation turns to include in context.
  */
-const DEFAULT_MAX_TURNS = 5;
+const DEFAULT_MAX_TURNS = "5";
 
 /**
  * Maximum length for individual messages before truncation.
@@ -13,14 +13,17 @@ const MAX_MESSAGE_LENGTH = 500;
 
 /**
  * Returns the maximum number of conversation turns to include in context.
- * Configurable via CONVERSATION_MAX_TURNS env var or SST secret.
+ * Configurable via CONVERSATION_MAX_TURNS env var or ConversationMaxTurns SST secret.
  */
 export function getMaxTurns(): number {
-  const value = getOptionalEnv("CONVERSATION_MAX_TURNS");
-  if (!value) return DEFAULT_MAX_TURNS;
+  const value = getOptionalSecretValue(
+    "CONVERSATION_MAX_TURNS",
+    "ConversationMaxTurns",
+    DEFAULT_MAX_TURNS,
+  );
 
   const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? DEFAULT_MAX_TURNS : parsed;
+  return isNaN(parsed) ? parseInt(DEFAULT_MAX_TURNS, 10) : parsed;
 }
 
 /**

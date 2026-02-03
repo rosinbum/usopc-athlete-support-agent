@@ -88,6 +88,35 @@ export function getSecretValue(
 }
 
 /**
+ * Resolve an optional secret value by checking a plain environment variable
+ * first, then falling back to an SST v3 Resource binding. Returns the default
+ * value if neither is available.
+ *
+ * Use this for configuration values that have sensible defaults.
+ */
+export function getOptionalSecretValue(
+  envKey: string,
+  sstResourceName: string,
+  defaultValue: string,
+): string {
+  // 1. Direct env var (highest priority)
+  const direct = process.env[envKey];
+  if (direct) return direct;
+
+  // 2. SST Resource binding
+  try {
+    const resource = (
+      Resource as unknown as Record<string, { value?: string }>
+    )[sstResourceName];
+    if (resource?.value) return resource.value;
+  } catch {
+    // Resource not available — fall through to default
+  }
+
+  return defaultValue;
+}
+
+/**
  * Returns `true` when `NODE_ENV` is `"production"`.
  */
 export function isProduction(): boolean {

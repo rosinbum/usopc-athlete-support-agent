@@ -3,7 +3,7 @@ import { AIMessage, HumanMessage } from "@langchain/core/messages";
 
 // Mock @usopc/shared before importing module under test
 vi.mock("@usopc/shared", () => ({
-  getOptionalEnv: vi.fn(),
+  getOptionalSecretValue: vi.fn(),
 }));
 
 import {
@@ -11,14 +11,15 @@ import {
   buildContextualQuery,
   getMaxTurns,
 } from "./conversationContext.js";
-import { getOptionalEnv } from "@usopc/shared";
+import { getOptionalSecretValue } from "@usopc/shared";
 
-const mockGetOptionalEnv = vi.mocked(getOptionalEnv);
+const mockGetOptionalSecretValue = vi.mocked(getOptionalSecretValue);
 
 describe("conversationContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetOptionalEnv.mockReturnValue(undefined);
+    // Default mock returns the default value "5"
+    mockGetOptionalSecretValue.mockReturnValue("5");
   });
 
   afterEach(() => {
@@ -26,23 +27,23 @@ describe("conversationContext", () => {
   });
 
   describe("getMaxTurns", () => {
-    it("returns default value of 5 when env var not set", () => {
-      mockGetOptionalEnv.mockReturnValue(undefined);
+    it("returns default value of 5 when secret returns default", () => {
+      mockGetOptionalSecretValue.mockReturnValue("5");
       expect(getMaxTurns()).toBe(5);
     });
 
-    it("returns parsed value from env var", () => {
-      mockGetOptionalEnv.mockReturnValue("10");
+    it("returns parsed value from secret", () => {
+      mockGetOptionalSecretValue.mockReturnValue("10");
       expect(getMaxTurns()).toBe(10);
     });
 
     it("returns default for invalid (non-numeric) value", () => {
-      mockGetOptionalEnv.mockReturnValue("invalid");
+      mockGetOptionalSecretValue.mockReturnValue("invalid");
       expect(getMaxTurns()).toBe(5);
     });
 
     it("returns default for empty string", () => {
-      mockGetOptionalEnv.mockReturnValue("");
+      mockGetOptionalSecretValue.mockReturnValue("");
       expect(getMaxTurns()).toBe(5);
     });
   });

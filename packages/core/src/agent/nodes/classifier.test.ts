@@ -21,7 +21,7 @@ vi.mock("@usopc/shared", () => ({
       debug: vi.fn(),
     }),
   },
-  getOptionalEnv: vi.fn().mockReturnValue(undefined),
+  getOptionalSecretValue: vi.fn().mockReturnValue("5"),
 }));
 
 import { classifierNode } from "./classifier.js";
