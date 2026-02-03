@@ -4,3 +4,7 @@ export { createAgentGraph } from "./graph.js";
 export type { GraphDependencies } from "./graph.js";
 export * from "./nodes/index.js";
 export * from "./edges/index.js";
+export { AgentRunner, convertMessages } from "./runner.js";
+export type { AgentRunnerConfig, AgentInput, AgentOutput } from "./runner.js";
+export { agentStreamToEvents } from "./streamAdapter.js";
+export type { AgentStreamEvent } from "./streamAdapter.js";
