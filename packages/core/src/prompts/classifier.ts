@@ -94,3 +94,40 @@ Example with clarification needed:
 export function buildClassifierPrompt(userMessage: string): string {
   return CLASSIFIER_PROMPT.replace("{{userMessage}}", userMessage);
 }
+
+/**
+ * Builds the classifier prompt with conversation history for context.
+ *
+ * When conversation history is provided, adds a section that helps the
+ * classifier resolve pronouns, references, and continue context from
+ * prior turns.
+ *
+ * @param userMessage - The current user message to classify
+ * @param conversationHistory - Formatted prior conversation history
+ */
+export function buildClassifierPromptWithHistory(
+  userMessage: string,
+  conversationHistory: string,
+): string {
+  // If no history, use standard prompt
+  if (!conversationHistory) {
+    return buildClassifierPrompt(userMessage);
+  }
+
+  const historySection = `## Conversation History
+
+Use this context to resolve pronouns and references (e.g., "it", "that", "they", "the same sport").
+Carry forward relevant context like sport, NGB, or topic from prior messages when classifying the current query.
+
+${conversationHistory}
+
+`;
+
+  // Insert history section before "## User Message" in the base prompt
+  const basePrompt = CLASSIFIER_PROMPT.replace(
+    "## User Message",
+    `${historySection}## User Message`,
+  );
+
+  return basePrompt.replace("{{userMessage}}", userMessage);
+}

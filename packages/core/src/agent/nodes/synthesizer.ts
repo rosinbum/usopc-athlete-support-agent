@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger } from "@usopc/shared";
 import { MODEL_CONFIG } from "../../config/index.js";
 import { SYSTEM_PROMPT, buildSynthesizerPrompt } from "../../prompts/index.js";
+import { buildContextualQuery } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 
@@ -116,9 +117,12 @@ function getLastUserMessage(state: AgentState): string {
 export async function synthesizerNode(
   state: AgentState,
 ): Promise<Partial<AgentState>> {
-  const userQuestion = getLastUserMessage(state);
+  // Build contextual query from conversation history
+  const { currentMessage, conversationContext } = buildContextualQuery(
+    state.messages,
+  );
 
-  if (!userQuestion) {
+  if (!currentMessage) {
     log.warn("Synthesizer received empty user question");
     return {
       answer:
@@ -128,10 +132,12 @@ export async function synthesizerNode(
 
   const context = buildContext(state);
   // Pass queryIntent to adapt response format (concise for factual/deadline, detailed for general)
+  // Pass conversation history for contextual responses
   const prompt = buildSynthesizerPrompt(
     context,
-    userQuestion,
+    currentMessage,
     state.queryIntent,
+    conversationContext,
   );
 
   const model = new ChatAnthropic({

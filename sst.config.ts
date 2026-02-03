@@ -22,6 +22,8 @@ export default $config({
     const langchainKey = new sst.Secret("LangchainApiKey");
     const slackBotToken = new sst.Secret("SlackBotToken");
     const slackSigningSecret = new sst.Secret("SlackSigningSecret");
+    // Optional config with default value
+    const conversationMaxTurns = new sst.Secret("ConversationMaxTurns", "5");
 
     // Database
     // Production: Aurora Serverless v2 with pgvector
@@ -53,7 +55,7 @@ export default $config({
     const api = new sst.aws.ApiGatewayV2("Api");
     api.route("$default", {
       handler: "apps/api/src/lambda.handler",
-      link: linkables,
+      link: [...linkables, conversationMaxTurns],
       timeout: "120 seconds",
       memory: "512 MB",
       environment: {
@@ -76,7 +78,7 @@ export default $config({
     // Next.js web app
     const web = new sst.aws.Nextjs("Web", {
       path: "apps/web",
-      link: [...linkables, api],
+      link: [...linkables, api, conversationMaxTurns],
       environment: {
         NEXT_PUBLIC_API_URL: api.url,
         ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),

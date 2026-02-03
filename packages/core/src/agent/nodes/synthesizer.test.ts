@@ -21,6 +21,7 @@ vi.mock("@usopc/shared", () => ({
       debug: vi.fn(),
     }),
   },
+  getOptionalSecretValue: vi.fn().mockReturnValue("5"),
 }));
 
 import { synthesizerNode } from "./synthesizer.js";

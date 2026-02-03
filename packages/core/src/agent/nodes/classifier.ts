@@ -2,7 +2,8 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { logger } from "@usopc/shared";
 import { MODEL_CONFIG } from "../../config/index.js";
-import { buildClassifierPrompt } from "../../prompts/index.js";
+import { buildClassifierPromptWithHistory } from "../../prompts/index.js";
+import { buildContextualQuery } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { TopicDomain, QueryIntent } from "../../types/index.js";
 
@@ -144,9 +145,13 @@ function parseClassifierResponse(raw: string): ClassifierOutput {
 export async function classifierNode(
   state: AgentState,
 ): Promise<Partial<AgentState>> {
-  const userMessage = getLastUserMessage(state);
+  // Build contextual query from conversation history
+  // TODO: Add conversation summarization for very long chats (#35)
+  const { currentMessage, conversationContext } = buildContextualQuery(
+    state.messages,
+  );
 
-  if (!userMessage) {
+  if (!currentMessage) {
     log.warn("Classifier received empty user message; defaulting state");
     return {
       queryIntent: "general",
@@ -160,7 +165,10 @@ export async function classifierNode(
     maxTokens: MODEL_CONFIG.classifier.maxTokens,
   });
 
-  const prompt = buildClassifierPrompt(userMessage);
+  const prompt = buildClassifierPromptWithHistory(
+    currentMessage,
+    conversationContext,
+  );
 
   try {
     const response = await model.invoke([new HumanMessage(prompt)]);

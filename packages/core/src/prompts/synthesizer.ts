@@ -117,19 +117,39 @@ ${BASE_INSTRUCTIONS}
 ${GENERAL_FORMAT}`;
 
 /**
+ * Builds the conversation history section for the synthesizer prompt.
+ */
+function buildConversationHistorySection(conversationHistory: string): string {
+  if (!conversationHistory) return "";
+
+  return `## Conversation History
+
+Use this context from prior exchanges to provide a coherent response that builds on the conversation.
+
+${conversationHistory}
+
+`;
+}
+
+/**
  * Fills the synthesizer prompt template with retrieved context, user question,
  * and optionally adapts the response format based on query intent.
  *
  * @param context - The retrieved documents formatted as text
  * @param userQuestion - The user's question
  * @param queryIntent - Optional intent to adapt response format (factual, procedural, deadline, general)
+ * @param conversationHistory - Optional formatted conversation history for context
  */
 export function buildSynthesizerPrompt(
   context: string,
   userQuestion: string,
   queryIntent?: QueryIntent,
+  conversationHistory?: string,
 ): string {
   const responseFormat = getResponseFormat(queryIntent);
+  const historySection = buildConversationHistorySection(
+    conversationHistory ?? "",
+  );
 
   const prompt = `You are the response synthesizer for the USOPC Athlete Support Assistant. \
 Your job is to produce an accurate, well-cited answer based on the retrieved context documents provided below.
@@ -138,7 +158,7 @@ Your job is to produce an accurate, well-cited answer based on the retrieved con
 
 ${context}
 
-## User Question
+${historySection}## User Question
 
 ${userQuestion}
 

@@ -21,6 +21,7 @@ export {
   getOptionalEnv,
   getDatabaseUrl,
   getSecretValue,
+  getOptionalSecretValue,
   isProduction,
   isDevelopment,
 } from "./env.js";
