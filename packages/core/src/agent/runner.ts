@@ -92,15 +92,19 @@ export class AgentRunner {
   }
 
   /**
-   * Stream graph execution — yields partial state updates.
+   * Stream graph execution — yields full state after each node.
    */
   async *stream(input: AgentInput): AsyncGenerator<Partial<AgentState>> {
     const initialState = this.buildInitialState(input);
 
-    const stream = await this.graph.stream(initialState);
+    // Use streamMode: "values" to get full state after each step
+    // (default "updates" mode returns { nodeName: nodeOutput } which doesn't match our adapter)
+    const stream = await this.graph.stream(initialState, {
+      streamMode: "values",
+    });
 
-    for await (const update of stream) {
-      yield update as Partial<AgentState>;
+    for await (const state of stream) {
+      yield state as Partial<AgentState>;
     }
   }
 

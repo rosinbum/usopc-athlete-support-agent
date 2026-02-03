@@ -5,7 +5,7 @@ export const MODEL_CONFIG = {
     maxTokens: 4096,
   },
   classifier: {
-    model: "claude-3-5-haiku-latest",
+    model: "claude-haiku-4-5-20251001",
     temperature: 0,
     maxTokens: 1024,
   },

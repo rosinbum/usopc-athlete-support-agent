@@ -19,13 +19,19 @@ export default $config({
     const anthropicKey = new sst.Secret("AnthropicApiKey");
     const openaiKey = new sst.Secret("OpenaiApiKey");
     const tavilyKey = new sst.Secret("TavilyApiKey");
+    const langchainKey = new sst.Secret("LangchainApiKey");
     const slackBotToken = new sst.Secret("SlackBotToken");
     const slackSigningSecret = new sst.Secret("SlackSigningSecret");
 
     // Database
     // Production: Aurora Serverless v2 with pgvector
     // Dev stages: Use local Docker postgres via DATABASE_URL env var
-    const linkables: sst.Linkable<any>[] = [anthropicKey, openaiKey, tavilyKey];
+    const linkables: sst.Linkable<any>[] = [
+      anthropicKey,
+      openaiKey,
+      tavilyKey,
+      langchainKey,
+    ];
 
     let databaseUrl: string | undefined;
 

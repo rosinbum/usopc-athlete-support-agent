@@ -243,7 +243,7 @@ describe("AgentRunner", () => {
       expect(updates[1]).toEqual({ answer: "Partial answer" });
     });
 
-    it("passes input state to graph.stream", async () => {
+    it("passes input state and streamMode values to graph.stream", async () => {
       const graph = makeFakeGraph();
       mockCreateAgentGraph.mockReturnValue(graph);
 
@@ -261,6 +261,7 @@ describe("AgentRunner", () => {
         expect.objectContaining({
           userSport: "track",
         }),
+        { streamMode: "values" },
       );
     });
 

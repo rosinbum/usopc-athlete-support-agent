@@ -11,7 +11,7 @@ USOPC Athlete Support Agent — an AI-powered governance and compliance assistan
 ```bash
 # Monorepo-wide (via Turbo)
 pnpm build          # Build all packages
-pnpm dev            # Run all dev servers
+pnpm dev            # Run dev servers via SST (injects secrets)
 pnpm test           # Run all tests
 pnpm typecheck      # Type-check all packages
 pnpm lint           # Lint all packages
@@ -72,7 +72,7 @@ Fan-out architecture via SQS FIFO queue (production only):
 
 ### Infrastructure (SST)
 
-Defined in `sst.config.ts`. Production uses Aurora Serverless v2 with pgvector; dev stages use local Docker Postgres at `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`. SST Resource bindings provide secrets (`AnthropicApiKey`, `OpenaiApiKey`, `TavilyApiKey`, `SlackBotToken`, `SlackSigningSecret`) and resource URLs.
+Defined in `sst.config.ts`. Production uses Aurora Serverless v2 with pgvector; dev stages use local Docker Postgres at `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`. SST Resource bindings provide secrets (`AnthropicApiKey`, `OpenaiApiKey`, `TavilyApiKey`, `LangchainApiKey`, `SlackBotToken`, `SlackSigningSecret`) and resource URLs. Use `pnpm dev` (which runs `sst dev`) for local development to inject these secrets.
 
 ## Formatting
 

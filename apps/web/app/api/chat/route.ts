@@ -58,7 +58,10 @@ export async function POST(req: Request) {
   console.log("POST /api/chat called");
   const { messages, userSport } = await req.json();
   const runner = await getRunner();
-  console.log("Runner initialized, LANGCHAIN_TRACING_V2:", process.env.LANGCHAIN_TRACING_V2);
+  console.log(
+    "Runner initialized, LANGCHAIN_TRACING_V2:",
+    process.env.LANGCHAIN_TRACING_V2,
+  );
 
   // Dynamic import to ensure env vars are set first
   const { AgentRunner, agentStreamToEvents } = await import("@usopc/core");
