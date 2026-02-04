@@ -46,6 +46,33 @@ declare module "sst" {
       "type": "sst.aws.Nextjs"
       "url": string
     }
+    "SourceConfigs": {
+      "type": "sst.aws.Dynamo"
+      "name": string
+    }
+    "DocumentsBucket": {
+      "type": "sst.aws.Bucket"
+      "name": string
+    }
+    "IngestionQueue": {
+      "type": "sst.aws.Queue"
+      "url": string
+    }
+    "IngestionDLQ": {
+      "type": "sst.aws.Queue"
+      "url": string
+    }
+    "IngestionCron": {
+      "type": "sst.aws.Cron"
+    }
+    "Database": {
+      "type": "sst.aws.Postgres"
+      "host": string
+      "port": number
+      "username": string
+      "password": string
+      "database": string
+    }
   }
 }
 /// <reference path="sst-env.d.ts" />

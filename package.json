@@ -19,7 +19,9 @@
     "db:down": "docker compose down",
     "db:migrate": "pnpm --filter @usopc/api db:migrate",
     "ingest": "pnpm --filter @usopc/ingestion ingest",
-    "seed": "pnpm --filter @usopc/ingestion seed"
+    "seed": "pnpm --filter @usopc/ingestion seed",
+    "seed:dynamodb": "pnpm --filter @usopc/ingestion seed:dynamodb",
+    "sources": "pnpm --filter @usopc/ingestion sources"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

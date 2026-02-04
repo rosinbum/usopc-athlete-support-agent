@@ -7,14 +7,14 @@
  *   pnpm --filter @usopc/ingestion ingest --all          # same as above
  *   pnpm --filter @usopc/ingestion ingest --source <id>  # ingest a single source
  *
- * Environment variables:
- *   DATABASE_URL   — PostgreSQL connection string (required)
- *   OPENAI_API_KEY — OpenAI API key for embeddings (required)
+ * Required config (via env var or SST secret):
+ *   DATABASE_URL / SST Database  — PostgreSQL connection string
+ *   OPENAI_API_KEY / OpenaiApiKey — OpenAI API key for embeddings
  */
 
 import { readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { getDatabaseUrl, getRequiredEnv, createLogger } from "@usopc/shared";
+import { getDatabaseUrl, getSecretValue, createLogger } from "@usopc/shared";
 import { ingestSource, ingestAll } from "../pipeline.js";
 import type { IngestionSource } from "../pipeline.js";
 
@@ -32,7 +32,7 @@ interface SourceFile {
 function sourcesDir(): string {
   return (
     process.env.SOURCES_DIR ??
-    resolve(import.meta.dirname ?? __dirname, "../../../../../data/sources")
+    resolve(import.meta.dirname ?? __dirname, "../../../../data/sources")
   );
 }
 
@@ -93,7 +93,7 @@ function parseArgs(): { sourceId?: string; all: boolean } {
 
 async function main(): Promise<void> {
   const databaseUrl = getDatabaseUrl();
-  const openaiApiKey = getRequiredEnv("OPENAI_API_KEY");
+  const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
   const { sourceId, all } = parseArgs();
 
   const sources = await loadAllSources();
