@@ -140,6 +140,9 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   }
+
+  // Exit explicitly since the database connection pool keeps the process alive
+  process.exit(0);
 }
 
 main().catch((error) => {
