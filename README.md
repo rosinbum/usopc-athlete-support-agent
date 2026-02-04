@@ -23,64 +23,12 @@ An AI-powered governance and compliance assistant for U.S. Olympic and Paralympi
   - Slack bot (coming soon — see [#7](https://github.com/rosinbum/usopc-athlete-support-agent/issues/7))
 - **Weekly Document Sync**: Automated ingestion pipeline keeps the knowledge base current
 
-## Architecture
+## Documentation
 
-This is a serverless monorepo deployed to AWS via [SST v3](https://sst.dev/).
-
-```
-apps/
-  api/         tRPC + Hono backend (AWS Lambda)
-  slack/       Slack Bolt bot (AWS Lambda)
-  web/         Next.js 16 frontend (React 19, Tailwind 4)
-
-packages/
-  core/        LangGraph agent, RAG pipeline, vector store, tools
-  ingestion/   Document ETL: load → clean → split → embed → store
-  shared/      Logger, env helpers, error classes, Zod schemas
-```
-
-### AI Agent (LangGraph)
-
-The core agent is a compiled [LangGraph](https://langchain-ai.github.io/langgraph/) state machine:
-
-```
-START → classifier → clarify | retriever | escalate
-             ↓            ↓          ↓
-        needsClarification?      needsMoreInfo?
-             ↓                  ↓       ↓
-            END          synthesizer  researcher
-                              ↓           ↓
-                              └─────┬─────┘
-                                    ↓
-                             citationBuilder → disclaimerGuard → END
-```
-
-**Nodes**:
-
-- `classifier`: Analyzes query to determine domain, intent, and whether clarification is needed
-- `clarify`: Returns a clarifying question when the query is ambiguous
-- `retriever`: Performs pgvector similarity search on embedded documents
-- `researcher`: Queries Tavily for additional web context
-- `synthesizer`: Generates the response via Claude (with adaptive formatting based on query intent)
-- `citationBuilder`: Extracts and formats source citations
-- `disclaimerGuard`: Adds disclaimers for sensitive topics
-- `escalate`: Routes urgent matters (abuse reports, imminent deadlines) to appropriate authorities
-
-### Ingestion Pipeline
-
-Fan-out architecture via SQS FIFO queue (production only):
-
-1. **Cron job** (weekly): Checks configured sources for changes via content hashing
-2. **Worker**: Processes each source — loads content (PDF/HTML/text), cleans, splits into chunks, embeds via OpenAI, stores in pgvector
-
-### Infrastructure
-
-| Component | Development                         | Production               |
-| --------- | ----------------------------------- | ------------------------ |
-| Database  | Local Docker Postgres with pgvector | Aurora Serverless v2     |
-| API       | Local Lambda emulation via SST      | API Gateway + Lambda     |
-| Web       | Next.js dev server                  | CloudFront + Lambda@Edge |
-| Secrets   | SST dev secrets                     | SST encrypted secrets    |
+- [Architecture](./docs/architecture.md) — Package structure, AI agent, ingestion pipeline, infrastructure
+- [Commands](./docs/commands.md) — Full CLI commands reference
+- [Deployment](./docs/deployment.md) — Production deployment guide
+- [Conventions](./docs/conventions.md) — Formatting, testing, and technical conventions
 
 ## Local Development Setup
 
@@ -164,81 +112,6 @@ To run the full ingestion pipeline:
 
 ```bash
 pnpm ingest
-```
-
-## Available Commands
-
-```bash
-# Development
-pnpm dev              # Start all services via SST
-pnpm db:up            # Start local PostgreSQL
-pnpm db:down          # Stop local PostgreSQL
-pnpm db:migrate       # Run database migrations
-
-# Building & Testing
-pnpm build            # Build all packages
-pnpm test             # Run all tests
-pnpm typecheck        # Type-check all packages
-pnpm lint             # Lint all packages
-
-# Single package commands
-pnpm --filter @usopc/core test
-pnpm --filter @usopc/api typecheck
-
-# Data management
-pnpm ingest           # Run document ingestion
-pnpm seed             # Seed database with sample data
-```
-
-## Production Deployment
-
-### Prerequisites
-
-- AWS account with appropriate permissions
-- SST CLI installed (`pnpm add -g sst`)
-- Production secrets configured
-
-### 1. Set Production Secrets
-
-```bash
-sst secret set AnthropicApiKey <key> --stage production
-sst secret set OpenaiApiKey <key> --stage production
-sst secret set TavilyApiKey <key> --stage production
-sst secret set SlackBotToken <token> --stage production
-sst secret set SlackSigningSecret <secret> --stage production
-```
-
-### 2. Deploy
-
-```bash
-sst deploy --stage production
-```
-
-This provisions:
-
-- Aurora Serverless v2 PostgreSQL cluster with pgvector
-- API Gateway + Lambda for the tRPC API
-- API Gateway + Lambda for Slack webhooks
-- CloudFront distribution + Lambda@Edge for the Next.js app
-- EventBridge + SQS + Lambda for the weekly ingestion pipeline
-
-### 3. Run Initial Ingestion
-
-After the first deployment, trigger the ingestion pipeline to populate the knowledge base:
-
-```bash
-# Via AWS Console: manually invoke the IngestionCron Lambda
-# Or wait for the weekly scheduled trigger
-```
-
-### Environment Outputs
-
-After deployment, SST outputs the service URLs:
-
-```
-apiUrl:   https://xxx.execute-api.us-east-1.amazonaws.com
-webUrl:   https://xxx.cloudfront.net
-slackUrl: https://xxx.execute-api.us-east-1.amazonaws.com/slack/events
 ```
 
 ## Slack Integration
