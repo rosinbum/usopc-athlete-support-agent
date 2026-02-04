@@ -85,12 +85,20 @@ export default function HomePage() {
             SafeSport, anti-doping, eligibility, and athlete rights across all
             National Governing Bodies and USOPC-managed sports.
           </p>
-          <Link
-            href="/chat"
-            className="inline-flex items-center rounded-lg bg-blue-600 px-6 py-3 text-white font-medium hover:bg-blue-700 transition-colors"
-          >
-            Start Chat
-          </Link>
+          <div className="flex gap-4">
+            <Link
+              href="/chat"
+              className="inline-flex items-center rounded-lg bg-blue-600 px-6 py-3 text-white font-medium hover:bg-blue-700 transition-colors"
+            >
+              Start Chat
+            </Link>
+            <Link
+              href="/sources"
+              className="inline-flex items-center rounded-lg border border-gray-300 px-6 py-3 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+            >
+              View Sources
+            </Link>
+          </div>
         </section>
 
         <section>

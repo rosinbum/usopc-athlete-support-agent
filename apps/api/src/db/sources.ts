@@ -1,0 +1,199 @@
+import type { Pool } from "pg";
+import type { TopicDomain, AuthorityLevel } from "@usopc/shared";
+
+export interface SourceDocument {
+  sourceUrl: string;
+  documentTitle: string;
+  documentType: string | null;
+  ngbId: string | null;
+  topicDomain: string | null;
+  authorityLevel: string | null;
+  effectiveDate: string | null;
+  ingestedAt: string;
+  chunkCount: number;
+}
+
+export interface SourcesListResponse {
+  documents: SourceDocument[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface SourcesStats {
+  totalDocuments: number;
+  totalOrganizations: number;
+  lastIngestedAt: string | null;
+}
+
+export interface ListUniqueDocumentsParams {
+  search?: string;
+  documentType?: string;
+  topicDomain?: TopicDomain;
+  ngbId?: string;
+  authorityLevel?: AuthorityLevel;
+  page?: number;
+  limit?: number;
+}
+
+interface DocumentRow {
+  source_url: string;
+  document_title: string;
+  document_type: string | null;
+  ngb_id: string | null;
+  topic_domain: string | null;
+  authority_level: string | null;
+  effective_date: string | null;
+  ingested_at: Date;
+  chunk_count: string;
+}
+
+interface CountRow {
+  total: string;
+}
+
+interface StatsRow {
+  total_documents: string;
+  total_organizations: string;
+  last_ingested_at: Date | null;
+}
+
+/**
+ * Lists unique documents from document_chunks, grouped by source_url.
+ * Supports filtering by search, documentType, topicDomain, ngbId, and authorityLevel.
+ * Returns paginated results.
+ */
+export async function listUniqueDocuments(
+  pool: Pool,
+  params: ListUniqueDocumentsParams,
+): Promise<SourcesListResponse> {
+  const {
+    search,
+    documentType,
+    topicDomain,
+    ngbId,
+    authorityLevel,
+    page = 1,
+    limit = 20,
+  } = params;
+
+  const conditions: string[] = [];
+  const values: (string | number)[] = [];
+  let paramIndex = 1;
+
+  if (search) {
+    conditions.push(`document_title ILIKE $${paramIndex}`);
+    values.push(`%${search}%`);
+    paramIndex++;
+  }
+
+  if (documentType) {
+    conditions.push(`document_type = $${paramIndex}`);
+    values.push(documentType);
+    paramIndex++;
+  }
+
+  if (topicDomain) {
+    conditions.push(`topic_domain = $${paramIndex}`);
+    values.push(topicDomain);
+    paramIndex++;
+  }
+
+  if (ngbId) {
+    conditions.push(`ngb_id = $${paramIndex}`);
+    values.push(ngbId);
+    paramIndex++;
+  }
+
+  if (authorityLevel) {
+    conditions.push(`authority_level = $${paramIndex}`);
+    values.push(authorityLevel);
+    paramIndex++;
+  }
+
+  const whereClause =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  // Count total unique documents matching filters
+  const countQuery = `
+    SELECT COUNT(DISTINCT source_url) as total
+    FROM document_chunks
+    ${whereClause}
+  `;
+
+  const countResult = await pool.query<CountRow>(countQuery, values);
+  const total = parseInt(countResult.rows[0]?.total ?? "0", 10);
+
+  // Calculate pagination
+  const offset = (page - 1) * limit;
+  const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
+
+  // Fetch documents with pagination
+  const dataQuery = `
+    SELECT
+      source_url,
+      document_title,
+      document_type,
+      ngb_id,
+      topic_domain,
+      authority_level,
+      effective_date,
+      MIN(ingested_at) as ingested_at,
+      COUNT(*) as chunk_count
+    FROM document_chunks
+    ${whereClause}
+    GROUP BY source_url, document_title, document_type, ngb_id,
+             topic_domain, authority_level, effective_date
+    ORDER BY ingested_at DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+
+  const dataResult = await pool.query<DocumentRow>(dataQuery, [
+    ...values,
+    limit,
+    offset,
+  ]);
+
+  const documents: SourceDocument[] = dataResult.rows.map((row) => ({
+    sourceUrl: row.source_url,
+    documentTitle: row.document_title,
+    documentType: row.document_type,
+    ngbId: row.ngb_id,
+    topicDomain: row.topic_domain,
+    authorityLevel: row.authority_level,
+    effectiveDate: row.effective_date,
+    ingestedAt: row.ingested_at.toISOString(),
+    chunkCount: parseInt(row.chunk_count, 10),
+  }));
+
+  return {
+    documents,
+    total,
+    page,
+    limit,
+    totalPages,
+  };
+}
+
+/**
+ * Returns aggregate statistics for all sources.
+ */
+export async function getSourcesStats(pool: Pool): Promise<SourcesStats> {
+  const query = `
+    SELECT
+      COUNT(DISTINCT source_url) as total_documents,
+      COUNT(DISTINCT ngb_id) as total_organizations,
+      MAX(ingested_at) as last_ingested_at
+    FROM document_chunks
+  `;
+
+  const result = await pool.query<StatsRow>(query);
+  const row = result.rows[0];
+
+  return {
+    totalDocuments: parseInt(row?.total_documents ?? "0", 10),
+    totalOrganizations: parseInt(row?.total_organizations ?? "0", 10),
+    lastIngestedAt: row?.last_ingested_at?.toISOString() ?? null,
+  };
+}

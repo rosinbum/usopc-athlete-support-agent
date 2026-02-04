@@ -17,11 +17,13 @@
     "@usopc/core": "workspace:*",
     "@usopc/shared": "workspace:*",
     "hono": "^4.6.16",
+    "pg": "^8.14.1",
     "superjson": "^2.2.2",
     "trpc-to-openapi": "^2.0.0-next.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/pg": "^8.11.11",
     "sst": "3.17.38",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",

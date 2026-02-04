@@ -4,6 +4,7 @@ import { conversationsRouter } from "./routers/conversations.js";
 import { ngbsRouter } from "./routers/ngbs.js";
 import { feedbackRouter } from "./routers/feedback.js";
 import { healthRouter } from "./routers/health.js";
+import { sourcesRouter } from "./routers/sources.js";
 
 export const appRouter = router({
   chat: chatRouter,
@@ -11,6 +12,7 @@ export const appRouter = router({
   ngbs: ngbsRouter,
   feedback: feedbackRouter,
   health: healthRouter,
+  sources: sourcesRouter,
 });
 
 export type AppRouter = typeof appRouter;
