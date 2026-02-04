@@ -9,10 +9,10 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "ingest": "tsx src/scripts/ingest.ts",
+    "ingest": "sst shell -- tsx src/scripts/ingest.ts",
     "seed": "tsx src/scripts/seed-db.ts",
-    "seed:dynamodb": "tsx src/scripts/seed-dynamodb.ts",
-    "sources": "tsx src/scripts/sources-cli.ts",
+    "seed:dynamodb": "sst shell -- tsx src/scripts/seed-dynamodb.ts",
+    "sources": "sst shell -- tsx src/scripts/sources-cli.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {

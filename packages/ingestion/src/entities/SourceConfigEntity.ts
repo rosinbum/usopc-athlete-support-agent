@@ -106,13 +106,20 @@ export class SourceConfigEntity {
   // ---------------------------------------------------------------------------
 
   private toItem(config: SourceConfig): SourceConfigItem {
-    return {
+    const { ngbId, ...rest } = config;
+    const item: Record<string, unknown> = {
       pk: this.pk(config.id),
       sk: this.sk(),
-      ...config,
+      ...rest,
       // Store enabled as string for GSI (DynamoDB GSI keys must be strings)
       enabled: config.enabled ? "true" : "false",
-    } as unknown as SourceConfigItem;
+    };
+    // Only include ngbId if it's not null (DynamoDB GSI keys cannot be null)
+    // This makes the GSI sparse - items without ngbId won't appear in ngbId-index
+    if (ngbId !== null) {
+      item.ngbId = ngbId;
+    }
+    return item as unknown as SourceConfigItem;
   }
 
   private fromItem(item: Record<string, unknown>): SourceConfig {
@@ -122,6 +129,8 @@ export class SourceConfigEntity {
       ...rest,
       // Convert enabled back to boolean
       enabled: rest.enabled === true || rest.enabled === "true",
+      // Convert missing ngbId to null (sparse GSI means it's omitted when null)
+      ngbId: (rest.ngbId as string) ?? null,
     } as SourceConfig;
   }
 
