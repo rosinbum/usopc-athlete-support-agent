@@ -16,20 +16,15 @@ export {
 };
 
 /**
- * Get the SourceConfigs table name from SST Resource or environment variable.
+ * Get the SourceConfigs table name from SST Resource.
  */
 export function getSourceConfigTableName(): string {
-  // Check env first (for local development or testing)
-  if (process.env.SOURCE_CONFIG_TABLE_NAME) {
-    return process.env.SOURCE_CONFIG_TABLE_NAME;
-  }
-
-  // Use SST Resource binding
   try {
-    return (Resource as any).SourceConfigs.name;
+    return (Resource as unknown as { SourceConfigs: { name: string } })
+      .SourceConfigs.name;
   } catch {
     throw new Error(
-      "SOURCE_CONFIG_TABLE_NAME env var not set and SST Resource not available",
+      "SST Resource SourceConfigs not available. Run with 'sst shell' or deploy with SST.",
     );
   }
 }

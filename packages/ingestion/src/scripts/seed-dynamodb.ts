@@ -7,8 +7,7 @@
  *   pnpm seed:dynamodb --dry-run    # Preview only (no writes)
  *   pnpm seed:dynamodb --force      # Overwrite existing items
  *
- * Environment variables:
- *   SOURCE_CONFIG_TABLE_NAME — DynamoDB table name (or use SST Resource)
+ * Requires SST context (run via `pnpm seed:dynamodb` which uses `sst shell`)
  */
 
 import { readFile, readdir } from "node:fs/promises";

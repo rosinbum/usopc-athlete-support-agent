@@ -9,8 +9,7 @@
  *   pnpm sources disable <id>
  *   pnpm sources validate [--fix-broken]
  *
- * Environment variables:
- *   SOURCE_CONFIG_TABLE_NAME — DynamoDB table name (or use SST Resource)
+ * Requires SST context (run via `pnpm sources` which uses `sst shell`)
  */
 
 import {
