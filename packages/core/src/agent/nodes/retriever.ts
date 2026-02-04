@@ -241,6 +241,19 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
       // Re-sort by composite score
       scoredResults.sort((a, b) => a.compositeScore - b.compositeScore);
 
+      // Debug: Log authority-weighted ranking
+      log.debug("Authority-weighted ranking", {
+        results: scoredResults.slice(0, 5).map((s) => ({
+          title: s.result[0].metadata.documentTitle ?? "(untitled)",
+          authority: s.result[0].metadata.authority_level ?? "(none)",
+          similarity: s.result[1].toFixed(4),
+          boost: computeAuthorityBoost(
+            s.result[0].metadata.authority_level as string | undefined,
+          ).toFixed(4),
+          composite: s.compositeScore.toFixed(4),
+        })),
+      });
+
       // Limit to configured topK
       const topResults = scoredResults
         .slice(0, RETRIEVAL_CONFIG.topK)
