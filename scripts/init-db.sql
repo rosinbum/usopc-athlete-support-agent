@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
   document_title TEXT,
   section_title TEXT,
   effective_date TIMESTAMPTZ,
+  authority_level TEXT,
   ingested_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -27,6 +28,7 @@ CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx
 CREATE INDEX IF NOT EXISTS idx_chunks_ngb_id ON document_chunks (ngb_id);
 CREATE INDEX IF NOT EXISTS idx_chunks_topic_domain ON document_chunks (topic_domain);
 CREATE INDEX IF NOT EXISTS idx_chunks_document_type ON document_chunks (document_type);
+CREATE INDEX IF NOT EXISTS idx_chunks_authority_level ON document_chunks (authority_level);
 CREATE INDEX IF NOT EXISTS idx_chunks_metadata ON document_chunks USING gin (metadata);
 
 -- Conversations table

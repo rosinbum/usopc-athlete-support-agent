@@ -1,5 +1,5 @@
 import type { Document } from "@langchain/core/documents";
-import { createLogger } from "@usopc/shared";
+import { createLogger, type AuthorityLevel } from "@usopc/shared";
 import { createEmbeddings, createVectorStore } from "@usopc/core/src/rag/index";
 import { loadPdf } from "./loaders/pdfLoader.js";
 import { loadWeb } from "./loaders/webLoader.js";
@@ -46,6 +46,7 @@ export interface IngestionSource {
   ngbId: string | null;
   priority: "high" | "medium" | "low";
   description: string;
+  authorityLevel?: AuthorityLevel;
 }
 
 export interface IngestionResult {

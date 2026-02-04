@@ -1,4 +1,5 @@
 import { BaseMessage } from "@langchain/core/messages";
+import type { AuthorityLevel } from "@usopc/shared";
 
 export type TopicDomain =
   | "team_selection"
@@ -50,6 +51,7 @@ export interface DocumentMetadata {
   sectionTitle?: string;
   effectiveDate?: string;
   ingestedAt?: string;
+  authorityLevel?: AuthorityLevel;
 }
 
 export interface AgentState {

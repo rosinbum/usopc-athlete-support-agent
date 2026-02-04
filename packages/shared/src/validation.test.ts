@@ -5,8 +5,10 @@ import {
   sportOrgIdSchema,
   topicDomainSchema,
   channelSchema,
+  authorityLevelSchema,
   TOPIC_DOMAINS,
   CHANNELS,
+  AUTHORITY_LEVELS,
 } from "./validation.js";
 
 describe("paginationSchema", () => {
@@ -160,5 +162,37 @@ describe("channelSchema", () => {
     expect(() => channelSchema.parse("discord")).toThrow();
     expect(() => channelSchema.parse("")).toThrow();
     expect(() => channelSchema.parse("WEB")).toThrow(); // case sensitive
+  });
+});
+
+describe("authorityLevelSchema", () => {
+  it("accepts all valid authority levels", () => {
+    AUTHORITY_LEVELS.forEach((level) => {
+      expect(authorityLevelSchema.parse(level)).toBe(level);
+    });
+  });
+
+  it("contains all 9 authority levels in priority order", () => {
+    expect(AUTHORITY_LEVELS).toEqual([
+      "law",
+      "international_rule",
+      "usopc_governance",
+      "usopc_policy_procedure",
+      "independent_office",
+      "anti_doping_national",
+      "ngb_policy_procedure",
+      "games_event_specific",
+      "educational_guidance",
+    ]);
+  });
+
+  it("has exactly 9 levels", () => {
+    expect(AUTHORITY_LEVELS.length).toBe(9);
+  });
+
+  it("rejects invalid authority level", () => {
+    expect(() => authorityLevelSchema.parse("invalid_level")).toThrow();
+    expect(() => authorityLevelSchema.parse("")).toThrow();
+    expect(() => authorityLevelSchema.parse("LAW")).toThrow(); // case sensitive
   });
 });
