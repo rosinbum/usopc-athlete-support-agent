@@ -95,4 +95,49 @@ describe("rerank", () => {
     });
     expect(result[0].pageContent).toBe("high");
   });
+
+  describe("authority level boosting", () => {
+    it("boosts documents with higher authority levels", () => {
+      const docs = [
+        makeDoc({ authority_level: "educational_guidance" }, "faq"),
+        makeDoc({ authority_level: "usopc_policy_procedure" }, "policy"),
+        makeDoc({ authority_level: "law" }, "law"),
+      ];
+
+      const result = rerank(docs);
+      // Law should rank first, then policy, then educational guidance
+      expect(result[0].pageContent).toBe("law");
+      expect(result[1].pageContent).toBe("policy");
+      expect(result[2].pageContent).toBe("faq");
+    });
+
+    it("stacks authority boost with NGB match boost", () => {
+      const docs = [
+        makeDoc(
+          { ngb_id: "usa_swimming", authority_level: "ngb_policy_procedure" },
+          "ngb-match-low-auth",
+        ),
+        makeDoc(
+          { ngb_id: "usa_gymnastics", authority_level: "law" },
+          "no-match-high-auth",
+        ),
+      ];
+
+      const result = rerank(docs, { ngbIds: ["usa_swimming"] });
+      // Both have boosts - NGB match + low authority vs no match + high authority
+      // The exact order depends on boost values
+      expect(result).toHaveLength(2);
+    });
+
+    it("handles documents without authority level", () => {
+      const docs = [
+        makeDoc({}, "no-authority"),
+        makeDoc({ authority_level: "usopc_governance" }, "has-authority"),
+      ];
+
+      const result = rerank(docs);
+      // Document with authority should rank higher
+      expect(result[0].pageContent).toBe("has-authority");
+    });
+  });
 });

@@ -10,6 +10,22 @@ import {
 import { buildContextualQuery } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
+import type { AuthorityLevel } from "@usopc/shared";
+
+/**
+ * Maps authority level codes to human-readable labels.
+ */
+const AUTHORITY_LEVEL_LABELS: Record<AuthorityLevel, string> = {
+  law: "Federal/State Law",
+  international_rule: "International Rule",
+  usopc_governance: "USOPC Governance",
+  usopc_policy_procedure: "USOPC Policy",
+  independent_office: "Independent Office (SafeSport, Ombuds)",
+  anti_doping_national: "USADA Rules",
+  ngb_policy_procedure: "NGB Policy",
+  games_event_specific: "Games-Specific Rules",
+  educational_guidance: "Educational Guidance",
+};
 
 const log = logger.child({ service: "synthesizer-node" });
 
@@ -35,6 +51,12 @@ function formatDocument(doc: RetrievedDocument, index: number): string {
   }
   if (doc.metadata.effectiveDate) {
     parts.push(`Effective Date: ${doc.metadata.effectiveDate}`);
+  }
+  if (doc.metadata.authorityLevel) {
+    const label =
+      AUTHORITY_LEVEL_LABELS[doc.metadata.authorityLevel] ||
+      doc.metadata.authorityLevel;
+    parts.push(`Authority Level: ${label}`);
   }
   if (doc.metadata.sourceUrl) {
     parts.push(`Source: ${doc.metadata.sourceUrl}`);

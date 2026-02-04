@@ -161,4 +161,38 @@ describe("citationBuilderNode", () => {
     const result = await citationBuilderNode(state);
     expect(result.citations![0].documentType).toBe("document");
   });
+
+  it("includes authorityLevel when present in document metadata", async () => {
+    const state = makeState({
+      retrievedDocuments: [
+        makeDoc({
+          metadata: {
+            documentTitle: "Ted Stevens Act",
+            sourceUrl: "https://example.com/law",
+            documentType: "legislation",
+            authorityLevel: "law",
+          },
+        }),
+      ],
+    });
+
+    const result = await citationBuilderNode(state);
+    expect(result.citations![0].authorityLevel).toBe("law");
+  });
+
+  it("omits authorityLevel when not present in document metadata", async () => {
+    const state = makeState({
+      retrievedDocuments: [
+        makeDoc({
+          metadata: {
+            documentTitle: "Legacy Document",
+            sourceUrl: "https://example.com/legacy",
+          },
+        }),
+      ],
+    });
+
+    const result = await citationBuilderNode(state);
+    expect(result.citations![0].authorityLevel).toBeUndefined();
+  });
 });

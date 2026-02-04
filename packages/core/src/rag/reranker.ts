@@ -1,4 +1,5 @@
 import type { Document } from "@langchain/core/documents";
+import { AUTHORITY_LEVELS, type AuthorityLevel } from "@usopc/shared";
 
 /**
  * Reranks documents based on relevance signals:
@@ -44,6 +45,20 @@ export function rerank(
       )
     ) {
       score += 0.1;
+    }
+
+    // Authority level boost (higher authority = larger boost)
+    if (doc.metadata.authority_level) {
+      const authorityIndex = AUTHORITY_LEVELS.indexOf(
+        doc.metadata.authority_level as AuthorityLevel,
+      );
+      if (authorityIndex !== -1) {
+        // Higher index = lower authority = less boost
+        // Range: 0.3 (law, index 0) to 0 (educational_guidance, index 8)
+        const maxBoost = 0.3;
+        score +=
+          maxBoost * (1 - authorityIndex / (AUTHORITY_LEVELS.length - 1));
+      }
     }
 
     return { doc, score };

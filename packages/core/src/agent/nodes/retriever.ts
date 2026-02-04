@@ -1,4 +1,4 @@
-import { logger } from "@usopc/shared";
+import { logger, AUTHORITY_LEVELS, type AuthorityLevel } from "@usopc/shared";
 import { RETRIEVAL_CONFIG } from "../../config/index.js";
 import { vectorStoreSearch } from "../../services/vectorStoreService.js";
 import { buildContextualQuery } from "../../utils/index.js";
@@ -93,6 +93,31 @@ function buildFilter(state: AgentState): Record<string, unknown> | undefined {
   }
 
   return Object.keys(conditions).length > 0 ? conditions : undefined;
+}
+
+/**
+ * Computes an authority boost for a document based on its authority level.
+ * Higher authority levels get a larger boost (lower composite score).
+ *
+ * Returns a value between 0 (highest authority) and 0.3 (lowest/no authority).
+ * This is subtracted from the similarity score, so lower = better.
+ */
+function computeAuthorityBoost(authorityLevel: string | undefined): number {
+  if (!authorityLevel) {
+    // No authority level = treated as lowest priority
+    return 0;
+  }
+
+  const index = AUTHORITY_LEVELS.indexOf(authorityLevel as AuthorityLevel);
+  if (index === -1) {
+    // Unknown authority level = no boost
+    return 0;
+  }
+
+  // Higher index = lower authority = less boost
+  // Range: 0.3 (law, index 0) to 0 (educational_guidance, index 8)
+  const maxBoost = 0.3;
+  return maxBoost * (1 - index / (AUTHORITY_LEVELS.length - 1));
 }
 
 /**
@@ -200,8 +225,26 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
       // Sort by score ascending (lower distance = better match for cosine)
       results.sort((a, b) => a[1] - b[1]);
 
+      // --- Phase 3b: Apply authority-weighted re-sorting ---
+      // Compute composite score that factors in authority level
+      // Lower composite score = higher rank
+      const scoredResults = results.map((result) => {
+        const [doc, similarityScore] = result;
+        const authorityBoost = computeAuthorityBoost(
+          doc.metadata.authority_level as string | undefined,
+        );
+        // Subtract authority boost (higher authority = larger boost = lower composite score)
+        const compositeScore = similarityScore - authorityBoost;
+        return { result, compositeScore };
+      });
+
+      // Re-sort by composite score
+      scoredResults.sort((a, b) => a.compositeScore - b.compositeScore);
+
       // Limit to configured topK
-      const topResults = results.slice(0, RETRIEVAL_CONFIG.topK);
+      const topResults = scoredResults
+        .slice(0, RETRIEVAL_CONFIG.topK)
+        .map((s) => s.result);
 
       const scores = topResults.map(([, score]) => score);
       const confidence = computeConfidence(scores);
@@ -221,6 +264,9 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
             sectionTitle: doc.metadata.sectionTitle as string | undefined,
             effectiveDate: doc.metadata.effectiveDate as string | undefined,
             ingestedAt: doc.metadata.ingestedAt as string | undefined,
+            authorityLevel: doc.metadata.authority_level as
+              | AuthorityLevel
+              | undefined,
           },
           score,
         }),
