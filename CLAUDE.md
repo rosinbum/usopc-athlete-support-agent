@@ -29,9 +29,19 @@ pnpm db:up          # Start Postgres container
 pnpm db:down        # Stop container
 pnpm db:migrate     # Run migrations (via @usopc/api)
 
-# Ingestion scripts
-pnpm ingest         # Run document ingestion (tsx)
-pnpm seed           # Seed database
+# Ingestion scripts (require SST context)
+pnpm ingest                        # Run document ingestion
+pnpm ingest -- --source <id>       # Ingest single source
+pnpm seed                          # Seed Postgres database
+pnpm seed:dynamodb                 # Seed DynamoDB source configs from JSON
+pnpm seed:dynamodb -- --dry-run    # Preview migration
+pnpm sources list                  # List source configs from DynamoDB
+pnpm sources show <id>             # Show source details
+pnpm sources enable <id>           # Enable a source
+pnpm sources disable <id>          # Disable a source
+
+# Local development database
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/usopc_athlete_support
 ```
 
 ## Architecture
@@ -69,12 +79,22 @@ Key nodes: classifier (query analysis + clarification detection), clarify (asks 
 
 Fan-out architecture via SQS FIFO queue (production only):
 
-- **Cron** (`packages/ingestion/src/cron.ts`): Weekly EventBridge trigger. Loads source configs from `data/sources/*.json`, fetches content, computes SHA-256 hash, skips unchanged sources, enqueues changed ones to SQS.
+- **Source configs**: Stored in DynamoDB (`SourceConfigs` table) in production, loaded from `data/sources/*.json` in development. Entity class in `packages/ingestion/src/entities/SourceConfigEntity.ts`.
+- **Cron** (`packages/ingestion/src/cron.ts`): Weekly EventBridge trigger. Loads source configs, fetches content with retry logic (`fetchWithRetry`), computes SHA-256 hash, skips unchanged sources, enqueues changed ones to SQS. Tracks success/failure in DynamoDB.
 - **Worker** (`packages/ingestion/src/worker.ts`): Processes one source per SQS message. Pipeline: load (PDF/HTML/text) → clean → split → enrich metadata → extract sections → batch embed (OpenAI) → store in pgvector. Handles `QuotaExhaustedError` by purging the queue.
+- **Document storage**: Fetched documents cached in S3 (`DocumentsBucket`) for resilience and audit trail.
 
 ### Infrastructure (SST)
 
-Defined in `sst.config.ts`. Production uses Aurora Serverless v2 with pgvector; dev stages use local Docker Postgres at `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`. SST Resource bindings provide secrets (`AnthropicApiKey`, `OpenaiApiKey`, `TavilyApiKey`, `LangchainApiKey`, `SlackBotToken`, `SlackSigningSecret`) and resource URLs. Use `pnpm dev` (which runs `sst dev`) for local development to inject these secrets.
+Defined in `sst.config.ts`. Production uses Aurora Serverless v2 with pgvector; dev stages use local Docker Postgres at `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`.
+
+**SST Resources:**
+- **Secrets**: `AnthropicApiKey`, `OpenaiApiKey`, `TavilyApiKey`, `LangchainApiKey`, `SlackBotToken`, `SlackSigningSecret`
+- **DynamoDB**: `SourceConfigs` table (source config management with GSIs for ngbId and enabled status)
+- **S3**: `DocumentsBucket` (cached documents with versioning)
+- **APIs**: `Api` (main tRPC), `SlackApi` (Slack events)
+
+Use `pnpm dev` (which runs `sst dev`) for local development to inject secrets. For scripts needing SST resources, use `sst shell -- <command>` or the wrapped npm scripts.
 
 ## Formatting
 
@@ -153,4 +173,8 @@ When writing code that is intentionally incomplete or deferred, add a `// TODO:`
 - **Build orchestration**: Turbo. `build`, `test`, `typecheck`, and `lint` depend on `^build` (deps build first).
 - **Environment resolution**: `@usopc/shared` provides `getDatabaseUrl()` (checks `DATABASE_URL` env, then SST Resource), `getSecretValue(envKey, sstResourceName)` (checks env, then SST Secret), and `getOptionalSecretValue(envKey, sstResourceName, defaultValue)` for optional config with defaults.
 - **Configuration via SST Secrets**: Always use SST secrets for configuration values, not plain environment variables. For required secrets, use `new sst.Secret("Name")`. For optional config with defaults, use `new sst.Secret("Name", "defaultValue")` and read via `getOptionalSecretValue()`. Never rely on `getOptionalEnv()` for configuration that should be managed through SST.
+- **SST secret naming**: SST secrets use PascalCase (`OpenaiApiKey`), env vars use SCREAMING_SNAKE_CASE (`OPENAI_API_KEY`). Use `getSecretValue("OPENAI_API_KEY", "OpenaiApiKey")` to check both.
+- **Scripts needing AWS resources**: Wrap with `sst shell --` in package.json (e.g., `"ingest": "sst shell -- tsx src/scripts/ingest.ts"`). This injects SST Resource bindings. Don't add `process.env.SOME_CONFIG` fallbacks—use SST Resources only.
+- **DynamoDB GSI keys cannot be null**: When using a Global Secondary Index, omit the attribute entirely rather than setting it to `null`. This creates a sparse index where items without the attribute aren't indexed.
+- **Path resolution in scripts**: Scripts in `packages/*/src/scripts/` need 4 levels up (`../../../../`) to reach repo root.
 - **Database**: PostgreSQL with pgvector. Schema includes `document_chunks` (embeddings with HNSW index), `conversations`, `messages`, `feedback`, `ingestion_status`. Migrations run through the API package.
