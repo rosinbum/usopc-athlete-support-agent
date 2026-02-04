@@ -47,7 +47,7 @@ interface SourceFile {
 function sourcesDir(): string {
   return (
     process.env.SOURCES_DIR ??
-    resolve(import.meta.dirname ?? __dirname, "../../../../../data/sources")
+    resolve(import.meta.dirname ?? __dirname, "../../../../data/sources")
   );
 }
 
