@@ -1,15 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@usopc/shared", () => ({
-  logger: {
-    child: () => ({
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    }),
-  },
-}));
+vi.mock("@usopc/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usopc/shared")>();
+  return {
+    ...actual,
+    logger: {
+      child: () => ({
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+      }),
+    },
+  };
+});
 
 import { createResearcherNode, type TavilySearchLike } from "./researcher.js";
 import { HumanMessage } from "@langchain/core/messages";

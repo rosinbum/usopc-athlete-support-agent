@@ -12,17 +12,21 @@ vi.mock("@langchain/anthropic", () => ({
   })),
 }));
 
-vi.mock("@usopc/shared", () => ({
-  logger: {
-    child: () => ({
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    }),
-  },
-  getOptionalSecretValue: vi.fn().mockReturnValue("5"),
-}));
+vi.mock("@usopc/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usopc/shared")>();
+  return {
+    ...actual,
+    logger: {
+      child: () => ({
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+      }),
+    },
+    getOptionalSecretValue: vi.fn().mockReturnValue("5"),
+  };
+});
 
 import { synthesizerNode } from "./synthesizer.js";
 import { HumanMessage } from "@langchain/core/messages";

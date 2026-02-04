@@ -7,6 +7,14 @@ export {
 } from "./logger.js";
 
 export {
+  CircuitBreaker,
+  CircuitBreakerError,
+  type CircuitBreakerConfig,
+  type CircuitBreakerMetrics,
+  type CircuitBreakerState,
+} from "./circuitBreaker.js";
+
+export {
   AppError,
   NotFoundError,
   ValidationError,

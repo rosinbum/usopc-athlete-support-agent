@@ -8,7 +8,22 @@ vi.mock("@langchain/openai", () => ({
   OpenAIEmbeddings: mockOpenAIEmbeddings,
 }));
 
-import { createEmbeddings } from "./embeddings.js";
+vi.mock("@usopc/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usopc/shared")>();
+  return {
+    ...actual,
+    logger: {
+      child: () => ({
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+      }),
+    },
+  };
+});
+
+import { createEmbeddings, createRawEmbeddings } from "./embeddings.js";
 
 describe("createEmbeddings", () => {
   beforeEach(() => {
@@ -68,12 +83,47 @@ describe("createEmbeddings", () => {
     );
   });
 
-  it("should return the created embeddings instance", () => {
-    const mockInstance = { embedDocuments: vi.fn() };
+  it("should return a ProtectedOpenAIEmbeddings instance", () => {
+    const mockInstance = {
+      embedDocuments: vi.fn(),
+      embedQuery: vi.fn(),
+    };
     mockOpenAIEmbeddings.mockReturnValue(mockInstance);
 
     const result = createEmbeddings("key");
 
+    // Should be a ProtectedOpenAIEmbeddings wrapper
+    expect(result).toHaveProperty("embedDocuments");
+    expect(result).toHaveProperty("embedQuery");
+    expect(typeof result.embedDocuments).toBe("function");
+    expect(typeof result.embedQuery).toBe("function");
+  });
+});
+
+describe("createRawEmbeddings", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.OPENAI_API_KEY;
+  });
+
+  it("should return raw OpenAIEmbeddings instance", () => {
+    const mockInstance = { embedDocuments: vi.fn() };
+    mockOpenAIEmbeddings.mockReturnValue(mockInstance);
+
+    const result = createRawEmbeddings("key");
+
     expect(result).toBe(mockInstance);
+  });
+
+  it("should create with correct parameters", () => {
+    createRawEmbeddings("test-key");
+
+    expect(mockOpenAIEmbeddings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openAIApiKey: "test-key",
+        modelName: "text-embedding-3-small",
+        dimensions: 1536,
+      }),
+    );
   });
 });

@@ -3,6 +3,10 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger } from "@usopc/shared";
 import { MODEL_CONFIG } from "../../config/index.js";
 import { SYSTEM_PROMPT, buildSynthesizerPrompt } from "../../prompts/index.js";
+import {
+  invokeAnthropic,
+  extractTextFromResponse,
+} from "../../services/anthropicService.js";
 import { buildContextualQuery } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
@@ -154,26 +158,12 @@ export async function synthesizerNode(
       queryIntent: state.queryIntent,
     });
 
-    const response = await model.invoke([
+    const response = await invokeAnthropic(model, [
       new SystemMessage(SYSTEM_PROMPT),
       new HumanMessage(prompt),
     ]);
 
-    const answer =
-      typeof response.content === "string"
-        ? response.content
-        : Array.isArray(response.content)
-          ? response.content
-              .filter(
-                (block): block is { type: "text"; text: string } =>
-                  typeof block === "object" &&
-                  block !== null &&
-                  "type" in block &&
-                  block.type === "text",
-              )
-              .map((block) => block.text)
-              .join("")
-          : "";
+    const answer = extractTextFromResponse(response);
 
     log.info("Synthesis complete", {
       answerLength: answer.length,

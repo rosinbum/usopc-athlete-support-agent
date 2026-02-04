@@ -1,16 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@usopc/shared", () => ({
-  logger: {
-    child: () => ({
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    }),
-  },
-  getOptionalSecretValue: vi.fn().mockReturnValue("5"),
-}));
+vi.mock("@usopc/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usopc/shared")>();
+  return {
+    ...actual,
+    logger: {
+      child: () => ({
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+      }),
+    },
+    getOptionalSecretValue: vi.fn().mockReturnValue("5"),
+  };
+});
 
 import { createRetrieverNode, type VectorStoreLike } from "./retriever.js";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
