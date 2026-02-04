@@ -259,6 +259,105 @@ describe("createRetrieverNode", () => {
     expect(doc.score).toBe(0.1);
   });
 
+  it("maps authorityLevel from vector store metadata", async () => {
+    const store = makeMockVectorStore([
+      [
+        makeSearchResult("federal law content", 0.1, {
+          documentTitle: "Ted Stevens Act",
+          authority_level: "law",
+        }),
+        makeSearchResult("policy content", 0.15, {
+          documentTitle: "USOPC Policy",
+          authority_level: "usopc_policy_procedure",
+        }),
+      ],
+    ]);
+
+    const node = createRetrieverNode(store);
+    const state = makeState({ topicDomain: "governance" });
+
+    const result = await node(state);
+    expect(result.retrievedDocuments![0].metadata.authorityLevel).toBe("law");
+    expect(result.retrievedDocuments![1].metadata.authorityLevel).toBe(
+      "usopc_policy_procedure",
+    );
+  });
+
+  describe("authority level weighting", () => {
+    it("ranks higher-authority documents higher when similarity scores are similar", async () => {
+      // Both docs have similar scores (0.10 vs 0.12) but different authority levels
+      const store = makeMockVectorStore([
+        [
+          makeSearchResult("educational guidance content", 0.1, {
+            documentTitle: "FAQ",
+            authority_level: "educational_guidance", // lowest authority
+          }),
+          makeSearchResult("federal law content", 0.12, {
+            documentTitle: "Ted Stevens Act",
+            authority_level: "law", // highest authority
+          }),
+        ],
+      ]);
+
+      const node = createRetrieverNode(store);
+      const state = makeState({ topicDomain: "governance" });
+
+      const result = await node(state);
+      // Law should rank first despite slightly worse similarity score
+      expect(result.retrievedDocuments![0].metadata.authorityLevel).toBe("law");
+      expect(result.retrievedDocuments![1].metadata.authorityLevel).toBe(
+        "educational_guidance",
+      );
+    });
+
+    it("preserves similarity-based ranking when score difference is significant", async () => {
+      // Significant score difference (0.1 vs 0.5) should keep similarity-based order
+      const store = makeMockVectorStore([
+        [
+          makeSearchResult("educational content with great match", 0.1, {
+            documentTitle: "Athlete Guide",
+            authority_level: "educational_guidance",
+          }),
+          makeSearchResult("law content with poor match", 0.5, {
+            documentTitle: "Ted Stevens Act",
+            authority_level: "law",
+          }),
+        ],
+      ]);
+
+      const node = createRetrieverNode(store);
+      const state = makeState({ topicDomain: "governance" });
+
+      const result = await node(state);
+      // Educational guide should still rank first due to much better similarity
+      expect(result.retrievedDocuments![0].metadata.authorityLevel).toBe(
+        "educational_guidance",
+      );
+      expect(result.retrievedDocuments![1].metadata.authorityLevel).toBe("law");
+    });
+
+    it("handles documents without authority level gracefully", async () => {
+      const store = makeMockVectorStore([
+        [
+          makeSearchResult("doc without authority", 0.1, {
+            documentTitle: "Legacy Doc",
+          }),
+          makeSearchResult("doc with authority", 0.12, {
+            documentTitle: "USOPC Policy",
+            authority_level: "usopc_policy_procedure",
+          }),
+        ],
+      ]);
+
+      const node = createRetrieverNode(store);
+      const state = makeState({ topicDomain: "governance" });
+
+      const result = await node(state);
+      // Should not crash and should return both documents
+      expect(result.retrievedDocuments).toHaveLength(2);
+    });
+  });
+
   it("uses $in filter for multiple NGB IDs", async () => {
     const store = makeMockVectorStore([
       [

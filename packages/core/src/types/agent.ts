@@ -24,6 +24,7 @@ export interface Citation {
   section?: string;
   effectiveDate?: string;
   snippet: string;
+  authorityLevel?: AuthorityLevel;
 }
 
 export interface EscalationInfo {

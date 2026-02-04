@@ -21,7 +21,9 @@ const BASE_INSTRUCTIONS = `## Instructions
 
 6. **Never fabricate.** If the context is insufficient to answer the question, say so. Do not guess, speculate, or generate plausible-sounding but unsupported information.
 
-7. **Use clear, accessible language.** Athletes may not have legal or governance expertise. Explain technical terms and acronyms on first use.`;
+7. **Use clear, accessible language.** Athletes may not have legal or governance expertise. Explain technical terms and acronyms on first use.
+
+8. **Prefer higher-authority sources.** When multiple documents address the same topic, prioritize information from higher-authority sources. The hierarchy from highest to lowest is: federal/state law → international rules → USOPC governance → USOPC policies → independent offices (SafeSport, Ombuds) → USADA rules → NGB policies → games-specific rules → educational guidance. If sources conflict, note the conflict and defer to the higher-authority source.`;
 
 /**
  * Response format for factual queries (simple lookups).

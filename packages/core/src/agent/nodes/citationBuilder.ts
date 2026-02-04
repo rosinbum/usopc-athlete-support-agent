@@ -36,6 +36,7 @@ export async function citationBuilderNode(
       effectiveDate: doc.metadata.effectiveDate,
       snippet:
         doc.content.slice(0, 200) + (doc.content.length > 200 ? "..." : ""),
+      authorityLevel: doc.metadata.authorityLevel,
     });
   }
 
