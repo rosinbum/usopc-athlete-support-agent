@@ -3,6 +3,10 @@ import { HumanMessage } from "@langchain/core/messages";
 import { logger } from "@usopc/shared";
 import { MODEL_CONFIG } from "../../config/index.js";
 import { buildClassifierPromptWithHistory } from "../../prompts/index.js";
+import {
+  invokeAnthropic,
+  extractTextFromResponse,
+} from "../../services/anthropicService.js";
 import { buildContextualQuery } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { TopicDomain, QueryIntent } from "../../types/index.js";
@@ -171,24 +175,8 @@ export async function classifierNode(
   );
 
   try {
-    const response = await model.invoke([new HumanMessage(prompt)]);
-
-    const responseText =
-      typeof response.content === "string"
-        ? response.content
-        : Array.isArray(response.content)
-          ? response.content
-              .filter(
-                (block): block is { type: "text"; text: string } =>
-                  typeof block === "object" &&
-                  block !== null &&
-                  "type" in block &&
-                  block.type === "text",
-              )
-              .map((block) => block.text)
-              .join("")
-          : "";
-
+    const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
+    const responseText = extractTextFromResponse(response);
     const result = parseClassifierResponse(responseText);
 
     log.info("Classification complete", {

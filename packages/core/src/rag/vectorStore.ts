@@ -1,5 +1,5 @@
 import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
-import type { OpenAIEmbeddings } from "@langchain/openai";
+import type { EmbeddingsInterface } from "@langchain/core/embeddings";
 import type { PoolConfig } from "pg";
 
 export interface VectorStoreConfig {
@@ -24,7 +24,7 @@ const DEFAULT_CONFIG: VectorStoreConfig = {
 };
 
 export async function createVectorStore(
-  embeddings: OpenAIEmbeddings,
+  embeddings: EmbeddingsInterface,
   config?: VectorStoreConfig,
 ): Promise<PGVectorStore> {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };

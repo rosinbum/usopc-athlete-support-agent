@@ -1,5 +1,6 @@
 import { logger } from "@usopc/shared";
 import { RETRIEVAL_CONFIG } from "../../config/index.js";
+import { vectorStoreSearch } from "../../services/vectorStoreService.js";
 import { buildContextualQuery } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
@@ -154,10 +155,15 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
           filter,
           topK: RETRIEVAL_CONFIG.narrowFilterTopK,
         });
-        results = await vectorStore.similaritySearchWithScore(
-          query,
-          RETRIEVAL_CONFIG.narrowFilterTopK,
-          filter,
+        // Use circuit breaker with fallback to empty array
+        results = await vectorStoreSearch(
+          () =>
+            vectorStore.similaritySearchWithScore(
+              query,
+              RETRIEVAL_CONFIG.narrowFilterTopK,
+              filter,
+            ),
+          [],
         );
       }
 
@@ -170,9 +176,14 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
             topK: RETRIEVAL_CONFIG.broadenFilterTopK,
           },
         );
-        const broadResults = await vectorStore.similaritySearchWithScore(
-          query,
-          RETRIEVAL_CONFIG.broadenFilterTopK,
+        // Use circuit breaker with fallback to empty array
+        const broadResults = await vectorStoreSearch(
+          () =>
+            vectorStore.similaritySearchWithScore(
+              query,
+              RETRIEVAL_CONFIG.broadenFilterTopK,
+            ),
+          [],
         );
 
         // Merge, deduplicating by content

@@ -1,6 +1,7 @@
 import { TavilySearch } from "@langchain/tavily";
 import { logger } from "@usopc/shared";
 import { TRUSTED_DOMAINS } from "../../config/index.js";
+import { searchWithTavily } from "../../services/tavilyService.js";
 import type { AgentState } from "../state.js";
 
 const log = logger.child({ service: "researcher-node" });
@@ -98,7 +99,8 @@ export function createResearcherNode(tavilySearch: TavilySearchLike) {
 
       // Tavily's invoke returns search results (string or object).
       // We scope the search to trusted USOPC-related domains.
-      const rawResult = await tavilySearch.invoke({ query });
+      // The call is protected by a circuit breaker for resilience.
+      const rawResult = await searchWithTavily(tavilySearch, query);
 
       // The Tavily tool may return a string or structured result.
       // Normalize to string then parse into individual result strings.
