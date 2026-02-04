@@ -1,5 +1,6 @@
 import { Document } from "@langchain/core/documents";
 import * as cheerio from "cheerio";
+import { fetchWithRetry } from "./fetchWithRetry.js";
 
 /**
  * Selectors for elements that should be stripped before extracting text.
@@ -44,20 +45,23 @@ const CONTENT_SELECTORS = [
  *
  * Uses Cheerio to parse the HTML.  Navigation, headers/footers, scripts, and
  * other non-content elements are stripped before text extraction.
+ *
+ * Uses fetchWithRetry for automatic retry on transient failures (5xx, 429,
+ * network errors) with exponential backoff.
  */
 export async function loadWeb(url: string): Promise<Document[]> {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "USOPC-Ingestion/1.0",
-      Accept: "text/html,application/xhtml+xml",
+  const response = await fetchWithRetry(
+    url,
+    {
+      headers: {
+        "User-Agent": "USOPC-Ingestion/1.0",
+        Accept: "text/html,application/xhtml+xml",
+      },
     },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch web page ${url}: ${response.status} ${response.statusText}`,
-    );
-  }
+    {
+      timeoutMs: 60000, // 60 second timeout for web pages
+    },
+  );
 
   const html = await response.text();
   const $ = cheerio.load(html);

@@ -36,9 +36,10 @@ export default $config({
     ];
 
     let databaseUrl: string | undefined;
+    let database: sst.aws.Postgres | undefined;
 
     if (isProd) {
-      const database = new sst.aws.Postgres("Database", {
+      database = new sst.aws.Postgres("Database", {
         scaling: {
           min: "0.5 ACU",
           max: "4 ACU",
@@ -50,6 +51,26 @@ export default $config({
       databaseUrl =
         "postgresql://postgres:postgres@localhost:5432/usopc_athlete_support";
     }
+
+    // DynamoDB table for source configs (enables dynamic management)
+    const sourceConfigTable = new sst.aws.Dynamo("SourceConfigs", {
+      fields: {
+        pk: "string",
+        sk: "string",
+        ngbId: "string",
+        enabled: "string",
+      },
+      primaryIndex: { hashKey: "pk", rangeKey: "sk" },
+      globalIndexes: {
+        "ngbId-index": { hashKey: "ngbId", rangeKey: "pk" },
+        "enabled-priority-index": { hashKey: "enabled", rangeKey: "sk" },
+      },
+    });
+
+    // S3 bucket for document storage (cache/archive)
+    const documentsBucket = new sst.aws.Bucket("DocumentsBucket", {
+      versioning: true,
+    });
 
     // tRPC API
     const api = new sst.aws.ApiGatewayV2("Api");
@@ -108,7 +129,7 @@ export default $config({
       ingestionQueue.subscribe(
         {
           handler: "packages/ingestion/src/worker.handler",
-          link: [...linkables, database],
+          link: [...linkables, database!, sourceConfigTable, documentsBucket],
           timeout: "15 minutes",
           memory: "1024 MB",
         },
@@ -122,7 +143,13 @@ export default $config({
         schedule: "rate(7 days)",
         job: {
           handler: "packages/ingestion/src/cron.handler",
-          link: [...linkables, database, ingestionQueue],
+          link: [
+            ...linkables,
+            database!,
+            ingestionQueue,
+            sourceConfigTable,
+            documentsBucket,
+          ],
           timeout: "5 minutes",
           memory: "512 MB",
         },
@@ -133,6 +160,8 @@ export default $config({
       apiUrl: api.url,
       webUrl: web.url,
       slackUrl: slackApi.url,
+      sourceConfigTableName: sourceConfigTable.name,
+      documentsBucketName: documentsBucket.name,
     };
   },
 });

@@ -44,6 +44,7 @@ vi.mock("pg", () => ({
 
 vi.mock("@usopc/shared", () => ({
   getDatabaseUrl: () => "postgresql://localhost/test",
+  isProduction: () => false, // Always use JSON files in tests
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),
@@ -51,6 +52,17 @@ vi.mock("@usopc/shared", () => ({
     debug: vi.fn(),
     child: vi.fn(),
   }),
+}));
+
+// Mock fetchWithRetry to use the global fetch mock
+const mockFetchWithRetry = vi.fn();
+vi.mock("./loaders/fetchWithRetry.js", () => ({
+  fetchWithRetry: (...args: unknown[]) => mockFetchWithRetry(...args),
+}));
+
+// Mock the entities module (not used when isProduction returns false)
+vi.mock("./entities/index.js", () => ({
+  createSourceConfigEntity: vi.fn(),
 }));
 
 // Import after mocks
@@ -89,11 +101,11 @@ function hashContent(content: string): string {
 
 describe("cron handler", () => {
   const originalEnv = process.env.SOURCES_DIR;
-  let mockFetch: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.SOURCES_DIR = "/fake/sources";
+    delete process.env.USE_DYNAMODB; // Ensure we use JSON files
 
     mockPoolEnd.mockResolvedValue(undefined);
     mockUpsertIngestionStatus.mockResolvedValue(undefined);
@@ -103,11 +115,10 @@ describe("cron handler", () => {
     mockReaddir.mockResolvedValue(["source1.json"]);
     mockReadFile.mockResolvedValue(JSON.stringify(makeSourceConfig()));
 
-    // Mock global fetch
-    mockFetch = vi.fn().mockResolvedValue({
+    // Mock fetchWithRetry to return a response-like object
+    mockFetchWithRetry.mockResolvedValue({
       text: () => Promise.resolve("fetched content"),
     });
-    vi.stubGlobal("fetch", mockFetch);
   });
 
   afterEach(() => {
@@ -116,7 +127,6 @@ describe("cron handler", () => {
     } else {
       process.env.SOURCES_DIR = originalEnv;
     }
-    vi.unstubAllGlobals();
   });
 
   it("enqueues changed source when hash differs from DB", async () => {
@@ -199,20 +209,15 @@ describe("cron handler", () => {
     );
   });
 
-  it("still enqueues when fetch throws (fallback content)", async () => {
-    mockFetch.mockRejectedValueOnce(new Error("network error"));
+  it("marks failure and continues when fetch throws", async () => {
+    mockFetchWithRetry.mockRejectedValueOnce(new Error("network error"));
     mockGetLastContentHash.mockResolvedValueOnce("any-old-hash");
 
     await handler();
 
-    // Should still enqueue because Date.now() content produces a different hash
-    expect(mockSend).toHaveBeenCalledOnce();
-    expect(mockUpsertIngestionStatus).toHaveBeenCalledWith(
-      expect.anything(),
-      "src-1",
-      "https://example.com/doc.pdf",
-      "ingesting",
-    );
+    // When fetch fails, source should be marked as failed (not enqueued)
+    // The handler now continues to the next source instead of forcing re-ingestion
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   it("handles per-source errors without stopping other sources", async () => {

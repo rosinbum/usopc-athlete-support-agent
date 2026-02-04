@@ -11,10 +11,15 @@
     "test": "vitest run",
     "ingest": "tsx src/scripts/ingest.ts",
     "seed": "tsx src/scripts/seed-db.ts",
+    "seed:dynamodb": "tsx src/scripts/seed-dynamodb.ts",
+    "sources": "tsx src/scripts/sources-cli.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.981.0",
+    "@aws-sdk/client-s3": "^3.981.0",
     "@aws-sdk/client-sqs": "^3.981.0",
+    "@aws-sdk/lib-dynamodb": "^3.981.0",
     "@langchain/community": "^0.3.22",
     "@langchain/core": "^0.3.28",
     "@langchain/openai": "^0.3.17",
@@ -27,6 +32,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@smithy/util-stream": "^3.0.0",
     "@types/aws-lambda": "^8.10.160",
     "@types/pg": "^8.11.10",
     "sst": "3.17.38",
