@@ -22,6 +22,11 @@ export default $config({
     const langchainKey = new sst.Secret("LangchainApiKey");
     const slackBotToken = new sst.Secret("SlackBotToken");
     const slackSigningSecret = new sst.Secret("SlackSigningSecret");
+    // Auth secrets (admin OAuth)
+    const authSecret = new sst.Secret("AuthSecret");
+    const gitHubClientId = new sst.Secret("GitHubClientId");
+    const gitHubClientSecret = new sst.Secret("GitHubClientSecret");
+    const adminEmails = new sst.Secret("AdminEmails");
     // Optional config with default value
     const conversationMaxTurns = new sst.Secret("ConversationMaxTurns", "5");
 
@@ -99,7 +104,15 @@ export default $config({
     // Next.js web app
     const web = new sst.aws.Nextjs("Web", {
       path: "apps/web",
-      link: [...linkables, api, conversationMaxTurns],
+      link: [
+        ...linkables,
+        api,
+        conversationMaxTurns,
+        authSecret,
+        gitHubClientId,
+        gitHubClientSecret,
+        adminEmails,
+      ],
       environment: {
         NEXT_PUBLIC_API_URL: api.url,
         ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
