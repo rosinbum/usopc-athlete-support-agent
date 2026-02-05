@@ -225,6 +225,32 @@ describe("loadWeb", () => {
       expect(docs[0].pageContent).toContain("Article content");
     });
 
+    it("extracts content from Drupal-style page with .tab-content", async () => {
+      const html = `
+        <html>
+          <head><title>Cornell Law</title></head>
+          <body>
+            <div id="skip-link">Skip to main content</div>
+            <form id="search-form">
+              <input type="text" placeholder="Quick search by citation" />
+            </form>
+            <aside class="sidebar">Sidebar navigation</aside>
+            <div class="tab-content">
+              <h2>36 USC Chapter 2205</h2>
+              <p>United States Olympic and Paralympic Committee</p>
+            </div>
+          </body>
+        </html>
+      `;
+      mockFetchWithRetry.mockResolvedValueOnce(createMockResponse(html));
+
+      const docs = await loadWeb("https://www.law.cornell.edu/uscode/text/36");
+
+      expect(docs[0].pageContent).toContain("United States Olympic");
+      expect(docs[0].pageContent).not.toContain("Quick search by citation");
+      expect(docs[0].pageContent).not.toContain("Sidebar navigation");
+    });
+
     it("falls back to body when no main/article", async () => {
       const html = `
         <html>

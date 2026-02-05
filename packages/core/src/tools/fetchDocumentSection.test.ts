@@ -44,7 +44,7 @@ describe("createFetchDocumentSectionTool", () => {
       await tool.invoke({ documentId: "doc-123" });
 
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining("metadata->>'documentId' = $1"),
+        expect.stringContaining("metadata->>'source_id' = $1"),
         ["doc-123"],
       );
     });
@@ -100,7 +100,7 @@ describe("createFetchDocumentSectionTool", () => {
       });
 
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining("metadata->>'sectionTitle' ILIKE $2"),
+        expect.stringContaining("metadata->>'section_title' ILIKE $2"),
         ["doc-456", "%Eligibility%"],
       );
     });
