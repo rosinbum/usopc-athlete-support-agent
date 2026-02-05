@@ -44,6 +44,7 @@ export function SourcesClient() {
   const [stats, setStats] = useState<SourcesStats | null>(null);
   const [data, setData] = useState<SourcesListResponse | null>(null);
   const [filters, setFilters] = useState<SourceFiltersState>({});
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,6 +72,7 @@ export function SourcesClient() {
       if (filters.ngbId) params.set("ngbId", filters.ngbId);
       if (filters.authorityLevel)
         params.set("authorityLevel", filters.authorityLevel);
+      if (page > 1) params.set("page", String(page));
 
       const res = await fetch(`/api/sources?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch sources");
@@ -81,7 +83,7 @@ export function SourcesClient() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, page]);
 
   useEffect(() => {
     fetchStats();
@@ -93,6 +95,7 @@ export function SourcesClient() {
 
   const handleFilterChange = (newFilters: Partial<SourceFiltersState>) => {
     setFilters((prev) => ({ ...prev, ...newFilters }));
+    setPage(1);
   };
 
   return (
@@ -185,10 +188,24 @@ export function SourcesClient() {
 
           {/* Pagination */}
           {data.totalPages > 1 && (
-            <div className="mt-8 flex justify-center gap-2">
+            <div className="mt-8 flex items-center justify-center gap-4">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={data.page <= 1}
+                className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
               <span className="text-sm text-gray-500">
                 Page {data.page} of {data.totalPages}
               </span>
+              <button
+                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                disabled={data.page >= data.totalPages}
+                className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
             </div>
           )}
         </>
