@@ -63,10 +63,24 @@ describe("listUniqueDocuments", () => {
 
     await listUniqueDocuments(pool, { search: "bylaws" });
 
+    // Count query (first call) should contain the filter
     expect(pool.query).toHaveBeenCalledWith(
       expect.stringContaining("document_title ILIKE"),
       expect.arrayContaining(["%bylaws%"]),
     );
+  });
+
+  it("count query uses subquery matching GROUP BY columns", async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ total: "0" }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await listUniqueDocuments(pool, {});
+
+    // First call is the count query - must use subquery with GROUP BY
+    const countCall = pool.query.mock.calls[0];
+    expect(countCall[0]).toContain("COUNT(*) as total FROM (");
+    expect(countCall[0]).toContain("GROUP BY source_url, document_title");
   });
 
   it("applies documentType filter", async () => {

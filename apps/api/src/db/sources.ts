@@ -115,11 +115,14 @@ export async function listUniqueDocuments(
   const whereClause =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  // Count total unique documents matching filters
+  // Count total grouped rows (must match GROUP BY in data query)
   const countQuery = `
-    SELECT COUNT(DISTINCT source_url) as total
-    FROM document_chunks
-    ${whereClause}
+    SELECT COUNT(*) as total FROM (
+      SELECT 1 FROM document_chunks
+      ${whereClause}
+      GROUP BY source_url, document_title, document_type, ngb_id,
+               topic_domain, authority_level, effective_date
+    ) sub
   `;
 
   const countResult = await pool.query<CountRow>(countQuery, values);

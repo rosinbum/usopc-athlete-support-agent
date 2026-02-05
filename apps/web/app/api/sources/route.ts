@@ -1,20 +1,5 @@
 import { NextResponse } from "next/server";
-import { Pool } from "pg";
-import { getDatabaseUrl } from "@usopc/shared";
-
-let pool: Pool | null = null;
-
-function getPool(): Pool {
-  if (!pool) {
-    pool = new Pool({
-      connectionString: getDatabaseUrl(),
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    });
-  }
-  return pool;
-}
+import { getPool } from "@usopc/shared";
 
 interface DocumentRow {
   source_url: string;
@@ -44,10 +29,10 @@ export async function GET(request: Request) {
     const action = url.searchParams.get("action");
 
     if (action === "stats") {
-      return handleStats();
+      return await handleStats();
     }
 
-    return handleList(url);
+    return await handleList(url);
   } catch (error) {
     console.error("Sources API error:", error);
     return NextResponse.json(
@@ -128,9 +113,13 @@ async function handleList(url: URL) {
   const whereClause =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  // Count total
+  // Count total grouped rows (must match GROUP BY in data query)
   const countResult = await db.query<CountRow>(
-    `SELECT COUNT(DISTINCT source_url) as total FROM document_chunks ${whereClause}`,
+    `SELECT COUNT(*) as total FROM (
+      SELECT 1 FROM document_chunks ${whereClause}
+      GROUP BY source_url, document_title, document_type, ngb_id,
+               topic_domain, authority_level, effective_date
+    ) sub`,
     values,
   );
 
