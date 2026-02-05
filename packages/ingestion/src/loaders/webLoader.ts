@@ -22,6 +22,10 @@ const STRIP_SELECTORS = [
   ".cookie-banner",
   ".advertisement",
   "#cookie-notice",
+  "form",
+  ".sidebar",
+  "aside",
+  "#sidebar",
 ];
 
 /**
@@ -38,6 +42,9 @@ const CONTENT_SELECTORS = [
   ".main-content",
   ".article-body",
   ".post-content",
+  ".tab-content",
+  "#block-system-main",
+  ".field-items",
 ];
 
 /**
