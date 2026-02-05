@@ -68,29 +68,34 @@ import { QuotaExhaustedError } from "./pipeline.js";
 // Fixtures
 // ---------------------------------------------------------------------------
 
+function makeSQSRecord(
+  body: string | Record<string, unknown>,
+  messageId = "msg-1",
+) {
+  return {
+    messageId,
+    receiptHandle: `receipt-${messageId}`,
+    body: typeof body === "string" ? body : JSON.stringify(body),
+    attributes: {
+      ApproximateReceiveCount: "1",
+      SentTimestamp: "0",
+      SenderId: "sender",
+      ApproximateFirstReceiveTimestamp: "0",
+    },
+    messageAttributes: {},
+    md5OfBody: "md5",
+    eventSource: "aws:sqs",
+    eventSourceARN: "arn:aws:sqs:us-east-1:123:queue",
+    awsRegion: "us-east-1",
+  };
+}
+
 function makeSQSEvent(
   body: Record<string, unknown>,
   messageId = "msg-1",
 ): SQSEvent {
   return {
-    Records: [
-      {
-        messageId,
-        receiptHandle: "receipt-1",
-        body: JSON.stringify(body),
-        attributes: {
-          ApproximateReceiveCount: "1",
-          SentTimestamp: "0",
-          SenderId: "sender",
-          ApproximateFirstReceiveTimestamp: "0",
-        },
-        messageAttributes: {},
-        md5OfBody: "md5",
-        eventSource: "aws:sqs",
-        eventSourceARN: "arn:aws:sqs:us-east-1:123:queue",
-        awsRegion: "us-east-1",
-      },
-    ],
+    Records: [makeSQSRecord(body, messageId)],
   };
 }
 
@@ -230,5 +235,90 @@ describe("worker handler", () => {
     mockIngestSource.mockRejectedValueOnce(new Error("unexpected"));
     await handler(makeSQSEvent(MESSAGE_BODY));
     expect(mockPoolEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it("processes multiple records in a single event", async () => {
+    const body2 = {
+      ...MESSAGE_BODY,
+      source: { ...MESSAGE_BODY.source, id: "src-2" },
+    };
+
+    mockIngestSource
+      .mockResolvedValueOnce({
+        sourceId: "src-1",
+        status: "completed",
+        chunksCount: 5,
+      })
+      .mockResolvedValueOnce({
+        sourceId: "src-2",
+        status: "completed",
+        chunksCount: 3,
+      });
+
+    const event: SQSEvent = {
+      Records: [
+        makeSQSRecord(MESSAGE_BODY, "msg-1"),
+        makeSQSRecord(body2, "msg-2"),
+      ],
+    };
+
+    const result = await handler(event);
+
+    expect(result).toEqual({ batchItemFailures: [] });
+    expect(mockIngestSource).toHaveBeenCalledTimes(2);
+    expect(mockUpsertIngestionStatus).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips malformed messages and continues", async () => {
+    mockIngestSource.mockResolvedValueOnce({
+      sourceId: "src-1",
+      status: "completed",
+      chunksCount: 5,
+    });
+
+    const event: SQSEvent = {
+      Records: [
+        makeSQSRecord("this is not json", "msg-bad"),
+        makeSQSRecord(MESSAGE_BODY, "msg-1"),
+      ],
+    };
+
+    const result = await handler(event);
+
+    expect(result).toEqual({ batchItemFailures: [] });
+    expect(mockIngestSource).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks remaining records as failures on QuotaExhaustedError", async () => {
+    mockIngestSource.mockRejectedValueOnce(
+      new QuotaExhaustedError("quota hit"),
+    );
+
+    const body2 = {
+      ...MESSAGE_BODY,
+      source: { ...MESSAGE_BODY.source, id: "src-2" },
+    };
+    const body3 = {
+      ...MESSAGE_BODY,
+      source: { ...MESSAGE_BODY.source, id: "src-3" },
+    };
+
+    const event: SQSEvent = {
+      Records: [
+        makeSQSRecord(MESSAGE_BODY, "msg-1"),
+        makeSQSRecord(body2, "msg-2"),
+        makeSQSRecord(body3, "msg-3"),
+      ],
+    };
+
+    const result = await handler(event);
+
+    // The first record hit quota; remaining two should be batch failures
+    expect(result.batchItemFailures).toEqual([
+      { itemIdentifier: "msg-2" },
+      { itemIdentifier: "msg-3" },
+    ]);
+    expect(mockIngestSource).toHaveBeenCalledTimes(1);
+    expect(mockSend).toHaveBeenCalledOnce();
   });
 });

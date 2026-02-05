@@ -124,6 +124,45 @@ function batchByTokenBudget(docs: Document[], maxTokens: number): Document[][] {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const EMBED_BATCH_MAX_RETRIES = 2;
+const EMBED_BATCH_RETRY_DELAY_MS = 30_000;
+
+/**
+ * Attempt to embed a batch of documents, retrying on transient errors.
+ * Quota errors are never retried — they throw immediately.
+ */
+async function embedBatchWithRetry(
+  vectorStore: { addDocuments: (docs: Document[]) => Promise<unknown> },
+  batch: Document[],
+  sourceId: string,
+  batchIndex: number,
+  totalBatches: number,
+): Promise<void> {
+  for (let attempt = 0; attempt <= EMBED_BATCH_MAX_RETRIES; attempt++) {
+    try {
+      await vectorStore.addDocuments(batch);
+      return;
+    } catch (error) {
+      if (isQuotaError(error)) {
+        throw new QuotaExhaustedError(
+          error instanceof Error ? error.message : "OpenAI quota exhausted",
+        );
+      }
+      if (attempt >= EMBED_BATCH_MAX_RETRIES) {
+        throw error;
+      }
+      logger.warn(
+        `Batch ${batchIndex + 1}/${totalBatches} failed (attempt ${attempt + 1}/${EMBED_BATCH_MAX_RETRIES + 1}), retrying in ${EMBED_BATCH_RETRY_DELAY_MS / 1000}s...`,
+        {
+          sourceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      await sleep(EMBED_BATCH_RETRY_DELAY_MS);
+    }
+  }
+}
+
 /**
  * Backfill denormalized text columns from the JSONB metadata column.
  * LangChain's PGVectorStore only writes id, content, embedding, and metadata —
@@ -177,12 +216,23 @@ export async function ingestSource(
   try {
     // 1. Load raw document(s)
     const rawDocs = await loadDocuments(source);
+    if (rawDocs.length === 0) {
+      throw new Error(`Loader returned 0 documents for ${source.url}`);
+    }
     logger.info(`Loaded ${rawDocs.length} document(s) from ${source.url}`, {
       sourceId: source.id,
     });
 
     // 2. Clean content
-    const cleanedDocs = cleanDocuments(rawDocs);
+    const allCleaned = cleanDocuments(rawDocs);
+    const cleanedDocs = allCleaned.filter(
+      (doc) => doc.pageContent.trim().length > 0,
+    );
+    if (cleanedDocs.length === 0) {
+      throw new Error(
+        `All ${rawDocs.length} document(s) were empty after cleaning for ${source.url}`,
+      );
+    }
 
     // 3. Split into chunks
     const splitter = createSplitter();
@@ -218,16 +268,13 @@ export async function ingestSource(
         });
         await sleep(60_000);
       }
-      try {
-        await vectorStore.addDocuments(batches[i]);
-      } catch (error) {
-        if (isQuotaError(error)) {
-          throw new QuotaExhaustedError(
-            error instanceof Error ? error.message : "OpenAI quota exhausted",
-          );
-        }
-        throw error;
-      }
+      await embedBatchWithRetry(
+        vectorStore,
+        batches[i],
+        source.id,
+        i,
+        batches.length,
+      );
       logger.info(
         `Batch ${i + 1}/${batches.length} complete (${batches[i].length} chunks)`,
         { sourceId: source.id },
