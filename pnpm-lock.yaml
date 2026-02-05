@@ -57,6 +57,9 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      '@types/pg':
+        specifier: ^8.11.11
+        version: 8.16.0
       sst:
         specifier: 3.17.38
         version: 3.17.38
@@ -295,10 +298,16 @@ importers:
 
   packages/shared:
     dependencies:
+      pg:
+        specifier: ^8.14.1
+        version: 8.18.0
       zod:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      '@types/pg':
+        specifier: ^8.11.11
+        version: 8.16.0
       sst:
         specifier: 3.17.38
         version: 3.17.38

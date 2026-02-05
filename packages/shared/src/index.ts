@@ -34,6 +34,8 @@ export {
   isDevelopment,
 } from "./env.js";
 
+export { getPool, closePool } from "./pool.js";
+
 export {
   paginationSchema,
   type Pagination,
