@@ -1,3 +1,3 @@
-export { auth as middleware } from "./auth.js";
+export { auth as proxy } from "./auth.js";
 
 export const config = { matcher: ["/admin/:path*"] };
