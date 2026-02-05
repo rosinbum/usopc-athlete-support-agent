@@ -105,11 +105,13 @@ async function loadSourceConfigsFromDynamoDB(): Promise<{
   return { sources, entity };
 }
 
+const MAX_CONSECUTIVE_FAILURES = 3;
+
 /**
  * Load all source configurations.
  * In production, loads from DynamoDB. Otherwise falls back to JSON files.
  */
-async function loadSourceConfigs(): Promise<{
+export async function loadSourceConfigs(): Promise<{
   sources: IngestionSource[];
   entity?: ReturnType<typeof createSourceConfigEntity>;
 }> {
@@ -164,6 +166,21 @@ export async function handler(): Promise<void> {
 
     for (const source of sources) {
       try {
+        // Skip sources with too many consecutive failures
+        if (entity) {
+          const config = await entity.getById(source.id);
+          if (
+            config &&
+            config.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
+          ) {
+            logger.warn(
+              `Skipping ${source.id} — ${config.consecutiveFailures} consecutive failures (reset via sources-cli)`,
+            );
+            skipped++;
+            continue;
+          }
+        }
+
         // Fetch the content to compute a hash and decide whether to re-ingest
         // Using fetchWithRetry for resilience
         let rawContent: string;
@@ -251,6 +268,18 @@ export async function handler(): Promise<void> {
     logger.info(
       `Coordinator complete: ${enqueued} enqueued, ${skipped} skipped, ${failed} failed`,
     );
+
+    // Systematic failure alerting
+    const totalProcessed = enqueued + failed;
+    if (failed > 0 && enqueued === 0) {
+      logger.error(
+        `ALERT: All ${failed} processed source(s) failed — no sources were enqueued`,
+      );
+    } else if (totalProcessed > 0 && failed > totalProcessed * 0.5) {
+      logger.warn(
+        `ALERT: Majority of sources failed (${failed}/${totalProcessed})`,
+      );
+    }
   } finally {
     await pool.end();
   }

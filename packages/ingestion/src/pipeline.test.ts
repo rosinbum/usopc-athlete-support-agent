@@ -85,6 +85,11 @@ import {
   type IngestionSource,
 } from "./pipeline.js";
 import { Client } from "pg";
+import { loadPdf } from "./loaders/pdfLoader.js";
+import { cleanText } from "./transformers/cleaner.js";
+
+const mockLoadPdf = vi.mocked(loadPdf);
+const mockCleanText = vi.mocked(cleanText);
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -196,9 +201,16 @@ describe("ingestSource", () => {
   });
 
   it("returns failed result for non-quota errors", async () => {
-    mockAddDocuments.mockRejectedValueOnce(new Error("network timeout"));
+    // Must reject all 3 attempts (1 initial + 2 retries) to exhaust retries
+    mockAddDocuments
+      .mockRejectedValueOnce(new Error("network timeout"))
+      .mockRejectedValueOnce(new Error("network timeout"))
+      .mockRejectedValueOnce(new Error("network timeout"));
 
-    const result = await ingestSource(SOURCE, OPTIONS);
+    const promise = ingestSource(SOURCE, OPTIONS);
+    await vi.advanceTimersByTimeAsync(30_000); // retry 1 delay
+    await vi.advanceTimersByTimeAsync(30_000); // retry 2 delay
+    const result = await promise;
 
     expect(result).toEqual({
       sourceId: "test-source",
@@ -206,6 +218,68 @@ describe("ingestSource", () => {
       chunksCount: 0,
       error: "network timeout",
     });
+  });
+
+  it("returns failed result when loader returns empty array", async () => {
+    mockLoadPdf.mockResolvedValueOnce([]);
+
+    const result = await ingestSource(SOURCE, OPTIONS);
+
+    expect(result.status).toBe("failed");
+    expect(result.error).toMatch(/Loader returned 0 documents/);
+  });
+
+  it("returns failed result when all documents are empty after cleaning", async () => {
+    mockLoadPdf.mockResolvedValueOnce([
+      { pageContent: "will-be-emptied", metadata: {} },
+    ]);
+    mockCleanText.mockReturnValueOnce("   ");
+
+    const result = await ingestSource(SOURCE, OPTIONS);
+
+    expect(result.status).toBe("failed");
+    expect(result.error).toMatch(/empty after cleaning/);
+  });
+
+  it("retries embedding batch on transient error and succeeds", async () => {
+    mockAddDocuments
+      .mockRejectedValueOnce(new Error("Connection reset"))
+      .mockResolvedValueOnce(undefined);
+
+    const promise = ingestSource(SOURCE, OPTIONS);
+    // Advance past the 30s retry delay
+    await vi.advanceTimersByTimeAsync(30_000);
+    const result = await promise;
+
+    expect(result.status).toBe("completed");
+    expect(mockAddDocuments).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry on QuotaExhaustedError", async () => {
+    mockAddDocuments.mockRejectedValueOnce(
+      new Error("insufficient_quota: upgrade plan"),
+    );
+
+    await expect(ingestSource(SOURCE, OPTIONS)).rejects.toThrow(
+      QuotaExhaustedError,
+    );
+    expect(mockAddDocuments).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails after exhausting batch retries", async () => {
+    mockAddDocuments
+      .mockRejectedValueOnce(new Error("timeout"))
+      .mockRejectedValueOnce(new Error("timeout"))
+      .mockRejectedValueOnce(new Error("timeout"));
+
+    const promise = ingestSource(SOURCE, OPTIONS);
+    await vi.advanceTimersByTimeAsync(30_000); // retry 1
+    await vi.advanceTimersByTimeAsync(30_000); // retry 2
+    const result = await promise;
+
+    expect(result.status).toBe("failed");
+    expect(result.error).toBe("timeout");
+    expect(mockAddDocuments).toHaveBeenCalledTimes(3);
   });
 });
 
