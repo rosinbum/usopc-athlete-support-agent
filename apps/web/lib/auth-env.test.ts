@@ -6,8 +6,8 @@ vi.mock("@usopc/shared", () => ({
 
 import {
   getAuthSecret,
-  getGoogleClientId,
-  getGoogleClientSecret,
+  getGitHubClientId,
+  getGitHubClientSecret,
   getAdminEmails,
 } from "./auth-env.js";
 import { getSecretValue } from "@usopc/shared";
@@ -31,27 +31,27 @@ describe("auth-env", () => {
     });
   });
 
-  describe("getGoogleClientId", () => {
+  describe("getGitHubClientId", () => {
     it("delegates to getSecretValue with correct params", () => {
-      mockGetSecretValue.mockReturnValue("google-id");
-      const result = getGoogleClientId();
+      mockGetSecretValue.mockReturnValue("github-id");
+      const result = getGitHubClientId();
       expect(mockGetSecretValue).toHaveBeenCalledWith(
-        "GOOGLE_CLIENT_ID",
-        "GoogleClientId",
+        "GITHUB_CLIENT_ID",
+        "GitHubClientId",
       );
-      expect(result).toBe("google-id");
+      expect(result).toBe("github-id");
     });
   });
 
-  describe("getGoogleClientSecret", () => {
+  describe("getGitHubClientSecret", () => {
     it("delegates to getSecretValue with correct params", () => {
-      mockGetSecretValue.mockReturnValue("google-secret");
-      const result = getGoogleClientSecret();
+      mockGetSecretValue.mockReturnValue("github-secret");
+      const result = getGitHubClientSecret();
       expect(mockGetSecretValue).toHaveBeenCalledWith(
-        "GOOGLE_CLIENT_SECRET",
-        "GoogleClientSecret",
+        "GITHUB_CLIENT_SECRET",
+        "GitHubClientSecret",
       );
-      expect(result).toBe("google-secret");
+      expect(result).toBe("github-secret");
     });
   });
 

@@ -4,12 +4,12 @@ export function getAuthSecret(): string {
   return getSecretValue("AUTH_SECRET", "AuthSecret");
 }
 
-export function getGoogleClientId(): string {
-  return getSecretValue("GOOGLE_CLIENT_ID", "GoogleClientId");
+export function getGitHubClientId(): string {
+  return getSecretValue("GITHUB_CLIENT_ID", "GitHubClientId");
 }
 
-export function getGoogleClientSecret(): string {
-  return getSecretValue("GOOGLE_CLIENT_SECRET", "GoogleClientSecret");
+export function getGitHubClientSecret(): string {
+  return getSecretValue("GITHUB_CLIENT_SECRET", "GitHubClientSecret");
 }
 
 export function getAdminEmails(): string[] {

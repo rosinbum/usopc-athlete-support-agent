@@ -24,8 +24,8 @@ export default $config({
     const slackSigningSecret = new sst.Secret("SlackSigningSecret");
     // Auth secrets (admin OAuth)
     const authSecret = new sst.Secret("AuthSecret");
-    const googleClientId = new sst.Secret("GoogleClientId");
-    const googleClientSecret = new sst.Secret("GoogleClientSecret");
+    const gitHubClientId = new sst.Secret("GitHubClientId");
+    const gitHubClientSecret = new sst.Secret("GitHubClientSecret");
     const adminEmails = new sst.Secret("AdminEmails");
     // Optional config with default value
     const conversationMaxTurns = new sst.Secret("ConversationMaxTurns", "5");
@@ -109,8 +109,8 @@ export default $config({
         api,
         conversationMaxTurns,
         authSecret,
-        googleClientId,
-        googleClientSecret,
+        gitHubClientId,
+        gitHubClientSecret,
         adminEmails,
       ],
       environment: {

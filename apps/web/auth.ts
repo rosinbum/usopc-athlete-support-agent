@@ -1,17 +1,17 @@
 import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
+import GitHub from "next-auth/providers/github";
 import {
   getAuthSecret,
-  getGoogleClientId,
-  getGoogleClientSecret,
+  getGitHubClientId,
+  getGitHubClientSecret,
   getAdminEmails,
 } from "./lib/auth-env.js";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    Google({
-      clientId: getGoogleClientId(),
-      clientSecret: getGoogleClientSecret(),
+    GitHub({
+      clientId: getGitHubClientId(),
+      clientSecret: getGitHubClientSecret(),
     }),
   ],
   session: { strategy: "jwt", maxAge: 24 * 60 * 60 },
@@ -31,7 +31,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (profile) {
         token.email = profile.email;
         token.name = profile.name;
-        token.picture = profile.picture;
+        token.picture = (profile as Record<string, unknown>)
+          .avatar_url as string;
       }
       return token;
     },
