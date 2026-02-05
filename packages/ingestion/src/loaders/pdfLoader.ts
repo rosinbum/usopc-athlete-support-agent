@@ -4,6 +4,35 @@ import { readFile } from "node:fs/promises";
 import { fetchWithRetry } from "./fetchWithRetry.js";
 
 /**
+ * Race the pdf-parse promise against a timeout.  A corrupted or extremely
+ * large PDF could hang forever; this ensures the Lambda eventually fails.
+ */
+export function withParseTimeout<T>(
+  parsePromise: Promise<T>,
+  timeoutMs: number,
+  source: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(
+        new Error(`PDF parsing timed out after ${timeoutMs}ms for ${source}`),
+      );
+    }, timeoutMs);
+
+    parsePromise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+/**
  * Load a PDF from a URL or local file path and return its text content as
  * a {@link Document} array.
  *
@@ -37,7 +66,7 @@ export async function loadPdf(source: string): Promise<Document[]> {
     buffer = await readFile(source);
   }
 
-  const parsed = await pdfParse(buffer);
+  const parsed = await withParseTimeout(pdfParse(buffer), 60_000, source);
 
   if (!parsed.text || parsed.text.trim().length === 0) {
     throw new Error(`PDF at ${source} produced no extractable text`);

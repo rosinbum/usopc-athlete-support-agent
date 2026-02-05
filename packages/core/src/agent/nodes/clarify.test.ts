@@ -21,6 +21,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     userSport: undefined,
     needsClarification: true,
     clarificationQuestion: undefined,
+    retrievalStatus: "success",
     ...overrides,
   };
 }

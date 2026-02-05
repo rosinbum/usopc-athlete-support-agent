@@ -5,6 +5,8 @@ import { createVectorStore } from "../rag/vectorStore.js";
 import { createTavilySearchTool } from "./nodes/researcher.js";
 import type { TavilySearchLike } from "./nodes/researcher.js";
 import { createAgentGraph } from "./graph.js";
+import { GRAPH_CONFIG } from "../config/index.js";
+import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
 
@@ -94,10 +96,15 @@ export class AgentRunner {
 
   /**
    * Run the full graph and return the final structured output.
+   * Enforces a timeout to prevent indefinitely hung invocations.
    */
   async invoke(input: AgentInput): Promise<AgentOutput> {
     const initialState = this.buildInitialState(input);
-    const finalState = await this.graph.invoke(initialState);
+    const finalState = await withTimeout(
+      this.graph.invoke(initialState),
+      GRAPH_CONFIG.invokeTimeoutMs,
+      "graph.invoke",
+    );
 
     return {
       answer: finalState.answer ?? "",
@@ -119,9 +126,11 @@ export class AgentRunner {
   /**
    * Stream graph execution with token-level streaming.
    * Uses dual stream mode to get both state updates and token-by-token LLM output.
+   * Enforces a deadline to prevent indefinitely hung streams.
    */
   async *stream(input: AgentInput): AsyncGenerator<StreamChunk> {
     const initialState = this.buildInitialState(input);
+    const deadline = Date.now() + GRAPH_CONFIG.streamTimeoutMs;
 
     // Dual stream mode: "values" for state after each node, "messages" for token streaming
     const stream = await this.graph.stream(initialState, {
@@ -129,6 +138,9 @@ export class AgentRunner {
     });
 
     for await (const chunk of stream) {
+      if (Date.now() > deadline) {
+        throw new TimeoutError("graph.stream", GRAPH_CONFIG.streamTimeoutMs);
+      }
       // LangGraph emits [mode, data] tuples when using array streamMode
       yield chunk as StreamChunk;
     }

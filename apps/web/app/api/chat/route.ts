@@ -78,6 +78,9 @@ export async function POST(req: Request) {
       for await (const event of events) {
         if (event.type === "text-delta" && event.textDelta) {
           writer.write(formatDataStreamPart("text", event.textDelta));
+        } else if (event.type === "error" && event.error) {
+          console.error("Agent stream error:", event.error);
+          writer.write(formatDataStreamPart("error", event.error.message));
         }
       }
     },

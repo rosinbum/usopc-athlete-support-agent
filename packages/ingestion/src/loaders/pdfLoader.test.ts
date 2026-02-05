@@ -41,7 +41,7 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 // Import after mocks
-import { loadPdf } from "./pdfLoader.js";
+import { loadPdf, withParseTimeout } from "./pdfLoader.js";
 import { FetchWithRetryError } from "./fetchWithRetry.js";
 
 // ---------------------------------------------------------------------------
@@ -300,5 +300,74 @@ describe("loadPdf", () => {
         "Invalid PDF structure",
       );
     });
+
+    it("throws timeout error when PDF parsing hangs", async () => {
+      vi.useFakeTimers();
+      const pdfBuffer = Buffer.from("fake pdf content");
+      mockReadFile.mockResolvedValueOnce(pdfBuffer);
+
+      // Mock pdfParse to never resolve
+      mockPdfParse.mockReturnValueOnce(new Promise(() => {}));
+
+      const promise = loadPdf("/path/to/corrupted.pdf");
+      // Prevent unhandled rejection warning while timers advance
+      promise.catch(() => {});
+
+      // Advance past the 60s timeout
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      await expect(promise).rejects.toThrow(
+        "PDF parsing timed out after 60000ms",
+      );
+      vi.useRealTimers();
+    });
+
+    it("succeeds when parsing completes within timeout", async () => {
+      const pdfBuffer = Buffer.from("fake pdf content");
+      mockReadFile.mockResolvedValueOnce(pdfBuffer);
+      mockPdfParse.mockResolvedValueOnce({
+        text: "Parsed content",
+        numpages: 2,
+      });
+
+      const docs = await loadPdf("/path/to/valid.pdf");
+
+      expect(docs).toHaveLength(1);
+      expect(docs[0].pageContent).toBe("Parsed content");
+    });
+  });
+});
+
+describe("withParseTimeout", () => {
+  it("resolves when promise completes before timeout", async () => {
+    const result = await withParseTimeout(
+      Promise.resolve("done"),
+      5000,
+      "test.pdf",
+    );
+    expect(result).toBe("done");
+  });
+
+  it("rejects with timeout error when promise does not resolve in time", async () => {
+    vi.useFakeTimers();
+    const promise = withParseTimeout(new Promise(() => {}), 5000, "test.pdf");
+    // Prevent unhandled rejection warning while timers advance
+    promise.catch(() => {});
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await expect(promise).rejects.toThrow(
+      "PDF parsing timed out after 5000ms for test.pdf",
+    );
+    vi.useRealTimers();
+  });
+
+  it("rejects with original error when promise rejects before timeout", async () => {
+    await expect(
+      withParseTimeout(
+        Promise.reject(new Error("parse failure")),
+        5000,
+        "test.pdf",
+      ),
+    ).rejects.toThrow("parse failure");
   });
 });

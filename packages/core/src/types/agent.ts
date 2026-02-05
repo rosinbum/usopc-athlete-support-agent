@@ -70,4 +70,5 @@ export interface AgentState {
   hasTimeConstraint: boolean;
   conversationId?: string;
   userSport?: string;
+  retrievalStatus: "success" | "error";
 }

@@ -14,6 +14,7 @@ import type { VectorStoreLike } from "./nodes/index.js";
 import type { TavilySearchLike } from "./nodes/index.js";
 import { routeByDomain } from "./edges/routeByDomain.js";
 import { needsMoreInfo } from "./edges/needsMoreInfo.js";
+import { withMetrics } from "./nodeMetrics.js";
 
 export interface GraphDependencies {
   vectorStore: VectorStoreLike;
@@ -33,14 +34,26 @@ export interface GraphDependencies {
  */
 export function createAgentGraph(deps: GraphDependencies) {
   const compiled = new StateGraph(AgentStateAnnotation)
-    .addNode("classifier", classifierNode)
-    .addNode("clarify", clarifyNode)
-    .addNode("retriever", createRetrieverNode(deps.vectorStore))
-    .addNode("researcher", createResearcherNode(deps.tavilySearch))
-    .addNode("synthesizer", synthesizerNode)
-    .addNode("escalate", escalateNode)
-    .addNode("citationBuilder", citationBuilderNode)
-    .addNode("disclaimerGuard", disclaimerGuardNode)
+    .addNode("classifier", withMetrics("classifier", classifierNode))
+    .addNode("clarify", withMetrics("clarify", clarifyNode))
+    .addNode(
+      "retriever",
+      withMetrics("retriever", createRetrieverNode(deps.vectorStore)),
+    )
+    .addNode(
+      "researcher",
+      withMetrics("researcher", createResearcherNode(deps.tavilySearch)),
+    )
+    .addNode("synthesizer", withMetrics("synthesizer", synthesizerNode))
+    .addNode("escalate", withMetrics("escalate", escalateNode))
+    .addNode(
+      "citationBuilder",
+      withMetrics("citationBuilder", citationBuilderNode),
+    )
+    .addNode(
+      "disclaimerGuard",
+      withMetrics("disclaimerGuard", disclaimerGuardNode),
+    )
     .addEdge("__start__", "classifier")
     .addConditionalEdges("classifier", routeByDomain)
     .addEdge("clarify", "__end__")

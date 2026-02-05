@@ -42,16 +42,19 @@ vi.mock("pg", () => ({
   })),
 }));
 
-vi.mock("@usopc/shared", () => ({
-  getDatabaseUrl: () => "postgresql://localhost/test",
-  isProduction: () => false, // Always use JSON files in tests
-  createLogger: () => ({
+const { mockLoggerInstance } = vi.hoisted(() => ({
+  mockLoggerInstance: {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
     child: vi.fn(),
-  }),
+  },
+}));
+vi.mock("@usopc/shared", () => ({
+  getDatabaseUrl: () => "postgresql://localhost/test",
+  isProduction: () => false, // Always use JSON files in tests
+  createLogger: () => mockLoggerInstance,
 }));
 
 // Mock fetchWithRetry to use the global fetch mock
@@ -60,9 +63,18 @@ vi.mock("./loaders/fetchWithRetry.js", () => ({
   fetchWithRetry: (...args: unknown[]) => mockFetchWithRetry(...args),
 }));
 
-// Mock the entities module (not used when isProduction returns false)
+// Mock the entities module
+const mockGetById = vi.fn();
+const mockGetAllEnabled = vi.fn();
+const mockMarkFailure = vi.fn();
+const mockMarkSuccess = vi.fn();
 vi.mock("./entities/index.js", () => ({
-  createSourceConfigEntity: vi.fn(),
+  createSourceConfigEntity: vi.fn(() => ({
+    getById: (...args: unknown[]) => mockGetById(...args),
+    getAllEnabled: (...args: unknown[]) => mockGetAllEnabled(...args),
+    markFailure: (...args: unknown[]) => mockMarkFailure(...args),
+    markSuccess: (...args: unknown[]) => mockMarkSuccess(...args),
+  })),
 }));
 
 // Import after mocks
@@ -278,5 +290,127 @@ describe("cron handler", () => {
     await expect(handler()).rejects.toThrow("ENOENT");
 
     expect(mockPoolEnd).toHaveBeenCalledOnce();
+  });
+
+  it("logs alert when all sources fail", async () => {
+    // Make fetch fail for every source
+    mockFetchWithRetry.mockRejectedValue(new Error("network error"));
+
+    await handler();
+
+    expect(mockLoggerInstance.error).toHaveBeenCalledWith(
+      expect.stringContaining("ALERT: All"),
+    );
+  });
+
+  it("does not log alert during normal operation", async () => {
+    mockGetLastContentHash.mockResolvedValueOnce("old-hash");
+
+    await handler();
+
+    // Check that no ALERT: message was logged
+    for (const call of mockLoggerInstance.error.mock.calls) {
+      expect(call[0]).not.toMatch(/ALERT:/);
+    }
+    for (const call of mockLoggerInstance.warn.mock.calls) {
+      expect(call[0]).not.toMatch(/ALERT:/);
+    }
+  });
+});
+
+describe("cron handler (DynamoDB mode)", () => {
+  const originalEnv = process.env.SOURCES_DIR;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.SOURCES_DIR = "/fake/sources";
+    process.env.USE_DYNAMODB = "true";
+
+    mockPoolEnd.mockResolvedValue(undefined);
+    mockUpsertIngestionStatus.mockResolvedValue(undefined);
+    mockSend.mockResolvedValue({});
+    mockMarkFailure.mockResolvedValue(undefined);
+    mockMarkSuccess.mockResolvedValue(undefined);
+
+    // Mock fetchWithRetry to return a response-like object
+    mockFetchWithRetry.mockResolvedValue({
+      text: () => Promise.resolve("fetched content"),
+    });
+  });
+
+  afterEach(() => {
+    delete process.env.USE_DYNAMODB;
+    if (originalEnv === undefined) {
+      delete process.env.SOURCES_DIR;
+    } else {
+      process.env.SOURCES_DIR = originalEnv;
+    }
+  });
+
+  it("skips sources with 3+ consecutive failures", async () => {
+    mockGetAllEnabled.mockResolvedValueOnce([
+      {
+        id: "src-broken",
+        title: "Broken",
+        documentType: "policy",
+        topicDomains: ["t"],
+        url: "https://example.com/broken.pdf",
+        format: "pdf",
+        ngbId: null,
+        priority: "medium",
+        description: "d",
+        authorityLevel: "official",
+        enabled: true,
+        lastIngestedAt: null,
+        lastContentHash: null,
+        consecutiveFailures: 3,
+        lastError: "fetch error",
+        s3Key: null,
+        s3VersionId: null,
+        createdAt: "2025-01-01T00:00:00Z",
+        updatedAt: "2025-01-01T00:00:00Z",
+      },
+      {
+        id: "src-ok",
+        title: "OK",
+        documentType: "policy",
+        topicDomains: ["t"],
+        url: "https://example.com/ok.pdf",
+        format: "pdf",
+        ngbId: null,
+        priority: "medium",
+        description: "d",
+        authorityLevel: "official",
+        enabled: true,
+        lastIngestedAt: null,
+        lastContentHash: null,
+        consecutiveFailures: 0,
+        lastError: null,
+        s3Key: null,
+        s3VersionId: null,
+        createdAt: "2025-01-01T00:00:00Z",
+        updatedAt: "2025-01-01T00:00:00Z",
+      },
+    ]);
+
+    // First getById for src-broken (failure check) returns the failing config
+    mockGetById
+      .mockResolvedValueOnce({
+        consecutiveFailures: 3,
+        lastContentHash: null,
+      })
+      // Second getById for src-ok (failure check) returns healthy config
+      .mockResolvedValueOnce({
+        consecutiveFailures: 0,
+        lastContentHash: "old-hash",
+      });
+
+    await handler();
+
+    // src-broken should be skipped, src-ok should be enqueued
+    expect(mockSend).toHaveBeenCalledOnce();
+    expect(mockLoggerInstance.warn).toHaveBeenCalledWith(
+      expect.stringContaining("Skipping src-broken"),
+    );
   });
 });

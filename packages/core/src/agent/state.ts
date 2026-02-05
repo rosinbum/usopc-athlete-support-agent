@@ -150,6 +150,16 @@ export const AgentStateAnnotation = Annotation.Root({
     reducer: (_prev, next) => next,
     default: () => undefined,
   }),
+
+  /**
+   * Indicates whether the retriever node succeeded or encountered an error.
+   * Downstream nodes (e.g. synthesizer) can use this to provide a
+   * user-friendly error message instead of synthesizing from empty context.
+   */
+  retrievalStatus: Annotation<"success" | "error">({
+    reducer: (_prev, next) => next,
+    default: () => "success",
+  }),
 });
 
 /**
