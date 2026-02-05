@@ -181,8 +181,11 @@ export function SourcesClient() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.documents.map((doc) => (
-              <SourceCard key={doc.sourceUrl} source={doc} />
+            {data.documents.map((doc, i) => (
+              <SourceCard
+                key={`${doc.sourceUrl}-${doc.documentTitle}-${i}`}
+                source={doc}
+              />
             ))}
           </div>
 
