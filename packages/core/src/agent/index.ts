@@ -16,3 +16,9 @@ export {
   legacyStateStreamToEvents,
 } from "./streamAdapter.js";
 export type { AgentStreamEvent } from "./streamAdapter.js";
+export {
+  nodeMetrics,
+  NodeMetricsCollector,
+  withMetrics,
+} from "./nodeMetrics.js";
+export type { NodeMetricEntry } from "./nodeMetrics.js";

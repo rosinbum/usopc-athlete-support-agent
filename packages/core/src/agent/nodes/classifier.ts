@@ -1,13 +1,13 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
-import { logger } from "@usopc/shared";
+import { logger, CircuitBreakerError } from "@usopc/shared";
 import { MODEL_CONFIG } from "../../config/index.js";
 import { buildClassifierPromptWithHistory } from "../../prompts/index.js";
 import {
   invokeAnthropic,
   extractTextFromResponse,
 } from "../../services/anthropicService.js";
-import { buildContextualQuery } from "../../utils/index.js";
+import { buildContextualQuery, stateContext } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { TopicDomain, QueryIntent } from "../../types/index.js";
 
@@ -69,11 +69,19 @@ function getLastUserMessage(state: AgentState): string {
   return "";
 }
 
+interface ParseResult {
+  output: ClassifierOutput;
+  warnings: string[];
+}
+
 /**
  * Parses the JSON response from the classifier model.
- * Returns a safe default if parsing fails.
+ * Returns a safe default if parsing fails, and collects warnings
+ * for any fields that were invalid but coerced.
  */
-function parseClassifierResponse(raw: string): ClassifierOutput {
+export function parseClassifierResponse(raw: string): ParseResult {
+  const warnings: string[] = [];
+
   // Strip any markdown code fences the model may have wrapped around the JSON
   let cleaned = raw.trim();
   if (cleaned.startsWith("```")) {
@@ -82,13 +90,22 @@ function parseClassifierResponse(raw: string): ClassifierOutput {
 
   const parsed = JSON.parse(cleaned) as Record<string, unknown>;
 
-  const topicDomain = VALID_DOMAINS.includes(parsed.topicDomain as TopicDomain)
-    ? (parsed.topicDomain as TopicDomain)
-    : undefined;
+  let topicDomain: TopicDomain | undefined;
+  if (VALID_DOMAINS.includes(parsed.topicDomain as TopicDomain)) {
+    topicDomain = parsed.topicDomain as TopicDomain;
+  } else if (parsed.topicDomain !== undefined) {
+    warnings.push(`Invalid topicDomain: "${String(parsed.topicDomain)}"`);
+  }
 
-  const queryIntent = VALID_INTENTS.includes(parsed.queryIntent as QueryIntent)
-    ? (parsed.queryIntent as QueryIntent)
-    : "general";
+  let queryIntent: QueryIntent;
+  if (VALID_INTENTS.includes(parsed.queryIntent as QueryIntent)) {
+    queryIntent = parsed.queryIntent as QueryIntent;
+  } else {
+    queryIntent = "general";
+    if (parsed.queryIntent !== undefined) {
+      warnings.push(`Invalid queryIntent: "${String(parsed.queryIntent)}"`);
+    }
+  }
 
   const detectedNgbIds = Array.isArray(parsed.detectedNgbIds)
     ? (parsed.detectedNgbIds as string[]).filter(
@@ -120,14 +137,17 @@ function parseClassifierResponse(raw: string): ClassifierOutput {
       : undefined;
 
   return {
-    topicDomain: topicDomain ?? "team_selection", // fallback handled below
-    detectedNgbIds,
-    queryIntent,
-    hasTimeConstraint,
-    shouldEscalate,
-    escalationReason,
-    needsClarification,
-    clarificationQuestion,
+    output: {
+      topicDomain: topicDomain ?? "team_selection", // fallback handled below
+      detectedNgbIds,
+      queryIntent,
+      hasTimeConstraint,
+      shouldEscalate,
+      escalationReason,
+      needsClarification,
+      clarificationQuestion,
+    },
+    warnings,
   };
 }
 
@@ -177,7 +197,14 @@ export async function classifierNode(
   try {
     const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
     const responseText = extractTextFromResponse(response);
-    const result = parseClassifierResponse(responseText);
+    const { output: result, warnings } = parseClassifierResponse(responseText);
+
+    if (warnings.length > 0) {
+      log.warn("Classifier response had coerced fields", {
+        warnings,
+        ...stateContext(state),
+      });
+    }
 
     log.info("Classification complete", {
       topicDomain: result.topicDomain,
@@ -186,6 +213,7 @@ export async function classifierNode(
       hasTimeConstraint: result.hasTimeConstraint,
       shouldEscalate: result.shouldEscalate,
       needsClarification: result.needsClarification,
+      ...stateContext(state),
     });
 
     return {
@@ -197,9 +225,16 @@ export async function classifierNode(
       clarificationQuestion: result.clarificationQuestion,
     };
   } catch (error) {
-    log.error("Classifier failed; falling back to defaults", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    if (error instanceof CircuitBreakerError) {
+      log.warn("Classifier circuit open; falling back to defaults", {
+        ...stateContext(state),
+      });
+    } else {
+      log.error("Classifier failed; falling back to defaults", {
+        error: error instanceof Error ? error.message : String(error),
+        ...stateContext(state),
+      });
+    }
 
     // Graceful degradation: allow the pipeline to continue with
     // safe defaults so the user still gets a response.

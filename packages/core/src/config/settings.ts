@@ -12,6 +12,13 @@ export const RATE_LIMIT = {
   maxTokensPerRequest: 8000,
 } as const;
 
+export const GRAPH_CONFIG = {
+  /** Maximum time (ms) for a full graph.invoke() call. */
+  invokeTimeoutMs: 90_000,
+  /** Maximum time (ms) for streaming graph execution. */
+  streamTimeoutMs: 120_000,
+} as const;
+
 export const TRUSTED_DOMAINS = [
   "usopc.org",
   "teamusa.org",

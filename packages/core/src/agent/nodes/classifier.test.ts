@@ -28,8 +28,9 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-import { classifierNode } from "./classifier.js";
+import { classifierNode, parseClassifierResponse } from "./classifier.js";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import { CircuitBreakerError } from "@usopc/shared";
 import type { AgentState } from "../state.js";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     userSport: undefined,
     needsClarification: false,
     clarificationQuestion: undefined,
+    retrievalStatus: "success",
     ...overrides,
   };
 }
@@ -375,5 +377,129 @@ describe("classifierNode", () => {
         "Which sport are you asking about?",
       );
     });
+  });
+
+  describe("CircuitBreakerError handling", () => {
+    it("falls back to defaults when circuit breaker is open", async () => {
+      mockInvoke.mockRejectedValueOnce(new CircuitBreakerError("anthropic"));
+
+      const state = makeState();
+      const result = await classifierNode(state);
+
+      expect(result.queryIntent).toBe("general");
+      expect(result.detectedNgbIds).toEqual([]);
+      expect(result.hasTimeConstraint).toBe(false);
+      expect(result.needsClarification).toBe(false);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseClassifierResponse
+// ---------------------------------------------------------------------------
+
+describe("parseClassifierResponse", () => {
+  it("parses valid JSON correctly", () => {
+    const { output, warnings } = parseClassifierResponse(
+      JSON.stringify({
+        topicDomain: "safesport",
+        detectedNgbIds: ["usa_swimming"],
+        queryIntent: "factual",
+        hasTimeConstraint: true,
+        shouldEscalate: false,
+      }),
+    );
+
+    expect(output.topicDomain).toBe("safesport");
+    expect(output.detectedNgbIds).toEqual(["usa_swimming"]);
+    expect(output.queryIntent).toBe("factual");
+    expect(output.hasTimeConstraint).toBe(true);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("warns on invalid topicDomain and defaults to team_selection", () => {
+    const { output, warnings } = parseClassifierResponse(
+      JSON.stringify({
+        topicDomain: "made_up_domain",
+        detectedNgbIds: [],
+        queryIntent: "general",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+      }),
+    );
+
+    expect(output.topicDomain).toBe("team_selection");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("Invalid topicDomain");
+    expect(warnings[0]).toContain("made_up_domain");
+  });
+
+  it("warns on invalid queryIntent and defaults to general", () => {
+    const { output, warnings } = parseClassifierResponse(
+      JSON.stringify({
+        topicDomain: "governance",
+        detectedNgbIds: [],
+        queryIntent: "invalid_intent",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+      }),
+    );
+
+    expect(output.queryIntent).toBe("general");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("Invalid queryIntent");
+  });
+
+  it("collects multiple warnings", () => {
+    const { output, warnings } = parseClassifierResponse(
+      JSON.stringify({
+        topicDomain: "bad_domain",
+        detectedNgbIds: [],
+        queryIntent: "bad_intent",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+      }),
+    );
+
+    expect(output.topicDomain).toBe("team_selection");
+    expect(output.queryIntent).toBe("general");
+    expect(warnings).toHaveLength(2);
+  });
+
+  it("throws on invalid JSON", () => {
+    expect(() => parseClassifierResponse("not json")).toThrow();
+  });
+
+  it("strips markdown code fences", () => {
+    const json = JSON.stringify({
+      topicDomain: "anti_doping",
+      detectedNgbIds: [],
+      queryIntent: "factual",
+      hasTimeConstraint: false,
+      shouldEscalate: false,
+    });
+
+    const { output, warnings } = parseClassifierResponse(
+      "```json\n" + json + "\n```",
+    );
+    expect(output.topicDomain).toBe("anti_doping");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("handles needsClarification and clarificationQuestion", () => {
+    const { output } = parseClassifierResponse(
+      JSON.stringify({
+        topicDomain: "team_selection",
+        detectedNgbIds: [],
+        queryIntent: "general",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+        needsClarification: true,
+        clarificationQuestion: "Which sport?",
+      }),
+    );
+
+    expect(output.needsClarification).toBe(true);
+    expect(output.clarificationQuestion).toBe("Which sport?");
   });
 });

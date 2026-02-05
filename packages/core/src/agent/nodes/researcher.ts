@@ -1,7 +1,8 @@
 import { TavilySearch } from "@langchain/tavily";
-import { logger } from "@usopc/shared";
+import { logger, CircuitBreakerError } from "@usopc/shared";
 import { TRUSTED_DOMAINS } from "../../config/index.js";
 import { searchWithTavily } from "../../services/tavilyService.js";
+import { stateContext } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 
 const log = logger.child({ service: "researcher-node" });
@@ -129,9 +130,18 @@ export function createResearcherNode(tavilySearch: TavilySearchLike) {
         webSearchResults: searchResults,
       };
     } catch (error) {
-      log.error("Web search failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const isCircuitOpen = error instanceof CircuitBreakerError;
+      if (isCircuitOpen) {
+        log.warn("Researcher circuit open; returning empty results", {
+          isCircuitOpen,
+          ...stateContext(state),
+        });
+      } else {
+        log.error("Web search failed", {
+          error: error instanceof Error ? error.message : String(error),
+          ...stateContext(state),
+        });
+      }
 
       // Graceful degradation: the synthesizer can still work with
       // whatever documents were retrieved earlier.
