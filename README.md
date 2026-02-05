@@ -1,6 +1,6 @@
 # USOPC Athlete Support Agent
 
-> **Work in Progress**: This project is under active development and should be treated as a prototype. It represents approximately 15 hours of development time and is not yet production-ready. Features may be incomplete, APIs may change, and the knowledge base needs additional content and quality improvements.
+> **Work in Progress**: This project is under active development and should be treated as a prototype. It represents approximately 17.3 hours of development time and is not yet production-ready. Features may be incomplete, APIs may change, and the knowledge base needs additional content and quality improvements.
 
 An AI-powered governance and compliance assistant for U.S. Olympic and Paralympic athletes. Ask questions about anti-doping rules, athlete rights, competition eligibility, and other USOPC policies — get accurate, cited answers with appropriate disclaimers.
 
@@ -132,19 +132,12 @@ Slack integration is under development. See [#7](https://github.com/rosinbum/uso
 See [CLAUDE.md](./CLAUDE.md) for detailed development guidelines.
 
 <!-- HOURS:START -->
-**Tracked build time:** 17.1 hours
+**Tracked build time:** 17.3 hours
 
 - Method: terminal-activity-based (idle cutoff: 10 min)
-- Last updated: 2026-02-05T13:12:01.665Z
+- Last updated: 2026-02-05T13:24:30.133Z
 <!-- HOURS:END -->
 
 ## License
 
 Proprietary. All rights reserved.
-
-<!-- HOURS:START -->
-**Tracked build time:** 16.7 hours
-
-- Method: terminal-activity-based (idle cutoff: 10 min)
-- Last updated: 2026-02-05T12:42:48.083Z
-<!-- HOURS:END -->
