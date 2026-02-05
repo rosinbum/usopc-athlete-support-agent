@@ -59,6 +59,18 @@ interface StatsRow {
   last_ingested_at: Date | null;
 }
 
+// LangChain's PGVectorStore stores metadata in a JSONB column but does not
+// populate the denormalized text columns. COALESCE reads metadata first, then
+// falls back to the column (for when the ingestion pipeline is fixed).
+const COL = {
+  source_url: "COALESCE(metadata->>'source_url', source_url)",
+  document_title: "COALESCE(metadata->>'document_title', document_title)",
+  document_type: "COALESCE(metadata->>'document_type', document_type)",
+  ngb_id: "COALESCE(metadata->>'ngb_id', ngb_id)",
+  topic_domain: "COALESCE(metadata->>'topic_domain', topic_domain)",
+  authority_level: "COALESCE(metadata->>'authority_level', authority_level)",
+} as const;
+
 /**
  * Lists unique documents from document_chunks, grouped by source_url.
  * Supports filtering by search, documentType, topicDomain, ngbId, and authorityLevel.
@@ -83,31 +95,31 @@ export async function listUniqueDocuments(
   let paramIndex = 1;
 
   if (search) {
-    conditions.push(`document_title ILIKE $${paramIndex}`);
+    conditions.push(`${COL.document_title} ILIKE $${paramIndex}`);
     values.push(`%${search}%`);
     paramIndex++;
   }
 
   if (documentType) {
-    conditions.push(`document_type = $${paramIndex}`);
+    conditions.push(`${COL.document_type} = $${paramIndex}`);
     values.push(documentType);
     paramIndex++;
   }
 
   if (topicDomain) {
-    conditions.push(`topic_domain = $${paramIndex}`);
+    conditions.push(`${COL.topic_domain} = $${paramIndex}`);
     values.push(topicDomain);
     paramIndex++;
   }
 
   if (ngbId) {
-    conditions.push(`ngb_id = $${paramIndex}`);
+    conditions.push(`${COL.ngb_id} = $${paramIndex}`);
     values.push(ngbId);
     paramIndex++;
   }
 
   if (authorityLevel) {
-    conditions.push(`authority_level = $${paramIndex}`);
+    conditions.push(`${COL.authority_level} = $${paramIndex}`);
     values.push(authorityLevel);
     paramIndex++;
   }
@@ -120,8 +132,8 @@ export async function listUniqueDocuments(
     SELECT COUNT(*) as total FROM (
       SELECT 1 FROM document_chunks
       ${whereClause}
-      GROUP BY source_url, document_title, document_type, ngb_id,
-               topic_domain, authority_level, effective_date
+      GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
+               ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level}
     ) sub
   `;
 
@@ -135,19 +147,20 @@ export async function listUniqueDocuments(
   // Fetch documents with pagination
   const dataQuery = `
     SELECT
-      source_url,
-      document_title,
-      document_type,
-      ngb_id,
-      topic_domain,
-      authority_level,
-      effective_date,
+      ${COL.source_url} as source_url,
+      ${COL.document_title} as document_title,
+      ${COL.document_type} as document_type,
+      ${COL.ngb_id} as ngb_id,
+      ${COL.topic_domain} as topic_domain,
+      ${COL.authority_level} as authority_level,
+      metadata->>'effective_date' as effective_date,
       MIN(ingested_at) as ingested_at,
       COUNT(*) as chunk_count
     FROM document_chunks
     ${whereClause}
-    GROUP BY source_url, document_title, document_type, ngb_id,
-             topic_domain, authority_level, effective_date
+    GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
+             ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level},
+             metadata->>'effective_date'
     ORDER BY ingested_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
   `;
@@ -185,8 +198,8 @@ export async function listUniqueDocuments(
 export async function getSourcesStats(pool: Pool): Promise<SourcesStats> {
   const query = `
     SELECT
-      COUNT(DISTINCT source_url) as total_documents,
-      COUNT(DISTINCT ngb_id) as total_organizations,
+      COUNT(DISTINCT ${COL.source_url}) as total_documents,
+      COUNT(DISTINCT ${COL.ngb_id}) as total_organizations,
       MAX(ingested_at) as last_ingested_at
     FROM document_chunks
   `;

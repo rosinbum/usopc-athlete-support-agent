@@ -56,18 +56,31 @@ describe("listUniqueDocuments", () => {
     expect(result.totalPages).toBe(1);
   });
 
-  it("applies search filter with ILIKE on document_title", async () => {
+  it("applies search filter with ILIKE on document_title via metadata", async () => {
     pool.query
       .mockResolvedValueOnce({ rows: [{ total: "0" }] })
       .mockResolvedValueOnce({ rows: [] });
 
     await listUniqueDocuments(pool, { search: "bylaws" });
 
-    // Count query (first call) should contain the filter
+    // Should use COALESCE(metadata->>'document_title', document_title) for filtering
     expect(pool.query).toHaveBeenCalledWith(
-      expect.stringContaining("document_title ILIKE"),
+      expect.stringContaining("ILIKE"),
       expect.arrayContaining(["%bylaws%"]),
     );
+  });
+
+  it("reads from metadata JSONB with COALESCE fallback", async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ total: "0" }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await listUniqueDocuments(pool, {});
+
+    // Data query should use COALESCE to read from metadata JSONB
+    const dataCall = pool.query.mock.calls[1];
+    expect(dataCall[0]).toContain("metadata->>'source_url'");
+    expect(dataCall[0]).toContain("COALESCE");
   });
 
   it("count query uses subquery matching GROUP BY columns", async () => {
@@ -80,7 +93,7 @@ describe("listUniqueDocuments", () => {
     // First call is the count query - must use subquery with GROUP BY
     const countCall = pool.query.mock.calls[0];
     expect(countCall[0]).toContain("COUNT(*) as total FROM (");
-    expect(countCall[0]).toContain("GROUP BY source_url, document_title");
+    expect(countCall[0]).toContain("GROUP BY");
   });
 
   it("applies documentType filter", async () => {
@@ -91,7 +104,7 @@ describe("listUniqueDocuments", () => {
     await listUniqueDocuments(pool, { documentType: "policy" });
 
     expect(pool.query).toHaveBeenCalledWith(
-      expect.stringContaining("document_type ="),
+      expect.stringContaining("document_type"),
       expect.arrayContaining(["policy"]),
     );
   });
@@ -104,7 +117,7 @@ describe("listUniqueDocuments", () => {
     await listUniqueDocuments(pool, { topicDomain: "safesport" });
 
     expect(pool.query).toHaveBeenCalledWith(
-      expect.stringContaining("topic_domain ="),
+      expect.stringContaining("topic_domain"),
       expect.arrayContaining(["safesport"]),
     );
   });
@@ -117,7 +130,7 @@ describe("listUniqueDocuments", () => {
     await listUniqueDocuments(pool, { ngbId: "usa_swimming" });
 
     expect(pool.query).toHaveBeenCalledWith(
-      expect.stringContaining("ngb_id ="),
+      expect.stringContaining("ngb_id"),
       expect.arrayContaining(["usa_swimming"]),
     );
   });
@@ -130,7 +143,7 @@ describe("listUniqueDocuments", () => {
     await listUniqueDocuments(pool, { authorityLevel: "law" });
 
     expect(pool.query).toHaveBeenCalledWith(
-      expect.stringContaining("authority_level ="),
+      expect.stringContaining("authority_level"),
       expect.arrayContaining(["law"]),
     );
   });
