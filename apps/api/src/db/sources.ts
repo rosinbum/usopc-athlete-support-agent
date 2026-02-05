@@ -59,16 +59,13 @@ interface StatsRow {
   last_ingested_at: Date | null;
 }
 
-// LangChain's PGVectorStore stores metadata in a JSONB column but does not
-// populate the denormalized text columns. COALESCE reads metadata first, then
-// falls back to the column (for when the ingestion pipeline is fixed).
 const COL = {
-  source_url: "COALESCE(metadata->>'source_url', source_url)",
-  document_title: "COALESCE(metadata->>'document_title', document_title)",
-  document_type: "COALESCE(metadata->>'document_type', document_type)",
-  ngb_id: "COALESCE(metadata->>'ngb_id', ngb_id)",
-  topic_domain: "COALESCE(metadata->>'topic_domain', topic_domain)",
-  authority_level: "COALESCE(metadata->>'authority_level', authority_level)",
+  source_url: "source_url",
+  document_title: "document_title",
+  document_type: "document_type",
+  ngb_id: "ngb_id",
+  topic_domain: "topic_domain",
+  authority_level: "authority_level",
 } as const;
 
 /**
