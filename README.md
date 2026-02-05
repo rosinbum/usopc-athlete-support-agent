@@ -258,6 +258,13 @@ Slack integration is under development. See [#7](https://github.com/rosinbum/uso
 
 See [CLAUDE.md](./CLAUDE.md) for detailed development guidelines.
 
+<!-- HOURS:START -->
+**Tracked build time:** 0.0 hours
+
+- Method: terminal-activity-based (idle cutoff: 10 min)
+- Last updated: 2026-02-05T12:08:58.278Z
+<!-- HOURS:END -->
+
 ## License
 
 Proprietary. All rights reserved.
