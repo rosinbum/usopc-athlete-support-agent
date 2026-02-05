@@ -303,6 +303,94 @@ describe("agentStreamToEvents (dual-mode)", () => {
     expect(textDeltas[0].textDelta).toBe("Please contact ");
     expect(textDeltas[1].textDelta).toBe("SafeSport");
   });
+
+  it("emits error event when stream throws", async () => {
+    async function* failingStream(): AsyncGenerator<StreamChunk> {
+      yield [
+        "messages",
+        [{ content: "Hello" }, { langgraph_node: "synthesizer" }],
+      ];
+      throw new Error("Stream broke");
+    }
+
+    const events: AgentStreamEvent[] = [];
+    for await (const event of agentStreamToEvents(failingStream())) {
+      events.push(event);
+    }
+
+    const errorEvents = events.filter((e) => e.type === "error");
+    expect(errorEvents).toHaveLength(1);
+    expect(errorEvents[0].error?.message).toBe("Stream broke");
+    expect(errorEvents[0].error?.code).toBe("GRAPH_ERROR");
+
+    // Should still emit done after error
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent.type).toBe("done");
+  });
+
+  it("maps TimeoutError to GRAPH_TIMEOUT code", async () => {
+    const { TimeoutError } = await import("../utils/withTimeout.js");
+
+    async function* timeoutStream(): AsyncGenerator<StreamChunk> {
+      throw new TimeoutError("graph.stream", 120000);
+    }
+
+    const events: AgentStreamEvent[] = [];
+    for await (const event of agentStreamToEvents(timeoutStream())) {
+      events.push(event);
+    }
+
+    const errorEvents = events.filter((e) => e.type === "error");
+    expect(errorEvents).toHaveLength(1);
+    expect(errorEvents[0].error?.code).toBe("GRAPH_TIMEOUT");
+    expect(errorEvents[0].error?.message).toContain("timed out");
+  });
+
+  it("maps AppError to its error code", async () => {
+    const { AppError } = await import("@usopc/shared");
+
+    async function* appErrorStream(): AsyncGenerator<StreamChunk> {
+      throw new AppError("Something failed", { code: "RETRIEVAL_ERROR" });
+    }
+
+    const events: AgentStreamEvent[] = [];
+    for await (const event of agentStreamToEvents(appErrorStream())) {
+      events.push(event);
+    }
+
+    const errorEvents = events.filter((e) => e.type === "error");
+    expect(errorEvents).toHaveLength(1);
+    expect(errorEvents[0].error?.code).toBe("RETRIEVAL_ERROR");
+  });
+
+  it("emits text deltas before error event when stream partially succeeds", async () => {
+    async function* partialStream(): AsyncGenerator<StreamChunk> {
+      yield [
+        "messages",
+        [{ content: "Partial " }, { langgraph_node: "synthesizer" }],
+      ];
+      yield [
+        "messages",
+        [{ content: "response" }, { langgraph_node: "synthesizer" }],
+      ];
+      throw new Error("Broke midway");
+    }
+
+    const events: AgentStreamEvent[] = [];
+    for await (const event of agentStreamToEvents(partialStream())) {
+      events.push(event);
+    }
+
+    const textDeltas = events.filter((e) => e.type === "text-delta");
+    expect(textDeltas).toHaveLength(2);
+    expect(textDeltas[0].textDelta).toBe("Partial ");
+    expect(textDeltas[1].textDelta).toBe("response");
+
+    const errorEvents = events.filter((e) => e.type === "error");
+    expect(errorEvents).toHaveLength(1);
+
+    expect(events[events.length - 1].type).toBe("done");
+  });
 });
 
 // ---------------------------------------------------------------------------

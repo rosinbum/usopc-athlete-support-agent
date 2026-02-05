@@ -1,12 +1,15 @@
+import { AppError } from "@usopc/shared";
+import { TimeoutError } from "../utils/withTimeout.js";
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
 import type { StreamChunk } from "./runner.js";
 
 export interface AgentStreamEvent {
-  type: "text-delta" | "citations" | "escalation" | "done";
+  type: "text-delta" | "citations" | "escalation" | "error" | "done";
   textDelta?: string;
   citations?: Citation[];
   escalation?: EscalationInfo;
+  error?: { message: string; code?: string };
 }
 
 /**
@@ -38,6 +41,15 @@ function extractTextFromContent(
 }
 
 /**
+ * Maps an error to an error code string for the stream event.
+ */
+function errorToCode(error: unknown): string {
+  if (error instanceof TimeoutError) return "GRAPH_TIMEOUT";
+  if (error instanceof AppError && error.code) return error.code;
+  return "GRAPH_ERROR";
+}
+
+/**
  * Converts a LangGraph dual-mode stream into a sequence of AgentStreamEvents.
  *
  * Handles two stream modes:
@@ -47,6 +59,9 @@ function extractTextFromContent(
  *
  * Only emits tokens from the synthesizer node to avoid showing
  * classifier JSON or other intermediate output.
+ *
+ * On stream error, emits an "error" event followed by "done" instead of
+ * throwing, so callers can handle the error gracefully.
  */
 export async function* agentStreamToEvents(
   stream: AsyncIterable<StreamChunk>,
@@ -60,54 +75,66 @@ export async function* agentStreamToEvents(
   // answer from values to avoid duplication
   let seenSynthesizerTokens = false;
 
-  for await (const chunk of stream) {
-    const [mode, data] = chunk;
+  try {
+    for await (const chunk of stream) {
+      const [mode, data] = chunk;
 
-    if (mode === "messages") {
-      // Token streaming from LLM calls
-      const [messageChunk, metadata] = data as [
-        { content: string | Array<{ type: string; text?: string }> },
-        { langgraph_node?: string },
-      ];
+      if (mode === "messages") {
+        // Token streaming from LLM calls
+        const [messageChunk, metadata] = data as [
+          { content: string | Array<{ type: string; text?: string }> },
+          { langgraph_node?: string },
+        ];
 
-      // Only stream tokens from specific nodes (synthesizer)
-      const nodeName = metadata?.langgraph_node;
-      if (nodeName && STREAMING_NODES.has(nodeName)) {
-        seenSynthesizerTokens = true;
-        const text = extractTextFromContent(messageChunk.content);
-        if (text) {
-          yield { type: "text-delta", textDelta: text };
+        // Only stream tokens from specific nodes (synthesizer)
+        const nodeName = metadata?.langgraph_node;
+        if (nodeName && STREAMING_NODES.has(nodeName)) {
+          seenSynthesizerTokens = true;
+          const text = extractTextFromContent(messageChunk.content);
+          if (text) {
+            yield { type: "text-delta", textDelta: text };
+          }
+        }
+      } else if (mode === "values") {
+        // State update after a node completes
+        const state = data as Partial<AgentState>;
+
+        // Emit answer changes from nodes that don't use LLM streaming
+        // (clarify, escalate, error handlers). Only if we haven't seen
+        // synthesizer tokens to avoid duplication.
+        if (
+          !seenSynthesizerTokens &&
+          state.answer !== undefined &&
+          state.answer.length > previousAnswerFromValues.length
+        ) {
+          const delta = state.answer.slice(previousAnswerFromValues.length);
+          previousAnswerFromValues = state.answer;
+          yield { type: "text-delta", textDelta: delta };
+        }
+
+        // Emit citations once when they first appear (non-empty)
+        if (
+          !citationsEmitted &&
+          state.citations &&
+          state.citations.length > 0
+        ) {
+          citationsEmitted = true;
+          yield { type: "citations", citations: state.citations };
+        }
+
+        // Emit escalation once when it first appears
+        if (!escalationEmitted && state.escalation) {
+          escalationEmitted = true;
+          yield { type: "escalation", escalation: state.escalation };
         }
       }
-    } else if (mode === "values") {
-      // State update after a node completes
-      const state = data as Partial<AgentState>;
-
-      // Emit answer changes from nodes that don't use LLM streaming
-      // (clarify, escalate, error handlers). Only if we haven't seen
-      // synthesizer tokens to avoid duplication.
-      if (
-        !seenSynthesizerTokens &&
-        state.answer !== undefined &&
-        state.answer.length > previousAnswerFromValues.length
-      ) {
-        const delta = state.answer.slice(previousAnswerFromValues.length);
-        previousAnswerFromValues = state.answer;
-        yield { type: "text-delta", textDelta: delta };
-      }
-
-      // Emit citations once when they first appear (non-empty)
-      if (!citationsEmitted && state.citations && state.citations.length > 0) {
-        citationsEmitted = true;
-        yield { type: "citations", citations: state.citations };
-      }
-
-      // Emit escalation once when it first appears
-      if (!escalationEmitted && state.escalation) {
-        escalationEmitted = true;
-        yield { type: "escalation", escalation: state.escalation };
-      }
     }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "An unexpected error occurred";
+    const code = errorToCode(error);
+
+    yield { type: "error", error: { message, code } };
   }
 
   yield { type: "done" };

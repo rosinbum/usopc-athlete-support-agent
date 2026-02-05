@@ -1,4 +1,4 @@
-export { classifierNode } from "./classifier.js";
+export { classifierNode, parseClassifierResponse } from "./classifier.js";
 export { clarifyNode } from "./clarify.js";
 export { createRetrieverNode } from "./retriever.js";
 export type { VectorStoreLike } from "./retriever.js";

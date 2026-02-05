@@ -5,3 +5,6 @@ export {
   type FormatHistoryOptions,
   type ContextualQuery,
 } from "./conversationContext.js";
+
+export { TimeoutError, withTimeout } from "./withTimeout.js";
+export { stateContext } from "./nodeLogging.js";

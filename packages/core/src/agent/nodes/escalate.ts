@@ -8,6 +8,7 @@ import {
   buildEscalation,
   type EscalationTarget,
 } from "../../prompts/index.js";
+import { stateContext } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { TopicDomain, EscalationInfo } from "../../types/index.js";
 
@@ -233,6 +234,7 @@ export async function escalateNode(
   } catch (error) {
     log.error("Escalation failed", {
       error: error instanceof Error ? error.message : String(error),
+      ...stateContext(state),
     });
 
     // Even on error, provide a basic referral

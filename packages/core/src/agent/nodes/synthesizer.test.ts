@@ -30,6 +30,7 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 
 import { synthesizerNode } from "./synthesizer.js";
 import { HumanMessage } from "@langchain/core/messages";
+import { CircuitBreakerError } from "@usopc/shared";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 
@@ -57,6 +58,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     userSport: undefined,
     needsClarification: false,
     clarificationQuestion: undefined,
+    retrievalStatus: "success",
     ...overrides,
   };
 }
@@ -179,5 +181,93 @@ describe("synthesizerNode", () => {
     const systemMessage = invokeArgs[0];
     expect(systemMessage._getType()).toBe("system");
     expect(systemMessage.content).toContain("USOPC Athlete Support");
+  });
+
+  describe("retrievalStatus handling", () => {
+    it("returns error message when retrievalStatus is error and no context available", async () => {
+      const state = makeState({
+        retrievalStatus: "error",
+        retrievedDocuments: [],
+        webSearchResults: [],
+      });
+
+      const result = await synthesizerNode(state);
+      expect(result.answer).toContain("unable to search our knowledge base");
+      expect(result.answer).toContain("ombudsman@usathlete.org");
+      expect(mockInvoke).not.toHaveBeenCalled();
+    });
+
+    it("proceeds with synthesis when retrievalStatus is error but documents exist", async () => {
+      mockInvoke.mockResolvedValueOnce({
+        content: "Answer from available docs",
+      });
+
+      const state = makeState({
+        retrievalStatus: "error",
+        retrievedDocuments: [makeDoc("some doc")],
+        webSearchResults: [],
+      });
+
+      const result = await synthesizerNode(state);
+      expect(result.answer).toBe("Answer from available docs");
+      expect(mockInvoke).toHaveBeenCalledTimes(1);
+    });
+
+    it("proceeds with synthesis when retrievalStatus is error but web results exist", async () => {
+      mockInvoke.mockResolvedValueOnce({
+        content: "Answer from web",
+      });
+
+      const state = makeState({
+        retrievalStatus: "error",
+        retrievedDocuments: [],
+        webSearchResults: ["some web result"],
+      });
+
+      const result = await synthesizerNode(state);
+      expect(result.answer).toBe("Answer from web");
+      expect(mockInvoke).toHaveBeenCalledTimes(1);
+    });
+
+    it("proceeds normally when retrievalStatus is success", async () => {
+      mockInvoke.mockResolvedValueOnce({
+        content: "Normal answer",
+      });
+
+      const state = makeState({
+        retrievalStatus: "success",
+        retrievedDocuments: [makeDoc("context")],
+      });
+
+      const result = await synthesizerNode(state);
+      expect(result.answer).toBe("Normal answer");
+    });
+  });
+
+  describe("CircuitBreakerError handling", () => {
+    it("returns rate-limit message when circuit breaker is open", async () => {
+      mockInvoke.mockRejectedValueOnce(new CircuitBreakerError("anthropic"));
+
+      const state = makeState({
+        retrievedDocuments: [makeDoc("context")],
+      });
+
+      const result = await synthesizerNode(state);
+      expect(result.answer).toContain("temporarily unable");
+      expect(result.answer).toContain("high demand");
+      expect(result.answer).toContain("ombudsman@usathlete.org");
+    });
+
+    it("returns generic error message for non-CircuitBreakerError", async () => {
+      mockInvoke.mockRejectedValueOnce(new Error("Model overloaded"));
+
+      const state = makeState({
+        retrievedDocuments: [makeDoc("context")],
+      });
+
+      const result = await synthesizerNode(state);
+      expect(result.answer).toContain("encountered an error");
+      expect(result.answer).not.toContain("high demand");
+    });
   });
 });

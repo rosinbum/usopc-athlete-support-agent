@@ -2,6 +2,8 @@ export {
   invokeAnthropic,
   invokeAnthropicWithFallback,
   extractTextFromResponse,
+  isTransientError,
+  withSingleRetry,
   getAnthropicCircuitMetrics,
   resetAnthropicCircuit,
 } from "./anthropicService.js";
