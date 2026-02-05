@@ -1,7 +1,7 @@
 import { logger, AUTHORITY_LEVELS, type AuthorityLevel } from "@usopc/shared";
 import { RETRIEVAL_CONFIG } from "../../config/index.js";
 import { vectorStoreSearch } from "../../services/vectorStoreService.js";
-import { buildContextualQuery } from "../../utils/index.js";
+import { buildContextualQuery, stateContext } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 
@@ -276,17 +276,24 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
         documentCount: retrievedDocuments.length,
         confidence: confidence.toFixed(3),
         topScore: scores[0]?.toFixed(3) ?? "N/A",
+        ...stateContext(state),
       });
 
       return {
         retrievedDocuments,
         retrievalConfidence: confidence,
+        retrievalStatus: "success" as const,
       };
     } catch (error) {
       log.error("Retrieval failed", {
         error: error instanceof Error ? error.message : String(error),
+        ...stateContext(state),
       });
-      return { retrievedDocuments: [], retrievalConfidence: 0 };
+      return {
+        retrievedDocuments: [],
+        retrievalConfidence: 0,
+        retrievalStatus: "error" as const,
+      };
     }
   };
 }

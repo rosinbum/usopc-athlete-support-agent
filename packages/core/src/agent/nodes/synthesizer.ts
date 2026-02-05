@@ -1,13 +1,13 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { logger } from "@usopc/shared";
+import { logger, CircuitBreakerError } from "@usopc/shared";
 import { MODEL_CONFIG } from "../../config/index.js";
 import { SYSTEM_PROMPT, buildSynthesizerPrompt } from "../../prompts/index.js";
 import {
   invokeAnthropic,
   extractTextFromResponse,
 } from "../../services/anthropicService.js";
-import { buildContextualQuery } from "../../utils/index.js";
+import { buildContextualQuery, stateContext } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 import type { AuthorityLevel } from "@usopc/shared";
@@ -156,6 +156,25 @@ export async function synthesizerNode(
     };
   }
 
+  // If the retriever reported an error and there are no documents or web
+  // results to work with, return a user-friendly error instead of
+  // synthesizing from empty context.
+  if (
+    state.retrievalStatus === "error" &&
+    state.retrievedDocuments.length === 0 &&
+    state.webSearchResults.length === 0
+  ) {
+    log.warn("Retrieval failed and no context available; skipping synthesis", {
+      ...stateContext(state),
+    });
+    return {
+      answer:
+        "I was unable to search our knowledge base for your question. Please try again, " +
+        "or contact the Athlete Ombuds at ombudsman@usathlete.org or 719-866-5000 " +
+        "for direct assistance.",
+    };
+  }
+
   const context = buildContext(state);
   // Pass queryIntent to adapt response format (concise for factual/deadline, detailed for general)
   // Pass conversation history for contextual responses
@@ -176,8 +195,7 @@ export async function synthesizerNode(
     log.info("Synthesizing answer", {
       documentCount: state.retrievedDocuments.length,
       webResultCount: state.webSearchResults.length,
-      topicDomain: state.topicDomain,
-      queryIntent: state.queryIntent,
+      ...stateContext(state),
     });
 
     const response = await invokeAnthropic(model, [
@@ -193,8 +211,21 @@ export async function synthesizerNode(
 
     return { answer };
   } catch (error) {
+    if (error instanceof CircuitBreakerError) {
+      log.warn("Synthesizer circuit open; returning rate-limit message", {
+        ...stateContext(state),
+      });
+      return {
+        answer:
+          "I'm temporarily unable to generate a response due to high demand. " +
+          "Please try again in a moment, or contact the Athlete Ombuds at " +
+          "ombudsman@usathlete.org or 719-866-5000 for direct assistance.",
+      };
+    }
+
     log.error("Synthesis failed", {
       error: error instanceof Error ? error.message : String(error),
+      ...stateContext(state),
     });
 
     return {
