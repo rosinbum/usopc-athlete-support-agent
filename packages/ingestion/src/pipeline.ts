@@ -1,4 +1,5 @@
 import type { Document } from "@langchain/core/documents";
+import { Client } from "pg";
 import { createLogger, type AuthorityLevel } from "@usopc/shared";
 import { createEmbeddings, createVectorStore } from "@usopc/core/src/rag/index";
 import { loadPdf } from "./loaders/pdfLoader.js";
@@ -123,6 +124,36 @@ function batchByTokenBudget(docs: Document[], maxTokens: number): Document[][] {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Backfill denormalized text columns from the JSONB metadata column.
+ * LangChain's PGVectorStore only writes id, content, embedding, and metadata —
+ * the dedicated columns (source_url, document_title, etc.) are left NULL.
+ */
+export async function backfillDenormalizedColumns(
+  databaseUrl: string,
+): Promise<number> {
+  const client = new Client({ connectionString: databaseUrl });
+  try {
+    await client.connect();
+    const result = await client.query(`
+      UPDATE document_chunks
+      SET
+        source_url      = metadata->>'source_url',
+        document_title  = metadata->>'document_title',
+        document_type   = metadata->>'document_type',
+        ngb_id          = metadata->>'ngb_id',
+        topic_domain    = metadata->>'topic_domain',
+        authority_level  = metadata->>'authority_level',
+        section_title   = metadata->>'section_title'
+      WHERE source_url IS NULL
+        AND metadata->>'source_url' IS NOT NULL
+    `);
+    return result.rowCount ?? 0;
+  } finally {
+    await client.end();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Pipeline entry points
 // ---------------------------------------------------------------------------
@@ -202,6 +233,13 @@ export async function ingestSource(
         { sourceId: source.id },
       );
     }
+
+    // 7. Backfill denormalized columns from JSONB metadata
+    const backfilled = await backfillDenormalizedColumns(options.databaseUrl);
+    logger.info(
+      `Backfilled ${backfilled} row(s) with denormalized column values`,
+      { sourceId: source.id },
+    );
 
     logger.info(
       `Successfully ingested ${withSections.length} chunks for ${source.id}`,

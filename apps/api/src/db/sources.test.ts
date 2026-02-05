@@ -56,31 +56,29 @@ describe("listUniqueDocuments", () => {
     expect(result.totalPages).toBe(1);
   });
 
-  it("applies search filter with ILIKE on document_title via metadata", async () => {
+  it("applies search filter with ILIKE on document_title", async () => {
     pool.query
       .mockResolvedValueOnce({ rows: [{ total: "0" }] })
       .mockResolvedValueOnce({ rows: [] });
 
     await listUniqueDocuments(pool, { search: "bylaws" });
 
-    // Should use COALESCE(metadata->>'document_title', document_title) for filtering
     expect(pool.query).toHaveBeenCalledWith(
       expect.stringContaining("ILIKE"),
       expect.arrayContaining(["%bylaws%"]),
     );
   });
 
-  it("reads from metadata JSONB with COALESCE fallback", async () => {
+  it("queries denormalized columns directly", async () => {
     pool.query
       .mockResolvedValueOnce({ rows: [{ total: "0" }] })
       .mockResolvedValueOnce({ rows: [] });
 
     await listUniqueDocuments(pool, {});
 
-    // Data query should use COALESCE to read from metadata JSONB
     const dataCall = pool.query.mock.calls[1];
-    expect(dataCall[0]).toContain("metadata->>'source_url'");
-    expect(dataCall[0]).toContain("COALESCE");
+    expect(dataCall[0]).toContain("source_url");
+    expect(dataCall[0]).not.toContain("COALESCE");
   });
 
   it("count query uses subquery matching GROUP BY columns", async () => {
