@@ -24,12 +24,12 @@ interface StatsRow {
 }
 
 const COL = {
-  source_url: "source_url",
-  document_title: "document_title",
-  document_type: "document_type",
-  ngb_id: "ngb_id",
-  topic_domain: "topic_domain",
-  authority_level: "authority_level",
+  source_url: "COALESCE(source_url, metadata->>'source_url')",
+  document_title: "COALESCE(document_title, metadata->>'document_title')",
+  document_type: "COALESCE(document_type, metadata->>'document_type')",
+  ngb_id: "COALESCE(ngb_id, metadata->>'ngb_id')",
+  topic_domain: "COALESCE(topic_domain, metadata->>'topic_domain')",
+  authority_level: "COALESCE(authority_level, metadata->>'authority_level')",
 } as const;
 
 export async function GET(request: Request) {
@@ -127,7 +127,8 @@ async function handleList(url: URL) {
     `SELECT COUNT(*) as total FROM (
       SELECT 1 FROM document_chunks ${whereClause}
       GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
-               ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level}
+               ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level},
+               metadata->>'effective_date'
     ) sub`,
     values,
   );
