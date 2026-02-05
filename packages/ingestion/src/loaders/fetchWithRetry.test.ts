@@ -114,15 +114,13 @@ describe("fetchWithRetry", () => {
       mockFetch.mockResolvedValueOnce(createMockResponse(400));
 
       const promise = fetchWithRetry("https://example.com/doc.pdf");
-      await vi.runAllTimersAsync();
-
-      try {
-        await promise;
-        expect.fail("Expected promise to reject");
-      } catch (error) {
+      const assertion = expect(promise).rejects.toSatisfy((error: unknown) => {
         expect(error).toBeInstanceOf(FetchWithRetryError);
         expect((error as FetchWithRetryError).message).toContain("400");
-      }
+        return true;
+      });
+      await vi.runAllTimersAsync();
+      await assertion;
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -130,14 +128,9 @@ describe("fetchWithRetry", () => {
       mockFetch.mockResolvedValueOnce(createMockResponse(401));
 
       const promise = fetchWithRetry("https://example.com/doc.pdf");
+      const assertion = expect(promise).rejects.toThrow(FetchWithRetryError);
       await vi.runAllTimersAsync();
-
-      try {
-        await promise;
-        expect.fail("Expected promise to reject");
-      } catch (error) {
-        expect(error).toBeInstanceOf(FetchWithRetryError);
-      }
+      await assertion;
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -145,14 +138,9 @@ describe("fetchWithRetry", () => {
       mockFetch.mockResolvedValueOnce(createMockResponse(403));
 
       const promise = fetchWithRetry("https://example.com/doc.pdf");
+      const assertion = expect(promise).rejects.toThrow(FetchWithRetryError);
       await vi.runAllTimersAsync();
-
-      try {
-        await promise;
-        expect.fail("Expected promise to reject");
-      } catch (error) {
-        expect(error).toBeInstanceOf(FetchWithRetryError);
-      }
+      await assertion;
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -160,14 +148,9 @@ describe("fetchWithRetry", () => {
       mockFetch.mockResolvedValueOnce(createMockResponse(404));
 
       const promise = fetchWithRetry("https://example.com/doc.pdf");
+      const assertion = expect(promise).rejects.toThrow(FetchWithRetryError);
       await vi.runAllTimersAsync();
-
-      try {
-        await promise;
-        expect.fail("Expected promise to reject");
-      } catch (error) {
-        expect(error).toBeInstanceOf(FetchWithRetryError);
-      }
+      await assertion;
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
@@ -183,9 +166,9 @@ describe("fetchWithRetry", () => {
         maxRetries: 3,
         initialDelayMs: 100,
       });
+      const assertion = expect(promise).rejects.toThrow(FetchWithRetryError);
       await vi.runAllTimersAsync();
-
-      await expect(promise).rejects.toThrow(FetchWithRetryError);
+      await assertion;
       // Initial attempt + 3 retries = 4 total calls
       expect(mockFetch).toHaveBeenCalledTimes(4);
     });
@@ -199,9 +182,9 @@ describe("fetchWithRetry", () => {
         maxRetries: 2,
         initialDelayMs: 100,
       });
+      const assertion = expect(promise).rejects.toThrow(FetchWithRetryError);
       await vi.runAllTimersAsync();
-
-      await expect(promise).rejects.toThrow(FetchWithRetryError);
+      await assertion;
       // Initial attempt + 2 retries = 3 total calls
       expect(mockFetch).toHaveBeenCalledTimes(3);
     });
@@ -233,11 +216,11 @@ describe("fetchWithRetry", () => {
         maxRetries: 0,
         initialDelayMs: 100,
       });
+      const assertion = expect(promise).rejects.toThrow(FetchWithRetryError);
 
       // Advance past the timeout
       await vi.advanceTimersByTimeAsync(6000);
-
-      await expect(promise).rejects.toThrow(FetchWithRetryError);
+      await assertion;
     });
 
     it("passes AbortSignal to fetch", async () => {
@@ -418,32 +401,28 @@ describe("fetchWithRetry", () => {
       mockFetch.mockResolvedValueOnce(createMockResponse(404));
 
       const promise = fetchWithRetry("https://example.com/doc.pdf");
-      await vi.runAllTimersAsync();
-
-      try {
-        await promise;
-        expect.fail("Expected promise to reject");
-      } catch (error) {
+      const assertion = expect(promise).rejects.toSatisfy((error: unknown) => {
         expect(error).toBeInstanceOf(FetchWithRetryError);
         expect((error as FetchWithRetryError).message).toContain(
           "https://example.com/doc.pdf",
         );
-      }
+        return true;
+      });
+      await vi.runAllTimersAsync();
+      await assertion;
     });
 
     it("includes HTTP status in error for non-retryable responses", async () => {
       mockFetch.mockResolvedValueOnce(createMockResponse(404));
 
       const promise = fetchWithRetry("https://example.com/doc.pdf");
-      await vi.runAllTimersAsync();
-
-      try {
-        await promise;
-        expect.fail("Expected promise to reject");
-      } catch (error) {
+      const assertion = expect(promise).rejects.toSatisfy((error: unknown) => {
         expect(error).toBeInstanceOf(FetchWithRetryError);
         expect((error as FetchWithRetryError).statusCode).toBe(404);
-      }
+        return true;
+      });
+      await vi.runAllTimersAsync();
+      await assertion;
     });
 
     it("includes attempt count in error after max retries", async () => {
@@ -455,15 +434,13 @@ describe("fetchWithRetry", () => {
         maxRetries: 2,
         initialDelayMs: 100,
       });
-      await vi.runAllTimersAsync();
-
-      try {
-        await promise;
-        expect.fail("Expected promise to reject");
-      } catch (error) {
+      const assertion = expect(promise).rejects.toSatisfy((error: unknown) => {
         expect(error).toBeInstanceOf(FetchWithRetryError);
         expect((error as FetchWithRetryError).attempts).toBe(3);
-      }
+        return true;
+      });
+      await vi.runAllTimersAsync();
+      await assertion;
     });
   });
 });
