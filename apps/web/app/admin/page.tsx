@@ -1,6 +1,6 @@
 export default function AdminPage() {
   return (
-    <div className="min-h-screen p-8">
+    <>
       <h1 className="text-2xl font-bold mb-6">Document Ingestion Dashboard</h1>
       <p className="text-gray-600 mb-8">
         Monitor document ingestion status across all sport organizations.
@@ -27,6 +27,6 @@ export default function AdminPage() {
           Connect to database to view ingestion status.
         </p>
       </div>
-    </div>
+    </>
   );
 }
