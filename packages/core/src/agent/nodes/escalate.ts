@@ -8,29 +8,11 @@ import {
   buildEscalation,
   type EscalationTarget,
 } from "../../prompts/index.js";
-import { stateContext } from "../../utils/index.js";
+import { getLastUserMessage, stateContext } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { TopicDomain, EscalationInfo } from "../../types/index.js";
 
 const log = logger.child({ service: "escalate-node" });
-
-/**
- * Extracts the text content from the last user message.
- */
-function getLastUserMessage(state: AgentState): string {
-  for (let i = state.messages.length - 1; i >= 0; i--) {
-    const msg = state.messages[i];
-    if (
-      msg._getType() === "human" ||
-      (msg as unknown as Record<string, unknown>).role === "user"
-    ) {
-      return typeof msg.content === "string"
-        ? msg.content
-        : JSON.stringify(msg.content);
-    }
-  }
-  return "";
-}
 
 /**
  * Determines urgency based on domain and state signals.
@@ -176,7 +158,7 @@ function buildReferralMessage(
 export async function escalateNode(
   state: AgentState,
 ): Promise<Partial<AgentState>> {
-  const userMessage = getLastUserMessage(state);
+  const userMessage = getLastUserMessage(state.messages);
   const domain = state.topicDomain ?? "dispute_resolution";
 
   try {
