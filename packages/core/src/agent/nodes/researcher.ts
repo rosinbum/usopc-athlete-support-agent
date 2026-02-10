@@ -2,7 +2,7 @@ import { TavilySearch } from "@langchain/tavily";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import { TRUSTED_DOMAINS } from "../../config/index.js";
 import { searchWithTavily } from "../../services/tavilyService.js";
-import { stateContext } from "../../utils/index.js";
+import { getLastUserMessage, stateContext } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 
 const log = logger.child({ service: "researcher-node" });
@@ -19,24 +19,6 @@ const MAX_SEARCH_RESULTS = 5;
  */
 export interface TavilySearchLike {
   invoke(input: string | { query: string }): Promise<unknown>;
-}
-
-/**
- * Extracts the text content from the last user message.
- */
-function getLastUserMessage(state: AgentState): string {
-  for (let i = state.messages.length - 1; i >= 0; i--) {
-    const msg = state.messages[i];
-    if (
-      msg._getType() === "human" ||
-      (msg as unknown as Record<string, unknown>).role === "user"
-    ) {
-      return typeof msg.content === "string"
-        ? msg.content
-        : JSON.stringify(msg.content);
-    }
-  }
-  return "";
 }
 
 /**
@@ -83,7 +65,7 @@ function buildSearchQuery(state: AgentState, userMessage: string): string {
  */
 export function createResearcherNode(tavilySearch: TavilySearchLike) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
-    const userMessage = getLastUserMessage(state);
+    const userMessage = getLastUserMessage(state.messages);
 
     if (!userMessage) {
       log.warn("Researcher received empty user message");
