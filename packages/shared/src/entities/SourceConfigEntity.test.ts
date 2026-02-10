@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("@usopc/shared", () => ({
+vi.mock("../logger.js", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),
@@ -24,6 +24,7 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
   QueryCommand: vi.fn((input: unknown) => ({ _type: "query", input })),
   UpdateCommand: vi.fn((input: unknown) => ({ _type: "update", input })),
   DeleteCommand: vi.fn((input: unknown) => ({ _type: "delete", input })),
+  ScanCommand: vi.fn((input: unknown) => ({ _type: "scan", input })),
 }));
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
@@ -41,6 +42,7 @@ import {
   GetCommand,
   QueryCommand,
   UpdateCommand,
+  ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 
 // ---------------------------------------------------------------------------
@@ -172,6 +174,41 @@ describe("SourceConfigEntity", () => {
       expect(result!.topicDomains).toEqual(["governance", "athlete_rights"]);
       expect(result!.format).toBe("pdf");
       expect(result!.authorityLevel).toBe("usopc_governance");
+    });
+  });
+
+  describe("getAll", () => {
+    it("returns all sources via Scan", async () => {
+      mockSend.mockResolvedValueOnce({
+        Items: [
+          { pk: "SOURCE#src1", sk: "CONFIG", ...SAMPLE_SOURCE, id: "src1" },
+          {
+            pk: "SOURCE#src2",
+            sk: "CONFIG",
+            ...SAMPLE_SOURCE,
+            id: "src2",
+            enabled: "false",
+          },
+        ],
+      });
+
+      const results = await entity.getAll();
+
+      expect(results).toHaveLength(2);
+      expect(results[0].id).toBe("src1");
+      expect(results[1].id).toBe("src2");
+      expect(results[1].enabled).toBe(false);
+      expect(ScanCommand).toHaveBeenCalledWith({
+        TableName: "test-table",
+      });
+    });
+
+    it("returns empty array when no sources exist", async () => {
+      mockSend.mockResolvedValueOnce({ Items: [] });
+
+      const results = await entity.getAll();
+
+      expect(results).toEqual([]);
     });
   });
 

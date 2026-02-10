@@ -101,25 +101,10 @@ export default $config({
       },
     });
 
-    // Next.js web app
-    const web = new sst.aws.Nextjs("Web", {
-      path: "apps/web",
-      link: [
-        ...linkables,
-        api,
-        conversationMaxTurns,
-        authSecret,
-        gitHubClientId,
-        gitHubClientSecret,
-        adminEmails,
-      ],
-      environment: {
-        NEXT_PUBLIC_API_URL: api.url,
-        ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
-      },
-    });
-
     // Document ingestion (weekly) - production only
+    // Declared before Web so the queue can be linked conditionally
+    let ingestionQueue: sst.aws.Queue | undefined;
+
     if (isProd) {
       // Dead-letter queue (must also be FIFO to match main queue)
       const ingestionDlq = new sst.aws.Queue("IngestionDLQ", {
@@ -127,7 +112,7 @@ export default $config({
       });
 
       // Main ingestion queue
-      const ingestionQueue = new sst.aws.Queue("IngestionQueue", {
+      ingestionQueue = new sst.aws.Queue("IngestionQueue", {
         fifo: {
           contentBasedDeduplication: true,
         },
@@ -168,6 +153,26 @@ export default $config({
         },
       });
     }
+
+    // Next.js web app
+    const web = new sst.aws.Nextjs("Web", {
+      path: "apps/web",
+      link: [
+        ...linkables,
+        api,
+        conversationMaxTurns,
+        authSecret,
+        gitHubClientId,
+        gitHubClientSecret,
+        adminEmails,
+        sourceConfigTable,
+        ...(ingestionQueue ? [ingestionQueue] : []),
+      ],
+      environment: {
+        NEXT_PUBLIC_API_URL: api.url,
+        ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+      },
+    });
 
     return {
       apiUrl: api.url,

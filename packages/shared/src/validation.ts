@@ -73,3 +73,21 @@ export const AUTHORITY_LEVELS = [
 export const authorityLevelSchema = z.enum(AUTHORITY_LEVELS);
 
 export type AuthorityLevel = z.infer<typeof authorityLevelSchema>;
+
+/**
+ * Known document types for source configurations.
+ */
+export const DOCUMENT_TYPES = [
+  "bylaws",
+  "code",
+  "legislation",
+  "policy",
+  "procedure",
+  "protocol",
+  "rulebook",
+  "selection_procedures",
+] as const;
+
+export const documentTypeSchema = z.enum(DOCUMENT_TYPES);
+
+export type DocumentType = z.infer<typeof documentTypeSchema>;

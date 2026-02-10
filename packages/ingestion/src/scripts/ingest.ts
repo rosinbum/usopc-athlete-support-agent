@@ -3,10 +3,10 @@
  * CLI script for manual document ingestion.
  *
  * Usage:
- *   pnpm --filter @usopc/ingestion ingest               # ingest ALL sources (resume by default)
+ *   pnpm --filter @usopc/ingestion ingest               # ingest only NEW (never-ingested) sources
  *   pnpm --filter @usopc/ingestion ingest --all          # same as above
- *   pnpm --filter @usopc/ingestion ingest --source <id>  # ingest a single source
- *   pnpm --filter @usopc/ingestion ingest --resume       # skip sources whose content hash is unchanged
+ *   pnpm --filter @usopc/ingestion ingest --source <id>  # ingest a single source (always runs)
+ *   pnpm --filter @usopc/ingestion ingest --resume       # re-ingest sources whose content hash changed
  *   pnpm --filter @usopc/ingestion ingest --force        # re-ingest everything regardless of state
  *
  * Required config (via env var or SST secret):
@@ -15,10 +15,16 @@
  */
 
 import { createHash } from "node:crypto";
-import { getDatabaseUrl, getSecretValue, createLogger } from "@usopc/shared";
+import {
+  getDatabaseUrl,
+  getSecretValue,
+  createLogger,
+  type SourceConfig,
+} from "@usopc/shared";
 import { ingestSource } from "../pipeline.js";
 import type { IngestionSource } from "../pipeline.js";
-import { loadSourceConfigs } from "../cron.js";
+import { createSourceConfigEntity } from "../entities/index.js";
+import { toIngestionSource } from "../cron.js";
 import { fetchWithRetry } from "../loaders/fetchWithRetry.js";
 
 const logger = createLogger({ service: "ingestion-cli" });
@@ -58,12 +64,9 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): ParsedArgs {
     resume = false;
   }
 
-  // Default to --all + --resume when no flags are provided
+  // Default to --all when no flags are provided (new-only behavior)
   if (!sourceId && !all) {
     all = true;
-  }
-  if (all && !force && !resume) {
-    resume = true;
   }
 
   return { sourceId, all, resume, force };
@@ -88,14 +91,13 @@ async function main(): Promise<void> {
   const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
   const { sourceId, all, resume, force } = parseArgs();
 
-  const { sources, entity } = await loadSourceConfigs();
-  logger.info(`Loaded ${sources.length} source configuration(s)`);
-
-  if (resume && !entity) {
-    logger.warn(
-      "DynamoDB entity unavailable — resume will not skip unchanged sources. Run with 'sst shell' for full resume support.",
-    );
-  }
+  // Load directly from DynamoDB so ingestion stats are always tracked.
+  // This script runs under `sst shell` (see package.json), so SST
+  // Resource bindings are always available.
+  const entity = createSourceConfigEntity();
+  const configs = await entity.getAllEnabled();
+  const sources: IngestionSource[] = configs.map(toIngestionSource);
+  logger.info(`Loaded ${sources.length} source configuration(s) from DynamoDB`);
 
   if (sourceId) {
     const source = sources.find((s) => s.id === sourceId);
@@ -110,6 +112,25 @@ async function main(): Promise<void> {
     logger.info(`Ingesting single source: ${source.id} — ${source.title}`);
     const result = await ingestSource(source, { databaseUrl, openaiApiKey });
 
+    // Update DynamoDB ingestion stats
+    try {
+      if (result.status === "completed") {
+        const res = await fetchWithRetry(
+          source.url,
+          { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
+          { timeoutMs: 60000, maxRetries: 3 },
+        );
+        const rawContent = await res.text();
+        await entity.markSuccess(source.id, hashContent(rawContent));
+      } else {
+        await entity.markFailure(source.id, result.error ?? "Unknown error");
+      }
+    } catch (statsError) {
+      logger.warn(
+        `Failed to update DynamoDB stats for ${source.id}: ${statsError instanceof Error ? statsError.message : "Unknown error"}`,
+      );
+    }
+
     if (result.status === "completed") {
       logger.info(
         `Done: ${result.chunksCount} chunks ingested for ${result.sourceId}`,
@@ -119,9 +140,8 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   } else if (all) {
-    logger.info(
-      `Ingesting all sources (mode: ${force ? "force" : resume ? "resume" : "all"})...`,
-    );
+    const mode = force ? "force" : resume ? "resume" : "new-only";
+    logger.info(`Ingesting all sources (mode: ${mode})...`);
 
     const results: {
       sourceId: string;
@@ -133,20 +153,44 @@ async function main(): Promise<void> {
     for (let i = 0; i < sources.length; i++) {
       const source: IngestionSource = sources[i];
 
-      // Resume: skip sources whose content hash hasn't changed
-      if (resume && entity) {
-        try {
-          const res = await fetchWithRetry(
-            source.url,
-            { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
-            { timeoutMs: 60000, maxRetries: 3 },
-          );
-          const rawContent = await res.text();
-          const contentHash = hashContent(rawContent);
+      if (!force) {
+        const config = await entity.getById(source.id);
 
-          const config = await entity.getById(source.id);
-          if (config?.lastContentHash === contentHash) {
-            logger.info(`Skipping ${source.id} — content unchanged`);
+        if (resume) {
+          // Resume: skip sources whose content hash hasn't changed
+          try {
+            const res = await fetchWithRetry(
+              source.url,
+              { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
+              { timeoutMs: 60000, maxRetries: 3 },
+            );
+            const rawContent = await res.text();
+            const contentHash = hashContent(rawContent);
+
+            if (config?.lastContentHash === contentHash) {
+              logger.info(`Skipping ${source.id} — content unchanged`);
+              results.push({
+                sourceId: source.id,
+                status: "skipped",
+                chunksCount: 0,
+              });
+              continue;
+            }
+          } catch (fetchError) {
+            const msg =
+              fetchError instanceof Error
+                ? fetchError.message
+                : "Unknown error";
+            logger.warn(
+              `Could not check hash for ${source.id}: ${msg} — will re-ingest`,
+            );
+          }
+        } else {
+          // Default (new-only): skip sources that have already been ingested
+          if (config?.lastIngestedAt) {
+            logger.info(
+              `Skipping ${source.id} — already ingested (use --resume or --force to re-ingest)`,
+            );
             results.push({
               sourceId: source.id,
               status: "skipped",
@@ -154,12 +198,6 @@ async function main(): Promise<void> {
             });
             continue;
           }
-        } catch (fetchError) {
-          const msg =
-            fetchError instanceof Error ? fetchError.message : "Unknown error";
-          logger.warn(
-            `Could not check hash for ${source.id}: ${msg} — will re-ingest`,
-          );
         }
       }
 
@@ -172,26 +210,23 @@ async function main(): Promise<void> {
       const result = await ingestSource(source, { databaseUrl, openaiApiKey });
       results.push(result);
 
-      // Best-effort DynamoDB state tracking
-      if (entity) {
-        try {
-          if (result.status === "completed") {
-            const res = await fetchWithRetry(
-              source.url,
-              { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
-              { timeoutMs: 60000, maxRetries: 3 },
-            );
-            const rawContent = await res.text();
-            await entity.markSuccess(source.id, hashContent(rawContent));
-          } else {
-            await entity.markFailure(
-              source.id,
-              result.error ?? "Unknown error",
-            );
-          }
-        } catch {
-          // best-effort
+      // Update DynamoDB ingestion stats
+      try {
+        if (result.status === "completed") {
+          const res = await fetchWithRetry(
+            source.url,
+            { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
+            { timeoutMs: 60000, maxRetries: 3 },
+          );
+          const rawContent = await res.text();
+          await entity.markSuccess(source.id, hashContent(rawContent));
+        } else {
+          await entity.markFailure(source.id, result.error ?? "Unknown error");
         }
+      } catch (statsError) {
+        logger.warn(
+          `Failed to update DynamoDB stats for ${source.id}: ${statsError instanceof Error ? statsError.message : "Unknown error"}`,
+        );
       }
     }
 

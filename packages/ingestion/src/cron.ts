@@ -77,7 +77,7 @@ async function loadSourceConfigsFromJson(): Promise<IngestionSource[]> {
 /**
  * Convert a DynamoDB SourceConfig to an IngestionSource for pipeline compatibility.
  */
-function toIngestionSource(config: SourceConfig): IngestionSource {
+export function toIngestionSource(config: SourceConfig): IngestionSource {
   return {
     id: config.id,
     title: config.title,
@@ -142,11 +142,13 @@ function hashContent(content: string): string {
 /**
  * EventBridge-triggered coordinator Lambda.
  *
- * 1. Loads all source configs (from DynamoDB in production, JSON files in dev).
- * 2. For each source, fetches the content (with retry) and computes a hash.
- * 3. Skips sources whose content hash has not changed since the last
- *    successful ingestion.
- * 4. Enqueues changed sources to the SQS FIFO queue for the worker to process.
+ * 1. Loads all enabled source configs (from DynamoDB in production, JSON files in dev).
+ * 2. Skips sources that have already been ingested (only new sources are processed).
+ * 3. For each new source, fetches the content (with retry) and computes a hash.
+ * 4. Enqueues new sources to the SQS FIFO queue for the worker to process.
+ *
+ * To re-ingest existing sources, use the admin UI (single or bulk) or the
+ * CLI with --resume (content-change detection) or --force (unconditional).
  */
 export async function handler(): Promise<void> {
   const databaseUrl = getDatabaseUrl();
@@ -166,9 +168,15 @@ export async function handler(): Promise<void> {
 
     for (const source of sources) {
       try {
-        // Skip sources with too many consecutive failures
+        // -----------------------------------------------------------------
+        // Default: only ingest NEW (never-ingested) sources.
+        // Re-ingestion of existing sources requires an explicit trigger
+        // via the admin UI or CLI (--resume / --force).
+        // -----------------------------------------------------------------
         if (entity) {
           const config = await entity.getById(source.id);
+
+          // Skip sources with too many consecutive failures
           if (
             config &&
             config.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
@@ -179,10 +187,24 @@ export async function handler(): Promise<void> {
             skipped++;
             continue;
           }
+
+          // Skip sources that have already been successfully ingested
+          if (config?.lastIngestedAt) {
+            logger.info(`Skipping ${source.id} — already ingested`);
+            skipped++;
+            continue;
+          }
+        } else {
+          // JSON dev fallback: check Postgres for prior ingestion
+          const lastHash = await getLastContentHash(pool, source.id);
+          if (lastHash) {
+            logger.info(`Skipping ${source.id} — already ingested`);
+            skipped++;
+            continue;
+          }
         }
 
-        // Fetch the content to compute a hash and decide whether to re-ingest
-        // Using fetchWithRetry for resilience
+        // Fetch the content to compute a hash for the worker
         let rawContent: string;
         try {
           const res = await fetchWithRetry(
@@ -197,7 +219,6 @@ export async function handler(): Promise<void> {
           );
           rawContent = await res.text();
         } catch (fetchError) {
-          // Log the fetch error but mark for re-ingestion
           const fetchMsg =
             fetchError instanceof Error ? fetchError.message : "Unknown error";
           logger.warn(`Fetch failed for ${source.id}: ${fetchMsg}`);
@@ -207,28 +228,11 @@ export async function handler(): Promise<void> {
             await entity.markFailure(source.id, fetchMsg);
           }
 
-          // Use timestamp to force re-ingestion attempt
-          rawContent = Date.now().toString();
           failed++;
           continue;
         }
 
         const contentHash = hashContent(rawContent);
-
-        // Get last hash from DynamoDB entity if available, otherwise from Postgres
-        let lastHash: string | null;
-        if (entity) {
-          const config = await entity.getById(source.id);
-          lastHash = config?.lastContentHash ?? null;
-        } else {
-          lastHash = await getLastContentHash(pool, source.id);
-        }
-
-        if (contentHash === lastHash) {
-          logger.info(`Skipping ${source.id} — content unchanged`);
-          skipped++;
-          continue;
-        }
 
         // Mark as ingesting in Postgres (for backward compatibility)
         await upsertIngestionStatus(pool, source.id, source.url, "ingesting");
