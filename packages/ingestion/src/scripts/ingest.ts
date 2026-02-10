@@ -88,13 +88,18 @@ async function main(): Promise<void> {
   const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
   const { sourceId, all, resume, force } = parseArgs();
 
+  // Always load from DynamoDB so ingestion stats are tracked.
+  // This script runs under `sst shell` (see package.json), so SST
+  // Resource bindings are always available.
+  process.env.USE_DYNAMODB = "true";
   const { sources, entity } = await loadSourceConfigs();
   logger.info(`Loaded ${sources.length} source configuration(s)`);
 
-  if (resume && !entity) {
-    logger.warn(
-      "DynamoDB entity unavailable — resume will not skip unchanged sources. Run with 'sst shell' for full resume support.",
+  if (!entity) {
+    logger.error(
+      "DynamoDB entity unavailable. The ingest script must be run via 'sst shell' so ingestion stats are tracked. Aborting.",
     );
+    process.exit(1);
   }
 
   if (sourceId) {
@@ -109,6 +114,25 @@ async function main(): Promise<void> {
 
     logger.info(`Ingesting single source: ${source.id} — ${source.title}`);
     const result = await ingestSource(source, { databaseUrl, openaiApiKey });
+
+    // Update DynamoDB ingestion stats
+    try {
+      if (result.status === "completed") {
+        const res = await fetchWithRetry(
+          source.url,
+          { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
+          { timeoutMs: 60000, maxRetries: 3 },
+        );
+        const rawContent = await res.text();
+        await entity.markSuccess(source.id, hashContent(rawContent));
+      } else {
+        await entity.markFailure(source.id, result.error ?? "Unknown error");
+      }
+    } catch (statsError) {
+      logger.warn(
+        `Failed to update DynamoDB stats for ${source.id}: ${statsError instanceof Error ? statsError.message : "Unknown error"}`,
+      );
+    }
 
     if (result.status === "completed") {
       logger.info(
@@ -134,7 +158,7 @@ async function main(): Promise<void> {
       const source: IngestionSource = sources[i];
 
       // Resume: skip sources whose content hash hasn't changed
-      if (resume && entity) {
+      if (resume) {
         try {
           const res = await fetchWithRetry(
             source.url,
@@ -172,26 +196,23 @@ async function main(): Promise<void> {
       const result = await ingestSource(source, { databaseUrl, openaiApiKey });
       results.push(result);
 
-      // Best-effort DynamoDB state tracking
-      if (entity) {
-        try {
-          if (result.status === "completed") {
-            const res = await fetchWithRetry(
-              source.url,
-              { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
-              { timeoutMs: 60000, maxRetries: 3 },
-            );
-            const rawContent = await res.text();
-            await entity.markSuccess(source.id, hashContent(rawContent));
-          } else {
-            await entity.markFailure(
-              source.id,
-              result.error ?? "Unknown error",
-            );
-          }
-        } catch {
-          // best-effort
+      // Update DynamoDB ingestion stats
+      try {
+        if (result.status === "completed") {
+          const res = await fetchWithRetry(
+            source.url,
+            { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
+            { timeoutMs: 60000, maxRetries: 3 },
+          );
+          const rawContent = await res.text();
+          await entity.markSuccess(source.id, hashContent(rawContent));
+        } else {
+          await entity.markFailure(source.id, result.error ?? "Unknown error");
         }
+      } catch (statsError) {
+        logger.warn(
+          `Failed to update DynamoDB stats for ${source.id}: ${statsError instanceof Error ? statsError.message : "Unknown error"}`,
+        );
       }
     }
 
