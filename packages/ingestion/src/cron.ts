@@ -77,7 +77,7 @@ async function loadSourceConfigsFromJson(): Promise<IngestionSource[]> {
 /**
  * Convert a DynamoDB SourceConfig to an IngestionSource for pipeline compatibility.
  */
-function toIngestionSource(config: SourceConfig): IngestionSource {
+export function toIngestionSource(config: SourceConfig): IngestionSource {
   return {
     id: config.id,
     title: config.title,

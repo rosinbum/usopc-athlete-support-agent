@@ -15,10 +15,16 @@
  */
 
 import { createHash } from "node:crypto";
-import { getDatabaseUrl, getSecretValue, createLogger } from "@usopc/shared";
+import {
+  getDatabaseUrl,
+  getSecretValue,
+  createLogger,
+  type SourceConfig,
+} from "@usopc/shared";
 import { ingestSource } from "../pipeline.js";
 import type { IngestionSource } from "../pipeline.js";
-import { loadSourceConfigs } from "../cron.js";
+import { createSourceConfigEntity } from "../entities/index.js";
+import { toIngestionSource } from "../cron.js";
 import { fetchWithRetry } from "../loaders/fetchWithRetry.js";
 
 const logger = createLogger({ service: "ingestion-cli" });
@@ -88,19 +94,13 @@ async function main(): Promise<void> {
   const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
   const { sourceId, all, resume, force } = parseArgs();
 
-  // Always load from DynamoDB so ingestion stats are tracked.
+  // Load directly from DynamoDB so ingestion stats are always tracked.
   // This script runs under `sst shell` (see package.json), so SST
   // Resource bindings are always available.
-  process.env.USE_DYNAMODB = "true";
-  const { sources, entity } = await loadSourceConfigs();
-  logger.info(`Loaded ${sources.length} source configuration(s)`);
-
-  if (!entity) {
-    logger.error(
-      "DynamoDB entity unavailable. The ingest script must be run via 'sst shell' so ingestion stats are tracked. Aborting.",
-    );
-    process.exit(1);
-  }
+  const entity = createSourceConfigEntity();
+  const configs = await entity.getAllEnabled();
+  const sources: IngestionSource[] = configs.map(toIngestionSource);
+  logger.info(`Loaded ${sources.length} source configuration(s) from DynamoDB`);
 
   if (sourceId) {
     const source = sources.find((s) => s.id === sourceId);
