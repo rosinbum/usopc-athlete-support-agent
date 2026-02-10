@@ -53,3 +53,10 @@ export {
   authorityLevelSchema,
   type AuthorityLevel,
 } from "./validation.js";
+
+export {
+  SourceConfigEntity,
+  type SourceConfig,
+  type CreateSourceInput,
+  type MarkSuccessOptions,
+} from "./entities/index.js";

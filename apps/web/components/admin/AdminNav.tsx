@@ -11,6 +11,12 @@ export default function AdminNav({ session }: { session: Session }) {
           Admin Dashboard
         </a>
         <a
+          href="/admin/sources"
+          className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          Sources
+        </a>
+        <a
           href="/"
           className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
         >
