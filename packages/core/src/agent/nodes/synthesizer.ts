@@ -7,7 +7,11 @@ import {
   invokeAnthropic,
   extractTextFromResponse,
 } from "../../services/anthropicService.js";
-import { buildContextualQuery, stateContext } from "../../utils/index.js";
+import {
+  buildContextualQuery,
+  getLastUserMessage,
+  stateContext,
+} from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 import type { AuthorityLevel } from "@usopc/shared";
@@ -108,24 +112,6 @@ function buildContext(state: AgentState): string {
   }
 
   return contextParts.join("\n\n");
-}
-
-/**
- * Extracts the text content from the last user message.
- */
-function getLastUserMessage(state: AgentState): string {
-  for (let i = state.messages.length - 1; i >= 0; i--) {
-    const msg = state.messages[i];
-    if (
-      msg._getType() === "human" ||
-      (msg as unknown as Record<string, unknown>).role === "user"
-    ) {
-      return typeof msg.content === "string"
-        ? msg.content
-        : JSON.stringify(msg.content);
-    }
-  }
-  return "";
 }
 
 /**

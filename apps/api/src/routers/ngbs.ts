@@ -4,7 +4,25 @@ import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
-function loadSportOrgs(): any[] {
+export interface SportOrganization {
+  id: string;
+  type: "ngb" | "usopc_managed";
+  officialName: string;
+  abbreviation: string | null;
+  sports: string[];
+  olympicProgram: "summer" | "winter" | "pan_american";
+  paralympicManaged: boolean;
+  websiteUrl: string | null;
+  bylawsUrl: string | null;
+  selectionProceduresUrl: string | null;
+  internationalFederation: string | null;
+  aliases: string[];
+  keywords: string[];
+  status: "active" | "decertified";
+  effectiveDate: string;
+}
+
+function loadSportOrgs(): SportOrganization[] {
   const possiblePaths = [
     join(process.cwd(), "data", "sport-organizations.json"),
     join(
@@ -15,7 +33,7 @@ function loadSportOrgs(): any[] {
 
   for (const p of possiblePaths) {
     try {
-      return JSON.parse(readFileSync(p, "utf-8"));
+      return JSON.parse(readFileSync(p, "utf-8")) as SportOrganization[];
     } catch {
       continue;
     }
@@ -41,15 +59,13 @@ export const ngbsRouter = router({
       const filters = input ?? { type: "all", status: "active" };
 
       if (filters.type !== "all") {
-        orgs = orgs.filter((o: any) => o.type === filters.type);
+        orgs = orgs.filter((o) => o.type === filters.type);
       }
       if (filters.olympicProgram) {
-        orgs = orgs.filter(
-          (o: any) => o.olympicProgram === filters.olympicProgram,
-        );
+        orgs = orgs.filter((o) => o.olympicProgram === filters.olympicProgram);
       }
       if (filters.status) {
-        orgs = orgs.filter((o: any) => o.status === filters.status);
+        orgs = orgs.filter((o) => o.status === filters.status);
       }
 
       return { organizations: orgs };
@@ -59,7 +75,7 @@ export const ngbsRouter = router({
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
       const orgs = loadSportOrgs();
-      const org = orgs.find((o: any) => o.id === input.id);
+      const org = orgs.find((o) => o.id === input.id);
       return { organization: org ?? null };
     }),
 
@@ -69,11 +85,11 @@ export const ngbsRouter = router({
       const orgs = loadSportOrgs();
       const q = input.query.toLowerCase();
       const matches = orgs.filter(
-        (o: any) =>
+        (o) =>
           o.officialName.toLowerCase().includes(q) ||
           o.abbreviation?.toLowerCase().includes(q) ||
-          o.sports.some((s: string) => s.toLowerCase().includes(q)) ||
-          o.aliases.some((a: string) => a.toLowerCase().includes(q)),
+          o.sports.some((s) => s.toLowerCase().includes(q)) ||
+          o.aliases.some((a) => a.toLowerCase().includes(q)),
       );
       return { organizations: matches };
     }),

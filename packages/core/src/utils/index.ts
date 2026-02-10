@@ -8,3 +8,4 @@ export {
 
 export { TimeoutError, withTimeout } from "./withTimeout.js";
 export { stateContext } from "./nodeLogging.js";
+export { isUserMessage, getLastUserMessage } from "./messageHelpers.js";

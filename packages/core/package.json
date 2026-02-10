@@ -19,7 +19,7 @@
     "@langchain/openai": "^0.3.17",
     "@langchain/tavily": "^0.1.0",
     "@usopc/shared": "workspace:*",
-    "pg": "^8.13.1",
+    "pg": "^8.14.1",
     "pgvector": "^0.2.0",
     "zod": "^3.24.1"
   },
