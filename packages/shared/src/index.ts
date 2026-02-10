@@ -52,6 +52,9 @@ export {
   AUTHORITY_LEVELS,
   authorityLevelSchema,
   type AuthorityLevel,
+  DOCUMENT_TYPES,
+  documentTypeSchema,
+  type DocumentType,
 } from "./validation.js";
 
 export {

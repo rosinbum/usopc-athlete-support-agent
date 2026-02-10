@@ -10,6 +10,7 @@ import {
   Search,
   ChevronUp,
   ChevronDown,
+  Plus,
 } from "lucide-react";
 import type { SourceConfig } from "@usopc/shared";
 
@@ -301,6 +302,17 @@ export function SourcesAdminClient() {
 
   return (
     <div>
+      {/* Add Source Button */}
+      <div className="flex justify-end mb-4">
+        <a
+          href="/admin/sources/new"
+          className="inline-flex items-center gap-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg px-4 py-2 text-sm font-medium"
+        >
+          <Plus className="w-4 h-4" />
+          Add Source
+        </a>
+      </div>
+
       {/* Health Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="border border-gray-200 rounded-lg p-4">

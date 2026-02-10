@@ -3,10 +3,10 @@
  * CLI script for manual document ingestion.
  *
  * Usage:
- *   pnpm --filter @usopc/ingestion ingest               # ingest ALL sources (resume by default)
+ *   pnpm --filter @usopc/ingestion ingest               # ingest only NEW (never-ingested) sources
  *   pnpm --filter @usopc/ingestion ingest --all          # same as above
- *   pnpm --filter @usopc/ingestion ingest --source <id>  # ingest a single source
- *   pnpm --filter @usopc/ingestion ingest --resume       # skip sources whose content hash is unchanged
+ *   pnpm --filter @usopc/ingestion ingest --source <id>  # ingest a single source (always runs)
+ *   pnpm --filter @usopc/ingestion ingest --resume       # re-ingest sources whose content hash changed
  *   pnpm --filter @usopc/ingestion ingest --force        # re-ingest everything regardless of state
  *
  * Required config (via env var or SST secret):
@@ -64,12 +64,9 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): ParsedArgs {
     resume = false;
   }
 
-  // Default to --all + --resume when no flags are provided
+  // Default to --all when no flags are provided (new-only behavior)
   if (!sourceId && !all) {
     all = true;
-  }
-  if (all && !force && !resume) {
-    resume = true;
   }
 
   return { sourceId, all, resume, force };
@@ -143,9 +140,8 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   } else if (all) {
-    logger.info(
-      `Ingesting all sources (mode: ${force ? "force" : resume ? "resume" : "all"})...`,
-    );
+    const mode = force ? "force" : resume ? "resume" : "new-only";
+    logger.info(`Ingesting all sources (mode: ${mode})...`);
 
     const results: {
       sourceId: string;
@@ -157,20 +153,44 @@ async function main(): Promise<void> {
     for (let i = 0; i < sources.length; i++) {
       const source: IngestionSource = sources[i];
 
-      // Resume: skip sources whose content hash hasn't changed
-      if (resume) {
-        try {
-          const res = await fetchWithRetry(
-            source.url,
-            { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
-            { timeoutMs: 60000, maxRetries: 3 },
-          );
-          const rawContent = await res.text();
-          const contentHash = hashContent(rawContent);
+      if (!force) {
+        const config = await entity.getById(source.id);
 
-          const config = await entity.getById(source.id);
-          if (config?.lastContentHash === contentHash) {
-            logger.info(`Skipping ${source.id} — content unchanged`);
+        if (resume) {
+          // Resume: skip sources whose content hash hasn't changed
+          try {
+            const res = await fetchWithRetry(
+              source.url,
+              { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
+              { timeoutMs: 60000, maxRetries: 3 },
+            );
+            const rawContent = await res.text();
+            const contentHash = hashContent(rawContent);
+
+            if (config?.lastContentHash === contentHash) {
+              logger.info(`Skipping ${source.id} — content unchanged`);
+              results.push({
+                sourceId: source.id,
+                status: "skipped",
+                chunksCount: 0,
+              });
+              continue;
+            }
+          } catch (fetchError) {
+            const msg =
+              fetchError instanceof Error
+                ? fetchError.message
+                : "Unknown error";
+            logger.warn(
+              `Could not check hash for ${source.id}: ${msg} — will re-ingest`,
+            );
+          }
+        } else {
+          // Default (new-only): skip sources that have already been ingested
+          if (config?.lastIngestedAt) {
+            logger.info(
+              `Skipping ${source.id} — already ingested (use --resume or --force to re-ingest)`,
+            );
             results.push({
               sourceId: source.id,
               status: "skipped",
@@ -178,12 +198,6 @@ async function main(): Promise<void> {
             });
             continue;
           }
-        } catch (fetchError) {
-          const msg =
-            fetchError instanceof Error ? fetchError.message : "Unknown error";
-          logger.warn(
-            `Could not check hash for ${source.id}: ${msg} — will re-ingest`,
-          );
         }
       }
 
