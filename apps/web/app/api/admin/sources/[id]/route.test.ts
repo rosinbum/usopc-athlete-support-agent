@@ -102,7 +102,7 @@ describe("PATCH /api/admin/sources/[id]", () => {
     expect(res.status).toBe(401);
   });
 
-  it("rejects invalid fields", async () => {
+  it("rejects unknown fields", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },
     } as never);
@@ -117,7 +117,58 @@ describe("PATCH /api/admin/sources/[id]", () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
+  });
+
+  it("rejects empty body", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+
+    const res = await PATCH(
+      new Request("http://localhost/api/admin/sources/test", {
+        method: "PATCH",
+        body: JSON.stringify({}),
+      }),
+      { params: Promise.resolve({ id: "test" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
     expect(body.error).toBe("No valid fields to update");
+  });
+
+  it("rejects invalid URL", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+
+    const res = await PATCH(
+      new Request("http://localhost/api/admin/sources/test", {
+        method: "PATCH",
+        body: JSON.stringify({ url: "not-a-url" }),
+      }),
+      { params: Promise.resolve({ id: "test" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe("Must be a valid URL");
+  });
+
+  it("rejects non-boolean enabled", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+
+    const res = await PATCH(
+      new Request("http://localhost/api/admin/sources/test", {
+        method: "PATCH",
+        body: JSON.stringify({ enabled: "yes" }),
+      }),
+      { params: Promise.resolve({ id: "test" }) },
+    );
+
+    expect(res.status).toBe(400);
   });
 
   it("updates allowed fields", async () => {

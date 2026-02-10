@@ -198,9 +198,28 @@ describe("SourceConfigEntity", () => {
       expect(results[0].id).toBe("src1");
       expect(results[1].id).toBe("src2");
       expect(results[1].enabled).toBe(false);
-      expect(ScanCommand).toHaveBeenCalledWith({
-        TableName: "test-table",
-      });
+    });
+
+    it("paginates when LastEvaluatedKey is present", async () => {
+      mockSend
+        .mockResolvedValueOnce({
+          Items: [
+            { pk: "SOURCE#src1", sk: "CONFIG", ...SAMPLE_SOURCE, id: "src1" },
+          ],
+          LastEvaluatedKey: { pk: "SOURCE#src1", sk: "CONFIG" },
+        })
+        .mockResolvedValueOnce({
+          Items: [
+            { pk: "SOURCE#src2", sk: "CONFIG", ...SAMPLE_SOURCE, id: "src2" },
+          ],
+        });
+
+      const results = await entity.getAll();
+
+      expect(results).toHaveLength(2);
+      expect(results[0].id).toBe("src1");
+      expect(results[1].id).toBe("src2");
+      expect(mockSend).toHaveBeenCalledTimes(2);
     });
 
     it("returns empty array when no sources exist", async () => {

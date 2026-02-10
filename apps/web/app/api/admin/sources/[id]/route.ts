@@ -1,6 +1,25 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
+
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+const patchSourceSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    url: z.string().url("Must be a valid URL").optional(),
+  })
+  .strict()
+  .refine((obj) => Object.keys(obj).length > 0, {
+    message: "No valid fields to update",
+  });
+
+// ---------------------------------------------------------------------------
+// GET
+// ---------------------------------------------------------------------------
 
 export async function GET(
   _request: Request,
@@ -28,7 +47,9 @@ export async function GET(
   }
 }
 
-const ALLOWED_FIELDS = new Set(["enabled", "url"]);
+// ---------------------------------------------------------------------------
+// PATCH
+// ---------------------------------------------------------------------------
 
 export async function PATCH(
   request: Request,
@@ -40,24 +61,15 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
+    const result = patchSourceSchema.safeParse(body);
 
-    // Only allow updating specific fields
-    const updates: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(body)) {
-      if (ALLOWED_FIELDS.has(key)) {
-        updates[key] = value;
-      }
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return NextResponse.json(
-        { error: "No valid fields to update" },
-        { status: 400 },
-      );
+    if (!result.success) {
+      const firstError = result.error.errors[0]?.message ?? "Invalid input";
+      return NextResponse.json({ error: firstError }, { status: 400 });
     }
 
     const entity = createSourceConfigEntity();
-    const source = await entity.update(id, updates);
+    const source = await entity.update(id, result.data);
     return NextResponse.json({ source });
   } catch (error) {
     console.error("Admin source update error:", error);

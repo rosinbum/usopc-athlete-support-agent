@@ -32,6 +32,22 @@ export async function POST(request: Request) {
     let succeeded = 0;
     let failed = 0;
 
+    // For ingest actions, resolve the queue URL and create the SQS client once
+    let sqs: SQSClient | undefined;
+    let queueUrl: string | undefined;
+    if (action === "ingest") {
+      try {
+        queueUrl = (Resource as unknown as { IngestionQueue: { url: string } })
+          .IngestionQueue.url;
+        sqs = new SQSClient({});
+      } catch {
+        return NextResponse.json(
+          { error: "Ingestion queue not available (dev environment)" },
+          { status: 501 },
+        );
+      }
+    }
+
     for (const id of ids) {
       try {
         if (action === "enable") {
@@ -43,18 +59,6 @@ export async function POST(request: Request) {
           if (!source) {
             failed++;
             continue;
-          }
-
-          let queueUrl: string;
-          try {
-            queueUrl = (
-              Resource as unknown as { IngestionQueue: { url: string } }
-            ).IngestionQueue.url;
-          } catch {
-            return NextResponse.json(
-              { error: "Ingestion queue not available (dev environment)" },
-              { status: 501 },
-            );
           }
 
           const message = {
@@ -74,10 +78,9 @@ export async function POST(request: Request) {
             triggeredAt: new Date().toISOString(),
           };
 
-          const sqs = new SQSClient({});
-          await sqs.send(
+          await sqs!.send(
             new SendMessageCommand({
-              QueueUrl: queueUrl,
+              QueueUrl: queueUrl!,
               MessageBody: JSON.stringify(message),
               MessageGroupId: source.id,
             }),
