@@ -196,48 +196,78 @@ export class SourceConfigEntity {
 
   /**
    * Get all source configurations (enabled and disabled).
+   * Paginates automatically if results exceed 1 MB.
    */
   async getAll(): Promise<SourceConfig[]> {
-    const result = await this.client.send(
-      new ScanCommand({ TableName: this.tableName }),
-    );
-    return (result.Items ?? []).map((item) => this.fromItem(item));
+    const items: Record<string, unknown>[] = [];
+    let lastKey: Record<string, unknown> | undefined;
+
+    do {
+      const result = await this.client.send(
+        new ScanCommand({
+          TableName: this.tableName,
+          ExclusiveStartKey: lastKey,
+        }),
+      );
+      items.push(...(result.Items ?? []));
+      lastKey = result.LastEvaluatedKey;
+    } while (lastKey);
+
+    return items.map((item) => this.fromItem(item));
   }
 
   /**
    * Get all enabled source configurations.
+   * Paginates automatically if results exceed 1 MB.
    */
   async getAllEnabled(): Promise<SourceConfig[]> {
-    const result = await this.client.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: "enabled-priority-index",
-        KeyConditionExpression: "enabled = :enabled",
-        ExpressionAttributeValues: {
-          ":enabled": "true",
-        },
-      }),
-    );
+    const items: Record<string, unknown>[] = [];
+    let lastKey: Record<string, unknown> | undefined;
 
-    return (result.Items ?? []).map((item) => this.fromItem(item));
+    do {
+      const result = await this.client.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: "enabled-priority-index",
+          KeyConditionExpression: "enabled = :enabled",
+          ExpressionAttributeValues: {
+            ":enabled": "true",
+          },
+          ExclusiveStartKey: lastKey,
+        }),
+      );
+      items.push(...(result.Items ?? []));
+      lastKey = result.LastEvaluatedKey;
+    } while (lastKey);
+
+    return items.map((item) => this.fromItem(item));
   }
 
   /**
    * Get source configurations by NGB ID.
+   * Paginates automatically if results exceed 1 MB.
    */
   async getByNgb(ngbId: string): Promise<SourceConfig[]> {
-    const result = await this.client.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: "ngbId-index",
-        KeyConditionExpression: "ngbId = :ngbId",
-        ExpressionAttributeValues: {
-          ":ngbId": ngbId,
-        },
-      }),
-    );
+    const items: Record<string, unknown>[] = [];
+    let lastKey: Record<string, unknown> | undefined;
 
-    return (result.Items ?? []).map((item) => this.fromItem(item));
+    do {
+      const result = await this.client.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: "ngbId-index",
+          KeyConditionExpression: "ngbId = :ngbId",
+          ExpressionAttributeValues: {
+            ":ngbId": ngbId,
+          },
+          ExclusiveStartKey: lastKey,
+        }),
+      );
+      items.push(...(result.Items ?? []));
+      lastKey = result.LastEvaluatedKey;
+    } while (lastKey);
+
+    return items.map((item) => this.fromItem(item));
   }
 
   /**
