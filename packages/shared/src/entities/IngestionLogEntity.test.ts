@@ -193,7 +193,7 @@ describe("IngestionLogEntity", () => {
 
       expect(results).toHaveLength(2);
       expect(mockFind).toHaveBeenCalledWith(
-        { gsi1pk: "INGEST" },
+        { gsi1pk: "Ingest" },
         { index: "gsi1", reverse: true, limit: 20 },
       );
     });
@@ -204,7 +204,7 @@ describe("IngestionLogEntity", () => {
       await entity.getRecent(5);
 
       expect(mockFind).toHaveBeenCalledWith(
-        { gsi1pk: "INGEST" },
+        { gsi1pk: "Ingest" },
         { index: "gsi1", reverse: true, limit: 5 },
       );
     });

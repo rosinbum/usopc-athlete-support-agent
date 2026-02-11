@@ -22,8 +22,8 @@ import type { SportOrganization, OlympicProgram } from "../types/sport-org.js";
  * using the OneTable single-table pattern.
  *
  * Table structure:
- * - PK: SPORTORG#{id}
- * - SK: PROFILE
+ * - PK: SportOrg#{id}
+ * - SK: Profile
  */
 export class SportOrgEntity {
   private model;

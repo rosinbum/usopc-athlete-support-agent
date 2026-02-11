@@ -88,7 +88,7 @@ export class IngestionLogEntity {
    * Get recent ingestion logs across all sources (via gsi1).
    */
   async getRecent(limit = 20): Promise<IngestionLog[]> {
-    const items = await this.model.find({ gsi1pk: "INGEST" } as never, {
+    const items = await this.model.find({ gsi1pk: "Ingest" } as never, {
       index: "gsi1",
       reverse: true,
       limit,

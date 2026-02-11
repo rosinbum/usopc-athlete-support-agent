@@ -16,8 +16,8 @@ export const AppTableSchema = {
   },
   models: {
     SourceConfig: {
-      pk: { type: String, value: "SOURCE#${id}" },
-      sk: { type: String, value: "CONFIG" },
+      pk: { type: String, value: "Source#${id}" },
+      sk: { type: String, value: "SourceConfig" },
       id: { type: String, required: true },
       title: { type: String, required: true },
       documentType: { type: String, required: true },
@@ -47,8 +47,8 @@ export const AppTableSchema = {
       updatedAt: { type: String },
     },
     SportOrganization: {
-      pk: { type: String, value: "SPORTORG#${id}" },
-      sk: { type: String, value: "PROFILE" },
+      pk: { type: String, value: "SportOrg#${id}" },
+      sk: { type: String, value: "Profile" },
       id: { type: String, required: true },
       type: {
         type: String,
@@ -76,8 +76,8 @@ export const AppTableSchema = {
       updatedAt: { type: String },
     },
     AgentModel: {
-      pk: { type: String, value: "AGENT#${id}" },
-      sk: { type: String, value: "CONFIG" },
+      pk: { type: String, value: "Agent#${id}" },
+      sk: { type: String, value: "AgentModel" },
       id: { type: String, required: true },
       role: { type: String, required: true },
       model: { type: String, required: true },
@@ -88,9 +88,9 @@ export const AppTableSchema = {
       updatedAt: { type: String },
     },
     IngestionLog: {
-      pk: { type: String, value: "SOURCE#${sourceId}" },
-      sk: { type: String, value: "INGEST#${startedAt}" },
-      gsi1pk: { type: String, value: "INGEST" },
+      pk: { type: String, value: "Source#${sourceId}" },
+      sk: { type: String, value: "Ingest#${startedAt}" },
+      gsi1pk: { type: String, value: "Ingest" },
       gsi1sk: { type: String, value: "${startedAt}" },
       sourceId: { type: String, required: true },
       sourceUrl: { type: String },
@@ -107,8 +107,8 @@ export const AppTableSchema = {
       createdAt: { type: String },
     },
     Prompt: {
-      pk: { type: String, value: "PROMPT#${name}" },
-      sk: { type: String, value: "CONFIG" },
+      pk: { type: String, value: "Prompt#${name}" },
+      sk: { type: String, value: "Prompt" },
       name: { type: String, required: true },
       content: { type: String, required: true },
       domain: { type: String },

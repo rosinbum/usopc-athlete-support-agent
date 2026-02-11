@@ -17,26 +17,27 @@ Assessed 2026-02-09. Items marked ~~strikethrough~~ have been resolved.
 
 The AI agent is not wired into the app surfaces yet. Handlers return placeholder responses.
 
-| Location | Issue | Tracked |
-|---|---|---|
-| `apps/slack/src/handlers/slashCommand.ts:62` | TODO: Invoke LangGraph agent | #7 |
-| `apps/slack/src/handlers/mention.ts:41` | TODO: Invoke LangGraph agent | #7 |
-| `apps/slack/src/handlers/message.ts:35` | Returns placeholder block response | #7 |
-| `apps/api/src/routers/chat.ts:14` | TODO: Wire to agent graph | #5 |
-| `apps/slack/src/index.ts:118` | TODO: Store feedback via tRPC API | — |
+| Location                                     | Issue                              | Tracked |
+| -------------------------------------------- | ---------------------------------- | ------- |
+| `apps/slack/src/handlers/slashCommand.ts:62` | TODO: Invoke LangGraph agent       | #7      |
+| `apps/slack/src/handlers/mention.ts:41`      | TODO: Invoke LangGraph agent       | #7      |
+| `apps/slack/src/handlers/message.ts:35`      | Returns placeholder block response | #7      |
+| `apps/api/src/routers/chat.ts:14`            | TODO: Wire to agent graph          | #5      |
+| `apps/slack/src/index.ts:118`                | TODO: Store feedback via tRPC API  | —       |
 
 ## Test Coverage Gaps (HIGH)
 
-| Package | Test Files | Source Files | Coverage | Priority |
-|---|---|---|---|---|
-| `apps/slack` | 0 | 10 | 0% | Critical |
-| `apps/api` | 2 | 11 | 18% | High |
-| `apps/web` | 6 | 43 | 14% | High |
-| `packages/core` | 31 | 61 | 51% | Moderate (strong for logic, weak for config/data) |
-| `packages/ingestion` | 12 | 32 | 38% | Moderate |
-| `packages/shared` | 5 | 8 | 63% | Low |
+| Package              | Test Files | Source Files | Coverage | Priority                                          |
+| -------------------- | ---------- | ------------ | -------- | ------------------------------------------------- |
+| `apps/slack`         | 0          | 10           | 0%       | Critical                                          |
+| `apps/api`           | 2          | 11           | 18%      | High                                              |
+| `apps/web`           | 6          | 43           | 14%      | High                                              |
+| `packages/core`      | 31         | 61           | 51%      | Moderate (strong for logic, weak for config/data) |
+| `packages/ingestion` | 12         | 32           | 38%      | Moderate                                          |
+| `packages/shared`    | 5          | 8            | 63%      | Low                                               |
 
 Key untested files:
+
 - `packages/shared/src/pool.ts` — critical database singleton
 - `apps/slack/src/handlers/*` — all event handlers
 - `apps/api/src/routers/chat.ts` — core chat endpoint
@@ -61,12 +62,12 @@ Key untested files:
 
 ## Architecture TODOs (MEDIUM)
 
-| Description | Location | Tracked |
-|---|---|---|
-| Conversation summarization for long chats | `packages/core/src/agent/nodes/classifier.ts:173` | #35 |
-| Dedicated query reformulation node | `packages/core/src/agent/nodes/retriever.ts:53` | #37 |
-| Database persistence for conversations | — | #36 |
-| Error handling for API routes and streaming | — | #31 |
+| Description                                 | Location                                          | Tracked |
+| ------------------------------------------- | ------------------------------------------------- | ------- |
+| Conversation summarization for long chats   | `packages/core/src/agent/nodes/classifier.ts:173` | #35     |
+| Dedicated query reformulation node          | `packages/core/src/agent/nodes/retriever.ts:53`   | #37     |
+| Database persistence for conversations      | —                                                 | #36     |
+| Error handling for API routes and streaming | —                                                 | #31     |
 
 ## Code Duplication (LOW)
 
