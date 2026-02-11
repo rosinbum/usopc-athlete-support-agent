@@ -62,19 +62,3 @@ CREATE TABLE IF NOT EXISTS feedback (
   comment TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- Ingestion status table
-CREATE TABLE IF NOT EXISTS ingestion_status (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  source_id TEXT NOT NULL,
-  source_url TEXT NOT NULL,
-  content_hash TEXT,
-  status TEXT NOT NULL CHECK (status IN ('pending', 'ingesting', 'completed', 'failed')),
-  chunks_count INTEGER DEFAULT 0,
-  error_message TEXT,
-  started_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_ingestion_source ON ingestion_status (source_id);
