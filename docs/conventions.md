@@ -21,4 +21,4 @@ npx prettier --check .                   # Check entire repo
 - **Scripts needing AWS resources**: Wrap with `sst shell --` in package.json (e.g., `"ingest": "sst shell -- tsx src/scripts/ingest.ts"`). This injects SST Resource bindings. Don't add `process.env.SOME_CONFIG` fallbacks—use SST Resources only.
 - **DynamoDB GSI keys cannot be null**: When using a Global Secondary Index, omit the attribute entirely rather than setting it to `null`. This creates a sparse index where items without the attribute aren't indexed.
 - **Path resolution in scripts**: Scripts in `packages/*/src/scripts/` need 4 levels up (`../../../../`) to reach repo root.
-- **Database**: PostgreSQL with pgvector. Schema includes `document_chunks` (embeddings with HNSW index), `conversations`, `messages`, `feedback`, `ingestion_status`. Migrations run through the API package.
+- **Database**: PostgreSQL with pgvector. Schema includes `document_chunks` (embeddings with HNSW index), `conversations`, `messages`, `feedback`. Ingestion tracking lives in DynamoDB. Migrations run through the API package.
