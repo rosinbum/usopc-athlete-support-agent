@@ -11,6 +11,7 @@ import {
   ChevronUp,
   ChevronDown,
   Plus,
+  Upload,
 } from "lucide-react";
 import type { SourceConfig } from "@usopc/shared";
 
@@ -302,8 +303,15 @@ export function SourcesAdminClient() {
 
   return (
     <div>
-      {/* Add Source Button */}
-      <div className="flex justify-end mb-4">
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-2 mb-4">
+        <a
+          href="/admin/sources/bulk-import"
+          className="inline-flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg px-4 py-2 text-sm font-medium"
+        >
+          <Upload className="w-4 h-4" />
+          Bulk Import
+        </a>
         <a
           href="/admin/sources/new"
           className="inline-flex items-center gap-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg px-4 py-2 text-sm font-medium"
