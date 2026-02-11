@@ -69,6 +69,11 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): ParsedArgs {
     all = true;
   }
 
+  // Default to resume when running --all without explicit --force
+  if (all && !force && !resume) {
+    resume = true;
+  }
+
   return { sourceId, all, resume, force };
 }
 

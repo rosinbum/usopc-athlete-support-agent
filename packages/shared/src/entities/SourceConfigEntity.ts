@@ -57,8 +57,8 @@ export interface MarkSuccessOptions {
  * using the OneTable single-table pattern.
  *
  * Table structure:
- * - PK: SOURCE#{id}
- * - SK: CONFIG
+ * - PK: Source#{id}
+ * - SK: SourceConfig
  *
  * GSIs:
  * - ngbId-index: Query sources by NGB
