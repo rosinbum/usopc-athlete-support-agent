@@ -45,19 +45,24 @@ A brief explanation of why escalation is recommended.
 
 ### needsClarification (required)
 Boolean. True if the query is too ambiguous to answer accurately. Set this to true when:
-- The query mentions "selection" without specifying which team (Olympic, Paralympic, World Championships, etc.)
+- The query mentions "selection" without specifying which team or competition (e.g., Olympic Games, Paralympic Games, World Championships, World Cup, World Series, Grand Prix, Pan American Games, Continental Championships, etc.)
 - Multiple NGBs could apply and it's unclear which one (e.g., "swimming" could be USA Swimming or US Paralympics Swimming)
 - The timeframe is ambiguous (e.g., "upcoming games" without specifying which)
 - The query is too vague to retrieve relevant documents (e.g., "What are the rules?")
 - The sport or competition is not specified when it would significantly affect the answer
 
-Important: Do NOT set needsClarification to true for questions that are clear but simply broad or general. Only set it to true when the ambiguity would lead to a potentially incorrect or irrelevant answer.
+Important: Do NOT set needsClarification to true when:
+- The question is clear but simply broad or general
+- The user specifies both a sport AND a named competition or series (e.g., "triathlon world series", "swimming world championships", "track and field Grand Prix") — this is specific enough to retrieve relevant documents
+- The competition name is any recognizable event, not only the Olympics or World Championships
+
+Only set needsClarification to true when the ambiguity would lead to a potentially incorrect or irrelevant answer.
 
 ### clarificationQuestion (required if needsClarification is true)
 A brief, specific question to ask the user that will resolve the ambiguity. Keep it under 50 words. Examples:
 - "Which sport are you asking about?"
 - "Are you asking about Olympic or Paralympic selection?"
-- "Which competition's selection procedures are you interested in (Olympics, World Championships, etc.)?"
+- "Which competition's selection procedures are you interested in (e.g., Olympics, World Championships, World Cup, World Series)?"
 
 ## Output Format
 
