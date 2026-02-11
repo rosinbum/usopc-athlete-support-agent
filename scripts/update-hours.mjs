@@ -62,7 +62,7 @@ function updateReadme(readme, replacement) {
 
   const before = readme.slice(0, startIdx + start.length);
   const after = readme.slice(endIdx);
-  return `${before}\n${replacement}\n${after}`;
+  return `${before}\n\n${replacement}\n${after}`;
 }
 
 function main() {
