@@ -43,9 +43,15 @@ All ingestion scripts require SST context (secrets and resources).
 ```bash
 pnpm ingest                        # Run document ingestion
 pnpm ingest -- --source <id>       # Ingest single source
-pnpm seed                          # Seed Postgres database
+pnpm seed                          # Full local setup (PG + DynamoDB + optional ingest)
+pnpm seed -- --skip-ingest         # PG + DynamoDB only (skip document ingestion)
+pnpm seed -- --force               # Overwrite existing DynamoDB items + re-ingest all
+pnpm seed -- --dry-run             # Preview DynamoDB changes, skip ingestion
+pnpm seed:pg                       # Seed Postgres only (schema + ingestion)
+pnpm seed:pg -- --init-only        # Postgres schema init only
 pnpm seed:dynamodb                 # Seed DynamoDB source configs from JSON
-pnpm seed:dynamodb -- --dry-run    # Preview migration
+pnpm seed:dynamodb -- --dry-run    # Preview DynamoDB changes
+pnpm seed:dynamodb -- --force      # Overwrite existing DynamoDB items
 ```
 
 ## Source Management

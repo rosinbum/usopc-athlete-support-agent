@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "ingest": "sst shell -- tsx src/scripts/ingest.ts",
-    "seed": "tsx src/scripts/seed-db.ts",
+    "seed": "sst shell -- tsx src/scripts/seed.ts",
+    "seed:pg": "sst shell -- tsx src/scripts/seed-db.ts",
     "seed:dynamodb": "sst shell -- tsx src/scripts/seed-dynamodb.ts",
     "sources": "sst shell -- tsx src/scripts/sources-cli.ts",
     "clean": "rm -rf dist"

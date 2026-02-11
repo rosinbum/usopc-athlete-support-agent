@@ -50,7 +50,7 @@ interface SourceFile {
 // CLI argument parsing
 // ---------------------------------------------------------------------------
 
-interface CliOptions {
+export interface CliOptions {
   dryRun: boolean;
   force: boolean;
 }
@@ -113,7 +113,7 @@ async function loadSourcesFromJson(): Promise<CreateSourceInput[]> {
   return allSources;
 }
 
-async function seedSourceConfigs(options: CliOptions): Promise<void> {
+export async function seedSourceConfigs(options: CliOptions): Promise<void> {
   const sources = await loadSourcesFromJson();
   logger.info(`Loaded ${sources.length} source(s) from JSON files`);
 
@@ -188,7 +188,7 @@ async function loadSportOrgsFromJson(): Promise<SportOrganization[]> {
   return JSON.parse(raw) as SportOrganization[];
 }
 
-async function seedSportOrgs(options: CliOptions): Promise<void> {
+export async function seedSportOrgs(options: CliOptions): Promise<void> {
   const orgs = await loadSportOrgsFromJson();
   logger.info(`Loaded ${orgs.length} sport organization(s) from JSON`);
 
@@ -272,9 +272,16 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  logger.error(
-    `Fatal error: ${error instanceof Error ? error.message : String(error)}`,
-  );
-  process.exit(1);
-});
+// Only run main() when executed directly (not when imported by tests or orchestrator)
+const isDirectExecution =
+  typeof process.env.VITEST === "undefined" &&
+  typeof process.env.NODE_TEST === "undefined";
+
+if (isDirectExecution) {
+  main().catch((error) => {
+    logger.error(
+      `Fatal error: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exit(1);
+  });
+}
