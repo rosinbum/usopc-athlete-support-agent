@@ -1,64 +1,54 @@
-import { readFile } from "node:fs/promises";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import type { SportOrgEntity } from "@usopc/shared";
 import type { SportOrganization } from "../types/sport-org.js";
 
 /**
- * Resolves the path to the sport-organizations.json data file.
- * Looks in the project root data/ directory.
+ * In-memory cache for loaded sport organizations with TTL.
  */
-function getDataFilePath(): string {
-  // Navigate from packages/core/src/knowledge/ up to the project root
-  const currentDir = dirname(fileURLToPath(import.meta.url));
-  return join(
-    currentDir,
-    "..",
-    "..",
-    "..",
-    "..",
-    "data",
-    "sport-organizations.json",
-  );
+let cachedOrgs: SportOrganization[] = [];
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+let entityRef: SportOrgEntity | null = null;
+
+/**
+ * Initialize the sport org registry with a DynamoDB entity reference.
+ * Must be called before loadSportOrganizations().
+ */
+export function initSportOrgRegistry(entity: SportOrgEntity): void {
+  entityRef = entity;
+  cachedOrgs = [];
+  cacheTimestamp = 0;
 }
 
 /**
- * In-memory cache for loaded sport organizations.
- */
-let cachedOrganizations: SportOrganization[] | null = null;
-
-/**
- * Loads sport organizations from the data/sport-organizations.json file.
- * Results are cached in memory after the first load.
+ * Loads sport organizations from DynamoDB via the SportOrgEntity.
+ * Results are cached in memory with a 5-minute TTL.
  *
  * @returns Array of SportOrganization objects
- * @throws Error if the data file cannot be read or parsed
+ * @throws Error if the registry has not been initialized
  */
 export async function loadSportOrganizations(): Promise<SportOrganization[]> {
-  if (cachedOrganizations) {
-    return cachedOrganizations;
+  const now = Date.now();
+  if (cachedOrgs.length > 0 && now - cacheTimestamp < CACHE_TTL_MS) {
+    return cachedOrgs;
   }
-
-  const filePath = getDataFilePath();
-
-  try {
-    const raw = await readFile(filePath, "utf-8");
-    const data = JSON.parse(raw) as SportOrganization[];
-    cachedOrganizations = data;
-    return data;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+  if (!entityRef) {
     throw new Error(
-      `Failed to load sport organizations from ${filePath}: ${message}`,
+      "SportOrgRegistry not initialized. Call initSportOrgRegistry() first.",
     );
   }
+  cachedOrgs = await entityRef.getAll();
+  cacheTimestamp = now;
+  return cachedOrgs;
 }
 
 /**
  * Clears the in-memory cache, forcing a reload on next access.
- * Useful for testing or when the data file is updated.
+ * Useful for testing or when the data is updated.
  */
 export function clearSportOrgCache(): void {
-  cachedOrganizations = null;
+  cachedOrgs = [];
+  cacheTimestamp = 0;
 }
 
 /**
@@ -89,7 +79,7 @@ function normalize(s: string): string {
  * @returns The best matching SportOrganization, or undefined
  */
 export function findSportOrg(query: string): SportOrganization | undefined {
-  if (!cachedOrganizations || cachedOrganizations.length === 0) {
+  if (cachedOrgs.length === 0) {
     return undefined;
   }
 
@@ -100,32 +90,32 @@ export function findSportOrg(query: string): SportOrganization | undefined {
   }
 
   // Priority 1: Exact ID match
-  const idMatch = cachedOrganizations.find(
+  const idMatch = cachedOrgs.find(
     (org) => org.id.toLowerCase() === normalizedQuery.replace(/\s+/g, "_"),
   );
   if (idMatch) return idMatch;
 
   // Priority 2: Exact abbreviation match
-  const abbrevMatch = cachedOrganizations.find(
+  const abbrevMatch = cachedOrgs.find(
     (org) =>
       org.abbreviation && normalize(org.abbreviation) === normalizedQuery,
   );
   if (abbrevMatch) return abbrevMatch;
 
   // Priority 3: Official name contains query
-  const nameMatch = cachedOrganizations.find((org) =>
+  const nameMatch = cachedOrgs.find((org) =>
     normalize(org.officialName).includes(normalizedQuery),
   );
   if (nameMatch) return nameMatch;
 
   // Priority 4: Query contains official name
-  const reverseNameMatch = cachedOrganizations.find((org) =>
+  const reverseNameMatch = cachedOrgs.find((org) =>
     normalizedQuery.includes(normalize(org.officialName)),
   );
   if (reverseNameMatch) return reverseNameMatch;
 
   // Priority 5: Any alias matches
-  const aliasMatch = cachedOrganizations.find((org) =>
+  const aliasMatch = cachedOrgs.find((org) =>
     org.aliases.some(
       (alias) =>
         normalize(alias).includes(normalizedQuery) ||
@@ -135,7 +125,7 @@ export function findSportOrg(query: string): SportOrganization | undefined {
   if (aliasMatch) return aliasMatch;
 
   // Priority 6: Any sport matches
-  const sportMatch = cachedOrganizations.find((org) =>
+  const sportMatch = cachedOrgs.find((org) =>
     org.sports.some(
       (sport) =>
         normalize(sport).includes(normalizedQuery) ||
@@ -145,7 +135,7 @@ export function findSportOrg(query: string): SportOrganization | undefined {
   if (sportMatch) return sportMatch;
 
   // Priority 7: Any keyword matches
-  const keywordMatch = cachedOrganizations.find((org) =>
+  const keywordMatch = cachedOrgs.find((org) =>
     org.keywords.some(
       (keyword) =>
         normalize(keyword).includes(normalizedQuery) ||
@@ -165,7 +155,7 @@ export function findSportOrg(query: string): SportOrganization | undefined {
  * @returns Array of matching SportOrganization objects
  */
 export function searchSportOrgs(query: string): SportOrganization[] {
-  if (!cachedOrganizations || cachedOrganizations.length === 0) {
+  if (cachedOrgs.length === 0) {
     return [];
   }
 
@@ -175,7 +165,7 @@ export function searchSportOrgs(query: string): SportOrganization[] {
     return [];
   }
 
-  return cachedOrganizations.filter((org) => {
+  return cachedOrgs.filter((org) => {
     const fields = [
       org.id,
       org.officialName,

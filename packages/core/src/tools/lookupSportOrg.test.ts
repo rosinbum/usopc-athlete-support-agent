@@ -1,65 +1,70 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { SportOrganization } from "../types/index.js";
 
-const { mockOrganizations, mockReadFile } = vi.hoisted(() => {
-  const mockOrganizations = [
-    {
-      officialName: "USA Swimming",
-      abbreviation: "USAS",
-      type: "ngb",
-      sports: ["Swimming", "Open Water Swimming"],
-      olympicProgram: "summer",
-      paralympicManaged: false,
-      websiteUrl: "https://www.usaswimming.org",
-      bylawsUrl: "https://www.usaswimming.org/bylaws",
-      selectionProceduresUrl: "https://www.usaswimming.org/selection",
-      internationalFederation: "World Aquatics",
-      status: "active",
-      effectiveDate: "2024-01-01",
-      aliases: ["US Swimming", "USA-S"],
-      keywords: ["pool", "freestyle", "backstroke"],
-    },
-    {
-      officialName: "USA Track & Field",
-      abbreviation: "USATF",
-      type: "ngb",
-      sports: ["Track and Field", "Cross Country", "Race Walking"],
-      olympicProgram: "summer",
-      paralympicManaged: false,
-      websiteUrl: "https://www.usatf.org",
-      bylawsUrl: null,
-      selectionProceduresUrl: null,
-      internationalFederation: "World Athletics",
-      status: "active",
-      effectiveDate: "2024-01-01",
-      aliases: ["USATF", "US Track"],
-      keywords: ["running", "sprinting", "marathon"],
-    },
-    {
-      officialName: "US Ski & Snowboard",
-      abbreviation: "USSS",
-      type: "ngb",
-      sports: ["Alpine Skiing", "Freestyle Skiing", "Snowboarding"],
-      olympicProgram: "winter",
-      paralympicManaged: true,
-      websiteUrl: "https://usskiandsnowboard.org",
-      bylawsUrl: null,
-      selectionProceduresUrl: null,
-      internationalFederation: "FIS",
-      status: "active",
-      effectiveDate: "2024-01-01",
-      aliases: ["USSA"],
-      keywords: ["ski", "snow", "alpine"],
-    },
-  ];
-  return {
-    mockOrganizations,
-    mockReadFile: vi.fn().mockResolvedValue(JSON.stringify(mockOrganizations)),
-  };
-});
+const mockOrganizations: SportOrganization[] = [
+  {
+    id: "usa-swimming",
+    officialName: "USA Swimming",
+    abbreviation: "USAS",
+    type: "ngb",
+    sports: ["Swimming", "Open Water Swimming"],
+    olympicProgram: "summer",
+    paralympicManaged: false,
+    websiteUrl: "https://www.usaswimming.org",
+    bylawsUrl: "https://www.usaswimming.org/bylaws",
+    selectionProceduresUrl: "https://www.usaswimming.org/selection",
+    internationalFederation: "World Aquatics",
+    status: "active",
+    effectiveDate: "2024-01-01",
+    aliases: ["US Swimming", "USA-S"],
+    keywords: ["pool", "freestyle", "backstroke"],
+  },
+  {
+    id: "usatf",
+    officialName: "USA Track & Field",
+    abbreviation: "USATF",
+    type: "ngb",
+    sports: ["Track and Field", "Cross Country", "Race Walking"],
+    olympicProgram: "summer",
+    paralympicManaged: false,
+    websiteUrl: "https://www.usatf.org",
+    bylawsUrl: undefined,
+    selectionProceduresUrl: undefined,
+    internationalFederation: "World Athletics",
+    status: "active",
+    effectiveDate: "2024-01-01",
+    aliases: ["USATF", "US Track"],
+    keywords: ["running", "sprinting", "marathon"],
+  },
+  {
+    id: "usss",
+    officialName: "US Ski & Snowboard",
+    abbreviation: "USSS",
+    type: "ngb",
+    sports: ["Alpine Skiing", "Freestyle Skiing", "Snowboarding"],
+    olympicProgram: "winter",
+    paralympicManaged: true,
+    websiteUrl: "https://usskiandsnowboard.org",
+    bylawsUrl: undefined,
+    selectionProceduresUrl: undefined,
+    internationalFederation: "FIS",
+    status: "active",
+    effectiveDate: "2024-01-01",
+    aliases: ["USSA"],
+    keywords: ["ski", "snow", "alpine"],
+  },
+];
 
-vi.mock("node:fs/promises", () => ({
-  readFile: mockReadFile,
-}));
+const mockGetAll = vi.fn().mockResolvedValue(mockOrganizations);
+
+const mockEntity = {
+  getAll: mockGetAll,
+  getById: vi.fn(),
+  search: vi.fn(),
+  create: vi.fn(),
+  update: vi.fn(),
+  delete: vi.fn(),
+};
 
 import { createLookupSportOrgTool } from "./lookupSportOrg.js";
 
@@ -68,7 +73,8 @@ describe("createLookupSportOrgTool", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    tool = createLookupSportOrgTool();
+    mockGetAll.mockResolvedValue(mockOrganizations);
+    tool = createLookupSportOrgTool(mockEntity as never);
   });
 
   describe("tool metadata", () => {
@@ -199,15 +205,11 @@ describe("createLookupSportOrgTool", () => {
   });
 
   describe("error handling", () => {
-    it("should handle file read errors gracefully", async () => {
-      const { readFile } = await import("node:fs/promises");
-      vi.mocked(readFile).mockRejectedValueOnce(new Error("File not found"));
-
-      // Need to clear cached orgs - create new tool after cache is potentially populated
-      const newTool = createLookupSportOrgTool();
-      const result = await newTool.invoke({ query: "USAS" });
-      // The first successful call cached the data, so this still works
-      expect(result).toContain("USA Swimming");
+    it("should handle entity errors gracefully", async () => {
+      mockGetAll.mockRejectedValueOnce(new Error("DynamoDB error"));
+      const result = await tool.invoke({ query: "USAS" });
+      expect(result).toContain("Sport organization lookup failed");
+      expect(result).toContain("DynamoDB error");
     });
   });
 

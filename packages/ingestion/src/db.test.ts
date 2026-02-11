@@ -1,69 +1,82 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Pool } from "pg";
 import { getLastContentHash, upsertIngestionStatus } from "./db.js";
+import type { IngestionLogEntity } from "./entities/index.js";
 
-function createMockPool() {
-  return { query: vi.fn() } as unknown as Pool & {
-    query: ReturnType<typeof vi.fn>;
+function createMockEntity() {
+  return {
+    create: vi.fn(),
+    getForSource: vi.fn(),
+    getRecent: vi.fn(),
+    updateStatus: vi.fn(),
+    getLastContentHash: vi.fn(),
+  } as unknown as IngestionLogEntity & {
+    create: ReturnType<typeof vi.fn>;
+    getForSource: ReturnType<typeof vi.fn>;
+    getRecent: ReturnType<typeof vi.fn>;
+    updateStatus: ReturnType<typeof vi.fn>;
+    getLastContentHash: ReturnType<typeof vi.fn>;
   };
 }
 
 describe("getLastContentHash", () => {
-  let pool: ReturnType<typeof createMockPool>;
+  let entity: ReturnType<typeof createMockEntity>;
 
   beforeEach(() => {
-    pool = createMockPool();
+    entity = createMockEntity();
   });
 
-  it("returns hash when row exists", async () => {
-    pool.query.mockResolvedValueOnce({
-      rows: [{ content_hash: "abc123" }],
-    });
+  it("returns hash when a completed ingestion exists", async () => {
+    entity.getLastContentHash.mockResolvedValueOnce("abc123");
 
-    const result = await getLastContentHash(pool, "source-1");
+    const result = await getLastContentHash(entity, "source-1");
 
     expect(result).toBe("abc123");
-    expect(pool.query).toHaveBeenCalledWith(
-      expect.stringContaining("SELECT content_hash FROM ingestion_status"),
-      ["source-1"],
-    );
+    expect(entity.getLastContentHash).toHaveBeenCalledWith("source-1");
   });
 
-  it("returns null when no rows", async () => {
-    pool.query.mockResolvedValueOnce({ rows: [] });
+  it("returns null when no completed ingestions exist", async () => {
+    entity.getLastContentHash.mockResolvedValueOnce(null);
 
-    const result = await getLastContentHash(pool, "source-1");
+    const result = await getLastContentHash(entity, "source-1");
 
     expect(result).toBeNull();
   });
 });
 
 describe("upsertIngestionStatus", () => {
-  let pool: ReturnType<typeof createMockPool>;
+  let entity: ReturnType<typeof createMockEntity>;
 
   beforeEach(() => {
-    pool = createMockPool();
-    pool.query.mockResolvedValue({ rows: [] });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-01-15T12:00:00.000Z"));
+    entity = createMockEntity();
   });
 
-  it('calls INSERT with correct params for "ingesting"', async () => {
+  it('creates a new log with status "in_progress" for "ingesting"', async () => {
+    entity.create.mockResolvedValueOnce({});
+
     await upsertIngestionStatus(
-      pool,
+      entity,
       "src-1",
       "https://example.com",
       "ingesting",
     );
 
-    expect(pool.query).toHaveBeenCalledOnce();
-    expect(pool.query).toHaveBeenCalledWith(
-      expect.stringContaining("INSERT INTO ingestion_status"),
-      ["src-1", "https://example.com", "ingesting"],
-    );
+    expect(entity.create).toHaveBeenCalledWith({
+      sourceId: "src-1",
+      sourceUrl: "https://example.com",
+      status: "in_progress",
+    });
   });
 
-  it('calls UPDATE with contentHash and chunksCount for "completed"', async () => {
+  it('updates latest log to "completed" with fields', async () => {
+    entity.getForSource.mockResolvedValueOnce([
+      { startedAt: "2024-01-15T11:00:00.000Z" },
+    ]);
+    entity.updateStatus.mockResolvedValueOnce(undefined);
+
     await upsertIngestionStatus(
-      pool,
+      entity,
       "src-1",
       "https://example.com",
       "completed",
@@ -73,16 +86,28 @@ describe("upsertIngestionStatus", () => {
       },
     );
 
-    expect(pool.query).toHaveBeenCalledOnce();
-    expect(pool.query).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE ingestion_status"),
-      ["completed", "hash123", 42, "src-1"],
+    expect(entity.getForSource).toHaveBeenCalledWith("src-1", 1);
+    expect(entity.updateStatus).toHaveBeenCalledWith(
+      "src-1",
+      "2024-01-15T11:00:00.000Z",
+      "completed",
+      {
+        contentHash: "hash123",
+        chunksCount: 42,
+        completedAt: "2024-01-15T12:00:00.000Z",
+        errorMessage: undefined,
+      },
     );
   });
 
-  it('calls UPDATE with errorMessage for "failed"', async () => {
+  it('updates latest log to "failed" with error message', async () => {
+    entity.getForSource.mockResolvedValueOnce([
+      { startedAt: "2024-01-15T11:00:00.000Z" },
+    ]);
+    entity.updateStatus.mockResolvedValueOnce(undefined);
+
     await upsertIngestionStatus(
-      pool,
+      entity,
       "src-1",
       "https://example.com",
       "failed",
@@ -91,39 +116,77 @@ describe("upsertIngestionStatus", () => {
       },
     );
 
-    expect(pool.query).toHaveBeenCalledOnce();
-    expect(pool.query).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE ingestion_status"),
-      ["failed", "something broke", "src-1"],
+    expect(entity.updateStatus).toHaveBeenCalledWith(
+      "src-1",
+      "2024-01-15T11:00:00.000Z",
+      "failed",
+      {
+        errorMessage: "something broke",
+        completedAt: "2024-01-15T12:00:00.000Z",
+      },
     );
   });
 
-  it('calls UPDATE with errorMessage for "quota_exceeded"', async () => {
+  it('maps "quota_exceeded" to "failed" with default error message', async () => {
+    entity.getForSource.mockResolvedValueOnce([
+      { startedAt: "2024-01-15T11:00:00.000Z" },
+    ]);
+    entity.updateStatus.mockResolvedValueOnce(undefined);
+
     await upsertIngestionStatus(
-      pool,
+      entity,
       "src-1",
       "https://example.com",
       "quota_exceeded",
-      {
-        errorMessage: "quota hit",
-      },
     );
 
-    expect(pool.query).toHaveBeenCalledOnce();
-    expect(pool.query).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE ingestion_status"),
-      ["quota_exceeded", "quota hit", "src-1"],
+    expect(entity.updateStatus).toHaveBeenCalledWith(
+      "src-1",
+      "2024-01-15T11:00:00.000Z",
+      "failed",
+      {
+        completedAt: "2024-01-15T12:00:00.000Z",
+        errorMessage: "Quota exceeded",
+      },
     );
   });
 
-  it("does not execute any query for unknown status", async () => {
+  it('maps "quota_exceeded" with custom error message', async () => {
+    entity.getForSource.mockResolvedValueOnce([
+      { startedAt: "2024-01-15T11:00:00.000Z" },
+    ]);
+    entity.updateStatus.mockResolvedValueOnce(undefined);
+
     await upsertIngestionStatus(
-      pool,
+      entity,
       "src-1",
       "https://example.com",
-      "unknown_status",
+      "quota_exceeded",
+      { errorMessage: "quota hit" },
     );
 
-    expect(pool.query).not.toHaveBeenCalled();
+    expect(entity.updateStatus).toHaveBeenCalledWith(
+      "src-1",
+      "2024-01-15T11:00:00.000Z",
+      "failed",
+      {
+        completedAt: "2024-01-15T12:00:00.000Z",
+        errorMessage: "quota hit",
+      },
+    );
+  });
+
+  it("does nothing when no existing log found for update status", async () => {
+    entity.getForSource.mockResolvedValueOnce([]);
+
+    await upsertIngestionStatus(
+      entity,
+      "src-1",
+      "https://example.com",
+      "completed",
+      { contentHash: "hash123" },
+    );
+
+    expect(entity.updateStatus).not.toHaveBeenCalled();
   });
 });

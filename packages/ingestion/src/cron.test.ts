@@ -34,14 +34,6 @@ vi.mock("sst", () => ({
   },
 }));
 
-const mockPoolEnd = vi.fn();
-vi.mock("pg", () => ({
-  Pool: vi.fn(() => ({
-    query: vi.fn(),
-    end: mockPoolEnd,
-  })),
-}));
-
 const { mockLoggerInstance } = vi.hoisted(() => ({
   mockLoggerInstance: {
     info: vi.fn(),
@@ -52,7 +44,6 @@ const { mockLoggerInstance } = vi.hoisted(() => ({
   },
 }));
 vi.mock("@usopc/shared", () => ({
-  getDatabaseUrl: () => "postgresql://localhost/test",
   isProduction: () => false, // Always use JSON files in tests
   createLogger: () => mockLoggerInstance,
 }));
@@ -68,12 +59,24 @@ const mockGetById = vi.fn();
 const mockGetAllEnabled = vi.fn();
 const mockMarkFailure = vi.fn();
 const mockMarkSuccess = vi.fn();
+const mockIngestionCreate = vi.fn();
+const mockIngestionGetForSource = vi.fn();
+const mockIngestionUpdateStatus = vi.fn();
+const mockIngestionGetLastContentHash = vi.fn();
 vi.mock("./entities/index.js", () => ({
   createSourceConfigEntity: vi.fn(() => ({
     getById: (...args: unknown[]) => mockGetById(...args),
     getAllEnabled: (...args: unknown[]) => mockGetAllEnabled(...args),
     markFailure: (...args: unknown[]) => mockMarkFailure(...args),
     markSuccess: (...args: unknown[]) => mockMarkSuccess(...args),
+  })),
+  createIngestionLogEntity: vi.fn(() => ({
+    create: (...args: unknown[]) => mockIngestionCreate(...args),
+    getForSource: (...args: unknown[]) => mockIngestionGetForSource(...args),
+    updateStatus: (...args: unknown[]) => mockIngestionUpdateStatus(...args),
+    getLastContentHash: (...args: unknown[]) =>
+      mockIngestionGetLastContentHash(...args),
+    getRecent: vi.fn(),
   })),
 }));
 
@@ -119,7 +122,6 @@ describe("cron handler", () => {
     process.env.SOURCES_DIR = "/fake/sources";
     delete process.env.USE_DYNAMODB; // Ensure we use JSON files
 
-    mockPoolEnd.mockResolvedValue(undefined);
     mockUpsertIngestionStatus.mockResolvedValue(undefined);
     mockSend.mockResolvedValue({});
 
@@ -141,8 +143,9 @@ describe("cron handler", () => {
     }
   });
 
-  it("enqueues changed source when hash differs from DB", async () => {
-    mockGetLastContentHash.mockResolvedValueOnce("old-hash");
+  it("enqueues new source when no prior ingestion exists", async () => {
+    // No prior ingestion — getLastContentHash returns null
+    mockGetLastContentHash.mockResolvedValueOnce(null);
 
     await handler();
 
@@ -164,9 +167,9 @@ describe("cron handler", () => {
     );
   });
 
-  it("skips unchanged source when hash matches DB", async () => {
-    const expectedHash = hashContent("fetched content");
-    mockGetLastContentHash.mockResolvedValueOnce(expectedHash);
+  it("skips source when it has already been ingested (any hash)", async () => {
+    // Prior ingestion exists — getLastContentHash returns a hash
+    mockGetLastContentHash.mockResolvedValueOnce("old-hash");
 
     await handler();
 
@@ -174,26 +177,26 @@ describe("cron handler", () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
-  it("handles mix of changed and unchanged sources", async () => {
+  it("handles mix of new and already-ingested sources", async () => {
     const config = {
       ngbId: "ngb-1",
       sources: [
         {
-          id: "src-changed",
-          title: "Changed",
+          id: "src-new",
+          title: "New",
           documentType: "policy",
           topicDomains: ["t"],
-          url: "https://example.com/changed.pdf",
+          url: "https://example.com/new.pdf",
           format: "pdf",
           priority: "medium",
           description: "d",
         },
         {
-          id: "src-same",
-          title: "Same",
+          id: "src-existing",
+          title: "Existing",
           documentType: "policy",
           topicDomains: ["t"],
-          url: "https://example.com/same.pdf",
+          url: "https://example.com/existing.pdf",
           format: "pdf",
           priority: "medium",
           description: "d",
@@ -202,33 +205,32 @@ describe("cron handler", () => {
     };
     mockReadFile.mockResolvedValue(JSON.stringify(config));
 
-    // "changed" has different hash, "same" has matching hash
-    const expectedHash = hashContent("fetched content");
+    // "new" has no prior ingestion, "existing" has a hash
     mockGetLastContentHash
-      .mockResolvedValueOnce("old-hash") // src-changed → different
-      .mockResolvedValueOnce(expectedHash); // src-same → same
+      .mockResolvedValueOnce(null) // src-new -> no prior ingestion
+      .mockResolvedValueOnce("existing-hash"); // src-existing -> already ingested
 
     await handler();
 
-    // Only one source should be enqueued
+    // Only the new source should be enqueued
     expect(mockSend).toHaveBeenCalledOnce();
     expect(mockUpsertIngestionStatus).toHaveBeenCalledTimes(1);
     expect(mockUpsertIngestionStatus).toHaveBeenCalledWith(
       expect.anything(),
-      "src-changed",
-      "https://example.com/changed.pdf",
+      "src-new",
+      "https://example.com/new.pdf",
       "ingesting",
     );
   });
 
   it("marks failure and continues when fetch throws", async () => {
+    // No prior ingestion so it will attempt fetch
+    mockGetLastContentHash.mockResolvedValueOnce(null);
     mockFetchWithRetry.mockRejectedValueOnce(new Error("network error"));
-    mockGetLastContentHash.mockResolvedValueOnce("any-old-hash");
 
     await handler();
 
     // When fetch fails, source should be marked as failed (not enqueued)
-    // The handler now continues to the next source instead of forcing re-ingestion
     expect(mockSend).not.toHaveBeenCalled();
   });
 
@@ -260,15 +262,15 @@ describe("cron handler", () => {
     };
     mockReadFile.mockResolvedValue(JSON.stringify(config));
 
-    // First source: getLastContentHash succeeds but upsertIngestionStatus throws
+    // Both are new sources (no prior ingestion)
     mockGetLastContentHash
-      .mockResolvedValueOnce("old-hash-1")
-      .mockResolvedValueOnce("old-hash-2");
+      .mockResolvedValueOnce(null) // src-fail
+      .mockResolvedValueOnce(null); // src-ok
 
     mockUpsertIngestionStatus
       .mockRejectedValueOnce(new Error("db error")) // src-fail ingesting call fails
-      .mockResolvedValueOnce(undefined) // src-ok ingesting call
-      .mockResolvedValueOnce(undefined); // src-fail "failed" status (from catch)
+      .mockResolvedValueOnce(undefined) // src-fail "failed" status (from catch)
+      .mockResolvedValueOnce(undefined); // src-ok ingesting call
 
     await handler();
 
@@ -276,23 +278,9 @@ describe("cron handler", () => {
     expect(mockSend).toHaveBeenCalled();
   });
 
-  it("always calls pool.end()", async () => {
-    mockGetLastContentHash.mockResolvedValueOnce("old-hash");
-
-    await handler();
-
-    expect(mockPoolEnd).toHaveBeenCalledOnce();
-  });
-
-  it("calls pool.end() even when loadSourceConfigs throws", async () => {
-    mockReaddir.mockRejectedValueOnce(new Error("ENOENT"));
-
-    await expect(handler()).rejects.toThrow("ENOENT");
-
-    expect(mockPoolEnd).toHaveBeenCalledOnce();
-  });
-
   it("logs alert when all sources fail", async () => {
+    // No prior ingestion so it will attempt fetch
+    mockGetLastContentHash.mockResolvedValueOnce(null);
     // Make fetch fail for every source
     mockFetchWithRetry.mockRejectedValue(new Error("network error"));
 
@@ -304,7 +292,8 @@ describe("cron handler", () => {
   });
 
   it("does not log alert during normal operation", async () => {
-    mockGetLastContentHash.mockResolvedValueOnce("old-hash");
+    // New source, successful fetch and enqueue
+    mockGetLastContentHash.mockResolvedValueOnce(null);
 
     await handler();
 
@@ -326,7 +315,6 @@ describe("cron handler (DynamoDB mode)", () => {
     process.env.SOURCES_DIR = "/fake/sources";
     process.env.USE_DYNAMODB = "true";
 
-    mockPoolEnd.mockResolvedValue(undefined);
     mockUpsertIngestionStatus.mockResolvedValue(undefined);
     mockSend.mockResolvedValue({});
     mockMarkFailure.mockResolvedValue(undefined);
@@ -399,10 +387,10 @@ describe("cron handler (DynamoDB mode)", () => {
         consecutiveFailures: 3,
         lastContentHash: null,
       })
-      // Second getById for src-ok (failure check) returns healthy config
+      // Second getById for src-ok returns healthy new config (no lastIngestedAt)
       .mockResolvedValueOnce({
         consecutiveFailures: 0,
-        lastContentHash: "old-hash",
+        lastIngestedAt: null,
       });
 
     await handler();

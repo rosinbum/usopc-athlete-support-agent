@@ -1,45 +1,20 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../trpc.js";
-import { readFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { Resource } from "sst";
+import {
+  createAppTable,
+  SportOrgEntity,
+  type SportOrganization,
+} from "@usopc/shared";
 
-export interface SportOrganization {
-  id: string;
-  type: "ngb" | "usopc_managed";
-  officialName: string;
-  abbreviation: string | null;
-  sports: string[];
-  olympicProgram: "summer" | "winter" | "pan_american";
-  paralympicManaged: boolean;
-  websiteUrl: string | null;
-  bylawsUrl: string | null;
-  selectionProceduresUrl: string | null;
-  internationalFederation: string | null;
-  aliases: string[];
-  keywords: string[];
-  status: "active" | "decertified";
-  effectiveDate: string;
+function getEntity(): SportOrgEntity {
+  const tableName = (Resource as unknown as { AppTable: { name: string } })
+    .AppTable.name;
+  const table = createAppTable(tableName);
+  return new SportOrgEntity(table);
 }
 
-function loadSportOrgs(): SportOrganization[] {
-  const possiblePaths = [
-    join(process.cwd(), "data", "sport-organizations.json"),
-    join(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../../../data/sport-organizations.json",
-    ),
-  ];
-
-  for (const p of possiblePaths) {
-    try {
-      return JSON.parse(readFileSync(p, "utf-8")) as SportOrganization[];
-    } catch {
-      continue;
-    }
-  }
-  return [];
-}
+export { type SportOrganization };
 
 export const ngbsRouter = router({
   list: publicProcedure
@@ -55,7 +30,8 @@ export const ngbsRouter = router({
         .optional(),
     )
     .query(async ({ input }) => {
-      let orgs = loadSportOrgs();
+      const entity = getEntity();
+      let orgs = await entity.getAll();
       const filters = input ?? { type: "all", status: "active" };
 
       if (filters.type !== "all") {
@@ -74,23 +50,16 @@ export const ngbsRouter = router({
   getById: publicProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
-      const orgs = loadSportOrgs();
-      const org = orgs.find((o) => o.id === input.id);
+      const entity = getEntity();
+      const org = await entity.getById(input.id);
       return { organization: org ?? null };
     }),
 
   search: publicProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
-      const orgs = loadSportOrgs();
-      const q = input.query.toLowerCase();
-      const matches = orgs.filter(
-        (o) =>
-          o.officialName.toLowerCase().includes(q) ||
-          o.abbreviation?.toLowerCase().includes(q) ||
-          o.sports.some((s) => s.toLowerCase().includes(q)) ||
-          o.aliases.some((a) => a.toLowerCase().includes(q)),
-      );
+      const entity = getEntity();
+      const matches = await entity.search(input.query);
       return { organizations: matches };
     }),
 });

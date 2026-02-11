@@ -36,11 +36,15 @@ const embeddingsCircuit = new CircuitBreaker({
 export class ProtectedOpenAIEmbeddings {
   private readonly embeddings: OpenAIEmbeddings;
 
-  constructor(apiKey?: string) {
+  constructor(
+    apiKey?: string,
+    embeddingsConfig?: { model: string; dimensions: number },
+  ) {
+    const config = embeddingsConfig ?? MODEL_CONFIG.embeddings;
     this.embeddings = new OpenAIEmbeddings({
       openAIApiKey: apiKey ?? process.env.OPENAI_API_KEY,
-      modelName: MODEL_CONFIG.embeddings.model,
-      dimensions: MODEL_CONFIG.embeddings.dimensions,
+      modelName: config.model,
+      dimensions: config.dimensions,
     });
   }
 
@@ -83,8 +87,9 @@ export class ProtectedOpenAIEmbeddings {
  */
 export function createProtectedEmbeddings(
   apiKey?: string,
+  embeddingsConfig?: { model: string; dimensions: number },
 ): ProtectedOpenAIEmbeddings {
-  return new ProtectedOpenAIEmbeddings(apiKey);
+  return new ProtectedOpenAIEmbeddings(apiKey, embeddingsConfig);
 }
 
 /**

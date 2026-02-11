@@ -1,9 +1,5 @@
-import { ChatAnthropic } from "@langchain/anthropic";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger } from "@usopc/shared";
-import { MODEL_CONFIG } from "../../config/index.js";
 import {
-  SYSTEM_PROMPT,
   getEscalationTargets,
   buildEscalation,
   type EscalationTarget,

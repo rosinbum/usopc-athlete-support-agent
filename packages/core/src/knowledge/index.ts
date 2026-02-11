@@ -10,6 +10,7 @@ export {
   getDeadlineById,
 } from "./deadlines.js";
 export {
+  initSportOrgRegistry,
   loadSportOrganizations,
   clearSportOrgCache,
   findSportOrg,

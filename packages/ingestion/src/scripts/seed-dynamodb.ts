@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 /**
- * Migrate source configurations from JSON files to DynamoDB.
+ * Seed DynamoDB with source configurations and sport organizations from JSON.
  *
  * Usage:
- *   pnpm seed:dynamodb              # Migrate JSON → DynamoDB
+ *   pnpm seed:dynamodb              # Seed JSON -> DynamoDB
  *   pnpm seed:dynamodb --dry-run    # Preview only (no writes)
  *   pnpm seed:dynamodb --force      # Overwrite existing items
  *
@@ -12,9 +12,16 @@
 
 import { readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { createLogger, type AuthorityLevel } from "@usopc/shared";
+import {
+  createLogger,
+  type AuthorityLevel,
+  createAppTable,
+  SportOrgEntity,
+  type SportOrganization,
+} from "@usopc/shared";
 import {
   createSourceConfigEntity,
+  getAppTableName,
   type CreateSourceInput,
 } from "../entities/index.js";
 
@@ -40,7 +47,32 @@ interface SourceFile {
 }
 
 // ---------------------------------------------------------------------------
-// Source loading from JSON
+// CLI argument parsing
+// ---------------------------------------------------------------------------
+
+interface CliOptions {
+  dryRun: boolean;
+  force: boolean;
+}
+
+function parseArgs(): CliOptions {
+  const args = process.argv.slice(2);
+  let dryRun = false;
+  let force = false;
+
+  for (const arg of args) {
+    if (arg === "--dry-run") {
+      dryRun = true;
+    } else if (arg === "--force") {
+      force = true;
+    }
+  }
+
+  return { dryRun, force };
+}
+
+// ---------------------------------------------------------------------------
+// Source Config seeding
 // ---------------------------------------------------------------------------
 
 function sourcesDir(): string {
@@ -81,63 +113,24 @@ async function loadSourcesFromJson(): Promise<CreateSourceInput[]> {
   return allSources;
 }
 
-// ---------------------------------------------------------------------------
-// CLI argument parsing
-// ---------------------------------------------------------------------------
-
-interface CliOptions {
-  dryRun: boolean;
-  force: boolean;
-}
-
-function parseArgs(): CliOptions {
-  const args = process.argv.slice(2);
-  let dryRun = false;
-  let force = false;
-
-  for (const arg of args) {
-    if (arg === "--dry-run") {
-      dryRun = true;
-    } else if (arg === "--force") {
-      force = true;
-    }
-  }
-
-  return { dryRun, force };
-}
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
-async function main(): Promise<void> {
-  const { dryRun, force } = parseArgs();
-
-  if (dryRun) {
-    logger.info("DRY RUN: No changes will be written to DynamoDB");
-  }
-
-  // Load sources from JSON
+async function seedSourceConfigs(options: CliOptions): Promise<void> {
   const sources = await loadSourcesFromJson();
   logger.info(`Loaded ${sources.length} source(s) from JSON files`);
 
   if (sources.length === 0) {
-    logger.warn("No sources found. Exiting.");
+    logger.warn("No sources found.");
     return;
   }
 
-  // Preview sources
-  logger.info("Sources to migrate:");
+  logger.info("Sources to seed:");
   for (const src of sources) {
     logger.info(`  - ${src.id}: ${src.title} (${src.format})`);
   }
 
-  if (dryRun) {
-    logger.info("DRY RUN complete. No changes made.");
+  if (options.dryRun) {
     return;
   }
 
-  // Create entity
   const entity = createSourceConfigEntity();
 
   let created = 0;
@@ -147,10 +140,9 @@ async function main(): Promise<void> {
 
   for (const src of sources) {
     try {
-      // Check if item already exists
       const existing = await entity.getById(src.id);
 
-      if (existing && !force) {
+      if (existing && !options.force) {
         logger.info(
           `Skipping ${src.id} (already exists, use --force to overwrite)`,
         );
@@ -158,33 +150,125 @@ async function main(): Promise<void> {
         continue;
       }
 
-      if (existing && force) {
-        // Delete existing and recreate
+      if (existing && options.force) {
         await entity.delete(src.id);
         await entity.create(src);
         logger.info(`Updated ${src.id}`);
         updated++;
       } else {
-        // Create new
         await entity.create(src);
         logger.info(`Created ${src.id}`);
         created++;
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error(`Error migrating ${src.id}: ${message}`);
+      logger.error(`Error seeding source ${src.id}: ${message}`);
       errors++;
     }
   }
 
-  logger.info("Migration complete:");
-  logger.info(`  Created: ${created}`);
-  logger.info(`  Updated: ${updated}`);
-  logger.info(`  Skipped: ${skipped}`);
-  logger.info(`  Errors:  ${errors}`);
+  logger.info(
+    `Source Configs: ${created} created, ${updated} updated, ${skipped} skipped, ${errors} errors`,
+  );
+}
 
-  if (errors > 0) {
-    process.exit(1);
+// ---------------------------------------------------------------------------
+// Sport Organization seeding
+// ---------------------------------------------------------------------------
+
+function sportOrgsPath(): string {
+  return resolve(
+    import.meta.dirname ?? __dirname,
+    "../../../../data/sport-organizations.json",
+  );
+}
+
+async function loadSportOrgsFromJson(): Promise<SportOrganization[]> {
+  const raw = await readFile(sportOrgsPath(), "utf-8");
+  return JSON.parse(raw) as SportOrganization[];
+}
+
+async function seedSportOrgs(options: CliOptions): Promise<void> {
+  const orgs = await loadSportOrgsFromJson();
+  logger.info(`Loaded ${orgs.length} sport organization(s) from JSON`);
+
+  if (orgs.length === 0) {
+    logger.warn("No sport organizations found.");
+    return;
+  }
+
+  if (options.dryRun) {
+    for (const org of orgs) {
+      logger.info(`  [DRY RUN] Would seed: ${org.id} (${org.officialName})`);
+    }
+    return;
+  }
+
+  const table = createAppTable(getAppTableName());
+  const sportOrgEntity = new SportOrgEntity(table);
+
+  let created = 0;
+  let skipped = 0;
+  let updated = 0;
+  let errors = 0;
+
+  for (const org of orgs) {
+    try {
+      const existing = await sportOrgEntity.getById(org.id);
+
+      if (existing && !options.force) {
+        logger.info(
+          `Skipping ${org.id} (already exists, use --force to overwrite)`,
+        );
+        skipped++;
+        continue;
+      }
+
+      if (existing && options.force) {
+        await sportOrgEntity.delete(org.id);
+        await sportOrgEntity.create(org);
+        logger.info(`Updated ${org.id}`);
+        updated++;
+      } else {
+        await sportOrgEntity.create(org);
+        logger.info(`Created ${org.id}`);
+        created++;
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Error seeding sport org ${org.id}: ${msg}`);
+      errors++;
+    }
+  }
+
+  logger.info(
+    `Sport Orgs: ${created} created, ${updated} updated, ${skipped} skipped, ${errors} errors`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+async function main(): Promise<void> {
+  const options = parseArgs();
+
+  if (options.dryRun) {
+    logger.info("DRY RUN: No changes will be written to DynamoDB");
+  }
+
+  // Seed source configurations
+  logger.info("--- Seeding Source Configs ---");
+  await seedSourceConfigs(options);
+
+  // Seed sport organizations
+  logger.info("--- Seeding Sport Organizations ---");
+  await seedSportOrgs(options);
+
+  if (options.dryRun) {
+    logger.info("DRY RUN complete. No changes made.");
+  } else {
+    logger.info("Seeding complete.");
   }
 }
 

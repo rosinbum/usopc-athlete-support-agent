@@ -57,18 +57,21 @@ export default $config({
         "postgresql://postgres:postgres@localhost:5432/usopc_athlete_support";
     }
 
-    // DynamoDB table for source configs (enables dynamic management)
-    const sourceConfigTable = new sst.aws.Dynamo("SourceConfigs", {
+    // DynamoDB single-table for all app entities (OneTable pattern)
+    const appTable = new sst.aws.Dynamo("AppTable", {
       fields: {
         pk: "string",
         sk: "string",
         ngbId: "string",
         enabled: "string",
+        gsi1pk: "string",
+        gsi1sk: "string",
       },
       primaryIndex: { hashKey: "pk", rangeKey: "sk" },
       globalIndexes: {
         "ngbId-index": { hashKey: "ngbId", rangeKey: "pk" },
         "enabled-priority-index": { hashKey: "enabled", rangeKey: "sk" },
+        gsi1: { hashKey: "gsi1pk", rangeKey: "gsi1sk" },
       },
     });
 
@@ -81,7 +84,7 @@ export default $config({
     const api = new sst.aws.ApiGatewayV2("Api");
     api.route("$default", {
       handler: "apps/api/src/lambda.handler",
-      link: [...linkables, conversationMaxTurns],
+      link: [...linkables, conversationMaxTurns, appTable],
       timeout: "120 seconds",
       memory: "512 MB",
       environment: {
@@ -127,7 +130,7 @@ export default $config({
       ingestionQueue.subscribe(
         {
           handler: "packages/ingestion/src/worker.handler",
-          link: [...linkables, database!, sourceConfigTable, documentsBucket],
+          link: [...linkables, database!, appTable, documentsBucket],
           timeout: "15 minutes",
           memory: "1024 MB",
         },
@@ -145,7 +148,7 @@ export default $config({
             ...linkables,
             database!,
             ingestionQueue,
-            sourceConfigTable,
+            appTable,
             documentsBucket,
           ],
           timeout: "5 minutes",
@@ -165,7 +168,7 @@ export default $config({
         gitHubClientId,
         gitHubClientSecret,
         adminEmails,
-        sourceConfigTable,
+        appTable,
         ...(ingestionQueue ? [ingestionQueue] : []),
       ],
       environment: {
@@ -178,7 +181,7 @@ export default $config({
       apiUrl: api.url,
       webUrl: web.url,
       slackUrl: slackApi.url,
-      sourceConfigTableName: sourceConfigTable.name,
+      sourceConfigTableName: appTable.name,
       documentsBucketName: documentsBucket.name,
     };
   },
