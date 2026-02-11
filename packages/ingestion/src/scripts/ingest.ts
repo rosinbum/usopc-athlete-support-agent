@@ -25,7 +25,10 @@ import { ingestSource } from "../pipeline.js";
 import type { IngestionSource } from "../pipeline.js";
 import { createSourceConfigEntity } from "../entities/index.js";
 import { toIngestionSource } from "../cron.js";
-import { fetchWithRetry } from "../loaders/fetchWithRetry.js";
+import {
+  fetchWithRetry,
+  FetchWithRetryError,
+} from "../loaders/fetchWithRetry.js";
 
 const logger = createLogger({ service: "ingestion-cli" });
 
@@ -186,6 +189,30 @@ async function main(): Promise<void> {
               fetchError instanceof Error
                 ? fetchError.message
                 : "Unknown error";
+
+            // Permanent HTTP errors (403, 404, etc.) — skip source entirely
+            if (
+              fetchError instanceof FetchWithRetryError &&
+              fetchError.statusCode &&
+              fetchError.statusCode >= 400 &&
+              fetchError.statusCode < 500
+            ) {
+              logger.warn(`Skipping ${source.id}: ${msg}`);
+              results.push({
+                sourceId: source.id,
+                status: "failed",
+                error: msg,
+                chunksCount: 0,
+              });
+              try {
+                await entity.markFailure(source.id, msg);
+              } catch {
+                /* already logged */
+              }
+              continue;
+            }
+
+            // Transient errors (network, 5xx) — proceed with re-ingestion attempt
             logger.warn(
               `Could not check hash for ${source.id}: ${msg} — will re-ingest`,
             );
@@ -245,11 +272,10 @@ async function main(): Promise<void> {
     );
 
     if (failed.length > 0) {
-      logger.error("Failed sources:");
+      logger.warn("Failed sources:");
       for (const f of failed) {
-        logger.error(`  - ${f.sourceId}: ${f.error}`);
+        logger.warn(`  - ${f.sourceId}: ${f.error}`);
       }
-      process.exit(1);
     }
   }
 
