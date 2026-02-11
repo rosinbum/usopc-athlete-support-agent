@@ -25,14 +25,14 @@ const logger = createLogger({ service: "seed-db" });
 // Helpers
 // ---------------------------------------------------------------------------
 
-function repoRoot(): string {
+export function repoRoot(): string {
   return resolve(import.meta.dirname ?? __dirname, "../../../..");
 }
 
 /**
  * Execute the `init-db.sql` migration to create all tables and indexes.
  */
-async function initDatabase(pool: Pool): Promise<void> {
+export async function initDatabase(pool: Pool): Promise<void> {
   const sqlPath = join(repoRoot(), "scripts", "init-db.sql");
   const sql = await readFile(sqlPath, "utf-8");
   await pool.query(sql);
@@ -60,7 +60,7 @@ function sourcesDir(): string {
   return process.env.SOURCES_DIR ?? join(repoRoot(), "data", "sources");
 }
 
-async function loadAllSources(): Promise<IngestionSource[]> {
+export async function loadAllSources(): Promise<IngestionSource[]> {
   const dir = sourcesDir();
   const files = await readdir(dir);
   const jsonFiles = files.filter((f) => f.endsWith(".json"));
@@ -146,9 +146,16 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  logger.error(
-    `Fatal error: ${error instanceof Error ? error.message : String(error)}`,
-  );
-  process.exit(1);
-});
+// Only run main() when executed directly (not when imported by tests or orchestrator)
+const isDirectExecution =
+  typeof process.env.VITEST === "undefined" &&
+  typeof process.env.NODE_TEST === "undefined";
+
+if (isDirectExecution) {
+  main().catch((error) => {
+    logger.error(
+      `Fatal error: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exit(1);
+  });
+}
