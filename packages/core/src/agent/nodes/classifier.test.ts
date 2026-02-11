@@ -292,6 +292,32 @@ describe("classifierNode", () => {
     expect(result.needsClarification).toBe(false);
   });
 
+  it("does not request clarification when sport and competition are specified", async () => {
+    mockInvoke.mockResolvedValueOnce(
+      classifierResponse({
+        topicDomain: "team_selection",
+        detectedNgbIds: ["usa_triathlon"],
+        queryIntent: "procedural",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+        needsClarification: false,
+      }),
+    );
+
+    const state = makeState({
+      messages: [
+        new HumanMessage(
+          "I'm a triathlete competing in the world series races, how will selection work?",
+        ),
+      ],
+    });
+    const result = await classifierNode(state);
+
+    expect(result.needsClarification).toBe(false);
+    expect(result.topicDomain).toBe("team_selection");
+    expect(result.detectedNgbIds).toEqual(["usa_triathlon"]);
+  });
+
   describe("conversation context", () => {
     it("uses conversation history to resolve follow-up questions", async () => {
       // First exchange about swimming team selection
