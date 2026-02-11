@@ -139,13 +139,39 @@ describe("getDatabaseUrl", () => {
     expect(url).toContain("p%40ss%3Aword%2F123");
   });
 
-  it("throws when neither DATABASE_URL nor SST Resource is available", () => {
+  it("throws when neither DATABASE_URL nor SST Resource is available in production", () => {
     delete process.env.DATABASE_URL;
+    process.env.NODE_ENV = "production";
     // mockResource.Database is not set, so accessing it will throw
 
     expect(() => getDatabaseUrl()).toThrow(
       "DATABASE_URL is not set and SST Database resource is not available",
     );
+  });
+
+  it("returns local dev default when in development mode and no other source", () => {
+    delete process.env.DATABASE_URL;
+    process.env.NODE_ENV = "development";
+
+    expect(getDatabaseUrl()).toBe(
+      "postgresql://postgres:postgres@localhost:5432/usopc_athlete_support",
+    );
+  });
+
+  it("returns local dev default when NODE_ENV is unset and no other source", () => {
+    delete process.env.DATABASE_URL;
+    delete process.env.NODE_ENV;
+
+    expect(getDatabaseUrl()).toBe(
+      "postgresql://postgres:postgres@localhost:5432/usopc_athlete_support",
+    );
+  });
+
+  it("prefers DATABASE_URL over local dev default", () => {
+    process.env.DATABASE_URL = "postgresql://custom:5433/other";
+    process.env.NODE_ENV = "development";
+
+    expect(getDatabaseUrl()).toBe("postgresql://custom:5433/other");
   });
 
   it("prefers DATABASE_URL over SST Resource", () => {

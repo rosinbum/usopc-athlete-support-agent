@@ -27,6 +27,9 @@ export function getOptionalEnv(
   return value;
 }
 
+const LOCAL_DEV_DATABASE_URL =
+  "postgresql://postgres:postgres@localhost:5432/usopc_athlete_support";
+
 /**
  * Returns the database connection URL.
  *
@@ -34,7 +37,8 @@ export function getOptionalEnv(
  *   1. `DATABASE_URL` environment variable (set directly or via .env)
  *   2. SST Resource binding (`Resource.Database` with `host`, `port`,
  *      `username`, `password`, `database` fields).
- *   3. Throws if neither source is available.
+ *   3. In development mode, falls back to the standard local Docker URL.
+ *   4. Throws if neither source is available.
  */
 export function getDatabaseUrl(): string {
   const directUrl = process.env.DATABASE_URL;
@@ -48,6 +52,9 @@ export function getDatabaseUrl(): string {
       .Database;
     return `postgresql://${encodeURIComponent(db.username)}:${encodeURIComponent(db.password)}@${db.host}:${db.port}/${db.database}`;
   } catch {
+    if (isDevelopment()) {
+      return LOCAL_DEV_DATABASE_URL;
+    }
     throw new Error(
       "DATABASE_URL is not set and SST Database resource is not available. " +
         "Provide DATABASE_URL or deploy with SST resource bindings.",
