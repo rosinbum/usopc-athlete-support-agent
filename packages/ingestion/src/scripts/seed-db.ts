@@ -117,11 +117,11 @@ async function main(): Promise<void> {
       return;
     }
 
+    const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
+
     if (clear) {
       await clearDocuments(pool);
     }
-
-    const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
     const sources = await loadAllSources();
     logger.info(`Loaded ${sources.length} source configuration(s)`);
 
