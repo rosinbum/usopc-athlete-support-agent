@@ -1,7 +1,7 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
-import { MODEL_CONFIG } from "../../config/index.js";
+import { getModelConfig } from "../../config/index.js";
 import { SYSTEM_PROMPT, buildSynthesizerPrompt } from "../../prompts/index.js";
 import {
   invokeAnthropic,
@@ -171,10 +171,11 @@ export async function synthesizerNode(
     conversationContext,
   );
 
+  const config = await getModelConfig();
   const model = new ChatAnthropic({
-    model: MODEL_CONFIG.agent.model,
-    temperature: MODEL_CONFIG.agent.temperature,
-    maxTokens: MODEL_CONFIG.agent.maxTokens,
+    model: config.agent.model,
+    temperature: config.agent.temperature,
+    maxTokens: config.agent.maxTokens,
   });
 
   try {

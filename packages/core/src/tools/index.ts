@@ -1,6 +1,7 @@
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import type { Pool } from "pg";
+import type { SportOrgEntity } from "@usopc/shared";
 
 import { createSearchKnowledgeBaseTool } from "./searchKnowledgeBase.js";
 import { createWebSearchTool, type WebSearchToolOptions } from "./webSearch.js";
@@ -30,6 +31,8 @@ export interface ToolDependencies {
   pool: Pool;
   /** Optional Tavily API key. Falls back to TAVILY_API_KEY env var. */
   tavilyApiKey?: string;
+  /** SportOrgEntity instance for DynamoDB sport organization lookups. */
+  sportOrgEntity: SportOrgEntity;
 }
 
 /**
@@ -44,6 +47,7 @@ export interface ToolDependencies {
  *   vectorStore,
  *   pool,
  *   tavilyApiKey: process.env.TAVILY_API_KEY,
+ *   sportOrgEntity,
  * });
  * ```
  */
@@ -51,7 +55,7 @@ export function getAllTools(deps: ToolDependencies): StructuredToolInterface[] {
   return [
     createSearchKnowledgeBaseTool(deps.vectorStore),
     createWebSearchTool({ apiKey: deps.tavilyApiKey }),
-    createLookupSportOrgTool(),
+    createLookupSportOrgTool(deps.sportOrgEntity),
     createCalculateDeadlineTool(),
     createLookupContactTool(),
     createFetchDocumentSectionTool(deps.pool),

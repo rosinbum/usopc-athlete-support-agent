@@ -1,28 +1,27 @@
-import type { Pool } from "pg";
+import type { IngestionLogEntity } from "./entities/index.js";
 
 /**
  * Retrieve the content hash of the last successful ingestion for a source.
  */
 export async function getLastContentHash(
-  pool: Pool,
+  entity: IngestionLogEntity,
   sourceId: string,
 ): Promise<string | null> {
-  const result = await pool.query(
-    `SELECT content_hash FROM ingestion_status
-     WHERE source_id = $1 AND status = 'completed'
-     ORDER BY completed_at DESC LIMIT 1`,
-    [sourceId],
-  );
-  return result.rows[0]?.content_hash ?? null;
+  return entity.getLastContentHash(sourceId);
 }
 
 /**
- * Insert or update an ingestion status row.
+ * Insert or update an ingestion status entry in DynamoDB.
  *
  * Supported statuses: "ingesting", "completed", "failed", "quota_exceeded".
+ * These are mapped to the IngestionLog entity statuses:
+ * - "ingesting" -> create new log with status "in_progress"
+ * - "completed" -> update latest log to "completed"
+ * - "failed" -> update latest log to "failed"
+ * - "quota_exceeded" -> update latest log to "failed" with error message
  */
 export async function upsertIngestionStatus(
-  pool: Pool,
+  entity: IngestionLogEntity,
   sourceId: string,
   sourceUrl: string,
   status: string,
@@ -32,27 +31,34 @@ export async function upsertIngestionStatus(
     errorMessage?: string;
   } = {},
 ): Promise<void> {
+  const now = new Date().toISOString();
+
   if (status === "ingesting") {
-    await pool.query(
-      `INSERT INTO ingestion_status (source_id, source_url, status, started_at)
-       VALUES ($1, $2, $3, NOW())`,
-      [sourceId, sourceUrl, status],
-    );
-  } else if (status === "completed") {
-    await pool.query(
-      `UPDATE ingestion_status
-       SET status = $1, content_hash = $2, chunks_count = $3, completed_at = NOW()
-       WHERE source_id = $4 AND status = 'ingesting'
-       ORDER BY started_at DESC LIMIT 1`,
-      [status, fields.contentHash, fields.chunksCount, sourceId],
-    );
-  } else if (status === "failed" || status === "quota_exceeded") {
-    await pool.query(
-      `UPDATE ingestion_status
-       SET status = $1, error_message = $2, completed_at = NOW()
-       WHERE source_id = $3 AND status = 'ingesting'
-       ORDER BY started_at DESC LIMIT 1`,
-      [status, fields.errorMessage, sourceId],
-    );
+    // Create a new ingestion log entry
+    await entity.create({
+      sourceId,
+      sourceUrl,
+      status: "in_progress",
+    });
+  } else {
+    // Get the most recent log for this source and update it
+    const logs = await entity.getForSource(sourceId, 1);
+    if (logs.length > 0) {
+      const latest = logs[0];
+      const mappedStatus = status === "quota_exceeded" ? "failed" : status;
+      await entity.updateStatus(
+        sourceId,
+        latest.startedAt,
+        mappedStatus as "completed" | "failed",
+        {
+          ...fields,
+          completedAt: now,
+          errorMessage:
+            status === "quota_exceeded"
+              ? (fields.errorMessage ?? "Quota exceeded")
+              : fields.errorMessage,
+        },
+      );
+    }
   }
 }

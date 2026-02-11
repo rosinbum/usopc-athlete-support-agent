@@ -14,7 +14,6 @@
     "@ai-sdk/anthropic": "^1.1.6",
     "@aws-sdk/client-dynamodb": "^3.981.0",
     "@aws-sdk/client-sqs": "^3.981.0",
-    "@aws-sdk/lib-dynamodb": "^3.981.0",
     "@usopc/core": "workspace:*",
     "@usopc/shared": "workspace:*",
     "ai": "^4.1.2",

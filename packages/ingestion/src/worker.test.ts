@@ -40,11 +40,18 @@ vi.mock("sst", () => ({
   },
 }));
 
-const mockPoolEnd = vi.fn();
-vi.mock("pg", () => ({
-  Pool: vi.fn(() => ({
-    query: vi.fn(),
-    end: mockPoolEnd,
+// Mock the entities module (IngestionLogEntity factory)
+const mockCreate = vi.fn();
+const mockGetForSource = vi.fn();
+const mockUpdateStatus = vi.fn();
+const mockGetLastContentHash = vi.fn();
+vi.mock("./entities/index.js", () => ({
+  createIngestionLogEntity: vi.fn(() => ({
+    create: (...args: unknown[]) => mockCreate(...args),
+    getForSource: (...args: unknown[]) => mockGetForSource(...args),
+    updateStatus: (...args: unknown[]) => mockUpdateStatus(...args),
+    getLastContentHash: (...args: unknown[]) => mockGetLastContentHash(...args),
+    getRecent: vi.fn(),
   })),
 }));
 
@@ -122,7 +129,6 @@ const MESSAGE_BODY = {
 describe("worker handler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPoolEnd.mockResolvedValue(undefined);
     mockUpsertIngestionStatus.mockResolvedValue(undefined);
     mockSend.mockResolvedValue({});
   });
@@ -192,49 +198,6 @@ describe("worker handler", () => {
     expect(result).toEqual({
       batchItemFailures: [{ itemIdentifier: "msg-42" }],
     });
-  });
-
-  it("always calls pool.end()", async () => {
-    // Success
-    mockIngestSource.mockResolvedValueOnce({
-      status: "completed",
-      chunksCount: 1,
-      sourceId: "src-1",
-    });
-    await handler(makeSQSEvent(MESSAGE_BODY));
-    expect(mockPoolEnd).toHaveBeenCalledTimes(1);
-
-    vi.clearAllMocks();
-    mockPoolEnd.mockResolvedValue(undefined);
-    mockUpsertIngestionStatus.mockResolvedValue(undefined);
-
-    // Failure
-    mockIngestSource.mockResolvedValueOnce({
-      status: "failed",
-      chunksCount: 0,
-      sourceId: "src-1",
-      error: "err",
-    });
-    await handler(makeSQSEvent(MESSAGE_BODY));
-    expect(mockPoolEnd).toHaveBeenCalledTimes(1);
-
-    vi.clearAllMocks();
-    mockPoolEnd.mockResolvedValue(undefined);
-    mockUpsertIngestionStatus.mockResolvedValue(undefined);
-    mockSend.mockResolvedValue({});
-
-    // Quota error
-    mockIngestSource.mockRejectedValueOnce(new QuotaExhaustedError("quota"));
-    await handler(makeSQSEvent(MESSAGE_BODY));
-    expect(mockPoolEnd).toHaveBeenCalledTimes(1);
-
-    vi.clearAllMocks();
-    mockPoolEnd.mockResolvedValue(undefined);
-
-    // Unexpected error
-    mockIngestSource.mockRejectedValueOnce(new Error("unexpected"));
-    await handler(makeSQSEvent(MESSAGE_BODY));
-    expect(mockPoolEnd).toHaveBeenCalledTimes(1);
   });
 
   it("processes multiple records in a single event", async () => {

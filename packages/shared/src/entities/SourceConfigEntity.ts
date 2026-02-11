@@ -1,14 +1,6 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  DynamoDBDocumentClient,
-  PutCommand,
-  GetCommand,
-  QueryCommand,
-  UpdateCommand,
-  DeleteCommand,
-  ScanCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { Table } from "dynamodb-onetable";
 import { createLogger, type AuthorityLevel } from "../index.js";
+import type { AppTableSchema } from "./schema.js";
 
 const logger = createLogger({ service: "source-config-entity" });
 
@@ -57,21 +49,12 @@ export interface MarkSuccessOptions {
 }
 
 // ---------------------------------------------------------------------------
-// DynamoDB item type (includes pk/sk)
-// ---------------------------------------------------------------------------
-
-interface SourceConfigItem extends Omit<SourceConfig, "enabled"> {
-  pk: string;
-  sk: string;
-  enabled: string; // Stored as string for GSI (DynamoDB requires string keys)
-}
-
-// ---------------------------------------------------------------------------
-// SourceConfigEntity
+// SourceConfigEntity — backed by dynamodb-onetable
 // ---------------------------------------------------------------------------
 
 /**
- * Entity class for managing source configurations in DynamoDB.
+ * Entity class for managing source configurations in DynamoDB
+ * using the OneTable single-table pattern.
  *
  * Table structure:
  * - PK: SOURCE#{id}
@@ -82,57 +65,63 @@ interface SourceConfigItem extends Omit<SourceConfig, "enabled"> {
  * - enabled-priority-index: Query enabled sources
  */
 export class SourceConfigEntity {
-  private client: DynamoDBDocumentClient;
-  private tableName: string;
+  private model;
+  private table: Table<typeof AppTableSchema>;
 
-  constructor(tableName: string, client?: DynamoDBDocumentClient) {
-    this.tableName = tableName;
-    this.client = client ?? DynamoDBDocumentClient.from(new DynamoDBClient({}));
-  }
-
-  // ---------------------------------------------------------------------------
-  // Key generation
-  // ---------------------------------------------------------------------------
-
-  private pk(id: string): string {
-    return `SOURCE#${id}`;
-  }
-
-  private sk(): string {
-    return "CONFIG";
+  constructor(table: Table<typeof AppTableSchema>) {
+    this.table = table;
+    this.model = table.getModel("SourceConfig");
   }
 
   // ---------------------------------------------------------------------------
   // Marshalling
   // ---------------------------------------------------------------------------
 
-  private toItem(config: SourceConfig): SourceConfigItem {
-    const { ngbId, ...rest } = config;
-    const item: Record<string, unknown> = {
-      pk: this.pk(config.id),
-      sk: this.sk(),
-      ...rest,
-      // Store enabled as string for GSI (DynamoDB GSI keys must be strings)
-      enabled: config.enabled ? "true" : "false",
+  /**
+   * Convert a OneTable item (string enabled, undefined for absent) to the
+   * external API shape (boolean enabled, null for absent).
+   */
+  private toExternal(item: Record<string, unknown>): SourceConfig {
+    return {
+      id: item.id as string,
+      title: item.title as string,
+      documentType: item.documentType as string,
+      topicDomains: (item.topicDomains as string[]) ?? [],
+      url: item.url as string,
+      format: item.format as SourceConfig["format"],
+      ngbId: (item.ngbId as string) ?? null,
+      priority: item.priority as SourceConfig["priority"],
+      description: item.description as string,
+      authorityLevel: item.authorityLevel as AuthorityLevel,
+      enabled: item.enabled === "true",
+      lastIngestedAt: (item.lastIngestedAt as string) ?? null,
+      lastContentHash: (item.lastContentHash as string) ?? null,
+      consecutiveFailures: (item.consecutiveFailures as number) ?? 0,
+      lastError: (item.lastError as string) ?? null,
+      s3Key: (item.s3Key as string) ?? null,
+      s3VersionId: (item.s3VersionId as string) ?? null,
+      createdAt: item.createdAt as string,
+      updatedAt: item.updatedAt as string,
     };
-    // Only include ngbId if it's not null (DynamoDB GSI keys cannot be null)
-    // This makes the GSI sparse - items without ngbId won't appear in ngbId-index
-    if (ngbId !== null) {
-      item.ngbId = ngbId;
-    }
-    return item as unknown as SourceConfigItem;
   }
 
-  private fromItem(item: Record<string, unknown>): SourceConfig {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { pk, sk, ...rest } = item;
-    return {
-      ...rest,
-      // Convert enabled back to boolean
-      enabled: rest.enabled === true || rest.enabled === "true",
-      // Convert missing ngbId to null (sparse GSI means it's omitted when null)
-      ngbId: (rest.ngbId as string) ?? null,
-    } as SourceConfig;
+  /**
+   * Convert external input to OneTable-compatible properties.
+   * - boolean enabled -> string "true"/"false"
+   * - null values -> removed (OneTable omits undefined fields when nulls: false)
+   */
+  private toInternal(config: Partial<SourceConfig>): Record<string, unknown> {
+    const item: Record<string, unknown> = { ...config };
+    if ("enabled" in config) {
+      item.enabled = config.enabled ? "true" : "false";
+    }
+    // Remove null values — OneTable uses undefined/omission for absent fields
+    for (const key of Object.keys(item)) {
+      if (item[key] === null) {
+        delete item[key];
+      }
+    }
+    return item;
   }
 
   // ---------------------------------------------------------------------------
@@ -158,18 +147,11 @@ export class SourceConfigEntity {
       updatedAt: now,
     };
 
-    const item = this.toItem(config);
-
     logger.info(`Creating source config: ${input.id}`, { sourceId: input.id });
 
-    await this.client.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: item,
-        ConditionExpression: "attribute_not_exists(pk)",
-      }),
-    );
-
+    await this.model.create(this.toInternal(config) as never, {
+      exists: null,
+    });
     return config;
   }
 
@@ -177,97 +159,44 @@ export class SourceConfigEntity {
    * Get a source configuration by ID.
    */
   async getById(id: string): Promise<SourceConfig | null> {
-    const result = await this.client.send(
-      new GetCommand({
-        TableName: this.tableName,
-        Key: {
-          pk: this.pk(id),
-          sk: this.sk(),
-        },
-      }),
-    );
-
-    if (!result.Item) {
-      return null;
-    }
-
-    return this.fromItem(result.Item);
+    const item = await this.model.get({ id } as never);
+    if (!item) return null;
+    return this.toExternal(item as unknown as Record<string, unknown>);
   }
 
   /**
    * Get all source configurations (enabled and disabled).
-   * Paginates automatically if results exceed 1 MB.
+   * OneTable handles pagination internally.
    */
   async getAll(): Promise<SourceConfig[]> {
-    const items: Record<string, unknown>[] = [];
-    let lastKey: Record<string, unknown> | undefined;
-
-    do {
-      const result = await this.client.send(
-        new ScanCommand({
-          TableName: this.tableName,
-          ExclusiveStartKey: lastKey,
-        }),
-      );
-      items.push(...(result.Items ?? []));
-      lastKey = result.LastEvaluatedKey;
-    } while (lastKey);
-
-    return items.map((item) => this.fromItem(item));
+    const items = await this.model.scan({} as never);
+    return items.map((item) =>
+      this.toExternal(item as unknown as Record<string, unknown>),
+    );
   }
 
   /**
-   * Get all enabled source configurations.
-   * Paginates automatically if results exceed 1 MB.
+   * Get all enabled source configurations via the enabled-priority-index GSI.
    */
   async getAllEnabled(): Promise<SourceConfig[]> {
-    const items: Record<string, unknown>[] = [];
-    let lastKey: Record<string, unknown> | undefined;
-
-    do {
-      const result = await this.client.send(
-        new QueryCommand({
-          TableName: this.tableName,
-          IndexName: "enabled-priority-index",
-          KeyConditionExpression: "enabled = :enabled",
-          ExpressionAttributeValues: {
-            ":enabled": "true",
-          },
-          ExclusiveStartKey: lastKey,
-        }),
-      );
-      items.push(...(result.Items ?? []));
-      lastKey = result.LastEvaluatedKey;
-    } while (lastKey);
-
-    return items.map((item) => this.fromItem(item));
+    const items = await this.model.find({ enabled: "true" } as never, {
+      index: "enabled-priority-index",
+    });
+    return items.map((item) =>
+      this.toExternal(item as unknown as Record<string, unknown>),
+    );
   }
 
   /**
-   * Get source configurations by NGB ID.
-   * Paginates automatically if results exceed 1 MB.
+   * Get source configurations by NGB ID via the ngbId-index GSI.
    */
   async getByNgb(ngbId: string): Promise<SourceConfig[]> {
-    const items: Record<string, unknown>[] = [];
-    let lastKey: Record<string, unknown> | undefined;
-
-    do {
-      const result = await this.client.send(
-        new QueryCommand({
-          TableName: this.tableName,
-          IndexName: "ngbId-index",
-          KeyConditionExpression: "ngbId = :ngbId",
-          ExpressionAttributeValues: {
-            ":ngbId": ngbId,
-          },
-          ExclusiveStartKey: lastKey,
-        }),
-      );
-      items.push(...(result.Items ?? []));
-      lastKey = result.LastEvaluatedKey;
-    } while (lastKey);
-
-    return items.map((item) => this.fromItem(item));
+    const items = await this.model.find({ ngbId } as never, {
+      index: "ngbId-index",
+    });
+    return items.map((item) =>
+      this.toExternal(item as unknown as Record<string, unknown>),
+    );
   }
 
   /**
@@ -278,45 +207,9 @@ export class SourceConfigEntity {
     updates: Partial<Omit<SourceConfig, "id" | "createdAt">>,
   ): Promise<SourceConfig> {
     const now = new Date().toISOString();
-
-    // Build update expression dynamically
-    const expressionParts: string[] = [];
-    const expressionValues: Record<string, unknown> = {
-      ":updatedAt": now,
-    };
-    const expressionNames: Record<string, string> = {};
-
-    expressionParts.push("updatedAt = :updatedAt");
-
-    for (const [key, value] of Object.entries(updates)) {
-      if (key === "enabled") {
-        // Convert boolean to string for GSI
-        expressionParts.push(`#${key} = :${key}`);
-        expressionValues[`:${key}`] = value ? "true" : "false";
-        expressionNames[`#${key}`] = key;
-      } else {
-        expressionParts.push(`#${key} = :${key}`);
-        expressionValues[`:${key}`] = value;
-        expressionNames[`#${key}`] = key;
-      }
-    }
-
-    const result = await this.client.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: {
-          pk: this.pk(id),
-          sk: this.sk(),
-        },
-        UpdateExpression: `SET ${expressionParts.join(", ")}`,
-        ExpressionAttributeValues: expressionValues,
-        ExpressionAttributeNames:
-          Object.keys(expressionNames).length > 0 ? expressionNames : undefined,
-        ReturnValues: "ALL_NEW",
-      }),
-    );
-
-    return this.fromItem(result.Attributes!);
+    const internal = this.toInternal({ ...updates, updatedAt: now });
+    const result = await this.model.update({ id, ...internal } as never);
+    return this.toExternal(result as unknown as Record<string, unknown>);
   }
 
   /**
@@ -324,16 +217,7 @@ export class SourceConfigEntity {
    */
   async delete(id: string): Promise<void> {
     logger.info(`Deleting source config: ${id}`, { sourceId: id });
-
-    await this.client.send(
-      new DeleteCommand({
-        TableName: this.tableName,
-        Key: {
-          pk: this.pk(id),
-          sk: this.sk(),
-        },
-      }),
-    );
+    await this.model.remove({ id } as never);
   }
 
   // ---------------------------------------------------------------------------
@@ -355,36 +239,25 @@ export class SourceConfigEntity {
       contentHash,
     });
 
-    await this.client.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: {
-          pk: this.pk(id),
-          sk: this.sk(),
-        },
-        UpdateExpression: `SET
-          lastContentHash = :contentHash,
-          lastIngestedAt = :ingestedAt,
-          consecutiveFailures = :failures,
-          lastError = :lastError,
-          s3Key = :s3Key,
-          s3VersionId = :s3VersionId,
-          updatedAt = :updatedAt`,
-        ExpressionAttributeValues: {
-          ":contentHash": contentHash,
-          ":ingestedAt": now,
-          ":failures": 0,
-          ":lastError": null,
-          ":s3Key": options?.s3Key ?? null,
-          ":s3VersionId": options?.s3VersionId ?? null,
-          ":updatedAt": now,
-        },
-      }),
-    );
+    const props: Record<string, unknown> = {
+      id,
+      lastContentHash: contentHash,
+      lastIngestedAt: now,
+      consecutiveFailures: 0,
+      updatedAt: now,
+    };
+    if (options?.s3Key !== undefined) {
+      props.s3Key = options.s3Key;
+    }
+    if (options?.s3VersionId !== undefined) {
+      props.s3VersionId = options.s3VersionId;
+    }
+
+    await this.model.update(props as never, { remove: ["lastError"] });
   }
 
   /**
-   * Mark a source as failed.
+   * Mark a source as failed. Increments consecutiveFailures atomically.
    */
   async markFailure(id: string, error: string): Promise<void> {
     const now = new Date().toISOString();
@@ -394,24 +267,19 @@ export class SourceConfigEntity {
       error,
     });
 
-    await this.client.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: {
-          pk: this.pk(id),
-          sk: this.sk(),
-        },
-        UpdateExpression: `SET
-          consecutiveFailures = consecutiveFailures + :inc,
-          lastError = :lastError,
-          updatedAt = :updatedAt`,
-        ExpressionAttributeValues: {
-          ":inc": 1,
-          ":lastError": error,
-          ":updatedAt": now,
-        },
-      }),
-    );
+    // Use get-then-update for the increment since OneTable's `add` param
+    // doesn't integrate cleanly with the typed Model API.
+    const current = await this.model.get({ id } as never);
+    const failures =
+      ((current as unknown as Record<string, unknown>)
+        ?.consecutiveFailures as number) ?? 0;
+
+    await this.model.update({
+      id,
+      consecutiveFailures: failures + 1,
+      lastError: error,
+      updatedAt: now,
+    } as never);
   }
 
   /**
@@ -419,7 +287,6 @@ export class SourceConfigEntity {
    */
   async disable(id: string): Promise<void> {
     logger.info(`Disabling source: ${id}`, { sourceId: id });
-
     await this.update(id, { enabled: false });
   }
 
@@ -428,7 +295,6 @@ export class SourceConfigEntity {
    */
   async enable(id: string): Promise<void> {
     logger.info(`Enabling source: ${id}`, { sourceId: id });
-
     await this.update(id, { enabled: true });
   }
 }

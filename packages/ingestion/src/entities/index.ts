@@ -1,12 +1,13 @@
 import { Resource } from "sst";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import {
+  createAppTable,
   SourceConfigEntity,
   type SourceConfig,
   type CreateSourceInput,
   type MarkSuccessOptions,
-} from "./SourceConfigEntity.js";
+  IngestionLogEntity,
+  type IngestionLog,
+} from "@usopc/shared";
 
 export {
   SourceConfigEntity,
@@ -15,16 +16,18 @@ export {
   type MarkSuccessOptions,
 };
 
+export { IngestionLogEntity, type IngestionLog };
+
 /**
- * Get the SourceConfigs table name from SST Resource.
+ * Get the AppTable name from SST Resource.
  */
-export function getSourceConfigTableName(): string {
+export function getAppTableName(): string {
   try {
-    return (Resource as unknown as { SourceConfigs: { name: string } })
-      .SourceConfigs.name;
+    return (Resource as unknown as { AppTable: { name: string } }).AppTable
+      .name;
   } catch {
     throw new Error(
-      "SST Resource SourceConfigs not available. Run with 'sst shell' or deploy with SST.",
+      "SST Resource AppTable not available. Run with 'sst shell' or deploy with SST.",
     );
   }
 }
@@ -33,7 +36,14 @@ export function getSourceConfigTableName(): string {
  * Factory function to create a SourceConfigEntity with SST integration.
  */
 export function createSourceConfigEntity(): SourceConfigEntity {
-  const tableName = getSourceConfigTableName();
-  const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
-  return new SourceConfigEntity(tableName, client);
+  const table = createAppTable(getAppTableName());
+  return new SourceConfigEntity(table);
+}
+
+/**
+ * Factory function to create an IngestionLogEntity with SST integration.
+ */
+export function createIngestionLogEntity(): IngestionLogEntity {
+  const table = createAppTable(getAppTableName());
+  return new IngestionLogEntity(table);
 }

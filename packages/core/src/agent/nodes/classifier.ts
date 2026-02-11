@@ -1,7 +1,7 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
-import { MODEL_CONFIG } from "../../config/index.js";
+import { getModelConfig } from "../../config/index.js";
 import { buildClassifierPromptWithHistory } from "../../prompts/index.js";
 import {
   invokeAnthropic,
@@ -169,10 +169,11 @@ export async function classifierNode(
     };
   }
 
+  const config = await getModelConfig();
   const model = new ChatAnthropic({
-    model: MODEL_CONFIG.classifier.model,
-    temperature: MODEL_CONFIG.classifier.temperature,
-    maxTokens: MODEL_CONFIG.classifier.maxTokens,
+    model: config.classifier.model,
+    temperature: config.classifier.temperature,
+    maxTokens: config.classifier.maxTokens,
   });
 
   const prompt = buildClassifierPromptWithHistory(

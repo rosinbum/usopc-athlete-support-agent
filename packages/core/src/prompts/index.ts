@@ -18,3 +18,4 @@ export {
   buildEscalationPrompt,
   type EscalationTarget,
 } from "./escalation.js";
+export { initPromptLoader, loadPrompt } from "./loader.js";

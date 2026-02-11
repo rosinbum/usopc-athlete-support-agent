@@ -1,7 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { createLogger, getDatabaseUrl, isProduction } from "@usopc/shared";
-import { Pool } from "pg";
+import { createLogger, isProduction } from "@usopc/shared";
 import { createHash } from "node:crypto";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
@@ -9,6 +8,7 @@ import type { IngestionSource } from "./pipeline.js";
 import { getLastContentHash, upsertIngestionStatus } from "./db.js";
 import {
   createSourceConfigEntity,
+  createIngestionLogEntity,
   type SourceConfig,
 } from "./entities/index.js";
 import { fetchWithRetry } from "./loaders/fetchWithRetry.js";
@@ -151,10 +151,8 @@ function hashContent(content: string): string {
  * CLI with --resume (content-change detection) or --force (unconditional).
  */
 export async function handler(): Promise<void> {
-  const databaseUrl = getDatabaseUrl();
-
-  const pool = new Pool({ connectionString: databaseUrl });
   const sqs = new SQSClient({});
+  const ingestionLogEntity = createIngestionLogEntity();
 
   try {
     const { sources, entity } = await loadSourceConfigs();
@@ -195,8 +193,11 @@ export async function handler(): Promise<void> {
             continue;
           }
         } else {
-          // JSON dev fallback: check Postgres for prior ingestion
-          const lastHash = await getLastContentHash(pool, source.id);
+          // JSON dev fallback: check DynamoDB for prior ingestion
+          const lastHash = await getLastContentHash(
+            ingestionLogEntity,
+            source.id,
+          );
           if (lastHash) {
             logger.info(`Skipping ${source.id} — already ingested`);
             skipped++;
@@ -234,8 +235,13 @@ export async function handler(): Promise<void> {
 
         const contentHash = hashContent(rawContent);
 
-        // Mark as ingesting in Postgres (for backward compatibility)
-        await upsertIngestionStatus(pool, source.id, source.url, "ingesting");
+        // Mark as ingesting in DynamoDB
+        await upsertIngestionStatus(
+          ingestionLogEntity,
+          source.id,
+          source.url,
+          "ingesting",
+        );
 
         // Enqueue for the worker
         const message: IngestionMessage = {
@@ -258,10 +264,16 @@ export async function handler(): Promise<void> {
         const msg = error instanceof Error ? error.message : "Unknown error";
         logger.error(`Coordinator error for ${source.id}: ${msg}`);
 
-        // Mark failure in both systems
-        await upsertIngestionStatus(pool, source.id, source.url, "failed", {
-          errorMessage: msg,
-        });
+        // Mark failure in DynamoDB
+        await upsertIngestionStatus(
+          ingestionLogEntity,
+          source.id,
+          source.url,
+          "failed",
+          {
+            errorMessage: msg,
+          },
+        );
         if (entity) {
           await entity.markFailure(source.id, msg);
         }
@@ -285,6 +297,6 @@ export async function handler(): Promise<void> {
       );
     }
   } finally {
-    await pool.end();
+    // No pool cleanup needed — DynamoDB client handles its own connections
   }
 }

@@ -1,11 +1,11 @@
 import type { SQSBatchResponse, SQSEvent, SQSRecord } from "aws-lambda";
 import { SQSClient, PurgeQueueCommand } from "@aws-sdk/client-sqs";
-import { Pool } from "pg";
 import { Resource } from "sst";
 import { createLogger, getDatabaseUrl, getSecretValue } from "@usopc/shared";
 import { ingestSource, QuotaExhaustedError } from "./pipeline.js";
 import { upsertIngestionStatus } from "./db.js";
 import type { IngestionMessage } from "./cron.js";
+import { createIngestionLogEntity } from "./entities/index.js";
 
 const logger = createLogger({ service: "ingestion-worker" });
 
@@ -22,7 +22,7 @@ const logger = createLogger({ service: "ingestion-worker" });
 export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
   const databaseUrl = getDatabaseUrl();
   const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
-  const pool = new Pool({ connectionString: databaseUrl });
+  const ingestionLogEntity = createIngestionLogEntity();
 
   const batchItemFailures: { itemIdentifier: string }[] = [];
 
@@ -54,7 +54,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
 
         if (result.status === "completed") {
           await upsertIngestionStatus(
-            pool,
+            ingestionLogEntity,
             message.source.id,
             message.source.url,
             "completed",
@@ -68,7 +68,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
           );
         } else {
           await upsertIngestionStatus(
-            pool,
+            ingestionLogEntity,
             message.source.id,
             message.source.url,
             "failed",
@@ -83,7 +83,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
           // Mark this source as quota-exceeded
           try {
             await upsertIngestionStatus(
-              pool,
+              ingestionLogEntity,
               message.source.id,
               message.source.url,
               "quota_exceeded",
@@ -127,6 +127,6 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
 
     return { batchItemFailures };
   } finally {
-    await pool.end();
+    // No pool cleanup needed — DynamoDB client handles its own connections
   }
 }

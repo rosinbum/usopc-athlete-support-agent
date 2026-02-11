@@ -57,9 +57,21 @@ export {
   type DocumentType,
 } from "./validation.js";
 
+export { AppTableSchema } from "./entities/index.js";
+export { createAppTable } from "./entities/index.js";
 export {
   SourceConfigEntity,
   type SourceConfig,
   type CreateSourceInput,
   type MarkSuccessOptions,
 } from "./entities/index.js";
+export { SportOrgEntity } from "./entities/index.js";
+export { AgentModelEntity, type AgentModelConfig } from "./entities/index.js";
+export { IngestionLogEntity, type IngestionLog } from "./entities/index.js";
+export { PromptEntity, type PromptConfig } from "./entities/index.js";
+export type {
+  OlympicProgram,
+  OrgStatus,
+  OrgType,
+  SportOrganization,
+} from "./types/sport-org.js";

@@ -1,9 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { readFile } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { SportOrganization } from "../types/index.js";
+import type { SportOrgEntity } from "@usopc/shared";
 import { logger } from "@usopc/shared";
 
 const lookupSportOrgSchema = z.object({
@@ -13,39 +11,6 @@ const lookupSportOrgSchema = z.object({
       "Name, abbreviation, sport, or alias of the organization to look up (e.g. 'USA Swimming', 'USAT', 'fencing', 'Team USA wrestling').",
     ),
 });
-
-/** Cached sport organizations data, loaded on first invocation. */
-let cachedOrgs: SportOrganization[] | null = null;
-
-/**
- * Resolves the path to the sport-organizations.json data file.
- * Walks up from this file's location to the project root and into data/.
- */
-function getDataFilePath(): string {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  // From packages/core/src/tools -> project root is ../../../../
-  return resolve(
-    __dirname,
-    "..",
-    "..",
-    "..",
-    "..",
-    "data",
-    "sport-organizations.json",
-  );
-}
-
-async function loadOrganizations(): Promise<SportOrganization[]> {
-  if (cachedOrgs) {
-    return cachedOrgs;
-  }
-
-  const filePath = getDataFilePath();
-  const raw = await readFile(filePath, "utf-8");
-  cachedOrgs = JSON.parse(raw) as SportOrganization[];
-  return cachedOrgs;
-}
 
 /**
  * Compute a simple relevance score for a candidate organization against the
@@ -164,17 +129,17 @@ function formatOrgResult(org: SportOrganization): string {
 }
 
 /**
- * Creates the lookup_sport_org tool. This tool reads from a static JSON file
- * and performs fuzzy matching, so it does not require any injected dependencies.
+ * Creates the lookup_sport_org tool. Accepts a SportOrgEntity instance
+ * to load organizations from DynamoDB.
  */
-export function createLookupSportOrgTool() {
+export function createLookupSportOrgTool(sportOrgEntity: SportOrgEntity) {
   return tool(
     async ({ query }): Promise<string> => {
       const log = logger.child({ tool: "lookup_sport_org" });
       log.debug("Looking up sport organization", { query });
 
       try {
-        const orgs = await loadOrganizations();
+        const orgs = await sportOrgEntity.getAll();
         const queryLower = query.toLowerCase().trim();
 
         // Score all orgs and find the best match
@@ -218,7 +183,7 @@ export function createLookupSportOrgTool() {
         log.error("Sport org lookup failed", {
           error: error instanceof Error ? error.message : String(error),
         });
-        return `Sport organization lookup failed: ${error instanceof Error ? error.message : String(error)}. The data file may not be available.`;
+        return `Sport organization lookup failed: ${error instanceof Error ? error.message : String(error)}. The data may not be available.`;
       }
     },
     {
