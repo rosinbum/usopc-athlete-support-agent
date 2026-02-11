@@ -16,15 +16,22 @@
  * Requires SST context (run via `pnpm seed` which uses `sst shell`).
  */
 
+import { createHash } from "node:crypto";
 import { Pool } from "pg";
 import { getDatabaseUrl, getSecretValue, createLogger } from "@usopc/shared";
-import { initDatabase, loadAllSources, repoRoot } from "./seed-db.js";
+import { initDatabase, loadAllSources } from "./seed-db.js";
 import {
   seedSourceConfigs,
   seedSportOrgs,
   type CliOptions,
 } from "./seed-dynamodb.js";
-import { ingestAll } from "../pipeline.js";
+import { ingestSource } from "../pipeline.js";
+import { upsertIngestionStatus } from "../db.js";
+import {
+  createIngestionLogEntity,
+  createSourceConfigEntity,
+} from "../entities/index.js";
+import { fetchWithRetry } from "../loaders/fetchWithRetry.js";
 
 const logger = createLogger({ service: "seed" });
 
@@ -55,6 +62,16 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): ParsedArgs {
 
   return { skipIngest, force, dryRun };
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function hashContent(content: string): string {
+  return createHash("sha256").update(content).digest("hex");
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // ---------------------------------------------------------------------------
 // Main
@@ -98,22 +115,87 @@ async function main(): Promise<void> {
         const sources = await loadAllSources();
         logger.info(`Loaded ${sources.length} source configuration(s)`);
 
-        const results = await ingestAll(sources, {
-          databaseUrl,
-          openaiApiKey,
-        });
+        const ingestionLogEntity = createIngestionLogEntity();
+        const sourceConfigEntity = createSourceConfigEntity();
 
-        const succeeded = results.filter((r) => r.status === "completed");
-        const failed = results.filter((r) => r.status === "failed");
-        const totalChunks = results.reduce((sum, r) => sum + r.chunksCount, 0);
+        let succeeded = 0;
+        let totalChunks = 0;
+        const failures: { sourceId: string; error?: string }[] = [];
+
+        for (let i = 0; i < sources.length; i++) {
+          const source = sources[i];
+
+          // Wait between sources for TPM window reset
+          if (i > 0 && totalChunks > 0) {
+            logger.info("Waiting 60s between sources for TPM window reset...");
+            await sleep(60_000);
+          }
+
+          // Mark as ingesting in DynamoDB
+          await upsertIngestionStatus(
+            ingestionLogEntity,
+            source.id,
+            source.url,
+            "ingesting",
+          );
+
+          const result = await ingestSource(source, {
+            databaseUrl,
+            openaiApiKey,
+          });
+
+          if (result.status === "completed") {
+            // Fetch content to compute hash (same as cron/worker path)
+            let contentHash = "";
+            try {
+              const res = await fetchWithRetry(
+                source.url,
+                { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
+                { timeoutMs: 60000, maxRetries: 3 },
+              );
+              const rawContent = await res.text();
+              contentHash = hashContent(rawContent);
+            } catch (fetchError) {
+              logger.warn(
+                `Could not fetch content hash for ${source.id}: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`,
+              );
+            }
+
+            await upsertIngestionStatus(
+              ingestionLogEntity,
+              source.id,
+              source.url,
+              "completed",
+              { contentHash, chunksCount: result.chunksCount },
+            );
+            await sourceConfigEntity.markSuccess(source.id, contentHash);
+
+            succeeded++;
+            totalChunks += result.chunksCount;
+            logger.info(`Ingested ${source.id} (${result.chunksCount} chunks)`);
+          } else {
+            const errorMessage = result.error ?? "Unknown error";
+
+            await upsertIngestionStatus(
+              ingestionLogEntity,
+              source.id,
+              source.url,
+              "failed",
+              { errorMessage },
+            );
+            await sourceConfigEntity.markFailure(source.id, errorMessage);
+
+            failures.push({ sourceId: source.id, error: result.error });
+          }
+        }
 
         logger.info(
-          `Ingestion: ${succeeded.length}/${results.length} succeeded, ${totalChunks} total chunks`,
+          `Ingestion: ${succeeded}/${sources.length} succeeded, ${totalChunks} total chunks`,
         );
 
-        if (failed.length > 0) {
+        if (failures.length > 0) {
           logger.error("Failed sources:");
-          for (const f of failed) {
+          for (const f of failures) {
             logger.error(`  - ${f.sourceId}: ${f.error}`);
           }
           process.exit(1);

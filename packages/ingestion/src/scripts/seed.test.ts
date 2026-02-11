@@ -29,7 +29,29 @@ vi.mock("./seed-dynamodb.js", () => ({
 }));
 
 vi.mock("../pipeline.js", () => ({
-  ingestAll: vi.fn(async () => []),
+  ingestSource: vi.fn(async () => ({
+    sourceId: "test",
+    status: "completed",
+    chunksCount: 0,
+  })),
+}));
+
+vi.mock("../db.js", () => ({
+  upsertIngestionStatus: vi.fn(async () => {}),
+}));
+
+vi.mock("../entities/index.js", () => ({
+  createIngestionLogEntity: vi.fn(() => ({})),
+  createSourceConfigEntity: vi.fn(() => ({
+    markSuccess: vi.fn(async () => {}),
+    markFailure: vi.fn(async () => {}),
+  })),
+}));
+
+vi.mock("../loaders/fetchWithRetry.js", () => ({
+  fetchWithRetry: vi.fn(async () => ({
+    text: async () => "mock content",
+  })),
 }));
 
 // Import after mocks
