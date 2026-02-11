@@ -84,9 +84,14 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): ParsedArgs {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** 4xx status codes indicate permanent client errors (e.g. 403 Forbidden, 404 Not Found). */
-const HTTP_CLIENT_ERROR_MIN = 400;
-const HTTP_CLIENT_ERROR_MAX = 499;
+function isPermanentHttpError(error: unknown): boolean {
+  return (
+    error instanceof FetchWithRetryError &&
+    error.statusCode !== undefined &&
+    error.statusCode >= 400 &&
+    error.statusCode < 500
+  );
+}
 
 function hashContent(content: string): string {
   return createHash("sha256").update(content).digest("hex");
@@ -194,13 +199,7 @@ async function main(): Promise<void> {
                 ? fetchError.message
                 : "Unknown error";
 
-            // Permanent HTTP errors (403, 404, etc.) — skip source entirely
-            if (
-              fetchError instanceof FetchWithRetryError &&
-              fetchError.statusCode &&
-              fetchError.statusCode >= HTTP_CLIENT_ERROR_MIN &&
-              fetchError.statusCode <= HTTP_CLIENT_ERROR_MAX
-            ) {
+            if (isPermanentHttpError(fetchError)) {
               logger.warn(`Skipping ${source.id}: ${msg}`);
               results.push({
                 sourceId: source.id,
