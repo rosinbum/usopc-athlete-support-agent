@@ -40,12 +40,11 @@ async function initDatabase(pool: Pool): Promise<void> {
 }
 
 /**
- * Remove all rows from `document_chunks` and `ingestion_status`.
+ * Remove all rows from `document_chunks`.
  */
 async function clearDocuments(pool: Pool): Promise<void> {
   await pool.query("DELETE FROM document_chunks");
-  await pool.query("DELETE FROM ingestion_status");
-  logger.info("Cleared document_chunks and ingestion_status tables");
+  logger.info("Cleared document_chunks table");
 }
 
 // ---------------------------------------------------------------------------
