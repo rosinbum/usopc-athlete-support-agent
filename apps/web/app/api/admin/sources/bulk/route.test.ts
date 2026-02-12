@@ -12,6 +12,12 @@ vi.mock("../../../../../lib/source-config.js", () => ({
   createSourceConfigEntity: vi.fn(),
 }));
 
+const mockDeleteChunks = vi.fn().mockResolvedValue(0);
+vi.mock("@usopc/shared", () => ({
+  getPool: () => "mock-pool",
+  deleteChunksBySourceId: (...args: unknown[]) => mockDeleteChunks(...args),
+}));
+
 const mockSqsSend = vi.fn();
 vi.mock("@aws-sdk/client-sqs", () => ({
   SQSClient: vi.fn(() => ({ send: mockSqsSend })),
@@ -95,7 +101,7 @@ describe("POST /api/admin/sources/bulk", () => {
       user: { email: "admin@test.com" },
     } as never);
 
-    const res = await POST(makeRequest({ action: "delete", ids: ["src1"] }));
+    const res = await POST(makeRequest({ action: "purge", ids: ["src1"] }));
     const body = await res.json();
 
     expect(res.status).toBe(400);
@@ -181,6 +187,29 @@ describe("POST /api/admin/sources/bulk", () => {
     expect(body.succeeded).toBe(1);
     expect(body.failed).toBe(0);
     expect(mockSqsSend).toHaveBeenCalledOnce();
+  });
+
+  it("bulk deletes sources with chunk cleanup", async () => {
+    const mockEntityDelete = vi.fn().mockResolvedValue(undefined);
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      delete: mockEntityDelete,
+    } as never);
+    mockDeleteChunks.mockResolvedValue(5);
+
+    const res = await POST(
+      makeRequest({ action: "delete", ids: ["src1", "src2"] }),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.succeeded).toBe(2);
+    expect(body.failed).toBe(0);
+    expect(mockDeleteChunks).toHaveBeenCalledTimes(2);
+    expect(mockEntityDelete).toHaveBeenCalledWith("src1");
+    expect(mockEntityDelete).toHaveBeenCalledWith("src2");
   });
 
   it("counts failure when source not found for ingest", async () => {

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
+import { getPool, deleteChunksBySourceId } from "@usopc/shared";
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 
 interface BulkRequest {
-  action: "enable" | "disable" | "ingest";
+  action: "enable" | "disable" | "ingest" | "delete";
   ids: string[];
 }
 
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!["enable", "disable", "ingest"].includes(action)) {
+    if (!["enable", "disable", "ingest", "delete"].includes(action)) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
@@ -85,6 +86,10 @@ export async function POST(request: Request) {
               MessageGroupId: source.id,
             }),
           );
+        } else if (action === "delete") {
+          const pool = getPool();
+          await deleteChunksBySourceId(pool, id);
+          await entity.delete(id);
         }
         succeeded++;
       } catch {
