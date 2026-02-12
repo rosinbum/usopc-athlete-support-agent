@@ -228,8 +228,18 @@ export function SourcesAdminClient() {
   // Bulk actions
   // -------------------------------------------------------------------------
 
-  async function bulkAction(action: "enable" | "disable" | "ingest") {
+  async function bulkAction(
+    action: "enable" | "disable" | "ingest" | "delete",
+  ) {
     if (selected.size === 0) return;
+
+    if (action === "delete") {
+      const confirmed = window.confirm(
+        `Delete ${selected.size} source${selected.size === 1 ? "" : "s"}?\n\nThis will permanently remove the source configs and all indexed chunks from the vector database.`,
+      );
+      if (!confirmed) return;
+    }
+
     setBulkLoading(true);
     try {
       const res = await fetch("/api/admin/sources/bulk", {
@@ -472,6 +482,13 @@ export function SourcesAdminClient() {
             className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
           >
             Trigger Ingestion
+          </button>
+          <button
+            onClick={() => bulkAction("delete")}
+            disabled={bulkLoading}
+            className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 ml-auto"
+          >
+            Delete
           </button>
           {bulkLoading && <Loader2 className="w-4 h-4 animate-spin" />}
         </div>

@@ -6,8 +6,8 @@ import {
   ArrowLeft,
   RefreshCw,
   ExternalLink,
-  Check,
-  X,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import type { SourceConfig } from "@usopc/shared";
 
@@ -43,14 +43,13 @@ function formatLabel(key: string): string {
 
 export function SourceDetailClient({ id }: { id: string }) {
   const [source, setSource] = useState<SourceConfig | null>(null);
+  const [chunkCount, setChunkCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toggling, setToggling] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   const [ingestResult, setIngestResult] = useState<string | null>(null);
-  const [editingUrl, setEditingUrl] = useState(false);
-  const [urlDraft, setUrlDraft] = useState("");
-  const [savingUrl, setSavingUrl] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchSource = useCallback(async () => {
     setLoading(true);
@@ -63,7 +62,7 @@ export function SourceDetailClient({ id }: { id: string }) {
       }
       const data = await res.json();
       setSource(data.source);
-      setUrlDraft(data.source.url);
+      setChunkCount(data.chunkCount ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -120,26 +119,23 @@ export function SourceDetailClient({ id }: { id: string }) {
     }
   }
 
-  async function saveUrl() {
-    if (!source || urlDraft === source.url) {
-      setEditingUrl(false);
-      return;
-    }
-    setSavingUrl(true);
+  async function handleDelete() {
+    if (!source) return;
+    const confirmed = window.confirm(
+      `Delete "${source.title}"?\n\nThis will permanently remove the source config and ${chunkCount} indexed chunk${chunkCount === 1 ? "" : "s"} from the vector database.`,
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
     try {
       const res = await fetch(`/api/admin/sources/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: urlDraft }),
+        method: "DELETE",
       });
-      if (!res.ok) throw new Error("Failed to update URL");
-      const data = await res.json();
-      setSource(data.source);
-      setEditingUrl(false);
+      if (!res.ok) throw new Error("Failed to delete source");
+      window.location.href = "/admin/sources";
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
-    } finally {
-      setSavingUrl(false);
+      setError(err instanceof Error ? err.message : "Delete failed");
+      setDeleting(false);
     }
   }
 
@@ -175,36 +171,7 @@ export function SourceDetailClient({ id }: { id: string }) {
       id: source.id,
       title: source.title,
       description: source.description,
-      url: editingUrl ? (
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={urlDraft}
-            onChange={(e) => setUrlDraft(e.target.value)}
-            className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm"
-          />
-          <button
-            onClick={saveUrl}
-            disabled={savingUrl}
-            className="text-green-600 hover:text-green-800"
-          >
-            {savingUrl ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Check className="w-4 h-4" />
-            )}
-          </button>
-          <button
-            onClick={() => {
-              setEditingUrl(false);
-              setUrlDraft(source.url);
-            }}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      ) : (
+      url: (
         <span className="flex items-center gap-2">
           <a
             href={source.url}
@@ -215,12 +182,6 @@ export function SourceDetailClient({ id }: { id: string }) {
             {source.url}
           </a>
           <ExternalLink className="w-3 h-3 flex-shrink-0" />
-          <button
-            onClick={() => setEditingUrl(true)}
-            className="text-xs text-gray-400 hover:text-gray-600 ml-1"
-          >
-            edit
-          </button>
         </span>
       ),
       format: source.format.toUpperCase(),
@@ -247,13 +208,14 @@ export function SourceDetailClient({ id }: { id: string }) {
     },
     Status: {
       enabled: source.enabled ? "Yes" : "No",
+      chunkCount: String(chunkCount),
       lastIngestedAt: formatDate(source.lastIngestedAt),
       consecutiveFailures: String(source.consecutiveFailures),
       lastError: source.lastError ?? "None",
     },
     Storage: {
-      s3Key: source.s3Key ?? "—",
-      s3VersionId: source.s3VersionId ?? "—",
+      s3Key: source.s3Key ?? "\u2014",
+      s3VersionId: source.s3VersionId ?? "\u2014",
     },
     Timestamps: {
       createdAt: formatDate(source.createdAt),
@@ -287,6 +249,14 @@ export function SourceDetailClient({ id }: { id: string }) {
 
       {/* Action Buttons */}
       <div className="flex items-center gap-3 mb-6">
+        <a
+          href={`/admin/sources/${id}/edit`}
+          className="px-4 py-2 text-sm rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 inline-flex items-center gap-1"
+        >
+          <Pencil className="w-4 h-4" />
+          Edit Source
+        </a>
+
         <button
           onClick={toggleEnabled}
           disabled={toggling}
@@ -313,6 +283,19 @@ export function SourceDetailClient({ id }: { id: string }) {
             <RefreshCw className="w-4 h-4" />
           )}
           Trigger Ingestion
+        </button>
+
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="px-4 py-2 text-sm rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-1 ml-auto"
+        >
+          {deleting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Trash2 className="w-4 h-4" />
+          )}
+          Delete Source
         </button>
       </div>
 
