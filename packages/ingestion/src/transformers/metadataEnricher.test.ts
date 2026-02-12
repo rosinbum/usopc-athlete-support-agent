@@ -31,8 +31,8 @@ describe("enrichMetadata", () => {
 
     const enriched = enrichMetadata(chunks, sourceWithAuthority);
 
-    expect(enriched[0].metadata.authority_level).toBe("usopc_governance");
-    expect(enriched[1].metadata.authority_level).toBe("usopc_governance");
+    expect(enriched[0].metadata.authorityLevel).toBe("usopc_governance");
+    expect(enriched[1].metadata.authorityLevel).toBe("usopc_governance");
   });
 
   it("does not include authority_level when not present in source", () => {
@@ -40,7 +40,7 @@ describe("enrichMetadata", () => {
 
     const enriched = enrichMetadata(chunks, baseSource);
 
-    expect(enriched[0].metadata.authority_level).toBeUndefined();
+    expect(enriched[0].metadata.authorityLevel).toBeUndefined();
   });
 
   it("preserves existing metadata fields", () => {
@@ -52,18 +52,18 @@ describe("enrichMetadata", () => {
 
     const enriched = enrichMetadata(chunks, sourceWithAuthority);
 
-    expect(enriched[0].metadata.ngb_id).toBe("usa-swimming");
-    expect(enriched[0].metadata.topic_domain).toBe("governance");
-    expect(enriched[0].metadata.topic_domains).toEqual([
+    expect(enriched[0].metadata.ngbId).toBe("usa-swimming");
+    expect(enriched[0].metadata.topicDomain).toBe("governance");
+    expect(enriched[0].metadata.topicDomains).toEqual([
       "governance",
       "athlete_rights",
     ]);
-    expect(enriched[0].metadata.document_type).toBe("policy");
-    expect(enriched[0].metadata.source_url).toBe("https://example.com/doc.pdf");
-    expect(enriched[0].metadata.document_title).toBe("Test Document");
-    expect(enriched[0].metadata.source_id).toBe("test-source");
-    expect(enriched[0].metadata.chunk_index).toBe(0);
-    expect(enriched[0].metadata.ingested_at).toBeDefined();
+    expect(enriched[0].metadata.documentType).toBe("policy");
+    expect(enriched[0].metadata.sourceUrl).toBe("https://example.com/doc.pdf");
+    expect(enriched[0].metadata.documentTitle).toBe("Test Document");
+    expect(enriched[0].metadata.sourceId).toBe("test-source");
+    expect(enriched[0].metadata.chunkIndex).toBe(0);
+    expect(enriched[0].metadata.ingestedAt).toBeDefined();
   });
 
   it("preserves original chunk metadata", () => {
@@ -89,8 +89,8 @@ describe("enrichMetadata", () => {
 
     const enriched = enrichMetadata(chunks, sourceWithAuthority);
 
-    expect(enriched[0].metadata.chunk_index).toBe(0);
-    expect(enriched[1].metadata.chunk_index).toBe(1);
-    expect(enriched[2].metadata.chunk_index).toBe(2);
+    expect(enriched[0].metadata.chunkIndex).toBe(0);
+    expect(enriched[1].metadata.chunkIndex).toBe(1);
+    expect(enriched[2].metadata.chunkIndex).toBe(2);
   });
 });

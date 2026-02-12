@@ -24,12 +24,12 @@ interface StatsRow {
 }
 
 const COL = {
-  source_url: "COALESCE(source_url, metadata->>'source_url')",
-  document_title: "COALESCE(document_title, metadata->>'document_title')",
-  document_type: "COALESCE(document_type, metadata->>'document_type')",
-  ngb_id: "COALESCE(ngb_id, metadata->>'ngb_id')",
-  topic_domain: "COALESCE(topic_domain, metadata->>'topic_domain')",
-  authority_level: "COALESCE(authority_level, metadata->>'authority_level')",
+  source_url: "COALESCE(source_url, metadata->>'sourceUrl')",
+  document_title: "COALESCE(document_title, metadata->>'documentTitle')",
+  document_type: "COALESCE(document_type, metadata->>'documentType')",
+  ngb_id: "COALESCE(ngb_id, metadata->>'ngbId')",
+  topic_domain: "COALESCE(topic_domain, metadata->>'topicDomain')",
+  authority_level: "COALESCE(authority_level, metadata->>'authorityLevel')",
 } as const;
 
 export async function GET(request: Request) {
@@ -128,7 +128,7 @@ async function handleList(url: URL) {
       SELECT 1 FROM document_chunks ${whereClause}
       GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
                ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level},
-               metadata->>'effective_date'
+               metadata->>'effectiveDate'
     ) sub`,
     values,
   );
@@ -147,14 +147,14 @@ async function handleList(url: URL) {
       ${COL.ngb_id} as ngb_id,
       ${COL.topic_domain} as topic_domain,
       ${COL.authority_level} as authority_level,
-      metadata->>'effective_date' as effective_date,
+      metadata->>'effectiveDate' as effective_date,
       MIN(ingested_at) as ingested_at,
       COUNT(*) as chunk_count
     FROM document_chunks
     ${whereClause}
     GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
              ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level},
-             metadata->>'effective_date'
+             metadata->>'effectiveDate'
     ORDER BY ingested_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `,

@@ -18,7 +18,7 @@ One of the following values:
 
 ### detectedNgbIds (required)
 An array of NGB or sport organization identifiers mentioned or implied in the query. \
-Use standard abbreviations when possible (e.g., "usa_swimming", "us_ski_snowboard", "usa_track_field"). \
+Use standard abbreviations when possible (e.g., "usa-swimming", "us-ski-snowboard", "usa-track-field"). \
 Return an empty array if no specific NGB is mentioned or can be inferred from the sport name.
 
 ### queryIntent (required)
@@ -70,7 +70,7 @@ Return ONLY valid JSON with no additional text, markdown formatting, or explanat
 
 {
   "topicDomain": "dispute_resolution",
-  "detectedNgbIds": ["usa_swimming"],
+  "detectedNgbIds": ["usa-swimming"],
   "queryIntent": "procedural",
   "hasTimeConstraint": true,
   "shouldEscalate": false,

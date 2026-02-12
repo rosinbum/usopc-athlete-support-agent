@@ -21,16 +21,16 @@ export function rerank(
     let score = 0;
 
     // Metadata match bonuses
-    if (ngbIds?.includes(doc.metadata.ngb_id)) {
+    if (ngbIds?.includes(doc.metadata.ngbId)) {
       score += 0.2;
     }
-    if (topicDomain && doc.metadata.topic_domain === topicDomain) {
+    if (topicDomain && doc.metadata.topicDomain === topicDomain) {
       score += 0.15;
     }
 
     // Recency bonus (documents from last year get a small boost)
-    if (doc.metadata.effective_date) {
-      const effectiveDate = new Date(doc.metadata.effective_date);
+    if (doc.metadata.effectiveDate) {
+      const effectiveDate = new Date(doc.metadata.effectiveDate);
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
       if (effectiveDate > oneYearAgo) {
@@ -41,16 +41,16 @@ export function rerank(
     // Priority boost for high-priority document types
     if (
       ["bylaws", "legislation", "selection_procedures"].includes(
-        doc.metadata.document_type,
+        doc.metadata.documentType,
       )
     ) {
       score += 0.1;
     }
 
     // Authority level boost (higher authority = larger boost)
-    if (doc.metadata.authority_level) {
+    if (doc.metadata.authorityLevel) {
       const authorityIndex = AUTHORITY_LEVELS.indexOf(
-        doc.metadata.authority_level as AuthorityLevel,
+        doc.metadata.authorityLevel as AuthorityLevel,
       );
       if (authorityIndex !== -1) {
         // Higher index = lower authority = less boost

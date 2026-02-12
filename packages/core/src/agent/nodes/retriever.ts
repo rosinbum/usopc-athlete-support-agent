@@ -96,6 +96,26 @@ function buildFilter(state: AgentState): Record<string, unknown> | undefined {
 }
 
 /**
+ * Builds a broadened filter that includes NGB-specific docs **or** universal
+ * docs (ngbId is null). This prevents broadening from losing NGB context
+ * entirely while still picking up cross-NGB content.
+ */
+function buildBroadFilter(
+  state: AgentState,
+): Record<string, unknown> | undefined {
+  if (state.detectedNgbIds.length === 0) return undefined;
+
+  const ngbCondition: Record<string, unknown> =
+    state.detectedNgbIds.length === 1
+      ? { ngbId: state.detectedNgbIds[0] }
+      : { ngbId: { $in: state.detectedNgbIds } };
+
+  return {
+    $or: [ngbCondition, { ngbId: null }],
+  };
+}
+
+/**
  * Computes an authority boost for a document based on its authority level.
  * Higher authority levels get a larger boost (lower composite score).
  *
@@ -202,11 +222,13 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
           },
         );
         // Use circuit breaker with fallback to empty array
+        const broadFilter = buildBroadFilter(state);
         const broadResults = await vectorStoreSearch(
           () =>
             vectorStore.similaritySearchWithScore(
               query,
               RETRIEVAL_CONFIG.broadenFilterTopK,
+              broadFilter,
             ),
           [],
         );
@@ -231,7 +253,7 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
       const scoredResults = results.map((result) => {
         const [doc, similarityScore] = result;
         const authorityBoost = computeAuthorityBoost(
-          doc.metadata.authority_level as string | undefined,
+          doc.metadata.authorityLevel as string | undefined,
         );
         // Subtract authority boost (higher authority = larger boost = lower composite score)
         const compositeScore = similarityScore - authorityBoost;
@@ -264,7 +286,7 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
             sectionTitle: doc.metadata.sectionTitle as string | undefined,
             effectiveDate: doc.metadata.effectiveDate as string | undefined,
             ingestedAt: doc.metadata.ingestedAt as string | undefined,
-            authorityLevel: doc.metadata.authority_level as
+            authorityLevel: doc.metadata.authorityLevel as
               | AuthorityLevel
               | undefined,
           },

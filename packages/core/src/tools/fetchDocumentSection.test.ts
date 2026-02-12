@@ -33,7 +33,7 @@ describe("createFetchDocumentSectionTool", () => {
             document_title: "Test Document",
             section_title: null,
             source_url: "https://example.com/doc",
-            ngb_id: "usa_swimming",
+            ngb_id: "usa-swimming",
             topic_domain: "team_selection",
             effective_date: "2024-01-01",
             chunk_index: 0,
@@ -44,7 +44,7 @@ describe("createFetchDocumentSectionTool", () => {
       await tool.invoke({ documentId: "doc-123" });
 
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining("metadata->>'source_id' = $1"),
+        expect.stringContaining("metadata->>'sourceId' = $1"),
         ["doc-123"],
       );
     });
@@ -57,7 +57,7 @@ describe("createFetchDocumentSectionTool", () => {
             document_title: "Selection Procedures",
             section_title: null,
             source_url: "https://usopc.org/selection",
-            ngb_id: "usa_swimming",
+            ngb_id: "usa-swimming",
             topic_domain: "team_selection",
             effective_date: "2024-01-01",
             chunk_index: 0,
@@ -69,7 +69,7 @@ describe("createFetchDocumentSectionTool", () => {
 
       expect(result).toContain("Document: Selection Procedures");
       expect(result).toContain("Source: https://usopc.org/selection");
-      expect(result).toContain("NGB: usa_swimming");
+      expect(result).toContain("NGB: usa-swimming");
       expect(result).toContain("Topic: team_selection");
       expect(result).toContain("Effective Date: 2024-01-01");
       expect(result).toContain("Chunks: 1");
@@ -100,7 +100,7 @@ describe("createFetchDocumentSectionTool", () => {
       });
 
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining("metadata->>'section_title' ILIKE $2"),
+        expect.stringContaining("metadata->>'sectionTitle' ILIKE $2"),
         ["doc-456", "%Eligibility%"],
       );
     });
@@ -275,7 +275,7 @@ describe("createFetchDocumentSectionTool", () => {
             document_title: "Complete Document",
             section_title: "Full Section",
             source_url: "https://full.example.com",
-            ngb_id: "full_ngb",
+            ngb_id: "full-ngb",
             topic_domain: "governance",
             effective_date: "2025-06-15",
             chunk_index: 0,
@@ -291,7 +291,7 @@ describe("createFetchDocumentSectionTool", () => {
       expect(result).toContain("Document: Complete Document");
       expect(result).toContain("Section: Full Section");
       expect(result).toContain("Source: https://full.example.com");
-      expect(result).toContain("NGB: full_ngb");
+      expect(result).toContain("NGB: full-ngb");
       expect(result).toContain("Topic: governance");
       expect(result).toContain("Effective Date: 2025-06-15");
     });

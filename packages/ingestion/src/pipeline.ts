@@ -177,15 +177,15 @@ export async function backfillDenormalizedColumns(
     const result = await client.query(`
       UPDATE document_chunks
       SET
-        source_url      = metadata->>'source_url',
-        document_title  = metadata->>'document_title',
-        document_type   = metadata->>'document_type',
-        ngb_id          = metadata->>'ngb_id',
-        topic_domain    = metadata->>'topic_domain',
-        authority_level  = metadata->>'authority_level',
-        section_title   = metadata->>'section_title'
+        source_url      = metadata->>'sourceUrl',
+        document_title  = metadata->>'documentTitle',
+        document_type   = metadata->>'documentType',
+        ngb_id          = metadata->>'ngbId',
+        topic_domain    = metadata->>'topicDomain',
+        authority_level  = metadata->>'authorityLevel',
+        section_title   = metadata->>'sectionTitle'
       WHERE source_url IS NULL
-        AND metadata->>'source_url' IS NOT NULL
+        AND metadata->>'sourceUrl' IS NOT NULL
     `);
     return result.rowCount ?? 0;
   } finally {

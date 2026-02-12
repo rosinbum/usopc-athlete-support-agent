@@ -75,13 +75,13 @@ describe("retrieve", () => {
       ]);
 
       await retrieve(mockVectorStore as unknown as PGVectorStore, "query", {
-        ngbIds: ["usa_swimming", "us_rowing"],
+        ngbIds: ["usa-swimming", "us-rowing"],
       });
 
       expect(mockVectorStore.similaritySearchWithScore).toHaveBeenCalledWith(
         "query",
         5,
-        { ngb_id: { $in: ["usa_swimming", "us_rowing"] } },
+        { ngbId: { $in: ["usa-swimming", "us-rowing"] } },
       );
     });
 
@@ -113,7 +113,7 @@ describe("retrieve", () => {
       expect(mockVectorStore.similaritySearchWithScore).toHaveBeenCalledWith(
         "query",
         5,
-        { topic_domain: "team_selection" },
+        { topicDomain: "team_selection" },
       );
     });
   });
@@ -125,7 +125,7 @@ describe("retrieve", () => {
       ]);
 
       await retrieve(mockVectorStore as unknown as PGVectorStore, "query", {
-        ngbIds: ["usa_swimming"],
+        ngbIds: ["usa-swimming"],
         topicDomain: "eligibility",
       });
 
@@ -133,8 +133,8 @@ describe("retrieve", () => {
         "query",
         5,
         {
-          ngb_id: { $in: ["usa_swimming"] },
-          topic_domain: "eligibility",
+          ngbId: { $in: ["usa-swimming"] },
+          topicDomain: "eligibility",
         },
       );
     });
@@ -156,7 +156,7 @@ describe("retrieve", () => {
       const result = await retrieve(
         mockVectorStore as unknown as PGVectorStore,
         "query",
-        { ngbIds: ["usa_swimming"], confidenceThreshold: 0.5 },
+        { ngbIds: ["usa-swimming"], confidenceThreshold: 0.5 },
       );
 
       // Should have called twice - narrow then broad
@@ -175,7 +175,7 @@ describe("retrieve", () => {
         .mockResolvedValueOnce([[createDoc("2", "Broad"), 0.8]]);
 
       await retrieve(mockVectorStore as unknown as PGVectorStore, "query", {
-        ngbIds: ["usa_swimming"],
+        ngbIds: ["usa-swimming"],
         topicDomain: "safesport",
         confidenceThreshold: 0.5,
       });
@@ -183,7 +183,7 @@ describe("retrieve", () => {
       // Second call should have only topic filter
       expect(
         mockVectorStore.similaritySearchWithScore.mock.calls[1][2],
-      ).toEqual({ topic_domain: "safesport" });
+      ).toEqual({ topicDomain: "safesport" });
     });
 
     it("should merge narrow and broad results with deduplication", async () => {
@@ -233,7 +233,7 @@ describe("retrieve", () => {
       ]);
 
       await retrieve(mockVectorStore as unknown as PGVectorStore, "query", {
-        ngbIds: ["usa_swimming"],
+        ngbIds: ["usa-swimming"],
         confidenceThreshold: 0.5,
       });
 

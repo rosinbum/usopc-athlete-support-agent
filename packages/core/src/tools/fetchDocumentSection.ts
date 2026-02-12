@@ -47,33 +47,33 @@ export function createFetchDocumentSectionTool(pool: Pool) {
           query = `
             SELECT
               content,
-              metadata->>'document_title' AS document_title,
-              metadata->>'section_title' AS section_title,
-              metadata->>'source_url' AS source_url,
-              metadata->>'ngb_id' AS ngb_id,
-              metadata->>'topic_domain' AS topic_domain,
-              metadata->>'effective_date' AS effective_date,
-              metadata->>'chunk_index' AS chunk_index
+              metadata->>'documentTitle' AS document_title,
+              metadata->>'sectionTitle' AS section_title,
+              metadata->>'sourceUrl' AS source_url,
+              metadata->>'ngbId' AS ngb_id,
+              metadata->>'topicDomain' AS topic_domain,
+              metadata->>'effectiveDate' AS effective_date,
+              metadata->>'chunkIndex' AS chunk_index
             FROM document_chunks
-            WHERE metadata->>'source_id' = $1
-              AND metadata->>'section_title' ILIKE $2
-            ORDER BY (metadata->>'chunk_index')::int ASC
+            WHERE metadata->>'sourceId' = $1
+              AND metadata->>'sectionTitle' ILIKE $2
+            ORDER BY (metadata->>'chunkIndex')::int ASC
           `;
           params = [documentId, `%${sectionTitle}%`];
         } else {
           query = `
             SELECT
               content,
-              metadata->>'document_title' AS document_title,
-              metadata->>'section_title' AS section_title,
-              metadata->>'source_url' AS source_url,
-              metadata->>'ngb_id' AS ngb_id,
-              metadata->>'topic_domain' AS topic_domain,
-              metadata->>'effective_date' AS effective_date,
-              metadata->>'chunk_index' AS chunk_index
+              metadata->>'documentTitle' AS document_title,
+              metadata->>'sectionTitle' AS section_title,
+              metadata->>'sourceUrl' AS source_url,
+              metadata->>'ngbId' AS ngb_id,
+              metadata->>'topicDomain' AS topic_domain,
+              metadata->>'effectiveDate' AS effective_date,
+              metadata->>'chunkIndex' AS chunk_index
             FROM document_chunks
-            WHERE metadata->>'source_id' = $1
-            ORDER BY (metadata->>'chunk_index')::int ASC
+            WHERE metadata->>'sourceId' = $1
+            ORDER BY (metadata->>'chunkIndex')::int ASC
           `;
           params = [documentId];
         }

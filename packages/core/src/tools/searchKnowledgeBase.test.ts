@@ -45,7 +45,7 @@ describe("createSearchKnowledgeBaseTool", () => {
         [
           createMockDocument("Test content", {
             documentTitle: "Test Doc",
-            ngbId: "usa_swimming",
+            ngbId: "usa-swimming",
           }),
           0.85,
         ],
@@ -66,7 +66,7 @@ describe("createSearchKnowledgeBaseTool", () => {
           createMockDocument("Content about selection criteria", {
             documentTitle: "Selection Procedures",
             sectionTitle: "Criteria",
-            ngbId: "usa_swimming",
+            ngbId: "usa-swimming",
             topicDomain: "team_selection",
             sourceUrl: "https://example.com/doc",
             effectiveDate: "2024-01-01",
@@ -80,7 +80,7 @@ describe("createSearchKnowledgeBaseTool", () => {
       expect(result).toContain("Result 1 (score: 0.876)");
       expect(result).toContain("Document: Selection Procedures");
       expect(result).toContain("Section: Criteria");
-      expect(result).toContain("NGB: usa_swimming");
+      expect(result).toContain("NGB: usa-swimming");
       expect(result).toContain("Topic: team_selection");
       expect(result).toContain("Source: https://example.com/doc");
       expect(result).toContain("Effective Date: 2024-01-01");
@@ -94,13 +94,13 @@ describe("createSearchKnowledgeBaseTool", () => {
 
       await tool.invoke({
         query: "eligibility requirements",
-        ngbIds: ["usa_swimming", "us_rowing"],
+        ngbIds: ["usa-swimming", "us-rowing"],
       });
 
       expect(mockVectorStore.similaritySearchWithScore).toHaveBeenCalledWith(
         "eligibility requirements",
         expect.any(Number),
-        { ngb_id: { $in: ["usa_swimming", "us_rowing"] } },
+        { ngbId: { $in: ["usa-swimming", "us-rowing"] } },
       );
     });
 
@@ -109,7 +109,7 @@ describe("createSearchKnowledgeBaseTool", () => {
 
       await tool.invoke({
         query: "team selection",
-        ngbIds: ["usa_swimming"],
+        ngbIds: ["usa-swimming"],
       });
 
       // With filter, should use narrowFilterTopK (typically 5)
@@ -130,7 +130,7 @@ describe("createSearchKnowledgeBaseTool", () => {
       expect(mockVectorStore.similaritySearchWithScore).toHaveBeenCalledWith(
         "how to file a complaint",
         expect.any(Number),
-        { topic_domain: "safesport" },
+        { topicDomain: "safesport" },
       );
     });
   });
@@ -141,7 +141,7 @@ describe("createSearchKnowledgeBaseTool", () => {
 
       await tool.invoke({
         query: "anti-doping rules",
-        ngbIds: ["usa_track_field"],
+        ngbIds: ["usa-track-field"],
         topicDomain: "anti_doping",
       });
 
@@ -149,8 +149,8 @@ describe("createSearchKnowledgeBaseTool", () => {
         "anti-doping rules",
         expect.any(Number),
         {
-          ngb_id: { $in: ["usa_track_field"] },
-          topic_domain: "anti_doping",
+          ngbId: { $in: ["usa-track-field"] },
+          topicDomain: "anti_doping",
         },
       );
     });
