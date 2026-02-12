@@ -74,24 +74,23 @@ export function EditSourceClient({ id }: { id: string }) {
     fetchSource();
   }, [fetchSource]);
 
-  // Build form initial values from loaded source
-  useEffect(() => {
-    if (source) {
-      initialValuesRef.current = {
-        id: source.id,
-        title: source.title,
-        description: source.description,
-        url: source.url,
-        format: source.format,
-        documentType: source.documentType as SourceFormValues["documentType"],
-        topicDomains: source.topicDomains,
-        authorityLevel:
-          source.authorityLevel as SourceFormValues["authorityLevel"],
-        priority: source.priority,
-        ngbId: source.ngbId ?? "",
-      };
-    }
-  }, [source]);
+  // Build form initial values eagerly during render (not in useEffect,
+  // which would run after SourceForm mounts with empty defaults).
+  if (source && !initialValuesRef.current) {
+    initialValuesRef.current = {
+      id: source.id,
+      title: source.title,
+      description: source.description,
+      url: source.url,
+      format: source.format,
+      documentType: source.documentType as SourceFormValues["documentType"],
+      topicDomains: source.topicDomains,
+      authorityLevel:
+        source.authorityLevel as SourceFormValues["authorityLevel"],
+      priority: source.priority,
+      ngbId: source.ngbId ?? "",
+    };
+  }
 
   async function handleSubmit(values: SourceFormValues) {
     if (!initialValuesRef.current) return;
