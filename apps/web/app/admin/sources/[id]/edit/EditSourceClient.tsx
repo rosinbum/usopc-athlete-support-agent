@@ -8,7 +8,44 @@ import {
   type SourceFormValues,
 } from "../../components/SourceForm.js";
 
+const SCALAR_FIELDS = [
+  "title",
+  "description",
+  "url",
+  "format",
+  "documentType",
+  "authorityLevel",
+  "priority",
+] as const satisfies readonly (keyof SourceFormValues)[];
+
+function computeDiff(
+  initial: SourceFormValues,
+  values: SourceFormValues,
+): Record<string, unknown> {
+  const diff: Record<string, unknown> = {};
+
+  for (const key of SCALAR_FIELDS) {
+    if (values[key] !== initial[key]) diff[key] = values[key];
+  }
+
+  if (
+    JSON.stringify([...values.topicDomains].sort()) !==
+    JSON.stringify([...initial.topicDomains].sort())
+  ) {
+    diff.topicDomains = values.topicDomains;
+  }
+
+  const newNgb = values.ngbId || null;
+  const oldNgb = initial.ngbId || null;
+  if (newNgb !== oldNgb) diff.ngbId = newNgb;
+
+  return diff;
+}
+
 export function EditSourceClient({ id }: { id: string }) {
+  const apiUrl = `/api/admin/sources/${id}`;
+  const detailUrl = `/admin/sources/${id}`;
+
   const [source, setSource] = useState<SourceConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +56,7 @@ export function EditSourceClient({ id }: { id: string }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/sources/${id}`);
+      const res = await fetch(apiUrl);
       if (!res.ok) {
         if (res.status === 404) throw new Error("Source not found");
         throw new Error("Failed to fetch source");
@@ -31,7 +68,7 @@ export function EditSourceClient({ id }: { id: string }) {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [apiUrl]);
 
   useEffect(() => {
     fetchSource();
@@ -60,36 +97,14 @@ export function EditSourceClient({ id }: { id: string }) {
     if (!initialValuesRef.current) return;
     setApiError(null);
 
-    // Compute diff — only send changed fields
-    const diff: Record<string, unknown> = {};
-    const initial = initialValuesRef.current;
-
-    if (values.title !== initial.title) diff.title = values.title;
-    if (values.description !== initial.description)
-      diff.description = values.description;
-    if (values.url !== initial.url) diff.url = values.url;
-    if (values.format !== initial.format) diff.format = values.format;
-    if (values.documentType !== initial.documentType)
-      diff.documentType = values.documentType;
-    if (
-      JSON.stringify(values.topicDomains.sort()) !==
-      JSON.stringify([...initial.topicDomains].sort())
-    )
-      diff.topicDomains = values.topicDomains;
-    if (values.authorityLevel !== initial.authorityLevel)
-      diff.authorityLevel = values.authorityLevel;
-    if (values.priority !== initial.priority) diff.priority = values.priority;
-    const newNgb = values.ngbId || null;
-    const oldNgb = initial.ngbId || null;
-    if (newNgb !== oldNgb) diff.ngbId = newNgb;
+    const diff = computeDiff(initialValuesRef.current, values);
 
     if (Object.keys(diff).length === 0) {
-      // No changes — navigate back
-      window.location.href = `/admin/sources/${id}`;
+      window.location.href = detailUrl;
       return;
     }
 
-    const res = await fetch(`/api/admin/sources/${id}`, {
+    const res = await fetch(apiUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(diff),
@@ -101,7 +116,7 @@ export function EditSourceClient({ id }: { id: string }) {
       return;
     }
 
-    window.location.href = `/admin/sources/${id}`;
+    window.location.href = detailUrl;
   }
 
   if (loading) {
@@ -130,7 +145,7 @@ export function EditSourceClient({ id }: { id: string }) {
   return (
     <div>
       <a
-        href={`/admin/sources/${id}`}
+        href={detailUrl}
         className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3"
       >
         <ArrowLeft className="w-4 h-4" /> Back to Source
