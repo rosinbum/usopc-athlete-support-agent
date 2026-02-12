@@ -14,16 +14,16 @@ export function enrichMetadata(
     ...chunk,
     metadata: {
       ...chunk.metadata,
-      ngb_id: source.ngbId,
-      topic_domain: source.topicDomains[0], // primary domain
-      topic_domains: source.topicDomains,
-      document_type: source.documentType,
-      source_url: source.url,
-      document_title: source.title,
-      source_id: source.id,
-      chunk_index: index,
-      ingested_at: new Date().toISOString(),
-      authority_level: source.authorityLevel,
+      ngbId: source.ngbId,
+      topicDomain: source.topicDomains[0], // primary domain
+      topicDomains: source.topicDomains,
+      documentType: source.documentType,
+      sourceUrl: source.url,
+      documentTitle: source.title,
+      sourceId: source.id,
+      chunkIndex: index,
+      ingestedAt: new Date().toISOString(),
+      authorityLevel: source.authorityLevel,
     },
   }));
 }

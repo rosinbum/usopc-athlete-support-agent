@@ -28,10 +28,10 @@ export async function retrieve(
   // Stage 1: Narrow search with filters
   let filter: Record<string, any> = {};
   if (ngbIds && ngbIds.length > 0) {
-    filter.ngb_id = { $in: ngbIds };
+    filter.ngbId = { $in: ngbIds };
   }
   if (topicDomain) {
-    filter.topic_domain = topicDomain;
+    filter.topicDomain = topicDomain;
   }
 
   const narrowResults = await vectorStore.similaritySearchWithScore(
@@ -55,7 +55,7 @@ export async function retrieve(
     // Remove NGB filter but keep topic if present
     const broadFilter: Record<string, any> = {};
     if (topicDomain) {
-      broadFilter.topic_domain = topicDomain;
+      broadFilter.topicDomain = topicDomain;
     }
 
     const broadResults = await vectorStore.similaritySearchWithScore(

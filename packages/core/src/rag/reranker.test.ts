@@ -16,18 +16,18 @@ describe("rerank", () => {
 
   it("boosts documents matching an NGB ID", () => {
     const docs = [
-      makeDoc({ ngb_id: "other" }, "other"),
-      makeDoc({ ngb_id: "usa_swimming" }, "match"),
+      makeDoc({ ngbId: "other" }, "other"),
+      makeDoc({ ngbId: "usa-swimming" }, "match"),
     ];
 
-    const result = rerank(docs, { ngbIds: ["usa_swimming"] });
+    const result = rerank(docs, { ngbIds: ["usa-swimming"] });
     expect(result[0].pageContent).toBe("match");
   });
 
   it("boosts documents matching the topic domain", () => {
     const docs = [
-      makeDoc({ topic_domain: "governance" }, "governance"),
-      makeDoc({ topic_domain: "safesport" }, "safesport"),
+      makeDoc({ topicDomain: "governance" }, "governance"),
+      makeDoc({ topicDomain: "safesport" }, "safesport"),
     ];
 
     const result = rerank(docs, { topicDomain: "safesport" });
@@ -36,8 +36,8 @@ describe("rerank", () => {
 
   it("boosts high-priority document types", () => {
     const docs = [
-      makeDoc({ document_type: "faq" }, "faq"),
-      makeDoc({ document_type: "bylaws" }, "bylaws"),
+      makeDoc({ documentType: "faq" }, "faq"),
+      makeDoc({ documentType: "bylaws" }, "bylaws"),
     ];
 
     const result = rerank(docs);
@@ -52,8 +52,8 @@ describe("rerank", () => {
     old.setFullYear(old.getFullYear() - 5);
 
     const docs = [
-      makeDoc({ effective_date: old.toISOString() }, "old"),
-      makeDoc({ effective_date: recent.toISOString() }, "recent"),
+      makeDoc({ effectiveDate: old.toISOString() }, "old"),
+      makeDoc({ effectiveDate: recent.toISOString() }, "recent"),
     ];
 
     const result = rerank(docs);
@@ -77,20 +77,20 @@ describe("rerank", () => {
     recent.setMonth(recent.getMonth() - 1);
 
     const docs = [
-      makeDoc({ document_type: "faq" }, "low"),
+      makeDoc({ documentType: "faq" }, "low"),
       makeDoc(
         {
-          ngb_id: "usa_swimming",
-          topic_domain: "team_selection",
-          document_type: "selection_procedures",
-          effective_date: recent.toISOString(),
+          ngbId: "usa-swimming",
+          topicDomain: "team_selection",
+          documentType: "selection_procedures",
+          effectiveDate: recent.toISOString(),
         },
         "high",
       ),
     ];
 
     const result = rerank(docs, {
-      ngbIds: ["usa_swimming"],
+      ngbIds: ["usa-swimming"],
       topicDomain: "team_selection",
     });
     expect(result[0].pageContent).toBe("high");
@@ -99,9 +99,9 @@ describe("rerank", () => {
   describe("authority level boosting", () => {
     it("boosts documents with higher authority levels", () => {
       const docs = [
-        makeDoc({ authority_level: "educational_guidance" }, "faq"),
-        makeDoc({ authority_level: "usopc_policy_procedure" }, "policy"),
-        makeDoc({ authority_level: "law" }, "law"),
+        makeDoc({ authorityLevel: "educational_guidance" }, "faq"),
+        makeDoc({ authorityLevel: "usopc_policy_procedure" }, "policy"),
+        makeDoc({ authorityLevel: "law" }, "law"),
       ];
 
       const result = rerank(docs);
@@ -114,16 +114,16 @@ describe("rerank", () => {
     it("stacks authority boost with NGB match boost", () => {
       const docs = [
         makeDoc(
-          { ngb_id: "usa_swimming", authority_level: "ngb_policy_procedure" },
+          { ngbId: "usa-swimming", authorityLevel: "ngb_policy_procedure" },
           "ngb-match-low-auth",
         ),
         makeDoc(
-          { ngb_id: "usa_gymnastics", authority_level: "law" },
+          { ngbId: "usa-gymnastics", authorityLevel: "law" },
           "no-match-high-auth",
         ),
       ];
 
-      const result = rerank(docs, { ngbIds: ["usa_swimming"] });
+      const result = rerank(docs, { ngbIds: ["usa-swimming"] });
       // Both have boosts - NGB match + low authority vs no match + high authority
       // The exact order depends on boost values
       expect(result).toHaveLength(2);
@@ -132,7 +132,7 @@ describe("rerank", () => {
     it("handles documents without authority level", () => {
       const docs = [
         makeDoc({}, "no-authority"),
-        makeDoc({ authority_level: "usopc_governance" }, "has-authority"),
+        makeDoc({ authorityLevel: "usopc_governance" }, "has-authority"),
       ];
 
       const result = rerank(docs);

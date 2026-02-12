@@ -150,14 +150,14 @@ export async function listUniqueDocuments(
       ${COL.ngb_id} as ngb_id,
       ${COL.topic_domain} as topic_domain,
       ${COL.authority_level} as authority_level,
-      metadata->>'effective_date' as effective_date,
+      metadata->>'effectiveDate' as effective_date,
       MIN(ingested_at) as ingested_at,
       COUNT(*) as chunk_count
     FROM document_chunks
     ${whereClause}
     GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
              ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level},
-             metadata->>'effective_date'
+             metadata->>'effectiveDate'
     ORDER BY ingested_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
   `;

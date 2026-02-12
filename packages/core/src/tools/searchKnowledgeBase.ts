@@ -15,7 +15,7 @@ const searchKnowledgeBaseSchema = z.object({
     .array(z.string())
     .optional()
     .describe(
-      "Optional list of NGB identifiers to narrow the search (e.g. ['usa_swimming', 'us_rowing']).",
+      "Optional list of NGB identifiers to narrow the search (e.g. ['usa-swimming', 'us-rowing']).",
     ),
   topicDomain: z
     .string()
@@ -50,13 +50,12 @@ export function createSearchKnowledgeBaseTool(vectorStore: PGVectorStore) {
         const k = topK ?? RETRIEVAL_CONFIG.narrowFilterTopK;
 
         // Build metadata filter if NGB or topic domain constraints are provided
-        // Uses snake_case field names and $in operator to match pgvector schema
         const filter: Record<string, unknown> = {};
         if (ngbIds && ngbIds.length > 0) {
-          filter.ngb_id = { $in: ngbIds };
+          filter.ngbId = { $in: ngbIds };
         }
         if (topicDomain) {
-          filter.topic_domain = topicDomain;
+          filter.topicDomain = topicDomain;
         }
 
         const hasFilter = Object.keys(filter).length > 0;

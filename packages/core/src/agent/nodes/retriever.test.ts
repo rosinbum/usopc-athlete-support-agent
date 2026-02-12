@@ -104,7 +104,7 @@ describe("createRetrieverNode", () => {
     const node = createRetrieverNode(store);
     const state = makeState({
       topicDomain: "team_selection",
-      detectedNgbIds: ["usa_swimming"],
+      detectedNgbIds: ["usa-swimming"],
     });
 
     const result = await node(state);
@@ -135,14 +135,45 @@ describe("createRetrieverNode", () => {
 
     const result = await node(state);
     expect(store.similaritySearchWithScore).toHaveBeenCalledTimes(2);
-    // Broad search has no filter
+    // Broad search has no NGB broad filter (no detectedNgbIds)
     expect(store.similaritySearchWithScore).toHaveBeenNthCalledWith(
       2,
       expect.any(String),
       10, // broadenFilterTopK
+      undefined,
     );
     // Should have merged results (1 narrow + 3 broad, deduped)
     expect(result.retrievedDocuments!.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("broad search uses $or filter for NGB + universal docs", async () => {
+    const store = makeMockVectorStore([
+      // Narrow: 1 result (< 2) triggers broadening
+      [makeSearchResult("narrow-doc", 0.1)],
+      // Broad: returns results
+      [
+        makeSearchResult("broad-doc-1", 0.15),
+        makeSearchResult("broad-doc-2", 0.2),
+      ],
+    ]);
+
+    const node = createRetrieverNode(store);
+    const state = makeState({
+      topicDomain: "team_selection",
+      detectedNgbIds: ["usa-swimming"],
+    });
+
+    await node(state);
+    expect(store.similaritySearchWithScore).toHaveBeenCalledTimes(2);
+    // Broad search should use $or filter: NGB match OR universal (ngbId: null)
+    expect(store.similaritySearchWithScore).toHaveBeenNthCalledWith(
+      2,
+      expect.any(String),
+      10,
+      {
+        $or: [{ ngbId: "usa-swimming" }, { ngbId: null }],
+      },
+    );
   });
 
   it("skips narrow search and goes directly to broad when no filters", async () => {
@@ -265,7 +296,7 @@ describe("createRetrieverNode", () => {
     const store = makeMockVectorStore([
       [
         makeSearchResult("content", 0.1, {
-          ngbId: "usa_swimming",
+          ngbId: "usa-swimming",
           topicDomain: "team_selection",
           documentType: "selection_procedures",
           sourceUrl: "https://example.com",
@@ -283,7 +314,7 @@ describe("createRetrieverNode", () => {
 
     const result = await node(state);
     const doc = result.retrievedDocuments![0];
-    expect(doc.metadata.ngbId).toBe("usa_swimming");
+    expect(doc.metadata.ngbId).toBe("usa-swimming");
     expect(doc.metadata.topicDomain).toBe("team_selection");
     expect(doc.metadata.documentType).toBe("selection_procedures");
     expect(doc.metadata.sourceUrl).toBe("https://example.com");
@@ -299,11 +330,11 @@ describe("createRetrieverNode", () => {
       [
         makeSearchResult("federal law content", 0.1, {
           documentTitle: "Ted Stevens Act",
-          authority_level: "law",
+          authorityLevel: "law",
         }),
         makeSearchResult("policy content", 0.15, {
           documentTitle: "USOPC Policy",
-          authority_level: "usopc_policy_procedure",
+          authorityLevel: "usopc_policy_procedure",
         }),
       ],
     ]);
@@ -325,11 +356,11 @@ describe("createRetrieverNode", () => {
         [
           makeSearchResult("educational guidance content", 0.1, {
             documentTitle: "FAQ",
-            authority_level: "educational_guidance", // lowest authority
+            authorityLevel: "educational_guidance", // lowest authority
           }),
           makeSearchResult("federal law content", 0.12, {
             documentTitle: "Ted Stevens Act",
-            authority_level: "law", // highest authority
+            authorityLevel: "law", // highest authority
           }),
         ],
       ]);
@@ -351,11 +382,11 @@ describe("createRetrieverNode", () => {
         [
           makeSearchResult("educational content with great match", 0.1, {
             documentTitle: "Athlete Guide",
-            authority_level: "educational_guidance",
+            authorityLevel: "educational_guidance",
           }),
           makeSearchResult("law content with poor match", 0.5, {
             documentTitle: "Ted Stevens Act",
-            authority_level: "law",
+            authorityLevel: "law",
           }),
         ],
       ]);
@@ -379,7 +410,7 @@ describe("createRetrieverNode", () => {
           }),
           makeSearchResult("doc with authority", 0.12, {
             documentTitle: "USOPC Policy",
-            authority_level: "usopc_policy_procedure",
+            authorityLevel: "usopc_policy_procedure",
           }),
         ],
       ]);
@@ -404,7 +435,7 @@ describe("createRetrieverNode", () => {
 
     const node = createRetrieverNode(store);
     const state = makeState({
-      detectedNgbIds: ["usa_swimming", "usa_track_field"],
+      detectedNgbIds: ["usa-swimming", "usa-track-field"],
       topicDomain: "team_selection",
     });
 
@@ -413,7 +444,7 @@ describe("createRetrieverNode", () => {
       expect.any(String),
       5,
       expect.objectContaining({
-        ngbId: { $in: ["usa_swimming", "usa_track_field"] },
+        ngbId: { $in: ["usa-swimming", "usa-track-field"] },
       }),
     );
   });
@@ -439,7 +470,7 @@ describe("createRetrieverNode", () => {
           new HumanMessage("What about alternates?"),
         ],
         topicDomain: "team_selection",
-        detectedNgbIds: ["usa_swimming"],
+        detectedNgbIds: ["usa-swimming"],
       });
 
       await node(state);
