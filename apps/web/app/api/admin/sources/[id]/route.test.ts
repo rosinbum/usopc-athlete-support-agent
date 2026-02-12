@@ -12,9 +12,33 @@ vi.mock("../../../../../lib/source-config.js", () => ({
   createSourceConfigEntity: vi.fn(),
 }));
 
+const mockDeleteChunks = vi.fn().mockResolvedValue(0);
+const mockUpdateChunkMetadata = vi.fn().mockResolvedValue(0);
+const mockCountChunks = vi.fn().mockResolvedValue(0);
+
+vi.mock("@usopc/shared", () => ({
+  getPool: () => "mock-pool",
+  deleteChunksBySourceId: (...args: unknown[]) => mockDeleteChunks(...args),
+  updateChunkMetadataBySourceId: (...args: unknown[]) =>
+    mockUpdateChunkMetadata(...args),
+  countChunksBySourceId: (...args: unknown[]) => mockCountChunks(...args),
+}));
+
+const mockSqsSend = vi.fn();
+vi.mock("@aws-sdk/client-sqs", () => ({
+  SQSClient: vi.fn(() => ({ send: mockSqsSend })),
+  SendMessageCommand: vi.fn((input: unknown) => input),
+}));
+
+vi.mock("sst", () => ({
+  Resource: {
+    IngestionQueue: { url: "https://sqs.us-east-1.amazonaws.com/test-queue" },
+  },
+}));
+
 import { auth } from "../../../../../auth.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
-import { GET, PATCH } from "./route.js";
+import { GET, PATCH, DELETE } from "./route.js";
 
 const mockAuth = vi.mocked(auth);
 const mockCreateEntity = vi.mocked(createSourceConfigEntity);
@@ -24,7 +48,24 @@ const SAMPLE_SOURCE = {
   title: "USOPC Bylaws",
   enabled: true,
   url: "https://example.com/bylaws.pdf",
+  format: "pdf",
+  documentType: "bylaws",
+  topicDomains: ["governance"],
+  ngbId: null,
+  priority: "high",
+  description: "Bylaws doc",
+  authorityLevel: "usopc_governance",
 };
+
+function authedAdmin() {
+  mockAuth.mockResolvedValueOnce({
+    user: { email: "admin@test.com" },
+  } as never);
+}
+
+// ===========================================================================
+// GET
+// ===========================================================================
 
 describe("GET /api/admin/sources/[id]", () => {
   beforeEach(() => {
@@ -36,27 +77,21 @@ describe("GET /api/admin/sources/[id]", () => {
 
     const res = await GET(
       new Request("http://localhost/api/admin/sources/test"),
-      {
-        params: Promise.resolve({ id: "test" }),
-      },
+      { params: Promise.resolve({ id: "test" }) },
     );
 
     expect(res.status).toBe(401);
   });
 
   it("returns 404 for missing source", async () => {
-    mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
-    } as never);
+    authedAdmin();
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(null),
     } as never);
 
     const res = await GET(
       new Request("http://localhost/api/admin/sources/missing"),
-      {
-        params: Promise.resolve({ id: "missing" }),
-      },
+      { params: Promise.resolve({ id: "missing" }) },
     );
     const body = await res.json();
 
@@ -64,13 +99,12 @@ describe("GET /api/admin/sources/[id]", () => {
     expect(body.error).toBe("Source not found");
   });
 
-  it("returns source detail", async () => {
-    mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
-    } as never);
+  it("returns source detail with chunk count", async () => {
+    authedAdmin();
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCE),
     } as never);
+    mockCountChunks.mockResolvedValueOnce(42);
 
     const res = await GET(
       new Request("http://localhost/api/admin/sources/usopc-bylaws"),
@@ -80,8 +114,13 @@ describe("GET /api/admin/sources/[id]", () => {
 
     expect(res.status).toBe(200);
     expect(body.source.id).toBe("usopc-bylaws");
+    expect(body.chunkCount).toBe(42);
   });
 });
+
+// ===========================================================================
+// PATCH
+// ===========================================================================
 
 describe("PATCH /api/admin/sources/[id]", () => {
   beforeEach(() => {
@@ -103,26 +142,21 @@ describe("PATCH /api/admin/sources/[id]", () => {
   });
 
   it("rejects unknown fields", async () => {
-    mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
-    } as never);
+    authedAdmin();
 
     const res = await PATCH(
       new Request("http://localhost/api/admin/sources/test", {
         method: "PATCH",
-        body: JSON.stringify({ authorityLevel: "law" }),
+        body: JSON.stringify({ bogusField: "foo" }),
       }),
       { params: Promise.resolve({ id: "test" }) },
     );
-    const body = await res.json();
 
     expect(res.status).toBe(400);
   });
 
   it("rejects empty body", async () => {
-    mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
-    } as never);
+    authedAdmin();
 
     const res = await PATCH(
       new Request("http://localhost/api/admin/sources/test", {
@@ -138,9 +172,7 @@ describe("PATCH /api/admin/sources/[id]", () => {
   });
 
   it("rejects invalid URL", async () => {
-    mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
-    } as never);
+    authedAdmin();
 
     const res = await PATCH(
       new Request("http://localhost/api/admin/sources/test", {
@@ -156,9 +188,7 @@ describe("PATCH /api/admin/sources/[id]", () => {
   });
 
   it("rejects non-boolean enabled", async () => {
-    mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
-    } as never);
+    authedAdmin();
 
     const res = await PATCH(
       new Request("http://localhost/api/admin/sources/test", {
@@ -171,11 +201,9 @@ describe("PATCH /api/admin/sources/[id]", () => {
     expect(res.status).toBe(400);
   });
 
-  it("updates allowed fields", async () => {
+  it("updates no-vector-impact fields (enabled only)", async () => {
     const updated = { ...SAMPLE_SOURCE, enabled: false };
-    mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
-    } as never);
+    authedAdmin();
     mockCreateEntity.mockReturnValueOnce({
       update: vi.fn().mockResolvedValueOnce(updated),
     } as never);
@@ -191,5 +219,185 @@ describe("PATCH /api/admin/sources/[id]", () => {
 
     expect(res.status).toBe(200);
     expect(body.source.enabled).toBe(false);
+    expect(body.actions).toEqual({});
+    expect(mockDeleteChunks).not.toHaveBeenCalled();
+    expect(mockUpdateChunkMetadata).not.toHaveBeenCalled();
+  });
+
+  it("updates metadata-only fields and syncs chunks", async () => {
+    const updated = { ...SAMPLE_SOURCE, title: "Updated Title" };
+    authedAdmin();
+    mockCreateEntity.mockReturnValueOnce({
+      update: vi.fn().mockResolvedValueOnce(updated),
+    } as never);
+    mockUpdateChunkMetadata.mockResolvedValueOnce(5);
+
+    const res = await PATCH(
+      new Request("http://localhost/api/admin/sources/usopc-bylaws", {
+        method: "PATCH",
+        body: JSON.stringify({ title: "Updated Title" }),
+      }),
+      { params: Promise.resolve({ id: "usopc-bylaws" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.source.title).toBe("Updated Title");
+    expect(body.actions.chunksUpdated).toBe(5);
+    expect(mockUpdateChunkMetadata).toHaveBeenCalledWith(
+      "mock-pool",
+      "usopc-bylaws",
+      { title: "Updated Title" },
+    );
+  });
+
+  it("deletes chunks and triggers re-ingestion for content-affecting changes", async () => {
+    const updated = { ...SAMPLE_SOURCE, url: "https://example.com/new.pdf" };
+    authedAdmin();
+    mockCreateEntity.mockReturnValueOnce({
+      update: vi.fn().mockResolvedValueOnce(updated),
+    } as never);
+    mockDeleteChunks.mockResolvedValueOnce(10);
+    mockSqsSend.mockResolvedValueOnce({});
+
+    const res = await PATCH(
+      new Request("http://localhost/api/admin/sources/usopc-bylaws", {
+        method: "PATCH",
+        body: JSON.stringify({ url: "https://example.com/new.pdf" }),
+      }),
+      { params: Promise.resolve({ id: "usopc-bylaws" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.actions.chunksDeleted).toBe(10);
+    expect(body.actions.reIngestionTriggered).toBe(true);
+    expect(mockDeleteChunks).toHaveBeenCalledWith("mock-pool", "usopc-bylaws");
+    expect(mockSqsSend).toHaveBeenCalledOnce();
+  });
+
+  it("content-affecting change wins over metadata change", async () => {
+    const updated = {
+      ...SAMPLE_SOURCE,
+      url: "https://example.com/new.pdf",
+      title: "New Title",
+    };
+    authedAdmin();
+    mockCreateEntity.mockReturnValueOnce({
+      update: vi.fn().mockResolvedValueOnce(updated),
+    } as never);
+    mockDeleteChunks.mockResolvedValueOnce(3);
+    mockSqsSend.mockResolvedValueOnce({});
+
+    const res = await PATCH(
+      new Request("http://localhost/api/admin/sources/usopc-bylaws", {
+        method: "PATCH",
+        body: JSON.stringify({
+          url: "https://example.com/new.pdf",
+          title: "New Title",
+        }),
+      }),
+      { params: Promise.resolve({ id: "usopc-bylaws" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.actions.chunksDeleted).toBe(3);
+    expect(body.actions.reIngestionTriggered).toBe(true);
+    expect(mockUpdateChunkMetadata).not.toHaveBeenCalled();
+  });
+
+  it("accepts all new field types", async () => {
+    const updated = {
+      ...SAMPLE_SOURCE,
+      authorityLevel: "law",
+      topicDomains: ["eligibility", "governance"],
+    };
+    authedAdmin();
+    mockCreateEntity.mockReturnValueOnce({
+      update: vi.fn().mockResolvedValueOnce(updated),
+    } as never);
+    mockUpdateChunkMetadata.mockResolvedValueOnce(2);
+
+    const res = await PATCH(
+      new Request("http://localhost/api/admin/sources/usopc-bylaws", {
+        method: "PATCH",
+        body: JSON.stringify({
+          authorityLevel: "law",
+          topicDomains: ["eligibility", "governance"],
+        }),
+      }),
+      { params: Promise.resolve({ id: "usopc-bylaws" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.actions.chunksUpdated).toBe(2);
+  });
+});
+
+// ===========================================================================
+// DELETE
+// ===========================================================================
+
+describe("DELETE /api/admin/sources/[id]", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 401 when not authenticated", async () => {
+    mockAuth.mockResolvedValueOnce(null as never);
+
+    const res = await DELETE(
+      new Request("http://localhost/api/admin/sources/test", {
+        method: "DELETE",
+      }),
+      { params: Promise.resolve({ id: "test" }) },
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 for missing source", async () => {
+    authedAdmin();
+    mockCreateEntity.mockReturnValueOnce({
+      getById: vi.fn().mockResolvedValueOnce(null),
+    } as never);
+
+    const res = await DELETE(
+      new Request("http://localhost/api/admin/sources/missing", {
+        method: "DELETE",
+      }),
+      { params: Promise.resolve({ id: "missing" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(body.error).toBe("Source not found");
+  });
+
+  it("deletes chunks then config and returns counts", async () => {
+    const mockEntityDelete = vi.fn().mockResolvedValueOnce(undefined);
+    authedAdmin();
+    mockCreateEntity.mockReturnValueOnce({
+      getById: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCE),
+      delete: mockEntityDelete,
+    } as never);
+    mockDeleteChunks.mockResolvedValueOnce(15);
+
+    const res = await DELETE(
+      new Request("http://localhost/api/admin/sources/usopc-bylaws", {
+        method: "DELETE",
+      }),
+      { params: Promise.resolve({ id: "usopc-bylaws" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.sourceId).toBe("usopc-bylaws");
+    expect(body.chunksDeleted).toBe(15);
+    expect(mockDeleteChunks).toHaveBeenCalledWith("mock-pool", "usopc-bylaws");
+    expect(mockEntityDelete).toHaveBeenCalledWith("usopc-bylaws");
   });
 });

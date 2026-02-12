@@ -37,6 +37,13 @@ export {
 export { getPool, closePool } from "./pool.js";
 
 export {
+  deleteChunksBySourceId,
+  updateChunkMetadataBySourceId,
+  countChunksBySourceId,
+  type ChunkMetadataUpdates,
+} from "./chunks.js";
+
+export {
   paginationSchema,
   type Pagination,
   uuidSchema,

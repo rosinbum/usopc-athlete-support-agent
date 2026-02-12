@@ -30,6 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_chunks_topic_domain ON document_chunks (topic_dom
 CREATE INDEX IF NOT EXISTS idx_chunks_document_type ON document_chunks (document_type);
 CREATE INDEX IF NOT EXISTS idx_chunks_authority_level ON document_chunks (authority_level);
 CREATE INDEX IF NOT EXISTS idx_chunks_metadata ON document_chunks USING gin (metadata);
+CREATE INDEX IF NOT EXISTS idx_chunks_source_id ON document_chunks ((metadata->>'sourceId'));
 
 -- Conversations table
 CREATE TABLE IF NOT EXISTS conversations (
