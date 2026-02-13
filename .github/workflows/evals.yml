@@ -51,12 +51,12 @@ jobs:
       - name: Run classifier eval
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
-        run: pnpm --filter @usopc/evals exec tsx src/scripts/run-evals.ts --suite classifier
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts src/evaluators/classifierAccuracy.eval.ts
 
       - name: Run escalation eval
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
-        run: pnpm --filter @usopc/evals exec tsx src/scripts/run-evals.ts --suite escalation
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts src/evaluators/escalation.eval.ts
 
       - name: Compare baselines
         run: pnpm --filter @usopc/evals exec tsx src/scripts/compare-baselines.ts
@@ -106,9 +106,9 @@ jobs:
       - name: Run groundedness eval
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
-        run: pnpm --filter @usopc/evals exec tsx src/scripts/run-evals.ts --suite groundedness
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts src/evaluators/groundedness.eval.ts
 
       - name: Run correctness eval
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
-        run: pnpm --filter @usopc/evals exec tsx src/scripts/run-evals.ts --suite correctness
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts src/evaluators/correctness.eval.ts
