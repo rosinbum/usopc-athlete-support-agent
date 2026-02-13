@@ -1,7 +1,11 @@
 import type { Document } from "@langchain/core/documents";
 import { Client } from "pg";
 import { createLogger, type AuthorityLevel } from "@usopc/shared";
-import { createEmbeddings, createVectorStore } from "@usopc/core/src/rag/index";
+import { MODEL_CONFIG } from "@usopc/core/src/config/index";
+import {
+  createRawEmbeddings,
+  createVectorStore,
+} from "@usopc/core/src/rag/index";
 import { loadPdf } from "./loaders/pdfLoader.js";
 import { loadWeb } from "./loaders/webLoader.js";
 import { loadHtml } from "./loaders/htmlLoader.js";
@@ -127,20 +131,50 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const EMBED_BATCH_MAX_RETRIES = 2;
 const EMBED_BATCH_RETRY_DELAY_MS = 30_000;
 
+class EmbeddingDimensionError extends Error {
+  constructor(expected: number, actual: number) {
+    super(
+      `OpenAI returned ${actual}-dim embeddings (expected ${expected}). ` +
+        "This is typically a transient API issue.",
+    );
+    this.name = "EmbeddingDimensionError";
+  }
+}
+
 /**
  * Attempt to embed a batch of documents, retrying on transient errors.
- * Quota errors are never retried — they throw immediately.
+ * Validates embedding dimensions before inserting to catch OpenAI API
+ * inconsistencies early. Quota errors are never retried.
  */
 async function embedBatchWithRetry(
-  vectorStore: { addDocuments: (docs: Document[]) => Promise<unknown> },
+  vectorStore: {
+    addVectors: (
+      vectors: number[][],
+      documents: Document[],
+    ) => Promise<unknown>;
+  },
+  embeddings: { embedDocuments: (texts: string[]) => Promise<number[][]> },
   batch: Document[],
+  expectedDimensions: number,
   sourceId: string,
   batchIndex: number,
   totalBatches: number,
 ): Promise<void> {
   for (let attempt = 0; attempt <= EMBED_BATCH_MAX_RETRIES; attempt++) {
     try {
-      await vectorStore.addDocuments(batch);
+      const texts = batch.map((d) => d.pageContent);
+      const vectors = await embeddings.embedDocuments(texts);
+
+      // Validate dimensions before inserting — OpenAI occasionally returns
+      // wrong dimensions during server instability.
+      if (vectors.length > 0 && vectors[0].length !== expectedDimensions) {
+        throw new EmbeddingDimensionError(
+          expectedDimensions,
+          vectors[0].length,
+        );
+      }
+
+      await vectorStore.addVectors(vectors, batch);
       return;
     } catch (error) {
       if (isQuotaError(error)) {
@@ -248,13 +282,15 @@ export async function ingestSource(
     const withSections = extractSections(enriched);
 
     // 6. Generate embeddings & store in pgvector (batched to respect TPM limits)
-    const embeddings = createEmbeddings(options.openaiApiKey);
+    const embeddings = createRawEmbeddings(options.openaiApiKey);
     const vectorStore = await createVectorStore(embeddings, {
       connectionString: options.databaseUrl,
     });
 
-    // Stay under the 40K TPM limit — use 30K budget to leave headroom
-    const batches = batchByTokenBudget(withSections, 30_000);
+    // Use small batches (~8K tokens) to avoid OpenAI 500 errors on large
+    // payloads, with a 15s inter-batch delay to stay under the 40K TPM limit
+    // (8K per 15s ≈ 32K/min, leaving headroom).
+    const batches = batchByTokenBudget(withSections, 8_000);
     logger.info(
       `Embedding ${withSections.length} chunks in ${batches.length} batch(es)`,
       { sourceId: source.id },
@@ -262,15 +298,16 @@ export async function ingestSource(
 
     for (let i = 0; i < batches.length; i++) {
       if (i > 0) {
-        // Wait between batches to let the TPM window reset
-        logger.info(`Waiting 60s before batch ${i + 1}/${batches.length}...`, {
+        logger.info(`Waiting 15s before batch ${i + 1}/${batches.length}...`, {
           sourceId: source.id,
         });
-        await sleep(60_000);
+        await sleep(15_000);
       }
       await embedBatchWithRetry(
         vectorStore,
+        embeddings,
         batches[i],
+        MODEL_CONFIG.embeddings.dimensions,
         source.id,
         i,
         batches.length,
@@ -335,8 +372,8 @@ export async function ingestAll(
     // Wait between sources to avoid TPM overlap from the previous source's
     // last batch. Skip the delay for the first source.
     if (i > 0 && results[i - 1].status === "completed") {
-      logger.info("Waiting 60s between sources for TPM window reset...");
-      await sleep(60_000);
+      logger.info("Waiting 15s between sources for TPM window reset...");
+      await sleep(15_000);
     }
     const result = await ingestSource(sources[i], options);
     results.push(result);
