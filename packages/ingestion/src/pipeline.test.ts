@@ -27,12 +27,21 @@ vi.mock("@usopc/shared", () => ({
   }),
 }));
 
-const mockAddDocuments = vi.fn();
+const mockAddVectors = vi.fn();
+const mockEmbedDocuments = vi.fn();
+
+vi.mock("@usopc/core/src/config/index", () => ({
+  MODEL_CONFIG: {
+    embeddings: { model: "text-embedding-3-small", dimensions: 1536 },
+  },
+}));
 
 vi.mock("@usopc/core/src/rag/index", () => ({
-  createEmbeddings: vi.fn(() => ({})),
+  createRawEmbeddings: vi.fn(() => ({
+    embedDocuments: mockEmbedDocuments,
+  })),
   createVectorStore: vi.fn(async () => ({
-    addDocuments: mockAddDocuments,
+    addVectors: mockAddVectors,
   })),
 }));
 
@@ -137,7 +146,9 @@ describe("ingestSource", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    mockAddDocuments.mockResolvedValue(undefined);
+    // Return a single 1536-dim zero vector (one per document in the batch)
+    mockEmbedDocuments.mockResolvedValue([new Array(1536).fill(0)]);
+    mockAddVectors.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -171,7 +182,7 @@ describe("ingestSource", () => {
   });
 
   it("throws QuotaExhaustedError for 'insufficient_quota' errors", async () => {
-    mockAddDocuments.mockRejectedValueOnce(
+    mockEmbedDocuments.mockRejectedValueOnce(
       new Error("insufficient_quota: please upgrade your plan"),
     );
 
@@ -181,7 +192,7 @@ describe("ingestSource", () => {
   });
 
   it("throws QuotaExhaustedError for 'exceeded your current quota' errors", async () => {
-    mockAddDocuments.mockRejectedValueOnce(
+    mockEmbedDocuments.mockRejectedValueOnce(
       new Error("You exceeded your current quota"),
     );
 
@@ -191,7 +202,7 @@ describe("ingestSource", () => {
   });
 
   it("throws QuotaExhaustedError for 'billing hard limit has been reached' errors", async () => {
-    mockAddDocuments.mockRejectedValueOnce(
+    mockEmbedDocuments.mockRejectedValueOnce(
       new Error("billing hard limit has been reached"),
     );
 
@@ -202,7 +213,7 @@ describe("ingestSource", () => {
 
   it("returns failed result for non-quota errors", async () => {
     // Must reject all 3 attempts (1 initial + 2 retries) to exhaust retries
-    mockAddDocuments
+    mockAddVectors
       .mockRejectedValueOnce(new Error("network timeout"))
       .mockRejectedValueOnce(new Error("network timeout"))
       .mockRejectedValueOnce(new Error("network timeout"));
@@ -242,7 +253,7 @@ describe("ingestSource", () => {
   });
 
   it("retries embedding batch on transient error and succeeds", async () => {
-    mockAddDocuments
+    mockAddVectors
       .mockRejectedValueOnce(new Error("Connection reset"))
       .mockResolvedValueOnce(undefined);
 
@@ -252,22 +263,33 @@ describe("ingestSource", () => {
     const result = await promise;
 
     expect(result.status).toBe("completed");
-    expect(mockAddDocuments).toHaveBeenCalledTimes(2);
+    expect(mockAddVectors).toHaveBeenCalledTimes(2);
   });
 
   it("does not retry on QuotaExhaustedError", async () => {
-    mockAddDocuments.mockRejectedValueOnce(
+    mockEmbedDocuments.mockRejectedValueOnce(
       new Error("insufficient_quota: upgrade plan"),
     );
 
     await expect(ingestSource(SOURCE, OPTIONS)).rejects.toThrow(
       QuotaExhaustedError,
     );
-    expect(mockAddDocuments).toHaveBeenCalledTimes(1);
+    expect(mockEmbedDocuments).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry on EmbeddingDimensionError", async () => {
+    // Return wrong dimension (512 instead of 1536)
+    mockEmbedDocuments.mockResolvedValueOnce([new Array(512).fill(0)]);
+
+    const result = await ingestSource(SOURCE, OPTIONS);
+
+    expect(result.status).toBe("failed");
+    expect(result.error).toContain("returned 512-dim embeddings");
+    expect(mockEmbedDocuments).toHaveBeenCalledTimes(1);
   });
 
   it("fails after exhausting batch retries", async () => {
-    mockAddDocuments
+    mockAddVectors
       .mockRejectedValueOnce(new Error("timeout"))
       .mockRejectedValueOnce(new Error("timeout"))
       .mockRejectedValueOnce(new Error("timeout"));
@@ -279,7 +301,7 @@ describe("ingestSource", () => {
 
     expect(result.status).toBe("failed");
     expect(result.error).toBe("timeout");
-    expect(mockAddDocuments).toHaveBeenCalledTimes(3);
+    expect(mockAddVectors).toHaveBeenCalledTimes(3);
   });
 });
 

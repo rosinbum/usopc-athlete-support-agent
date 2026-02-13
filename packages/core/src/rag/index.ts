@@ -1,4 +1,4 @@
-export { createEmbeddings } from "./embeddings";
+export { createEmbeddings, createRawEmbeddings } from "./embeddings";
 export { createVectorStore } from "./vectorStore";
 export type { VectorStoreConfig } from "./vectorStore";
 export { retrieve } from "./retriever";
