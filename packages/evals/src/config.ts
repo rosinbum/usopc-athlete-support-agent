@@ -3,7 +3,7 @@ import { Client } from "langsmith";
 /** LangSmith project name for all eval experiments. */
 export const LANGSMITH_PROJECT = "usopc-evals";
 
-/** Dataset names — must match what seed-datasets.ts creates. */
+/** Dataset names — must match what seed-langsmith.ts creates. */
 export const DATASET_NAMES = {
   classifier: "usopc-classifier",
   retrieval: "usopc-retrieval",
@@ -11,19 +11,6 @@ export const DATASET_NAMES = {
   escalation: "usopc-escalation",
   trajectory: "usopc-trajectory",
 } as const;
-
-/** Suite names that map to evaluator modules. */
-export const SUITE_NAMES = [
-  "classifier",
-  "groundedness",
-  "correctness",
-  "escalation",
-  "trajectory",
-  "citations",
-  "disclaimers",
-] as const;
-
-export type SuiteName = (typeof SUITE_NAMES)[number];
 
 let _client: Client | undefined;
 

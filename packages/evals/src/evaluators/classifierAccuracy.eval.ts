@@ -20,14 +20,16 @@ function jaccardSimilarity(a: string[], b: string[]): number {
 
 const examples = await fetchExamples(DATASET_NAMES.classifier);
 
-ls.describe("usopc-classifier", () => {
-  ls.test.each(examples)(
-    "classifier accuracy",
-    async ({ inputs, referenceOutputs }) => {
-      const message = String(inputs.message ?? "");
-      const state = makeTestState({
-        messages: [new HumanMessage(message)],
-      });
+ls.describe(
+  "usopc-classifier",
+  () => {
+    ls.test.each(examples)(
+      "classifier accuracy",
+      async ({ inputs, referenceOutputs }) => {
+        const message = String(inputs.message ?? "");
+        const state = makeTestState({
+          messages: [new HumanMessage(message)],
+        });
 
       const result = await classifierNode(state);
 

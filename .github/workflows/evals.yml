@@ -58,10 +58,6 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
         run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts src/evaluators/escalation.eval.ts
 
-      - name: Compare baselines
-        run: pnpm --filter @usopc/evals exec tsx src/scripts/compare-baselines.ts
-        continue-on-error: true
-
   llm-judge-evals:
     name: LLM Judge Evaluations
     runs-on: ubuntu-latest
