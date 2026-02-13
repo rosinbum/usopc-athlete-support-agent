@@ -120,8 +120,8 @@ function escalationEvaluator(args: {
 /**
  * Runs the escalation evaluation suite.
  */
-export async function run(): Promise<void> {
-  await runEvalSuite({
+export async function run() {
+  return await runEvalSuite({
     datasetName: DATASET_NAMES.escalation,
     experimentPrefix: "escalation-routing",
     description:

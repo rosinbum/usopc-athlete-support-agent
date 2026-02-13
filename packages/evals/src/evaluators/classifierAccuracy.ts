@@ -102,8 +102,8 @@ function classifierAccuracyEvaluator(args: {
 /**
  * Runs the classifier accuracy evaluation suite.
  */
-export async function run(): Promise<void> {
-  await runEvalSuite({
+export async function run() {
+  return await runEvalSuite({
     datasetName: DATASET_NAMES.classifier,
     experimentPrefix: "classifier-accuracy",
     description:

@@ -93,8 +93,8 @@ function trajectoryMatchEvaluator(args: {
 /**
  * Runs the trajectory evaluation suite.
  */
-export async function run(): Promise<void> {
-  await runEvalSuite({
+export async function run() {
+  return await runEvalSuite({
     datasetName: DATASET_NAMES.trajectory,
     experimentPrefix: "agent-trajectory",
     description:

@@ -78,7 +78,8 @@ function parseArgs(argv: string[]): {
   return { suite, list, help };
 }
 
-async function runSuite(name: SuiteName): Promise<void> {
+/** Returns true if the suite passed (all metrics >= 0.8). */
+async function runSuite(name: SuiteName): Promise<boolean> {
   console.log(`\n--- Running eval suite: ${name} ---\n`);
 
   try {
@@ -89,8 +90,16 @@ async function runSuite(name: SuiteName): Promise<void> {
       console.error(`Suite "${name}" does not export a run() function`);
       process.exit(1);
     }
-    await mod.run();
-    console.log(`\n--- Suite "${name}" complete ---\n`);
+    const result = await mod.run();
+    console.log(`--- Suite "${name}" complete ---\n`);
+
+    // Check if all metrics passed
+    if (result?.metrics) {
+      return Object.values(result.metrics as Record<string, number>).every(
+        (score) => score >= 0.8,
+      );
+    }
+    return true;
   } catch (error) {
     if (
       error instanceof Error &&
@@ -98,7 +107,7 @@ async function runSuite(name: SuiteName): Promise<void> {
       (error as NodeJS.ErrnoException).code === "ERR_MODULE_NOT_FOUND"
     ) {
       console.log(`Suite "${name}" not yet implemented — skipping.`);
-      return;
+      return true;
     }
     throw error;
   }
@@ -120,13 +129,22 @@ async function main(): Promise<void> {
     return;
   }
 
+  const failed: SuiteName[] = [];
+
   if (suite) {
-    await runSuite(suite);
+    const passed = await runSuite(suite);
+    if (!passed) failed.push(suite);
   } else {
     console.log("Running all evaluation suites...\n");
     for (const name of SUITE_NAMES) {
-      await runSuite(name);
+      const passed = await runSuite(name);
+      if (!passed) failed.push(name);
     }
+  }
+
+  if (failed.length > 0) {
+    console.error(`\nFailed suites: ${failed.join(", ")}`);
+    process.exit(1);
   }
 }
 

@@ -32,8 +32,8 @@ const groundednessJudge = createLLMAsJudge({
 /**
  * Runs the groundedness evaluation suite.
  */
-export async function run(): Promise<void> {
-  await runEvalSuite({
+export async function run() {
+  return await runEvalSuite({
     datasetName: DATASET_NAMES.answerQuality,
     experimentPrefix: "answer-groundedness",
     description:

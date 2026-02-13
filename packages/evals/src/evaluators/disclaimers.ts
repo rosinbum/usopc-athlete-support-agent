@@ -118,8 +118,8 @@ function disclaimerEvaluator(args: {
 /**
  * Runs the disclaimer evaluation suite.
  */
-export async function run(): Promise<void> {
-  await runEvalSuite({
+export async function run() {
+  return await runEvalSuite({
     datasetName: DATASET_NAMES.answerQuality,
     experimentPrefix: "disclaimer-compliance",
     description:

@@ -55,8 +55,8 @@ function concisenessEvaluator(args: {
 /**
  * Runs the correctness evaluation suite.
  */
-export async function run(): Promise<void> {
-  await runEvalSuite({
+export async function run() {
+  return await runEvalSuite({
     datasetName: DATASET_NAMES.answerQuality,
     experimentPrefix: "answer-correctness",
     description:
