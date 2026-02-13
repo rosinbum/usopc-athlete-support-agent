@@ -19,7 +19,9 @@
     "seed": "pnpm --filter @usopc/ingestion seed",
     "seed:pg": "pnpm --filter @usopc/ingestion seed:pg",
     "seed:dynamodb": "pnpm --filter @usopc/ingestion seed:dynamodb",
-    "sources": "pnpm --filter @usopc/ingestion sources"
+    "sources": "pnpm --filter @usopc/ingestion sources",
+    "eval": "pnpm --filter @usopc/evals eval",
+    "seed-langsmith": "pnpm --filter @usopc/evals seed-langsmith"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
@@ -30,7 +32,8 @@
   },
   "pnpm": {
     "overrides": {
-      "zod-to-json-schema": "3.24.1"
+      "zod-to-json-schema": "3.24.1",
+      "@langchain/openai": "<1.0.0"
     }
   }
 }

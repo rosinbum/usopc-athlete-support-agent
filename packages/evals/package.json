@@ -1,0 +1,37 @@
+{
+  "name": "@usopc/evals",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "eval": "sst shell -- vitest run --config ls.vitest.config.ts",
+    "eval:classifier": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/classifierAccuracy.eval.ts",
+    "eval:escalation": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/escalation.eval.ts",
+    "eval:groundedness": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/groundedness.eval.ts",
+    "eval:correctness": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/correctness.eval.ts",
+    "eval:trajectory": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/trajectory.eval.ts",
+    "eval:citations": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/citations.eval.ts",
+    "eval:disclaimers": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/disclaimers.eval.ts",
+    "seed-langsmith": "sst shell -- tsx src/scripts/seed-datasets.ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@langchain/core": "^0.3.28",
+    "@usopc/core": "workspace:*",
+    "@usopc/shared": "workspace:*",
+    "agentevals": "^0.0.6",
+    "langsmith": "^0.5.3",
+    "openevals": "^0.1.4"
+  },
+  "devDependencies": {
+    "sst": "3.17.38",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
