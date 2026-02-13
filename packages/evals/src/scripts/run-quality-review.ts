@@ -74,19 +74,24 @@ async function runScenario(
   process.env.LANGSMITH_TRACING = "true";
 
   const traced = traceable(
-    async () => {
+    async (input: {
+      messages: Array<{ role: "user" | "assistant"; content: string }>;
+      userSport?: string;
+      scenarioId: string;
+      description: string;
+    }) => {
       const start = Date.now();
       let answer: string;
       let trajectory: string[];
 
       if (isMultiTurn(scenario)) {
-        const result = await runMultiTurnPipeline(scenario.input.messages, {
-          userSport: scenario.input.userSport,
+        const result = await runMultiTurnPipeline(input.messages, {
+          userSport: input.userSport,
         });
         answer = result.state.answer ?? "";
         trajectory = result.trajectory;
       } else {
-        const result = await runPipeline(scenario.input.messages[0].content);
+        const result = await runPipeline(input.messages[0].content);
         answer = result.state.answer ?? "";
         trajectory = result.trajectory;
       }
@@ -107,7 +112,12 @@ async function runScenario(
     },
   );
 
-  return await traced();
+  return await traced({
+    messages: scenario.input.messages,
+    userSport: scenario.input.userSport,
+    scenarioId: scenario.id,
+    description: scenario.metadata.description,
+  });
 }
 
 // ---------------------------------------------------------------------------
