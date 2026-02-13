@@ -169,6 +169,11 @@ function computeConfidence(scores: number[]): number {
   return normalizedBest * 0.6 + normalizedAvg * 0.4;
 }
 
+type SearchResult = [
+  { pageContent: string; metadata: Record<string, unknown> },
+  number,
+];
+
 /**
  * Factory function that creates a RETRIEVER node bound to a specific
  * vector store instance.
@@ -180,11 +185,6 @@ function computeConfidence(scores: number[]): number {
  * 4. Computes a retrievalConfidence score
  * 5. Returns retrievedDocuments and retrievalConfidence on state
  */
-type SearchResult = [
-  { pageContent: string; metadata: Record<string, unknown> },
-  number,
-];
-
 export function createRetrieverNode(vectorStore: VectorStoreLike) {
   // Build traced RunnableLambda wrappers once per factory call
   const buildQuerySpan = new RunnableLambda({
@@ -221,6 +221,7 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
           filter: input.filter,
           topK: RETRIEVAL_CONFIG.narrowFilterTopK,
         });
+        // Use circuit breaker with fallback to empty array
         results = await vectorStoreSearch(
           () =>
             vectorStore.similaritySearchWithScore(
@@ -261,6 +262,7 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
           },
         );
         const broadFilter = buildBroadFilter(input.state);
+        // Use circuit breaker with fallback to empty array
         const broadResults = await vectorStoreSearch(
           () =>
             vectorStore.similaritySearchWithScore(
@@ -271,6 +273,7 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
           [],
         );
 
+        // Merge, deduplicating by content
         const seen = new Set(results.map(([doc]) => doc.pageContent));
         for (const result of broadResults) {
           if (!seen.has(result[0].pageContent)) {
@@ -293,19 +296,25 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
       docsReturned: number;
     }> => {
       const { results } = input;
+      // Sort by score ascending (lower distance = better match for cosine)
       results.sort((a, b) => a[1] - b[1]);
 
+      // Compute composite score that factors in authority level
+      // Lower composite score = higher rank
       const scoredResults = results.map((result) => {
         const [doc, similarityScore] = result;
         const authorityBoost = computeAuthorityBoost(
           doc.metadata.authorityLevel as string | undefined,
         );
+        // Subtract authority boost (higher authority = larger boost = lower composite score)
         const compositeScore = similarityScore - authorityBoost;
         return { result, compositeScore };
       });
 
+      // Re-sort by composite score
       scoredResults.sort((a, b) => a.compositeScore - b.compositeScore);
 
+      // Limit to configured topK
       const topResults = scoredResults
         .slice(0, RETRIEVAL_CONFIG.topK)
         .map((s) => s.result);
