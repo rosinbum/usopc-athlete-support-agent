@@ -1,5 +1,10 @@
 #!/usr/bin/env tsx
 
+import { resolveEnv } from "../helpers/resolveEnv.js";
+
+// Bridge SST Resource bindings → env vars before any SDK is loaded
+resolveEnv();
+
 import { SUITE_NAMES, type SuiteName } from "../config.js";
 
 /** Maps suite CLI names to their evaluator module file names. */

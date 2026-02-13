@@ -7,6 +7,11 @@
  * Usage: pnpm --filter @usopc/evals seed-datasets
  */
 
+import { resolveEnv } from "../helpers/resolveEnv.js";
+
+// Bridge SST Resource bindings → env vars before any SDK is loaded
+resolveEnv();
+
 import { getLangSmithClient, DATASET_NAMES } from "../config.js";
 import { classifierExamples } from "../datasets/classifier.js";
 import { retrievalExamples } from "../datasets/retrieval.js";
