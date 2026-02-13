@@ -1,3 +1,4 @@
+import type { RunnableConfig } from "@langchain/core/runnables";
 import type { AgentState } from "./state.js";
 
 export interface NodeMetricEntry {
@@ -43,12 +44,21 @@ export const nodeMetrics = new NodeMetricsCollector();
  */
 export function withMetrics(
   nodeName: string,
-  fn: (state: AgentState) => Promise<Partial<AgentState>>,
-): (state: AgentState) => Promise<Partial<AgentState>> {
-  return async (state: AgentState): Promise<Partial<AgentState>> => {
+  fn: (
+    state: AgentState,
+    config?: RunnableConfig,
+  ) => Promise<Partial<AgentState>>,
+): (
+  state: AgentState,
+  config?: RunnableConfig,
+) => Promise<Partial<AgentState>> {
+  return async (
+    state: AgentState,
+    config?: RunnableConfig,
+  ): Promise<Partial<AgentState>> => {
     const start = Date.now();
     try {
-      const result = await fn(state);
+      const result = await fn(state, config);
       nodeMetrics.record(nodeName, Date.now() - start);
       return result;
     } catch (error) {

@@ -449,6 +449,22 @@ describe("createRetrieverNode", () => {
     );
   });
 
+  it("accepts an optional RunnableConfig as second argument", async () => {
+    const store = makeMockVectorStore([
+      [
+        makeSearchResult("doc1", 0.1, { topicDomain: "team_selection" }),
+        makeSearchResult("doc2", 0.2, { topicDomain: "team_selection" }),
+      ],
+    ]);
+
+    const node = createRetrieverNode(store);
+    const state = makeState({ topicDomain: "team_selection" });
+
+    const result = await node(state, { runName: "test-config" });
+    expect(result.retrievedDocuments).toHaveLength(2);
+    expect(result.retrievalConfidence).toBeGreaterThan(0);
+  });
+
   describe("conversation context", () => {
     it("enriches search query with context from prior messages", async () => {
       const store = makeMockVectorStore([

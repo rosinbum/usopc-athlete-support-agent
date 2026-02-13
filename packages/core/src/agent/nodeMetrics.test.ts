@@ -129,6 +129,6 @@ describe("withMetrics", () => {
 
     await wrapped(state);
 
-    expect(node).toHaveBeenCalledWith(state);
+    expect(node).toHaveBeenCalledWith(state, undefined);
   });
 });

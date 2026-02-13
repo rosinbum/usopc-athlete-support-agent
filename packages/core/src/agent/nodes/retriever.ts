@@ -1,4 +1,5 @@
 import { logger, AUTHORITY_LEVELS, type AuthorityLevel } from "@usopc/shared";
+import { RunnableLambda, type RunnableConfig } from "@langchain/core/runnables";
 import { RETRIEVAL_CONFIG } from "../../config/index.js";
 import { vectorStoreSearch } from "../../services/vectorStoreService.js";
 import { buildContextualQuery, stateContext } from "../../utils/index.js";
@@ -179,41 +180,79 @@ function computeConfidence(scores: number[]): number {
  * 4. Computes a retrievalConfidence score
  * 5. Returns retrievedDocuments and retrievalConfidence on state
  */
+type SearchResult = [
+  { pageContent: string; metadata: Record<string, unknown> },
+  number,
+];
+
 export function createRetrieverNode(vectorStore: VectorStoreLike) {
-  return async (state: AgentState): Promise<Partial<AgentState>> => {
-    const query = buildEnrichedQuery(state);
+  // Build traced RunnableLambda wrappers once per factory call
+  const buildQuerySpan = new RunnableLambda({
+    func: async (input: {
+      state: AgentState;
+    }): Promise<{
+      query: string;
+      messageCount: number;
+      hasContext: boolean;
+    }> => {
+      const query = buildEnrichedQuery(input.state);
+      return {
+        query,
+        messageCount: input.state.messages.length,
+        hasContext:
+          query.length >
+          ((input.state.messages.at(-1)?.content as string) ?? "").length,
+      };
+    },
+  }).withConfig({ runName: "retriever:build_query" });
 
-    if (!query) {
-      log.warn("Retriever received empty query");
-      return { retrievedDocuments: [], retrievalConfidence: 0 };
-    }
-
-    try {
-      // --- Phase 1: Narrow (filtered) search ---
-      const filter = buildFilter(state);
-      let results: Array<
-        [{ pageContent: string; metadata: Record<string, unknown> }, number]
-      > = [];
-
-      if (filter) {
+  const narrowSearchSpan = new RunnableLambda({
+    func: async (input: {
+      query: string;
+      filter: Record<string, unknown> | undefined;
+    }): Promise<{
+      results: SearchResult[];
+      resultCount: number;
+      topScore: number | null;
+    }> => {
+      let results: SearchResult[] = [];
+      if (input.filter) {
         log.info("Running narrow retrieval", {
-          filter,
+          filter: input.filter,
           topK: RETRIEVAL_CONFIG.narrowFilterTopK,
         });
-        // Use circuit breaker with fallback to empty array
         results = await vectorStoreSearch(
           () =>
             vectorStore.similaritySearchWithScore(
-              query,
+              input.query,
               RETRIEVAL_CONFIG.narrowFilterTopK,
-              filter,
+              input.filter,
             ),
           [],
         );
       }
+      return {
+        results,
+        resultCount: results.length,
+        topScore: results.length > 0 ? results[0][1] : null,
+      };
+    },
+  }).withConfig({ runName: "retriever:narrow_search" });
 
-      // --- Phase 2: Broaden if narrow search yields too few results ---
+  const broadSearchSpan = new RunnableLambda({
+    func: async (input: {
+      query: string;
+      narrowResults: SearchResult[];
+      state: AgentState;
+    }): Promise<{
+      results: SearchResult[];
+      broadened: boolean;
+      finalCount: number;
+    }> => {
+      let results = input.narrowResults;
+      let broadened = false;
       if (results.length < 2) {
+        broadened = true;
         log.info(
           "Broadening retrieval (narrow returned insufficient results)",
           {
@@ -221,19 +260,17 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
             topK: RETRIEVAL_CONFIG.broadenFilterTopK,
           },
         );
-        // Use circuit breaker with fallback to empty array
-        const broadFilter = buildBroadFilter(state);
+        const broadFilter = buildBroadFilter(input.state);
         const broadResults = await vectorStoreSearch(
           () =>
             vectorStore.similaritySearchWithScore(
-              query,
+              input.query,
               RETRIEVAL_CONFIG.broadenFilterTopK,
               broadFilter,
             ),
           [],
         );
 
-        // Merge, deduplicating by content
         const seen = new Set(results.map(([doc]) => doc.pageContent));
         for (const result of broadResults) {
           if (!seen.has(result[0].pageContent)) {
@@ -242,28 +279,33 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
           }
         }
       }
+      return { results, broadened, finalCount: results.length };
+    },
+  }).withConfig({ runName: "retriever:broad_search" });
 
-      // --- Phase 3: Score and rank ---
-      // Sort by score ascending (lower distance = better match for cosine)
+  const scoreAndRankSpan = new RunnableLambda({
+    func: async (input: {
+      results: SearchResult[];
+    }): Promise<{
+      topResults: SearchResult[];
+      confidence: number;
+      topScore: number | null;
+      docsReturned: number;
+    }> => {
+      const { results } = input;
       results.sort((a, b) => a[1] - b[1]);
 
-      // --- Phase 3b: Apply authority-weighted re-sorting ---
-      // Compute composite score that factors in authority level
-      // Lower composite score = higher rank
       const scoredResults = results.map((result) => {
         const [doc, similarityScore] = result;
         const authorityBoost = computeAuthorityBoost(
           doc.metadata.authorityLevel as string | undefined,
         );
-        // Subtract authority boost (higher authority = larger boost = lower composite score)
         const compositeScore = similarityScore - authorityBoost;
         return { result, compositeScore };
       });
 
-      // Re-sort by composite score
       scoredResults.sort((a, b) => a.compositeScore - b.compositeScore);
 
-      // Limit to configured topK
       const topResults = scoredResults
         .slice(0, RETRIEVAL_CONFIG.topK)
         .map((s) => s.result);
@@ -271,7 +313,42 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
       const scores = topResults.map(([, score]) => score);
       const confidence = computeConfidence(scores);
 
-      // --- Phase 4: Map to RetrievedDocument[] ---
+      return {
+        topResults,
+        confidence,
+        topScore: scores[0] ?? null,
+        docsReturned: topResults.length,
+      };
+    },
+  }).withConfig({ runName: "retriever:score_and_rank" });
+
+  return async (
+    state: AgentState,
+    config?: RunnableConfig,
+  ): Promise<Partial<AgentState>> => {
+    const { query } = await buildQuerySpan.invoke({ state }, config);
+
+    if (!query) {
+      log.warn("Retriever received empty query");
+      return { retrievedDocuments: [], retrievalConfidence: 0 };
+    }
+
+    try {
+      const filter = buildFilter(state);
+
+      const { results: narrowResults } = await narrowSearchSpan.invoke(
+        { query, filter },
+        config,
+      );
+
+      const { results } = await broadSearchSpan.invoke(
+        { query, narrowResults, state },
+        config,
+      );
+
+      const { topResults, confidence, topScore } =
+        await scoreAndRankSpan.invoke({ results }, config);
+
       const retrievedDocuments: RetrievedDocument[] = topResults.map(
         ([doc, score]) => ({
           content: doc.pageContent,
@@ -297,7 +374,7 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
       log.info("Retrieval complete", {
         documentCount: retrievedDocuments.length,
         confidence: confidence.toFixed(3),
-        topScore: scores[0]?.toFixed(3) ?? "N/A",
+        topScore: topScore?.toFixed(3) ?? "N/A",
         ...stateContext(state),
       });
 
