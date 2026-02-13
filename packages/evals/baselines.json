@@ -1,0 +1,39 @@
+{
+  "$schema": "./baselines.schema.json",
+  "_comment": "Golden baseline scores per eval metric. Updated via: pnpm --filter @usopc/evals tsx src/scripts/update-baselines.ts",
+  "classifier": {
+    "topic_domain_accuracy": 0.85,
+    "query_intent_accuracy": 0.8,
+    "ngb_detection_jaccard": 0.7,
+    "escalation_accuracy": 0.9,
+    "clarification_accuracy": 0.8
+  },
+  "escalation": {
+    "route_correct": 1.0,
+    "target_correct": 0.9,
+    "urgency_correct": 0.9,
+    "contact_info_present": 0.9
+  },
+  "citations": {
+    "citations_present": 1.0,
+    "citations_have_urls": 0.7,
+    "citations_have_snippets": 0.7
+  },
+  "disclaimers": {
+    "disclaimer_present": 1.0,
+    "disclaimer_correct_domain": 0.9,
+    "disclaimer_safety_info": 0.9
+  },
+  "groundedness": {
+    "groundedness": 0.8
+  },
+  "correctness": {
+    "correctness": 0.7,
+    "conciseness": 0.8
+  },
+  "trajectory": {
+    "trajectory_strict_match": 0.7,
+    "trajectory_subset_match": 0.85,
+    "path_type_correct": 0.9
+  }
+}
