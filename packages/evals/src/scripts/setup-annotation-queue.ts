@@ -129,6 +129,80 @@ async function main(): Promise<void> {
     console.log(`  ✓ Added ${runIds.length} runs to annotation queue`);
   }
 
+  // ------------------------------------------------------------------
+  // 3. Register feedback keys by seeding configs on the first run.
+  //    This makes the keys appear in the annotation UI for all runs.
+  // ------------------------------------------------------------------
+  if (runIds.length > 0) {
+    console.log();
+    console.log("  Registering feedback keys...");
+    const seedRunId = runIds[0];
+
+    // Continuous score keys (1–5)
+    const scoreKeys = [
+      {
+        key: FEEDBACK_KEYS.quality,
+        label: "Overall Quality",
+      },
+      {
+        key: FEEDBACK_KEYS.helpfulness,
+        label: "Helpfulness",
+      },
+      {
+        key: FEEDBACK_KEYS.accuracy,
+        label: "Factual Accuracy",
+      },
+      {
+        key: FEEDBACK_KEYS.completeness,
+        label: "Completeness",
+      },
+      {
+        key: FEEDBACK_KEYS.tone,
+        label: "Tone",
+      },
+    ];
+
+    for (const { key, label } of scoreKeys) {
+      await client.createFeedback(seedRunId, key, {
+        score: 3,
+        comment: `[auto-seed] Placeholder to register "${label}" feedback key. Replace during annotation.`,
+        feedbackConfig: {
+          type: "continuous",
+          min: 1,
+          max: 5,
+        },
+      });
+    }
+    console.log(`  ✓ Registered ${scoreKeys.length} score keys (1–5 scale)`);
+
+    // Categorical key for failure modes (numeric values with code labels)
+    const failureModeEntries = Object.keys(FAILURE_MODES);
+    await client.createFeedback(seedRunId, FEEDBACK_KEYS.failureModes, {
+      value: "none",
+      comment:
+        "[auto-seed] Placeholder to register failure_modes key. Select applicable failure modes during annotation.",
+      feedbackConfig: {
+        type: "categorical",
+        categories: failureModeEntries.map((code, i) => ({
+          value: i,
+          label: `${code}: ${FAILURE_MODES[code as keyof typeof FAILURE_MODES].label}`,
+        })),
+      },
+    });
+    console.log(
+      `  ✓ Registered failure_modes key (categorical, ${failureModeEntries.length} codes)`,
+    );
+
+    // Freeform key for notes
+    await client.createFeedback(seedRunId, FEEDBACK_KEYS.notes, {
+      comment: "[auto-seed] Placeholder to register reviewer_notes key.",
+      feedbackConfig: {
+        type: "freeform",
+      },
+    });
+    console.log("  ✓ Registered reviewer_notes key (freeform)");
+  }
+
   console.log();
   console.log("Setup complete.");
   console.log(
