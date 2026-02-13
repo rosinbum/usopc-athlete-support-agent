@@ -135,7 +135,7 @@ class EmbeddingDimensionError extends Error {
   constructor(expected: number, actual: number) {
     super(
       `OpenAI returned ${actual}-dim embeddings (expected ${expected}). ` +
-        "This is typically a transient API issue.",
+        "This indicates a configuration or API version mismatch.",
     );
     this.name = "EmbeddingDimensionError";
   }
@@ -177,6 +177,10 @@ async function embedBatchWithRetry(
       await vectorStore.addVectors(vectors, batch);
       return;
     } catch (error) {
+      // Dimension errors are not transient - throw immediately without retry
+      if (error instanceof EmbeddingDimensionError) {
+        throw error;
+      }
       if (isQuotaError(error)) {
         throw new QuotaExhaustedError(
           error instanceof Error ? error.message : "OpenAI quota exhausted",

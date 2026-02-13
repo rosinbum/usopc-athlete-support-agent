@@ -277,6 +277,17 @@ describe("ingestSource", () => {
     expect(mockEmbedDocuments).toHaveBeenCalledTimes(1);
   });
 
+  it("does not retry on EmbeddingDimensionError", async () => {
+    // Return wrong dimension (512 instead of 1536)
+    mockEmbedDocuments.mockResolvedValueOnce([new Array(512).fill(0)]);
+
+    const result = await ingestSource(SOURCE, OPTIONS);
+
+    expect(result.status).toBe("failed");
+    expect(result.error).toContain("returned 512-dim embeddings");
+    expect(mockEmbedDocuments).toHaveBeenCalledTimes(1);
+  });
+
   it("fails after exhausting batch retries", async () => {
     mockAddVectors
       .mockRejectedValueOnce(new Error("timeout"))
