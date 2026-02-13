@@ -9,8 +9,8 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "eval": "tsx src/scripts/run-evals.ts",
-    "seed-datasets": "tsx src/scripts/seed-datasets.ts",
+    "eval": "sst shell -- tsx src/scripts/run-evals.ts",
+    "seed-datasets": "sst shell -- tsx src/scripts/seed-datasets.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {
@@ -22,6 +22,7 @@
     "openevals": "^0.1.4"
   },
   "devDependencies": {
+    "sst": "3.17.38",
     "tsx": "^4.19.0",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
