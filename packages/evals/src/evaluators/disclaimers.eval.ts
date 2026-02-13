@@ -70,6 +70,5 @@ ls.describe("usopc-disclaimers", () => {
         });
       }
     }
-
   });
 });
