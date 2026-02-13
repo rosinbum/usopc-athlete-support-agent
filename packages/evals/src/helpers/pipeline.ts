@@ -67,16 +67,22 @@ export async function runPipeline(userMessage: string): Promise<{
 }
 
 /**
- * Runs the full agent pipeline and returns just the answer + context
- * needed for groundedness/correctness evaluation.
+ * Runs the full agent pipeline and returns the answer, citations, and
+ * trajectory needed for groundedness/correctness evaluation.
  */
 export async function runPipelineForAnswerEval(userMessage: string): Promise<{
   answer: string;
+  context: string;
   trajectory: string[];
 }> {
   const result = await runPipeline(userMessage);
+  const citations = result.state.citations ?? [];
+  const context = citations
+    .map((c) => `[${c.title}] ${c.snippet}`)
+    .join("\n\n");
   return {
     answer: result.state.answer ?? "",
+    context,
     trajectory: result.trajectory,
   };
 }

@@ -21,7 +21,7 @@
     "seed:dynamodb": "pnpm --filter @usopc/ingestion seed:dynamodb",
     "sources": "pnpm --filter @usopc/ingestion sources",
     "eval": "pnpm --filter @usopc/evals eval",
-    "seed-datasets": "pnpm --filter @usopc/evals seed-datasets"
+    "seed-langsmith": "pnpm --filter @usopc/evals seed-langsmith"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

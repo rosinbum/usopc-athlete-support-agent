@@ -4,7 +4,7 @@
  * Seeds evaluation datasets to LangSmith.
  * Idempotent — skips datasets that already exist with the expected example count.
  *
- * Usage: pnpm --filter @usopc/evals seed-datasets
+ * Usage: pnpm --filter @usopc/evals seed-langsmith
  */
 
 import { resolveEnv } from "../helpers/resolveEnv.js";

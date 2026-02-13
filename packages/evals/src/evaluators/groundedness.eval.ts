@@ -14,21 +14,19 @@ const groundednessJudge = createLLMAsJudge({
 const examples = await fetchExamples(DATASET_NAMES.answerQuality);
 
 ls.describe("usopc-groundedness", () => {
-  ls.test.each(examples)(
-    "answer groundedness",
-    async ({ inputs, referenceOutputs }) => {
-      const message = String(inputs.message ?? "");
-      const result = await runPipelineForAnswerEval(message);
+  ls.test.each(examples)("answer groundedness", async ({ inputs }) => {
+    const message = String(inputs.message ?? "");
+    const result = await runPipelineForAnswerEval(message);
 
-      const outputs = { answer: result.answer };
-      ls.logOutputs(outputs);
+    const outputs = { answer: result.answer };
+    ls.logOutputs(outputs);
 
-      const wrappedJudge = ls.wrapEvaluator(groundednessJudge);
-      await wrappedJudge({
-        inputs,
-        outputs,
-        referenceOutputs,
-      });
-    },
-  );
+    // openevals auto-wraps in langsmith/vitest test context — do not
+    // double-wrap with ls.wrapEvaluator.  RAG_GROUNDEDNESS_PROMPT uses
+    // {context} and {outputs} template variables.
+    await groundednessJudge({
+      outputs,
+      context: result.context,
+    });
+  });
 });

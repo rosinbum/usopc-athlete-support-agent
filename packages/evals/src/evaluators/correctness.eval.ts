@@ -23,13 +23,10 @@ ls.describe("usopc-correctness", () => {
       const outputs = { answer: result.answer };
       ls.logOutputs(outputs);
 
-      // LLM-as-judge correctness
-      const wrappedJudge = ls.wrapEvaluator(correctnessJudge);
-      await wrappedJudge({
-        inputs,
-        outputs,
-        referenceOutputs,
-      });
+      // openevals auto-wraps in langsmith/vitest test context — do not
+      // double-wrap with ls.wrapEvaluator.  CORRECTNESS_PROMPT uses
+      // {inputs}, {outputs}, and {reference_outputs} template variables.
+      await correctnessJudge({ inputs, outputs, referenceOutputs });
 
       // Deterministic conciseness
       const wordCount = result.answer.split(/\s+/).filter(Boolean).length;
