@@ -22,6 +22,7 @@
     "quality:run": "sst shell -- tsx src/scripts/run-quality-review.ts",
     "quality:setup": "sst shell -- tsx src/scripts/setup-annotation-queue.ts",
     "quality:report": "sst shell -- tsx src/scripts/generate-report.ts",
+    "quality:all": "pnpm quality:run && pnpm quality:setup",
     "clean": "rm -rf dist"
   },
   "dependencies": {
