@@ -103,6 +103,20 @@ describe("CLASSIFIER_PROMPT", () => {
     }
   });
 
+  it("includes universal framework terms for clarification guidance", () => {
+    const terms = [
+      "Section 9",
+      "Section 10",
+      "USOPC Bylaws",
+      "USADA",
+      "SafeSport",
+      "Athlete Bill of Rights",
+    ];
+    for (const term of terms) {
+      expect(CLASSIFIER_PROMPT).toContain(term);
+    }
+  });
+
   it("lists all 5 query intents", () => {
     const intents = [
       "factual",
