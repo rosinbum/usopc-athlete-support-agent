@@ -62,6 +62,7 @@ export async function runPipeline(userMessage: string): Promise<{
       clarificationQuestion: undefined,
       escalationReason: undefined,
       retrievalStatus: "success",
+      emotionalState: "neutral",
     },
     trajectory,
   };

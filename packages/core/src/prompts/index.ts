@@ -18,4 +18,9 @@ export {
   buildEscalationPrompt,
   type EscalationTarget,
 } from "./escalation.js";
+export {
+  getEmpathyPreamble,
+  withEmpathy,
+  getEmotionalToneGuidance,
+} from "./empathy.js";
 export { initPromptLoader, loadPrompt } from "./loader.js";

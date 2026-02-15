@@ -79,6 +79,15 @@ A brief, specific question to ask the user that will resolve the ambiguity. Keep
 - "Are you asking about Olympic or Paralympic selection?"
 - "Which competition's selection procedures are you interested in (e.g., Olympics, World Championships, World Cup, World Series)?"
 
+### emotionalState (required)
+One of the following values:
+- "neutral" -- The user's tone is calm, factual, or matter-of-fact. No emotional distress signals.
+- "distressed" -- The user expresses sadness, hopelessness, feeling alone, or being overwhelmed (e.g., "I feel completely alone", "I don't know what to do with my life", "I've given everything and it wasn't enough").
+- "panicked" -- The user expresses panic, extreme urgency, or fear of imminent irreversible consequences (e.g., "I'm panicking", "my career could be over", "What do I do RIGHT NOW?").
+- "fearful" -- The user expresses fear of retaliation, being cut from the team, or consequences for speaking up (e.g., "I'm afraid if I report it I'll be cut", "I'm terrified", "I don't know who to trust").
+
+Default to "neutral" unless the user's language clearly signals emotional distress. When in doubt, choose "neutral".
+
 ## Output Format
 
 Return ONLY valid JSON with no additional text, markdown formatting, or explanation. Example:
@@ -89,7 +98,8 @@ Return ONLY valid JSON with no additional text, markdown formatting, or explanat
   "queryIntent": "procedural",
   "hasTimeConstraint": true,
   "shouldEscalate": false,
-  "needsClarification": false
+  "needsClarification": false,
+  "emotionalState": "neutral"
 }
 
 Example with clarification needed:
@@ -101,7 +111,8 @@ Example with clarification needed:
   "hasTimeConstraint": false,
   "shouldEscalate": false,
   "needsClarification": true,
-  "clarificationQuestion": "Which sport's selection criteria are you asking about?"
+  "clarificationQuestion": "Which sport's selection criteria are you asking about?",
+  "emotionalState": "neutral"
 }
 
 ## User Message

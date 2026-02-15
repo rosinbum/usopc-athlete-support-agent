@@ -13,7 +13,11 @@ import {
   stateContext,
 } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
-import type { TopicDomain, QueryIntent } from "../../types/index.js";
+import type {
+  TopicDomain,
+  QueryIntent,
+  EmotionalState,
+} from "../../types/index.js";
 
 const log = logger.child({ service: "classifier-node" });
 
@@ -42,6 +46,16 @@ const VALID_INTENTS: QueryIntent[] = [
 ];
 
 /**
+ * Valid emotional states for guard-checking the classifier output.
+ */
+const VALID_EMOTIONAL_STATES: EmotionalState[] = [
+  "neutral",
+  "distressed",
+  "panicked",
+  "fearful",
+];
+
+/**
  * Parsed output from the classifier model.
  */
 interface ClassifierOutput {
@@ -53,6 +67,7 @@ interface ClassifierOutput {
   escalationReason?: string;
   needsClarification: boolean;
   clarificationQuestion?: string;
+  emotionalState: EmotionalState;
 }
 
 interface ParseResult {
@@ -122,6 +137,15 @@ export function parseClassifierResponse(raw: string): ParseResult {
       ? parsed.clarificationQuestion
       : undefined;
 
+  let emotionalState: EmotionalState = "neutral";
+  if (
+    VALID_EMOTIONAL_STATES.includes(parsed.emotionalState as EmotionalState)
+  ) {
+    emotionalState = parsed.emotionalState as EmotionalState;
+  } else if (parsed.emotionalState !== undefined) {
+    warnings.push(`Invalid emotionalState: "${String(parsed.emotionalState)}"`);
+  }
+
   return {
     output: {
       topicDomain: topicDomain ?? "team_selection", // fallback handled below
@@ -132,6 +156,7 @@ export function parseClassifierResponse(raw: string): ParseResult {
       escalationReason,
       needsClarification,
       clarificationQuestion,
+      emotionalState,
     },
     warnings,
   };
@@ -166,6 +191,7 @@ export async function classifierNode(
     return {
       queryIntent: "general",
       needsClarification: false,
+      emotionalState: "neutral",
     };
   }
 
@@ -200,6 +226,7 @@ export async function classifierNode(
       hasTimeConstraint: result.hasTimeConstraint,
       shouldEscalate: result.shouldEscalate,
       needsClarification: result.needsClarification,
+      emotionalState: result.emotionalState,
       ...stateContext(state),
     });
 
@@ -210,6 +237,7 @@ export async function classifierNode(
       hasTimeConstraint: result.hasTimeConstraint,
       needsClarification: result.needsClarification,
       clarificationQuestion: result.clarificationQuestion,
+      emotionalState: result.emotionalState,
       escalationReason: result.escalationReason,
     };
   } catch (error) {
@@ -232,6 +260,7 @@ export async function classifierNode(
       queryIntent: "general",
       hasTimeConstraint: false,
       needsClarification: false,
+      emotionalState: "neutral",
     };
   }
 }

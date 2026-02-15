@@ -17,6 +17,8 @@ export type QueryIntent =
   | "escalation"
   | "general";
 
+export type EmotionalState = "neutral" | "distressed" | "panicked" | "fearful";
+
 export interface Citation {
   title: string;
   url?: string;
@@ -70,6 +72,7 @@ export interface AgentState {
   hasTimeConstraint: boolean;
   conversationId?: string;
   userSport?: string;
+  emotionalState: EmotionalState;
   escalationReason?: string;
   retrievalStatus: "success" | "error";
 }

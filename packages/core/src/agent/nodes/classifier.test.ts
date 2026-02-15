@@ -57,6 +57,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     clarificationQuestion: undefined,
     escalationReason: undefined,
     retrievalStatus: "success",
+    emotionalState: "neutral",
     ...overrides,
   };
 }
@@ -683,6 +684,43 @@ describe("classifierNode", () => {
     });
   });
 
+  describe("emotionalState detection", () => {
+    it("returns emotionalState from classifier response", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "safesport",
+          detectedNgbIds: [],
+          queryIntent: "escalation",
+          hasTimeConstraint: false,
+          shouldEscalate: true,
+          emotionalState: "fearful",
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage("I'm terrified my coach will retaliate if I report"),
+        ],
+      });
+      const result = await classifierNode(state);
+      expect(result.emotionalState).toBe("fearful");
+    });
+
+    it("returns neutral on error fallback", async () => {
+      mockInvoke.mockRejectedValueOnce(new Error("API error"));
+
+      const state = makeState();
+      const result = await classifierNode(state);
+      expect(result.emotionalState).toBe("neutral");
+    });
+
+    it("returns neutral for empty messages", async () => {
+      const state = makeState({ messages: [] });
+      const result = await classifierNode(state);
+      expect(result.emotionalState).toBe("neutral");
+    });
+  });
+
   describe("CircuitBreakerError handling", () => {
     it("falls back to defaults when circuit breaker is open", async () => {
       mockInvoke.mockRejectedValueOnce(new CircuitBreakerError("anthropic"));
@@ -694,6 +732,7 @@ describe("classifierNode", () => {
       expect(result.detectedNgbIds).toEqual([]);
       expect(result.hasTimeConstraint).toBe(false);
       expect(result.needsClarification).toBe(false);
+      expect(result.emotionalState).toBe("neutral");
     });
   });
 });
@@ -805,5 +844,54 @@ describe("parseClassifierResponse", () => {
 
     expect(output.needsClarification).toBe(true);
     expect(output.clarificationQuestion).toBe("Which sport?");
+  });
+
+  it("parses valid emotionalState from response", () => {
+    const { output, warnings } = parseClassifierResponse(
+      JSON.stringify({
+        topicDomain: "safesport",
+        detectedNgbIds: [],
+        queryIntent: "escalation",
+        hasTimeConstraint: false,
+        shouldEscalate: true,
+        emotionalState: "fearful",
+      }),
+    );
+
+    expect(output.emotionalState).toBe("fearful");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("defaults emotionalState to neutral when field is missing", () => {
+    const { output, warnings } = parseClassifierResponse(
+      JSON.stringify({
+        topicDomain: "team_selection",
+        detectedNgbIds: [],
+        queryIntent: "factual",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+      }),
+    );
+
+    expect(output.emotionalState).toBe("neutral");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("defaults emotionalState to neutral with warning for invalid value", () => {
+    const { output, warnings } = parseClassifierResponse(
+      JSON.stringify({
+        topicDomain: "team_selection",
+        detectedNgbIds: [],
+        queryIntent: "factual",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+        emotionalState: "angry",
+      }),
+    );
+
+    expect(output.emotionalState).toBe("neutral");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("Invalid emotionalState");
+    expect(warnings[0]).toContain("angry");
   });
 });

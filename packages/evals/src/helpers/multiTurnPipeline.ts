@@ -85,6 +85,7 @@ export async function runMultiTurnPipeline(
       clarificationQuestion: undefined,
       escalationReason: undefined,
       retrievalStatus: "success",
+      emotionalState: "neutral",
     },
     trajectory,
   };

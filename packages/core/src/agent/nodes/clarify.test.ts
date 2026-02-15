@@ -23,6 +23,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     clarificationQuestion: undefined,
     escalationReason: undefined,
     retrievalStatus: "success",
+    emotionalState: "neutral",
     ...overrides,
   };
 }
@@ -71,5 +72,28 @@ describe("clarifyNode", () => {
 
     // Empty string should also trigger default
     expect(result.answer).toContain("more information");
+  });
+
+  it("prepends empathy preamble for distressed state", async () => {
+    const state = makeState({
+      clarificationQuestion: "Which sport are you asking about?",
+      emotionalState: "distressed",
+    });
+
+    const result = await clarifyNode(state);
+
+    expect(result.answer).toContain("what you're feeling is valid");
+    expect(result.answer).toContain("Which sport are you asking about?");
+  });
+
+  it("does not modify answer for neutral state", async () => {
+    const state = makeState({
+      clarificationQuestion: "Which sport are you asking about?",
+      emotionalState: "neutral",
+    });
+
+    const result = await clarifyNode(state);
+
+    expect(result.answer).toBe("Which sport are you asking about?");
   });
 });

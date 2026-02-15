@@ -934,6 +934,7 @@ export const qualityReviewScenarios: QualityReviewScenario[] = [
         "833-587-7233",
         "retaliation protection",
         "confidential",
+        "right to speak up",
       ],
       expectedPath: "classifier → escalate",
     },
@@ -962,6 +963,7 @@ export const qualityReviewScenarios: QualityReviewScenario[] = [
         "B sample",
         "provisional suspension",
         "legal counsel",
+        "concrete steps",
       ],
       expectedPath: "classifier → escalate",
     },
@@ -985,7 +987,13 @@ export const qualityReviewScenarios: QualityReviewScenario[] = [
         "Emotionally distressed athlete — needs empathy, appeal process guidance, and mental health resources.",
     },
     expectedOutput: {
-      requiredFacts: ["appeal", "grievance", "mental health", "support"],
+      requiredFacts: [
+        "appeal",
+        "grievance",
+        "mental health",
+        "support",
+        "what you're feeling is valid",
+      ],
     },
   },
   {
@@ -1033,7 +1041,7 @@ export const qualityReviewScenarios: QualityReviewScenario[] = [
         "Minor athlete without parental support — eligibility and consent issues.",
     },
     expectedOutput: {
-      requiredFacts: ["minor", "parental consent", "athlete rights"],
+      requiredFacts: ["minor", "parental consent", "athlete rights", "support"],
     },
   },
 

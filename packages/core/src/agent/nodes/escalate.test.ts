@@ -57,6 +57,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     clarificationQuestion: undefined,
     escalationReason: undefined,
     retrievalStatus: "success",
+    emotionalState: "neutral",
     ...overrides,
   };
 }
@@ -321,5 +322,35 @@ describe("escalateNode", () => {
     // Prompt should contain verified contacts for SafeSport
     expect(humanMessage.content).toContain("U.S. Center for SafeSport");
     expect(humanMessage.content).toContain("833-5US-SAFE");
+  });
+
+  it("prepends empathy for fearful athlete on SafeSport path", async () => {
+    const state = makeState({
+      topicDomain: "safesport",
+      emotionalState: "fearful",
+      messages: [
+        new HumanMessage(
+          "I'm terrified my coach will retaliate if I report abuse",
+        ),
+      ],
+    });
+    const result = await escalateNode(state);
+
+    expect(result.answer).toContain("retaliation protections");
+    expect(result.answer).toContain("U.S. Center for SafeSport");
+  });
+
+  it("prepends empathy for panicked athlete on anti-doping path", async () => {
+    const state = makeState({
+      topicDomain: "anti_doping",
+      emotionalState: "panicked",
+      messages: [
+        new HumanMessage("I just failed a drug test and I'm panicking"),
+      ],
+    });
+    const result = await escalateNode(state);
+
+    expect(result.answer).toContain("Take a breath");
+    expect(result.answer).toContain("USADA");
   });
 });

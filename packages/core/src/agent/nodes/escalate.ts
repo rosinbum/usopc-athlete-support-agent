@@ -5,6 +5,7 @@ import { getModelConfig } from "../../config/index.js";
 import {
   getEscalationTargets,
   buildEscalation,
+  withEmpathy,
   buildEscalationPrompt,
   SYSTEM_PROMPT,
   type EscalationTarget,
@@ -173,13 +174,15 @@ export async function escalateNode(
       };
 
       return {
-        answer:
+        answer: withEmpathy(
           "Your question is best addressed by speaking with the Athlete Ombuds, " +
-          "who provides free, confidential, and independent advice to athletes.\n\n" +
-          "**Athlete Ombuds**\n" +
-          "- Phone: 719-866-5000\n" +
-          "- Email: ombudsman@usathlete.org\n" +
-          "- Website: https://www.usathlete.org",
+            "who provides free, confidential, and independent advice to athletes.\n\n" +
+            "**Athlete Ombuds**\n" +
+            "- Phone: 719-866-5000\n" +
+            "- Email: ombudsman@usathlete.org\n" +
+            "- Website: https://www.usathlete.org",
+          state.emotionalState,
+        ),
         escalation: fallbackEscalation,
       };
     }
@@ -210,7 +213,7 @@ export async function escalateNode(
     });
 
     return {
-      answer,
+      answer: withEmpathy(answer, state.emotionalState),
       escalation: escalation ?? undefined,
     };
   } catch (error) {
@@ -221,10 +224,12 @@ export async function escalateNode(
 
     // Even on error, provide a basic referral
     return {
-      answer:
+      answer: withEmpathy(
         "I encountered an issue processing your request. For immediate assistance, " +
-        "please contact the Athlete Ombuds at ombudsman@usathlete.org or 719-866-5000. " +
-        "They provide free, confidential advice to athletes.",
+          "please contact the Athlete Ombuds at ombudsman@usathlete.org or 719-866-5000. " +
+          "They provide free, confidential advice to athletes.",
+        state.emotionalState,
+      ),
       escalation: {
         target: "athlete_ombuds",
         organization: "Athlete Ombuds",

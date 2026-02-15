@@ -44,6 +44,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     clarificationQuestion: undefined,
     escalationReason: undefined,
     retrievalStatus: "success",
+    emotionalState: "neutral",
     ...overrides,
   };
 }
