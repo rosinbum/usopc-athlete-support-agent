@@ -16,6 +16,7 @@ import { resolveEnv } from "../helpers/resolveEnv.js";
 // Bridge SST Resource bindings → env vars before any SDK is loaded
 resolveEnv();
 
+import net from "node:net";
 import { traceable } from "langsmith/traceable";
 import { QUALITY_REVIEW_PROJECT } from "../config.js";
 import { runPipeline } from "../helpers/pipeline.js";
@@ -24,6 +25,51 @@ import {
   qualityReviewScenarios,
   type QualityReviewScenario,
 } from "../quality-review/scenarios.js";
+
+// ---------------------------------------------------------------------------
+// Database connectivity check
+// ---------------------------------------------------------------------------
+
+async function checkDatabase(): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    console.error("✗ DATABASE_URL is not set. Run within `sst shell`.");
+    process.exit(1);
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    console.error("✗ DATABASE_URL is not a valid URL.");
+    process.exit(1);
+  }
+
+  const host = parsed.hostname;
+  const port = parseInt(parsed.port || "5432", 10);
+
+  await new Promise<void>((resolve, reject) => {
+    const sock = net.createConnection({ host, port, timeout: 3000 }, () => {
+      sock.destroy();
+      resolve();
+    });
+    sock.on("error", (err) => {
+      sock.destroy();
+      reject(err);
+    });
+    sock.on("timeout", () => {
+      sock.destroy();
+      reject(new Error("Connection timed out"));
+    });
+  }).catch((err) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`✗ Cannot connect to database at ${host}:${port}: ${msg}`);
+    console.error(
+      "  Make sure the database is running before executing quality:run.",
+    );
+    process.exit(1);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // CLI arg parsing
@@ -125,6 +171,8 @@ async function runScenario(
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
+  await checkDatabase();
+
   const { category, tag } = parseArgs();
 
   let scenarios = qualityReviewScenarios;
@@ -160,7 +208,13 @@ async function main(): Promise<void> {
       );
     } catch (error) {
       failed++;
-      const msg = error instanceof Error ? error.message : String(error);
+      let msg: string;
+      if (error instanceof AggregateError) {
+        const sub = error.errors.map((e: Error) => e.message).join("; ");
+        msg = `AggregateError: ${sub || error.message}`;
+      } else {
+        msg = error instanceof Error ? error.message : String(error);
+      }
       console.log(`\r  ✗ ${label}`);
       console.log(`    Error: ${msg}`);
     }
