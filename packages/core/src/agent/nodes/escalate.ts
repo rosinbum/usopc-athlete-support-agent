@@ -1,9 +1,18 @@
-import { logger } from "@usopc/shared";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { logger, CircuitBreakerError } from "@usopc/shared";
+import { getModelConfig } from "../../config/index.js";
 import {
   getEscalationTargets,
   buildEscalation,
+  buildEscalationPrompt,
+  SYSTEM_PROMPT,
   type EscalationTarget,
 } from "../../prompts/index.js";
+import {
+  invokeAnthropic,
+  extractTextFromResponse,
+} from "../../services/anthropicService.js";
 import { getLastUserMessage, stateContext } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { TopicDomain, EscalationInfo } from "../../types/index.js";
@@ -31,7 +40,8 @@ function determineUrgency(
 }
 
 /**
- * Formats an escalation target into a human-readable contact block.
+ * Formats an escalation target into a human-readable contact block
+ * for the deterministic fallback message.
  */
 function formatContactBlock(target: EscalationTarget): string {
   const lines: string[] = [];
@@ -52,88 +62,72 @@ function formatContactBlock(target: EscalationTarget): string {
 }
 
 /**
- * Builds a referral answer message based on the escalation targets.
+ * Builds a deterministic fallback message when the LLM is unavailable.
+ * Unlike the old template, this does NOT include a blanket 911 preamble.
  */
-function buildReferralMessage(
-  targets: EscalationTarget[],
-  domain: TopicDomain,
-  urgency: "immediate" | "standard",
-  userMessage: string,
-): string {
+function buildFallbackMessage(targets: EscalationTarget[]): string {
   const parts: string[] = [];
 
-  if (urgency === "immediate") {
-    // Safety-critical preamble for immediate escalation
-    if (domain === "safesport") {
-      parts.push(
-        "**If you are in immediate danger, please call 911 first.**\n",
-      );
-      parts.push(
-        "Your concern involves potential abuse or misconduct, which requires " +
-          "reporting to the appropriate authority. I am not equipped to investigate " +
-          "or resolve SafeSport matters, but I can direct you to the right resources.\n",
-      );
-    } else if (domain === "anti_doping") {
-      parts.push(
-        "Your question involves an anti-doping matter that may require immediate " +
-          "action. It is important that you contact USADA directly for guidance " +
-          "specific to your situation.\n",
-      );
-    } else {
-      parts.push(
-        "Based on the urgency of your situation, I recommend contacting the " +
-          "following resource(s) directly for timely assistance.\n",
-      );
-    }
-  } else {
-    parts.push(
-      "Your question is best addressed by a specialized authority. " +
-        "I recommend reaching out to the following resource(s) for personalized guidance.\n",
-    );
-  }
+  parts.push(
+    "I recommend reaching out to the following resource(s) " +
+      "for assistance with your situation.\n",
+  );
 
-  // Contact blocks for each relevant target
-  parts.push("## Recommended Contact(s)\n");
   for (const target of targets) {
     parts.push(formatContactBlock(target));
     parts.push(""); // blank line between contacts
   }
 
-  // Add a brief note about what these contacts can help with
-  parts.push("## What They Can Help With\n");
-  const domainHelp: Record<TopicDomain, string> = {
-    safesport:
-      "The U.S. Center for SafeSport can investigate reports of sexual, emotional, " +
-      "or physical misconduct, bullying, hazing, and harassment. Reports can be " +
-      "made anonymously.",
-    anti_doping:
-      "USADA can assist with questions about drug testing, Therapeutic Use Exemptions " +
-      "(TUEs), whereabouts requirements, prohibited substances, and anti-doping " +
-      "rule violation proceedings.",
-    dispute_resolution:
-      "The Athlete Ombuds provides free, confidential advice on disputes including " +
-      "Section 9 arbitration, grievance procedures, and how to challenge decisions " +
-      "by an NGB or the USOPC.",
-    team_selection:
-      "The Athlete Ombuds can help you understand the selection procedures for your " +
-      "sport and your options if you believe a selection decision was made in error.",
-    eligibility:
-      "The Athlete Ombuds can advise on eligibility requirements and processes for " +
-      "your specific sport and competition level.",
-    governance:
-      "The Athletes' Commission and Athlete Ombuds can assist with governance concerns, " +
-      "NGB compliance issues, and athlete representation questions.",
-    athlete_rights:
-      "The Athletes' Commission can help with questions about athlete representation, " +
-      "the Athlete Bill of Rights, and marketing/sponsorship rights. The Athlete " +
-      "Ombuds can provide confidential guidance on rights-related disputes.",
-  };
-
-  if (domain && domainHelp[domain]) {
-    parts.push(domainHelp[domain]);
-  }
-
   return parts.join("\n");
+}
+
+/**
+ * Generates a context-aware escalation response using the LLM.
+ * Falls back to a deterministic message if the LLM is unavailable.
+ */
+async function generateEscalationResponse(
+  userMessage: string,
+  domain: TopicDomain,
+  urgency: "immediate" | "standard",
+  escalationReason: string | undefined,
+  targets: EscalationTarget[],
+): Promise<string> {
+  const prompt = buildEscalationPrompt(
+    userMessage,
+    domain,
+    urgency,
+    escalationReason,
+    targets,
+  );
+
+  const config = await getModelConfig();
+  const model = new ChatAnthropic({
+    model: config.agent.model,
+    temperature: config.agent.temperature,
+    maxTokens: config.agent.maxTokens,
+  });
+
+  try {
+    const response = await invokeAnthropic(model, [
+      new SystemMessage(SYSTEM_PROMPT),
+      new HumanMessage(prompt),
+    ]);
+
+    return extractTextFromResponse(response);
+  } catch (error) {
+    if (error instanceof CircuitBreakerError) {
+      log.warn("Escalation LLM circuit open; using fallback message", {
+        domain,
+      });
+    } else {
+      log.error("Escalation LLM call failed; using fallback message", {
+        error: error instanceof Error ? error.message : String(error),
+        domain,
+      });
+    }
+
+    return buildFallbackMessage(targets);
+  }
 }
 
 /**
@@ -144,18 +138,20 @@ function buildReferralMessage(
  *
  * 1. Identifies the relevant escalation targets for the topic domain
  * 2. Determines the urgency level
- * 3. Builds an EscalationInfo object with contact details
- * 4. Generates a helpful referral message directing the user to the
- *    correct authority
+ * 3. Builds an EscalationInfo object with contact details (deterministic)
+ * 4. Generates a context-aware referral message using the LLM
  *
- * The answer is a referral message (not a substantive answer to the
- * user's question) because the query requires human assistance.
+ * The LLM tailors the response to the athlete's specific situation while
+ * keeping contact information grounded in verified data. If the LLM is
+ * unavailable, a deterministic fallback provides contact info without
+ * the blanket 911 preamble.
  */
 export async function escalateNode(
   state: AgentState,
 ): Promise<Partial<AgentState>> {
   const userMessage = getLastUserMessage(state.messages);
   const domain = state.topicDomain ?? "dispute_resolution";
+  const escalationReason = state.escalationReason;
 
   try {
     const targets = getEscalationTargets(domain);
@@ -171,6 +167,7 @@ export async function escalateNode(
         contactPhone: "719-866-5000",
         contactUrl: "https://www.usathlete.org",
         reason:
+          escalationReason ??
           "Query requires human assistance and no specific escalation target was identified",
         urgency: "standard",
       };
@@ -187,22 +184,29 @@ export async function escalateNode(
       };
     }
 
-    // Build the escalation info from the primary target
-    const escalation = buildEscalation(
-      domain,
+    // Build the escalation info deterministically for analytics/tracking
+    const reason =
+      escalationReason ??
       `User query requires ${urgency} escalation to ${targets[0].organization} ` +
-        `for ${domain.replace(/_/g, " ")} matter`,
-      urgency,
-    );
+        `for ${domain.replace(/_/g, " ")} matter`;
 
-    // Generate the referral message
-    const answer = buildReferralMessage(targets, domain, urgency, userMessage);
+    const escalation = buildEscalation(domain, reason, urgency);
+
+    // Generate context-aware response via LLM (with fallback)
+    const answer = await generateEscalationResponse(
+      userMessage,
+      domain,
+      urgency,
+      escalationReason,
+      targets,
+    );
 
     log.info("Escalation complete", {
       domain,
       urgency,
       targetCount: targets.length,
       primaryTarget: targets[0].id,
+      llmGenerated: true,
     });
 
     return {
@@ -227,7 +231,9 @@ export async function escalateNode(
         contactEmail: "ombudsman@usathlete.org",
         contactPhone: "719-866-5000",
         contactUrl: "https://www.usathlete.org",
-        reason: "Escalation processing error; providing default referral",
+        reason:
+          escalationReason ??
+          "Escalation processing error; providing default referral",
         urgency: "standard",
       },
     };

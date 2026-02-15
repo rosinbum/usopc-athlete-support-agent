@@ -55,6 +55,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     userSport: undefined,
     needsClarification: false,
     clarificationQuestion: undefined,
+    escalationReason: undefined,
     retrievalStatus: "success",
     ...overrides,
   };
@@ -121,6 +122,47 @@ describe("classifierNode", () => {
     expect(result.queryIntent).toBe("escalation");
     expect(result.topicDomain).toBe("safesport");
     expect(result.hasTimeConstraint).toBe(true);
+  });
+
+  it("passes escalationReason to state when shouldEscalate is true", async () => {
+    mockInvoke.mockResolvedValueOnce(
+      classifierResponse({
+        topicDomain: "safesport",
+        detectedNgbIds: [],
+        queryIntent: "factual",
+        hasTimeConstraint: false,
+        shouldEscalate: true,
+        escalationReason: "Athlete reports pattern of emotional misconduct",
+      }),
+    );
+
+    const state = makeState({
+      messages: [
+        new HumanMessage("My coach has been verbally abusive for months"),
+      ],
+    });
+    const result = await classifierNode(state);
+
+    expect(result.escalationReason).toBe(
+      "Athlete reports pattern of emotional misconduct",
+    );
+  });
+
+  it("sets escalationReason to undefined when shouldEscalate is false", async () => {
+    mockInvoke.mockResolvedValueOnce(
+      classifierResponse({
+        topicDomain: "team_selection",
+        detectedNgbIds: ["usa_swimming"],
+        queryIntent: "procedural",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+      }),
+    );
+
+    const state = makeState();
+    const result = await classifierNode(state);
+
+    expect(result.escalationReason).toBeUndefined();
   });
 
   it("handles markdown code fences around JSON", async () => {

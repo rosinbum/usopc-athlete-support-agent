@@ -123,71 +123,114 @@ export function buildEscalation(
   };
 }
 
-export const ESCALATION_PROMPT = `You are the escalation assessor for the USOPC Athlete Support Assistant. \
-Based on the classified query and user message, determine if the user should be directed \
-to an external authority for immediate or specialized assistance.
+export const ESCALATION_PROMPT = `You are the USOPC Athlete Support Assistant responding to an athlete \
+who needs to be connected with the appropriate authority for their situation.
 
-## Escalation Criteria
+## Your Task
 
-### Immediate Escalation (urgency: "immediate")
-- User describes active abuse, harassment, or misconduct --> U.S. Center for SafeSport
-- User or someone else is in immediate physical danger --> 911, then SafeSport
-- User has been notified of an anti-doping rule violation --> USADA
-- User has a hearing or arbitration deadline within 7 days --> Athlete Ombuds
+Write a supportive, context-aware response that:
+1. Briefly acknowledges the athlete's specific situation (do NOT repeat their message back verbatim)
+2. Explains why you are directing them to the recommended contact(s)
+3. Provides the verified contact information below
+4. Offers brief, situation-specific guidance on what to expect or how to prepare
 
-### Standard Escalation (urgency: "standard")
-- User needs legal guidance on an active dispute --> Athlete Ombuds
-- User wants to file a formal complaint or grievance --> Athlete Ombuds
-- User has questions about a pending CAS appeal --> Athlete Ombuds + CAS
-- User wants to report non-urgent misconduct --> U.S. Center for SafeSport
-- User has governance or representation concerns --> Athletes' Commission
+## Critical Rules
 
-## Escalation Targets
+- **911 guidance**: ONLY mention calling 911 if the escalation reason indicates IMMINENT PHYSICAL DANGER \
+(e.g., active physical abuse happening now, someone in immediate danger of harm). \
+Do NOT mention 911 for retaliation reports, emotional misconduct, policy violations, banned persons sightings, \
+or any situation that is not an immediate physical safety emergency.
+- **Contact information**: Use ONLY the verified contact details provided below. Do not fabricate phone numbers, \
+emails, or URLs.
+- **Cross-domain awareness**: If the athlete's situation spans multiple domains (e.g., a SafeSport issue that \
+also involves a team selection dispute), address both aspects and provide contacts for each.
+- **Tone**: Be empathetic but direct. The athlete is in a difficult situation and needs clear action steps.
+- **Do NOT** attempt to investigate, adjudicate, or resolve the matter. You are connecting them to the right people.
+- **Do NOT** use generic boilerplate. Tailor your response to what the athlete actually described.
 
-{{escalationTargets}}
+## Verified Contact Information
 
-## User Message
+{{contactBlocks}}
 
-{{userMessage}}
+## Domain Context
 
-## Classification Result
+{{domainGuidance}}
 
-{{classificationResult}}
+## Escalation Reason
 
-## Instructions
+{{escalationReason}}
 
-Based on the above, determine:
-1. Whether escalation is needed
-2. Which target(s) to escalate to
-3. The urgency level
-4. A clear reason for the escalation
+## Athlete's Message
 
-Return a JSON object:
-{
-  "shouldEscalate": boolean,
-  "escalations": [
-    {
-      "targetId": string,
-      "urgency": "immediate" | "standard",
-      "reason": string
-    }
-  ]
-}`;
+{{userMessage}}`;
 
 /**
- * Fills the escalation prompt template with context.
+ * Formats a single escalation target into a contact block for the prompt.
+ */
+function formatTargetForPrompt(target: EscalationTarget): string {
+  const lines: string[] = [];
+  lines.push(`### ${target.organization}`);
+  lines.push(target.description);
+  if (target.contactPhone) lines.push(`- Phone: ${target.contactPhone}`);
+  if (target.contactEmail) lines.push(`- Email: ${target.contactEmail}`);
+  if (target.contactUrl) lines.push(`- Website: ${target.contactUrl}`);
+  return lines.join("\n");
+}
+
+/**
+ * Domain-specific guidance for the LLM to incorporate into responses.
+ */
+const DOMAIN_GUIDANCE: Record<TopicDomain, string> = {
+  safesport:
+    "This is a SafeSport matter. The U.S. Center for SafeSport has exclusive jurisdiction over " +
+    "misconduct investigations in U.S. Olympic and Paralympic sport. Reports can be made anonymously. " +
+    "If the athlete mentions retaliation, note that the SafeSport Code prohibits retaliation.",
+  anti_doping:
+    "This is an anti-doping matter. USADA handles all testing, adjudication, and TUE decisions " +
+    "for U.S. Olympic and Paralympic athletes. Time-sensitive action may be required.",
+  dispute_resolution:
+    "This involves a dispute that may require formal resolution. The Athlete Ombuds provides " +
+    "free, confidential guidance. Section 9 arbitration and AAA proceedings have strict deadlines.",
+  team_selection:
+    "This involves a team selection concern. The Athlete Ombuds can explain the athlete's options, " +
+    "including whether a Section 9 arbitration claim is available.",
+  eligibility:
+    "This involves an eligibility question that requires expert guidance. " +
+    "The Athlete Ombuds can advise on eligibility requirements and processes.",
+  governance:
+    "This involves a governance or compliance concern. The Athletes' Commission and " +
+    "Athlete Ombuds can help with NGB compliance and athlete representation issues.",
+  athlete_rights:
+    "This involves athlete rights or representation. The Athletes' Commission handles " +
+    "representation on boards/committees, and the Athlete Ombuds can advise on rights-related disputes.",
+};
+
+/**
+ * Builds the escalation prompt with full context for LLM generation.
+ *
+ * @param userMessage - The athlete's original message
+ * @param domain - The classified topic domain
+ * @param urgency - The determined urgency level
+ * @param escalationReason - Why escalation was triggered (from classifier)
+ * @param targets - Verified escalation targets for this domain
  */
 export function buildEscalationPrompt(
   userMessage: string,
-  classificationResult: string,
+  domain: TopicDomain,
+  urgency: "immediate" | "standard",
+  escalationReason: string | undefined,
+  targets: EscalationTarget[],
 ): string {
-  const targetsDescription = ESCALATION_TARGETS.map(
-    (t) =>
-      `- **${t.organization}** (${t.id}): ${t.description} ` +
-      `[${t.contactPhone ?? ""} | ${t.contactEmail ?? ""} | ${t.contactUrl ?? ""}]`,
-  ).join("\n");
+  const contactBlocks = targets.map(formatTargetForPrompt).join("\n\n");
 
-  return ESCALATION_PROMPT.replace("{{escalationTargets}}", targetsDescription)
-    .replace("{{userMessage}}", userMessage)
-    .replace("{{classificationResult}}", classificationResult);
+  const domainGuidance = DOMAIN_GUIDANCE[domain] ?? "";
+
+  const reason =
+    escalationReason ??
+    `User query requires ${urgency} escalation for ${domain.replace(/_/g, " ")} matter`;
+
+  return ESCALATION_PROMPT.replace("{{contactBlocks}}", contactBlocks)
+    .replace("{{domainGuidance}}", domainGuidance)
+    .replace("{{escalationReason}}", reason)
+    .replace("{{userMessage}}", userMessage);
 }
