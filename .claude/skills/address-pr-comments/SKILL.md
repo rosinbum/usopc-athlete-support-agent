@@ -25,6 +25,7 @@ Paginate if needed (use `perPage: 100`).
 ## Step 3: Filter threads
 
 Process only threads that are:
+
 - **Not resolved** (`isResolved` is false)
 - **Not outdated** (`isOutdated` is false)
 
@@ -42,6 +43,7 @@ For each unresolved, non-outdated review thread:
 ### 4b. Evaluate the suggestion
 
 Consider:
+
 - **Correctness**: Does the suggestion fix a real bug or prevent a real issue?
 - **Clarity**: Does it meaningfully improve readability or maintainability?
 - **Safety**: Does it address a security concern or error-handling gap?
@@ -49,6 +51,7 @@ Consider:
 - **Context**: Is the reviewer missing context that makes the current code correct?
 
 Classify the suggestion as one of:
+
 1. **Apply** — the suggestion is valid and improves the code
 2. **Partially apply** — the core idea is right but the exact suggestion needs adjustment
 3. **Decline** — the suggestion is incorrect, unnecessary, or would reduce code quality
@@ -56,6 +59,7 @@ Classify the suggestion as one of:
 ### 4c. Take action
 
 **If applying or partially applying:**
+
 1. Make the code change using the `Edit` tool
 2. Reply to the thread via `gh api` explaining what was changed:
    ```bash
@@ -69,6 +73,7 @@ Classify the suggestion as one of:
    Reply format: `"Applied — [brief description of what changed]."`
 
 **If declining:**
+
 1. Do NOT modify the code
 2. Reply to the thread explaining why:
    Reply format: `"Respectfully declining — [clear reason]. [Optional: brief explanation of why the current approach is preferred]."`
@@ -76,6 +81,7 @@ Classify the suggestion as one of:
 ### 4d. Track changes
 
 Keep a running list of:
+
 - Files modified
 - Threads addressed (with thread node IDs)
 - Threads declined (with reasons)
@@ -98,7 +104,6 @@ Do NOT resolve threads that were declined — leave those open for further discu
 ## Step 6: Format changed files
 
 Run `npx prettier --write` on all files that were modified.
-
 
 ## Step 7: Check types changed files
 
