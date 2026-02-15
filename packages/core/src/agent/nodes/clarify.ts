@@ -1,4 +1,5 @@
 import { logger } from "@usopc/shared";
+import { withEmpathy } from "../../prompts/index.js";
 import type { AgentState } from "../state.js";
 
 const log = logger.child({ service: "clarify-node" });
@@ -35,7 +36,7 @@ export async function clarifyNode(
   });
 
   return {
-    answer: question,
+    answer: withEmpathy(question, state.emotionalState),
     disclaimerRequired: false, // No disclaimer needed for clarification questions
   };
 }

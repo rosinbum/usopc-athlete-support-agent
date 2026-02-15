@@ -1,6 +1,7 @@
 export type {
   TopicDomain,
   QueryIntent,
+  EmotionalState,
   Citation,
   EscalationInfo,
   RetrievedDocument,

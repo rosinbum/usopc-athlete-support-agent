@@ -2,6 +2,7 @@ import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
 import type {
   TopicDomain,
   QueryIntent,
+  EmotionalState,
   Citation,
   EscalationInfo,
   RetrievedDocument,
@@ -149,6 +150,15 @@ export const AgentStateAnnotation = Annotation.Root({
   clarificationQuestion: Annotation<string | undefined>({
     reducer: (_prev, next) => next,
     default: () => undefined,
+  }),
+
+  /**
+   * The detected emotional state of the user, set by the classifier node.
+   * Downstream nodes use this to inject empathy preambles and adjust tone.
+   */
+  emotionalState: Annotation<EmotionalState>({
+    reducer: (_prev, next) => next,
+    default: () => "neutral",
   }),
 
   /**

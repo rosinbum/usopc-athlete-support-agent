@@ -38,6 +38,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     needsClarification: false,
     clarificationQuestion: undefined,
     retrievalStatus: "success",
+    emotionalState: "neutral",
     ...overrides,
   };
 }
@@ -139,5 +140,35 @@ describe("escalateNode", () => {
     // dispute_resolution has Athlete Ombuds and CAS
     expect(result.answer).toContain("Athlete Ombuds");
     expect(result.answer).toContain("Court of Arbitration for Sport");
+  });
+
+  it("prepends empathy for fearful athlete on SafeSport path", async () => {
+    const state = makeState({
+      topicDomain: "safesport",
+      emotionalState: "fearful",
+      messages: [
+        new HumanMessage(
+          "I'm terrified my coach will retaliate if I report abuse",
+        ),
+      ],
+    });
+    const result = await escalateNode(state);
+
+    expect(result.answer).toContain("retaliation protections");
+    expect(result.answer).toContain("U.S. Center for SafeSport");
+  });
+
+  it("prepends empathy for panicked athlete on anti-doping path", async () => {
+    const state = makeState({
+      topicDomain: "anti_doping",
+      emotionalState: "panicked",
+      messages: [
+        new HumanMessage("I just failed a drug test and I'm panicking"),
+      ],
+    });
+    const result = await escalateNode(state);
+
+    expect(result.answer).toContain("Take a breath");
+    expect(result.answer).toContain("USADA");
   });
 });

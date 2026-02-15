@@ -59,6 +59,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     needsClarification: false,
     clarificationQuestion: undefined,
     retrievalStatus: "success",
+    emotionalState: "neutral",
     ...overrides,
   };
 }
@@ -236,11 +237,79 @@ describe("synthesizerNode", () => {
 
       const state = makeState({
         retrievalStatus: "success",
+        emotionalState: "neutral",
         retrievedDocuments: [makeDoc("context")],
       });
 
       const result = await synthesizerNode(state);
       expect(result.answer).toBe("Normal answer");
+    });
+  });
+
+  describe("emotional intelligence", () => {
+    it("prepends distressed preamble with mental health resources", async () => {
+      mockInvoke.mockResolvedValueOnce({
+        content: "Here are the appeal options for your selection dispute...",
+      });
+
+      const state = makeState({
+        emotionalState: "distressed",
+        retrievedDocuments: [makeDoc("Selection appeal procedures...")],
+        messages: [
+          new HumanMessage(
+            "I feel completely alone. The selection committee overlooked me.",
+          ),
+        ],
+      });
+      const result = await synthesizerNode(state);
+
+      expect(result.answer).toContain("what you're feeling is valid");
+      expect(result.answer).toContain("1-888-602-9002");
+      expect(result.answer).toContain("appeal options");
+    });
+
+    it("injects tone guidance into prompt for non-neutral state", async () => {
+      mockInvoke.mockResolvedValueOnce({
+        content: "Here are the steps you can take...",
+      });
+
+      const state = makeState({
+        emotionalState: "panicked",
+        retrievedDocuments: [makeDoc("Anti-doping procedures...")],
+        messages: [
+          new HumanMessage(
+            "I just failed a drug test and I'm panicking. What do I do?",
+          ),
+        ],
+      });
+      await synthesizerNode(state);
+
+      // Verify the prompt includes tone guidance
+      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const humanMessage = invokeArgs[1];
+      expect(humanMessage.content).toContain("TONE GUIDANCE");
+      expect(humanMessage.content).toContain("calm, reassuring");
+    });
+
+    it("does not modify answer or prompt for neutral state", async () => {
+      mockInvoke.mockResolvedValueOnce({
+        content: "Section 9 allows athletes to file complaints...",
+      });
+
+      const state = makeState({
+        emotionalState: "neutral",
+        retrievedDocuments: [makeDoc("Section 9 procedures...")],
+      });
+      const result = await synthesizerNode(state);
+
+      expect(result.answer).toBe(
+        "Section 9 allows athletes to file complaints...",
+      );
+
+      // Verify no tone guidance was injected
+      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const humanMessage = invokeArgs[1];
+      expect(humanMessage.content).not.toContain("TONE GUIDANCE");
     });
   });
 

@@ -2,7 +2,12 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import { getModelConfig } from "../../config/index.js";
-import { SYSTEM_PROMPT, buildSynthesizerPrompt } from "../../prompts/index.js";
+import {
+  SYSTEM_PROMPT,
+  buildSynthesizerPrompt,
+  withEmpathy,
+  getEmotionalToneGuidance,
+} from "../../prompts/index.js";
 import {
   invokeAnthropic,
   extractTextFromResponse,
@@ -164,12 +169,14 @@ export async function synthesizerNode(
   const context = buildContext(state);
   // Pass queryIntent to adapt response format (concise for factual/deadline, detailed for general)
   // Pass conversation history for contextual responses
-  const prompt = buildSynthesizerPrompt(
+  const basePrompt = buildSynthesizerPrompt(
     context,
     currentMessage,
     state.queryIntent,
     conversationContext,
   );
+  // Append emotional tone guidance when the user is in a non-neutral state
+  const prompt = basePrompt + getEmotionalToneGuidance(state.emotionalState);
 
   const config = await getModelConfig();
   const model = new ChatAnthropic({
@@ -190,7 +197,8 @@ export async function synthesizerNode(
       new HumanMessage(prompt),
     ]);
 
-    const answer = extractTextFromResponse(response);
+    const rawAnswer = extractTextFromResponse(response);
+    const answer = withEmpathy(rawAnswer, state.emotionalState);
 
     log.info("Synthesis complete", {
       answerLength: answer.length,
