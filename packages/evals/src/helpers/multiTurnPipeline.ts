@@ -83,6 +83,7 @@ export async function runMultiTurnPipeline(
       userSport: opts?.userSport,
       needsClarification: false,
       clarificationQuestion: undefined,
+      escalationReason: undefined,
       retrievalStatus: "success",
     },
     trajectory,
