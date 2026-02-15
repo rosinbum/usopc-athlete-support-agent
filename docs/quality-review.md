@@ -21,6 +21,8 @@ Creates the `usopc-quality-review` dataset in LangSmith with ~60 scenarios.
 
 ### 2. Run scenarios through the agent
 
+**Important:** The database must be running before executing this step.
+
 ```bash
 # Run all scenarios
 pnpm --filter @usopc/evals quality:run
@@ -30,17 +32,27 @@ pnpm --filter @usopc/evals quality:run -- --category boundary
 
 # Tag a batch for tracking
 pnpm --filter @usopc/evals quality:run -- --tag sprint-42
+
+# Combine filters
+pnpm --filter @usopc/evals quality:run -- --category multi_turn --tag v2-test
 ```
 
 This invokes each scenario through the full agent pipeline and logs traces to the `usopc-quality-review` LangSmith project with metadata (scenario ID, category, difficulty, domains).
 
-### 3. Set up the annotation queue
+### 3. Add runs to the annotation queue
 
 ```bash
 pnpm --filter @usopc/evals quality:setup
 ```
 
 Creates (or updates) a LangSmith annotation queue named `quality-review` and adds all runs from the quality review project to it. The queue includes rubric instructions and the full failure mode taxonomy.
+
+**You must re-run this after every `quality:run`** — new traces are not automatically added to the annotation queue. The typical workflow is:
+
+```bash
+pnpm --filter @usopc/evals quality:run -- --tag my-batch   # generate traces
+pnpm --filter @usopc/evals quality:setup                    # add them to the queue
+```
 
 ### 4. Annotate in LangSmith
 
