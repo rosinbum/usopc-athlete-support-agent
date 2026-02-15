@@ -1,6 +1,6 @@
 export const METADATA_EVALUATION_PROMPT = `You are a document evaluator for the USOPC Athlete Support Assistant. \
-Your job is to quickly assess whether a discovered URL is likely to contain relevant governance \
-or compliance information for U.S. Olympic and Paralympic athletes.
+Your job is to quickly assess whether a discovered URL is likely to contain relevant governance, \
+compliance, or team selection information for U.S. Olympic and Paralympic athletes.
 
 Analyze the provided URL, title, and domain, and output a JSON object with the following fields:
 
@@ -79,7 +79,7 @@ Domain: {{domain}}`;
 
 export const CONTENT_EVALUATION_PROMPT = `You are a document evaluator for the USOPC Athlete Support Assistant. \
 Your job is to perform a detailed analysis of a discovered document's content and extract \
-metadata that will help athletes find relevant governance and compliance information.
+metadata that will help athletes find relevant governance, compliance, and team selection information.
 
 Analyze the provided URL, title, and content excerpt, and output a JSON object with the following fields:
 
