@@ -119,19 +119,69 @@ describe("buildEscalation", () => {
 });
 
 describe("buildEscalationPrompt", () => {
-  it("fills in the user message and classification result", () => {
+  it("fills in the user message and escalation reason", () => {
+    const targets = getEscalationTargets("safesport");
     const prompt = buildEscalationPrompt(
       "I want to report abuse",
-      '{"topicDomain":"safesport"}',
+      "safesport",
+      "immediate",
+      "Athlete reports active abuse",
+      targets,
     );
     expect(prompt).toContain("I want to report abuse");
-    expect(prompt).toContain('{"topicDomain":"safesport"}');
+    expect(prompt).toContain("Athlete reports active abuse");
   });
 
-  it("includes escalation target descriptions", () => {
-    const prompt = buildEscalationPrompt("test", "test");
-    expect(prompt).toContain("Athlete Ombuds");
+  it("includes contact details for the given domain targets", () => {
+    const targets = getEscalationTargets("safesport");
+    const prompt = buildEscalationPrompt(
+      "test",
+      "safesport",
+      "immediate",
+      "test reason",
+      targets,
+    );
     expect(prompt).toContain("U.S. Center for SafeSport");
+    expect(prompt).toContain("833-5US-SAFE");
+  });
+
+  it("includes domain guidance for the given domain", () => {
+    const targets = getEscalationTargets("dispute_resolution");
+    const prompt = buildEscalationPrompt(
+      "test",
+      "dispute_resolution",
+      "standard",
+      undefined,
+      targets,
+    );
+    expect(prompt).toContain("Athlete Ombuds");
+    expect(prompt).toContain("Section 9 arbitration");
+  });
+
+  it("generates default reason when escalationReason is undefined", () => {
+    const targets = getEscalationTargets("anti_doping");
+    const prompt = buildEscalationPrompt(
+      "test",
+      "anti_doping",
+      "immediate",
+      undefined,
+      targets,
+    );
+    expect(prompt).toContain("anti doping");
+  });
+
+  it("includes only targets for the specified domain", () => {
+    const targets = getEscalationTargets("anti_doping");
+    const prompt = buildEscalationPrompt(
+      "test",
+      "anti_doping",
+      "immediate",
+      "test reason",
+      targets,
+    );
     expect(prompt).toContain("USADA");
+    // Contact block should not contain SafeSport center's phone number
+    // since it's not in anti_doping targets
+    expect(prompt).not.toContain("833-5US-SAFE");
   });
 });

@@ -210,6 +210,7 @@ export async function classifierNode(
       hasTimeConstraint: result.hasTimeConstraint,
       needsClarification: result.needsClarification,
       clarificationQuestion: result.clarificationQuestion,
+      escalationReason: result.escalationReason,
     };
   } catch (error) {
     if (error instanceof CircuitBreakerError) {
