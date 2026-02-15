@@ -225,6 +225,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error);
+  console.error("Fatal error:", error instanceof Error ? error.stack : error);
   process.exit(1);
 });
