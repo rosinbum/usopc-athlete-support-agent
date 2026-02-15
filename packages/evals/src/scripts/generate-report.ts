@@ -100,10 +100,9 @@ async function collectFeedback(since?: string): Promise<RunFeedback[]> {
   }
 
   if (!projectId) {
-    console.error(
+    throw new Error(
       `Project "${QUALITY_REVIEW_PROJECT}" not found. Run quality:run first.`,
     );
-    process.exit(1);
   }
 
   // Collect runs and their feedback
@@ -397,10 +396,9 @@ async function main(): Promise<void> {
   const feedback = await collectFeedback(since);
 
   if (feedback.length === 0) {
-    console.error(
+    throw new Error(
       "No runs found. Run quality:run first, then annotate traces.",
     );
-    process.exit(1);
   }
 
   const report = analyze(feedback);

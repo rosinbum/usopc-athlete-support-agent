@@ -115,10 +115,6 @@ async function runScenario(
     metadata.user_sport = scenario.input.userSport;
   }
 
-  // Set project env var so LangChain auto-tracing goes to the right project
-  process.env.LANGCHAIN_PROJECT = QUALITY_REVIEW_PROJECT;
-  process.env.LANGSMITH_TRACING = "true";
-
   const traced = traceable(
     async (input: {
       messages: Array<{ role: "user" | "assistant"; content: string }>;
@@ -127,23 +123,18 @@ async function runScenario(
       description: string;
     }) => {
       const start = Date.now();
-      let answer: string;
-      let trajectory: string[];
 
-      if (isMultiTurn(scenario)) {
-        const result = await runMultiTurnPipeline(input.messages, {
-          userSport: input.userSport,
-        });
-        answer = result.state.answer ?? "";
-        trajectory = result.trajectory;
-      } else {
-        const result = await runPipeline(input.messages[0].content);
-        answer = result.state.answer ?? "";
-        trajectory = result.trajectory;
-      }
+      const result = isMultiTurn(scenario)
+        ? await runMultiTurnPipeline(input.messages, {
+            userSport: input.userSport,
+          })
+        : await runPipeline(input.messages[0].content);
 
-      const durationMs = Date.now() - start;
-      return { answer, trajectory, durationMs };
+      return {
+        answer: result.state.answer ?? "",
+        trajectory: result.trajectory,
+        durationMs: Date.now() - start,
+      };
     },
     {
       name: `quality-review: ${scenario.id}`,
@@ -171,6 +162,10 @@ async function runScenario(
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
+  // Set project env vars once so LangChain auto-tracing goes to the right project
+  process.env.LANGCHAIN_PROJECT = QUALITY_REVIEW_PROJECT;
+  process.env.LANGSMITH_TRACING = "true";
+
   await checkDatabase();
 
   const { category, tag } = parseArgs();

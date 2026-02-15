@@ -33,7 +33,14 @@ export async function runMultiTurnPipeline(
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error(
-      "DATABASE_URL is required. Run within `sst shell` to set environment variables.",
+      "runMultiTurnPipeline: DATABASE_URL is required. Run within `sst shell` to set environment variables.",
+    );
+  }
+
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+  if (!openaiApiKey) {
+    throw new Error(
+      "runMultiTurnPipeline: OPENAI_API_KEY is required. Run within `sst shell` to set environment variables.",
     );
   }
 
@@ -41,7 +48,7 @@ export async function runMultiTurnPipeline(
 
   const runner = await AgentRunner.create({
     databaseUrl,
-    openaiApiKey: process.env.OPENAI_API_KEY,
+    openaiApiKey,
     tavilyApiKey: process.env.TAVILY_API_KEY,
   });
 
@@ -61,6 +68,9 @@ export async function runMultiTurnPipeline(
       answer: output.answer,
       citations: output.citations,
       escalation: output.escalation,
+      // These fields aren't directly available from AgentOutput,
+      // so we set sensible defaults. Full state is available through
+      // the graph's stream mode if needed.
       topicDomain: undefined,
       detectedNgbIds: [],
       queryIntent: undefined,
