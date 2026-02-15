@@ -60,6 +60,7 @@ export async function runPipeline(userMessage: string): Promise<{
       userSport: undefined,
       needsClarification: false,
       clarificationQuestion: undefined,
+      escalationReason: undefined,
       retrievalStatus: "success",
     },
     trajectory,
