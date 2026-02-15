@@ -75,7 +75,8 @@ Return ONLY valid JSON with no additional text, markdown formatting, or explanat
 
 URL: {{url}}
 Title: {{title}}
-Domain: {{domain}}`;
+Domain: {{domain}}
+{{contextHint}}`;
 
 export const CONTENT_EVALUATION_PROMPT = `You are a document evaluator for the USOPC Athlete Support Assistant. \
 Your job is to perform a detailed analysis of a discovered document's content and extract \
@@ -189,6 +190,7 @@ Return ONLY valid JSON with no additional text, markdown formatting, or explanat
 
 URL: {{url}}
 Title: {{title}}
+{{contextHint}}
 Content excerpt (first 8000 characters):
 
 {{content}}`;
@@ -200,10 +202,20 @@ export function buildMetadataEvaluationPrompt(
   url: string,
   title: string,
   domain: string,
+  contextHint?: string,
 ): string {
-  return METADATA_EVALUATION_PROMPT.replace("{{url}}", url)
+  let prompt = METADATA_EVALUATION_PROMPT.replace("{{url}}", url)
     .replace("{{title}}", title)
     .replace("{{domain}}", domain);
+
+  // Add context hint if available, otherwise remove the placeholder
+  if (contextHint) {
+    prompt = prompt.replace("{{contextHint}}", `\n${contextHint}`);
+  } else {
+    prompt = prompt.replace("{{contextHint}}", "");
+  }
+
+  return prompt;
 }
 
 /**
@@ -213,12 +225,22 @@ export function buildContentEvaluationPrompt(
   url: string,
   title: string,
   content: string,
+  contextHint?: string,
 ): string {
   // Truncate content to first 8000 characters if longer
   const truncatedContent =
     content.length > 8000 ? content.substring(0, 8000) : content;
 
-  return CONTENT_EVALUATION_PROMPT.replace("{{url}}", url)
+  let prompt = CONTENT_EVALUATION_PROMPT.replace("{{url}}", url)
     .replace("{{title}}", title)
     .replace("{{content}}", truncatedContent);
+
+  // Add context hint if available, otherwise remove the placeholder
+  if (contextHint) {
+    prompt = prompt.replace("{{contextHint}}", `${contextHint}\n`);
+  } else {
+    prompt = prompt.replace("{{contextHint}}", "");
+  }
+
+  return prompt;
 }

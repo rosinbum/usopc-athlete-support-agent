@@ -6,6 +6,7 @@ import {
   buildMetadataEvaluationPrompt,
   buildContentEvaluationPrompt,
 } from "../prompts/sourceEvaluation.js";
+import { generateContextHint } from "./contextHints.js";
 
 const logger = createLogger({ service: "evaluation-service" });
 
@@ -87,9 +88,19 @@ export class EvaluationService {
     title: string,
     domain: string,
   ): Promise<MetadataEvaluation> {
-    const prompt = buildMetadataEvaluationPrompt(url, title, domain);
+    const contextHint = generateContextHint(url);
+    const prompt = buildMetadataEvaluationPrompt(
+      url,
+      title,
+      domain,
+      contextHint,
+    );
 
-    logger.info("Evaluating metadata", { url, domain });
+    logger.info("Evaluating metadata", {
+      url,
+      domain,
+      hasHints: !!contextHint,
+    });
 
     try {
       const response = await this.model.invoke([new HumanMessage(prompt)]);
@@ -129,9 +140,19 @@ export class EvaluationService {
     title: string,
     content: string,
   ): Promise<ContentEvaluation> {
-    const prompt = buildContentEvaluationPrompt(url, title, content);
+    const contextHint = generateContextHint(url);
+    const prompt = buildContentEvaluationPrompt(
+      url,
+      title,
+      content,
+      contextHint,
+    );
 
-    logger.info("Evaluating content", { url, contentLength: content.length });
+    logger.info("Evaluating content", {
+      url,
+      contentLength: content.length,
+      hasHints: !!contextHint,
+    });
 
     try {
       const response = await this.model.invoke([new HumanMessage(prompt)]);
