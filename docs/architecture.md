@@ -72,6 +72,7 @@ Fan-out architecture via SQS FIFO queue (production only):
 Automated discovery pipeline to find new governance documents across NGB websites:
 
 **Discovery Pipeline** (`packages/ingestion/src/discoveryOrchestrator.ts`):
+
 1. **Discovery**: Find URLs via Tavily Map (site crawl) or Search (targeted queries)
 2. **Metadata Evaluation**: Fast LLM pre-filter based on URL, title, and domain (with context hints)
 3. **Content Extraction**: Load web content for relevant URLs
@@ -79,12 +80,14 @@ Automated discovery pipeline to find new governance documents across NGB website
 5. **Storage**: Save to DynamoDB with evaluation results and auto-approval status
 
 **Context Hints** (`packages/ingestion/src/services/contextHints.ts`):
+
 - NGB-specific hints for 5 major NGBs (USA Swimming, USA Track & Field, USA Gymnastics, USA Basketball, USA Hockey)
 - Each NGB has URL patterns, document types, topic domains, and keywords
 - Topic keyword mappings for all 7 topic domains (team_selection, dispute_resolution, safesport, anti_doping, eligibility, governance, athlete_rights)
 - Context hints injected into LLM evaluation prompts to improve accuracy
 
 **Orchestration Features**:
+
 - Configurable concurrency (default: 3 URLs at a time)
 - Progress tracking with real-time stats (discovered/evaluated/approved/rejected/skipped/errors)
 - Error recovery: individual URL failures don't stop the pipeline
@@ -92,6 +95,7 @@ Automated discovery pipeline to find new governance documents across NGB website
 - Progress callbacks for live updates
 
 **Discovery CLI** (`packages/ingestion/src/scripts/discoveryCli.ts`):
+
 - `--dry-run`: Preview without saving to DynamoDB
 - `--domain <domain>`: Discover from specific domain only
 - `--query <query>`: Discover from specific search query only
