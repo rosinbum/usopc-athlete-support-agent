@@ -3,6 +3,9 @@ import { Client } from "langsmith";
 /** LangSmith project name for all eval experiments. */
 export const LANGSMITH_PROJECT = "usopc-evals";
 
+/** LangSmith project name for quality review traces. */
+export const QUALITY_REVIEW_PROJECT = "usopc-quality-review";
+
 /** Dataset names — must match what seed-langsmith.ts creates. */
 export const DATASET_NAMES = {
   classifier: "usopc-classifier",
@@ -10,6 +13,7 @@ export const DATASET_NAMES = {
   answerQuality: "usopc-answer-quality",
   escalation: "usopc-escalation",
   trajectory: "usopc-trajectory",
+  qualityReview: "usopc-quality-review",
 } as const;
 
 let _client: Client | undefined;

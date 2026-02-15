@@ -18,6 +18,11 @@
     "eval:citations": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/citations.eval.ts",
     "eval:disclaimers": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/disclaimers.eval.ts",
     "seed-langsmith": "sst shell -- tsx src/scripts/seed-datasets.ts",
+    "quality:seed": "sst shell -- tsx src/scripts/seed-quality-review.ts",
+    "quality:run": "sst shell -- tsx src/scripts/run-quality-review.ts",
+    "quality:setup": "sst shell -- tsx src/scripts/setup-annotation-queue.ts",
+    "quality:report": "sst shell -- tsx src/scripts/generate-report.ts",
+    "quality:all": "pnpm quality:run && pnpm quality:setup",
     "clean": "rm -rf dist"
   },
   "dependencies": {
