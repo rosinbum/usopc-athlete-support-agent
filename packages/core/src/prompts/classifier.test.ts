@@ -53,7 +53,7 @@ describe("buildClassifierPromptWithHistory", () => {
     );
 
     expect(result).toContain(
-      "Use this context to resolve pronouns and references",
+      "Use this context from prior exchanges to inform your classification",
     );
   });
 

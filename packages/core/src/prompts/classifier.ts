@@ -147,8 +147,15 @@ export function buildClassifierPromptWithHistory(
 
   const historySection = `## Conversation History
 
-Use this context to resolve pronouns and references (e.g., "it", "that", "they", "the same sport").
-Carry forward relevant context like sport, NGB, or topic from prior messages when classifying the current query.
+Use this context from prior exchanges to inform your classification:
+
+1. **Resolve references**: Carry forward sport, NGB, topic domain, and other context from prior messages. Resolve pronouns (e.g., "it", "that", "they") using conversation history.
+
+2. **Do NOT re-ask for context already established**: If prior turns established a topic, sport, or NGB (or deliberately kept things general), do not set needsClarification=true to ask for that same context again. The user has already set the conversational frame.
+
+3. **Respect general framing**: If the conversation has been general (no specific sport/NGB), the user likely wants general information. Provide general answers rather than demanding specificity. You may note that details vary by sport, but do not block the response.
+
+4. **Build progressively**: In follow-up questions, provide the best answer you can with the context available. If additional specificity would help, mention it in your response — but do not gate the response behind a clarification question.
 
 ${conversationHistory}
 

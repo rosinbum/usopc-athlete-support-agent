@@ -448,6 +448,116 @@ describe("classifierNode", () => {
     });
   });
 
+  describe("multi-turn clarification avoids re-asking established context", () => {
+    it("does not ask 'which sport?' when conversation was general (multi-03)", async () => {
+      // User asked general Olympics questions for 2 turns, then asks about
+      // challenging selection criteria → should discuss Section 9/CAS, not ask "which sport?"
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "dispute_resolution",
+          detectedNgbIds: [],
+          queryIntent: "procedural",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage("How does team selection work for the Olympics?"),
+          new AIMessage(
+            "Olympic team selection varies by sport, but generally each NGB sets qualification criteria...",
+          ),
+          new HumanMessage("What about the Paralympic selection process?"),
+          new AIMessage(
+            "Paralympic selection follows a similar structure. Each NGB establishes criteria...",
+          ),
+          new HumanMessage(
+            "Has anyone ever successfully challenged selection criteria?",
+          ),
+        ],
+      });
+
+      const result = await classifierNode(state);
+
+      expect(result.needsClarification).toBe(false);
+      expect(result.topicDomain).toBe("dispute_resolution");
+
+      // Verify the prompt sent to the model includes conversation history
+      const promptArg = mockInvoke.mock.calls[0][0];
+      const promptText =
+        typeof promptArg[0]?.content === "string"
+          ? promptArg[0].content
+          : String(promptArg);
+      expect(promptText).toContain("Conversation History");
+    });
+
+    it("does not re-ask about citizenship when already established (multi-06)", async () => {
+      // User identified as dual citizen in turn 1, asks about competing
+      // for another country in turn 3 → should provide Olympic Charter rules
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "eligibility",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage(
+            "I'm a dual citizen of the US and Canada. Can I compete for the US?",
+          ),
+          new AIMessage(
+            "As a dual citizen, you can generally choose which country to represent, subject to eligibility rules...",
+          ),
+          new HumanMessage(
+            "I competed for another country two years ago. Does that change anything?",
+          ),
+        ],
+      });
+
+      const result = await classifierNode(state);
+
+      expect(result.needsClarification).toBe(false);
+      expect(result.topicDomain).toBe("eligibility");
+    });
+
+    it("respects general framing without demanding sport specificity", async () => {
+      // Conversation has been general with no sport mentioned — follow-up
+      // should also not demand sport specificity
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "athlete_rights",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage("What rights do Olympic athletes have?"),
+          new AIMessage(
+            "Athletes have several rights under the Ted Stevens Act and USOPC Bylaws...",
+          ),
+          new HumanMessage("Can I use my own sponsors at competitions?"),
+        ],
+      });
+
+      const result = await classifierNode(state);
+
+      expect(result.needsClarification).toBe(false);
+      expect(result.topicDomain).toBe("athlete_rights");
+    });
+  });
+
   describe("universal framework questions do not request clarification", () => {
     it("Section 9 selection dispute with unnamed NGB", async () => {
       mockInvoke.mockResolvedValueOnce(
