@@ -1,0 +1,21 @@
+{
+  "domains": [
+    "teamusa.org",
+    "usopc.org",
+    "usatf.org",
+    "usaswimming.org",
+    "usagym.org",
+    "usabasketball.com",
+    "usahockey.com"
+  ],
+  "searchQueries": [
+    "USOPC team selection procedures 2024",
+    "NGB athlete eligibility requirements",
+    "USOPC grievance policy",
+    "SafeSport reporting procedures",
+    "USADA anti-doping policy"
+  ],
+  "maxResultsPerDomain": 20,
+  "maxResultsPerQuery": 10,
+  "autoApprovalThreshold": 0.85
+}
