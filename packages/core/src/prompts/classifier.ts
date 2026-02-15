@@ -64,7 +64,7 @@ Important: Do NOT set needsClarification to true when:
   - General dispute resolution procedures (grievances, AAA arbitration, CAS appeals)
   - Athlete Bill of Rights and athlete representation structures (Athletes' Advisory Council)
 
-When the user says "my NGB" without naming it, that does NOT make the question ambiguous if the answer comes from a universal framework. For example, "My NGB changed selection criteria right before trials — can I challenge this?" is answerable using Section 9 (which applies to all NGBs). Provide the universal framework answer first; you may note that NGB-specific details could vary, but do not block the response by requesting clarification.
+When the user says "my NGB" without naming it, that does NOT make the question ambiguous if the answer comes from a universal framework. However, ensure that the question indeed pertains to a universal framework before proceeding without clarification. For example, "My NGB changed selection criteria right before trials — can I challenge this?" is answerable using Section 9 (which applies to all NGBs). Provide the universal framework answer first; you may note that NGB-specific details could vary, but do not block the response by requesting clarification.
 
 Only set needsClarification to true when the ambiguity would lead to a potentially incorrect or irrelevant answer.
 
