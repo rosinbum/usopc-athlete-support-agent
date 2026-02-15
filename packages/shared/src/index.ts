@@ -72,6 +72,13 @@ export {
   type CreateSourceInput,
   type MarkSuccessOptions,
 } from "./entities/index.js";
+export {
+  DiscoveredSourceEntity,
+  type DiscoveredSource,
+  type CreateDiscoveredSourceInput,
+  type DiscoveryMethod,
+  type DiscoveryStatus,
+} from "./entities/index.js";
 export { SportOrgEntity } from "./entities/index.js";
 export { AgentModelEntity, type AgentModelConfig } from "./entities/index.js";
 export { IngestionLogEntity, type IngestionLog } from "./entities/index.js";

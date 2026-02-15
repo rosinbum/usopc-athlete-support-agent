@@ -6,6 +6,13 @@ export {
   type CreateSourceInput,
   type MarkSuccessOptions,
 } from "./SourceConfigEntity.js";
+export {
+  DiscoveredSourceEntity,
+  type DiscoveredSource,
+  type CreateDiscoveredSourceInput,
+  type DiscoveryMethod,
+  type DiscoveryStatus,
+} from "./DiscoveredSourceEntity.js";
 export { SportOrgEntity } from "./SportOrgEntity.js";
 export { AgentModelEntity, type AgentModelConfig } from "./AgentModelEntity.js";
 export { IngestionLogEntity, type IngestionLog } from "./IngestionLogEntity.js";

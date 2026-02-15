@@ -293,6 +293,9 @@ importers:
       '@aws-sdk/client-sqs':
         specifier: ^3.981.0
         version: 3.981.0
+      '@langchain/anthropic':
+        specifier: ^0.3.11
+        version: 0.3.34(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@6.21.0(ws@8.19.0)(zod@3.25.76)))(zod@3.25.76)
       '@langchain/community':
         specifier: ^0.3.22
         version: 0.3.59(@aws-crypto/sha256-js@5.2.0)(@aws-sdk/client-dynamodb@3.982.0)(@aws-sdk/client-s3@3.982.0)(@aws-sdk/credential-provider-node@3.972.5)(@browserbasehq/sdk@2.6.0)(@browserbasehq/stagehand@1.14.0(@playwright/test@1.58.1)(deepmerge@4.3.1)(dotenv@16.6.1)(openai@6.21.0(ws@8.19.0)(zod@3.25.76))(zod@3.25.76))(@ibm-cloud/watsonx-ai@1.7.7)(@langchain/anthropic@0.3.34(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@6.21.0(ws@8.19.0)(zod@3.25.76)))(zod@3.25.76))(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@6.21.0(ws@8.19.0)(zod@3.25.76)))(@opentelemetry/api@1.9.0)(@smithy/util-utf8@2.3.0)(axios@1.13.4)(cheerio@1.2.0)(fast-xml-parser@5.3.4)(ibm-cloud-sdk-core@5.4.5)(jsdom@26.1.0)(jsonwebtoken@9.0.3)(openai@6.21.0(ws@8.19.0)(zod@3.25.76))(pdf-parse@1.1.4)(pg@8.18.0)(playwright@1.58.1)(weaviate-client@3.11.0)(ws@8.19.0)
@@ -305,6 +308,9 @@ importers:
       '@langchain/textsplitters':
         specifier: ^0.1.0
         version: 0.1.0(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@6.21.0(ws@8.19.0)(zod@3.25.76)))
+      '@tavily/core':
+        specifier: ^0.7.1
+        version: 0.7.1
       '@usopc/core':
         specifier: workspace:*
         version: link:../core
@@ -2389,6 +2395,9 @@ packages:
 
   '@tailwindcss/postcss@4.1.18':
     resolution: {integrity: sha512-Ce0GFnzAOuPyfV5SxjXGn0CubwGcuDB0zcdaPuCSzAa/2vII24JTkH+I6jcbXLb1ctjZMZZI6OjDaLPJQL1S0g==}
+
+  '@tavily/core@0.7.1':
+    resolution: {integrity: sha512-pESSzbYBJIbvD6LAxWcb2dASZXcO7dsaZDREGKYKd3ssgg01WdMZzhm6LIaZNGhECD+kOg2ldt8+b7BGespu/g==}
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -7122,6 +7131,15 @@ snapshots:
       '@tailwindcss/oxide': 4.1.18
       postcss: 8.5.6
       tailwindcss: 4.1.18
+
+  '@tavily/core@0.7.1':
+    dependencies:
+      axios: 1.13.4(debug@4.4.3)
+      https-proxy-agent: 7.0.6
+      js-tiktoken: 1.0.21
+    transitivePeerDependencies:
+      - debug
+      - supports-color
 
   '@testing-library/dom@10.4.1':
     dependencies:

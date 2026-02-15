@@ -46,6 +46,61 @@ export const AppTableSchema = {
       createdAt: { type: String },
       updatedAt: { type: String },
     },
+    DiscoveredSource: {
+      pk: { type: String, value: "Discovery#${id}" },
+      sk: { type: String, value: "DiscoveredSource" },
+      gsi1pk: { type: String, value: "Discovery#${status}" },
+      gsi1sk: { type: String, value: "${discoveredAt}" },
+      id: { type: String, required: true },
+      url: { type: String, required: true },
+      title: { type: String, required: true },
+      // Discovery metadata
+      discoveryMethod: {
+        type: String,
+        required: true,
+        enum: ["map", "search", "manual"] as const,
+      },
+      discoveredAt: { type: String, required: true },
+      discoveredFrom: { type: String },
+      // Evaluation results
+      status: {
+        type: String,
+        required: true,
+        enum: [
+          "pending_metadata",
+          "pending_content",
+          "approved",
+          "rejected",
+        ] as const,
+      },
+      metadataConfidence: { type: Number },
+      contentConfidence: { type: Number },
+      combinedConfidence: { type: Number },
+      // Extracted metadata
+      documentType: { type: String },
+      topicDomains: { type: Array, items: { type: String } },
+      format: {
+        type: String,
+        enum: ["pdf", "html", "text"] as const,
+      },
+      ngbId: { type: String },
+      priority: {
+        type: String,
+        enum: ["high", "medium", "low"] as const,
+      },
+      description: { type: String },
+      authorityLevel: { type: String },
+      // LLM reasoning
+      metadataReasoning: { type: String },
+      contentReasoning: { type: String },
+      // Review tracking
+      reviewedAt: { type: String },
+      reviewedBy: { type: String },
+      rejectionReason: { type: String },
+      sourceConfigId: { type: String }, // if approved and created
+      createdAt: { type: String },
+      updatedAt: { type: String },
+    },
     SportOrganization: {
       pk: { type: String, value: "SportOrg#${id}" },
       sk: { type: String, value: "Profile" },
