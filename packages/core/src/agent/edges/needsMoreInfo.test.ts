@@ -20,6 +20,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     userSport: undefined,
     needsClarification: false,
     clarificationQuestion: undefined,
+    escalationReason: undefined,
     retrievalStatus: "success",
     emotionalState: "neutral",
     ...overrides,

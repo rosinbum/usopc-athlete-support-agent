@@ -73,5 +73,6 @@ export interface AgentState {
   conversationId?: string;
   userSport?: string;
   emotionalState: EmotionalState;
+  escalationReason?: string;
   retrievalStatus: "success" | "error";
 }

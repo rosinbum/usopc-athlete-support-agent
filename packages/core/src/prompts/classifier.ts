@@ -41,7 +41,12 @@ Boolean. True if the query involves:
 - Any situation where the user may be in danger
 
 ### escalationReason (required if shouldEscalate is true)
-A brief explanation of why escalation is recommended.
+A brief explanation of why escalation is recommended. Be specific about the nature of the concern. \
+Distinguish between:
+- **Imminent physical danger** (e.g., "Athlete reports active physical abuse by coach" or "User states they are in immediate danger")
+- **Non-imminent misconduct** (e.g., "Athlete reports pattern of emotional misconduct" or "Retaliation concerns after filing complaint")
+- **Urgent procedural needs** (e.g., "Hearing deadline in 3 days" or "Pending anti-doping violation notification")
+This distinction helps downstream responses include appropriate guidance (e.g., 911 only for imminent physical danger).
 
 ### needsClarification (required)
 Boolean. True if the query is too ambiguous to answer accurately. Set this to true when:

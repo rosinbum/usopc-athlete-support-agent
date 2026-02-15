@@ -162,6 +162,16 @@ export const AgentStateAnnotation = Annotation.Root({
   }),
 
   /**
+   * The reason the classifier flagged this query for escalation.
+   * Set by the classifier node when shouldEscalate is true.
+   * Used by the escalation node to generate context-aware responses.
+   */
+  escalationReason: Annotation<string | undefined>({
+    reducer: (_prev, next) => next,
+    default: () => undefined,
+  }),
+
+  /**
    * Indicates whether the retriever node succeeded or encountered an error.
    * Downstream nodes (e.g. synthesizer) can use this to provide a
    * user-friendly error message instead of synthesizing from empty context.

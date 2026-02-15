@@ -238,6 +238,7 @@ export async function classifierNode(
       needsClarification: result.needsClarification,
       clarificationQuestion: result.clarificationQuestion,
       emotionalState: result.emotionalState,
+      escalationReason: result.escalationReason,
     };
   } catch (error) {
     if (error instanceof CircuitBreakerError) {
