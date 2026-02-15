@@ -20,9 +20,10 @@
     "seed-langsmith": "sst shell -- tsx src/scripts/seed-datasets.ts",
     "quality:seed": "sst shell -- tsx src/scripts/seed-quality-review.ts",
     "quality:run": "sst shell -- tsx src/scripts/run-quality-review.ts",
+    "quality:evaluate": "sst shell -- tsx src/scripts/evaluate-quality-review.ts",
     "quality:setup": "sst shell -- tsx src/scripts/setup-annotation-queue.ts",
     "quality:report": "sst shell -- tsx src/scripts/generate-report.ts",
-    "quality:all": "pnpm quality:run && pnpm quality:setup",
+    "quality:all": "pnpm quality:run && pnpm quality:evaluate && pnpm quality:setup",
     "clean": "rm -rf dist"
   },
   "dependencies": {
