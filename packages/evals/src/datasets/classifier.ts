@@ -453,6 +453,72 @@ export const classifierExamples: ClassifierExample[] = [
     },
   },
 
+  // ── universal framework (no clarification needed) ──────────────────────
+  {
+    input: {
+      message:
+        "My NGB changed selection criteria right before trials. Can I challenge this?",
+    },
+    expectedOutput: {
+      topicDomain: "dispute_resolution",
+      queryIntent: "procedural",
+      detectedNgbIds: [],
+      shouldEscalate: false,
+      needsClarification: false,
+    },
+  },
+  {
+    input: {
+      message: "My NGB won't let me compete because of unresolved fees.",
+    },
+    expectedOutput: {
+      topicDomain: "dispute_resolution",
+      queryIntent: "procedural",
+      detectedNgbIds: [],
+      shouldEscalate: false,
+      needsClarification: false,
+    },
+  },
+  {
+    input: {
+      message:
+        "I'm a Paralympic athlete — my NGB has no disabled athletes on the board. Is this a violation?",
+    },
+    expectedOutput: {
+      topicDomain: "governance",
+      queryIntent: "factual",
+      detectedNgbIds: [],
+      shouldEscalate: false,
+      needsClarification: false,
+    },
+  },
+  {
+    input: {
+      message:
+        "I want to run for my NGB's board as an athlete rep. What are the requirements?",
+    },
+    expectedOutput: {
+      topicDomain: "governance",
+      queryIntent: "factual",
+      detectedNgbIds: [],
+      shouldEscalate: false,
+      needsClarification: false,
+    },
+  },
+  {
+    input: {
+      message:
+        "I need a TUE for ADHD medication — will it affect team selection eligibility?",
+    },
+    expectedOutput: {
+      topicDomain: "anti_doping",
+      queryIntent: "factual",
+      detectedNgbIds: [],
+      shouldEscalate: false,
+      needsClarification: false,
+    },
+  },
+
   // ── general / ambiguous (3 examples) ─────────────────────────────────────
   {
     input: { message: "Hi, can you help me?" },

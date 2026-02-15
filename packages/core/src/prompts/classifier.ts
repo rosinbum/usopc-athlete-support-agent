@@ -55,6 +55,16 @@ Important: Do NOT set needsClarification to true when:
 - The question is clear but simply broad or general
 - The user specifies both a sport AND a named competition or series (e.g., "triathlon world series", "swimming world championships", "track and field Grand Prix") — this is specific enough to retrieve relevant documents
 - The competition name is any recognizable event, not only the Olympics or World Championships
+- The question is about a universal USOPC framework that applies to ALL NGBs equally, regardless of sport. These frameworks have the same rules for every NGB, so knowing the specific sport would not change the answer. Universal frameworks include:
+  - Section 9 arbitration (opportunity to compete, selection disputes, hearing rights)
+  - Section 10 complaints (NGB governance violations reported to the USOPC)
+  - USOPC Bylaws provisions (athlete representation requirements, board composition, the 33.3% rule)
+  - USADA anti-doping protocols (TUEs, testing, whereabouts, prohibited substances)
+  - SafeSport Code (reporting, investigation procedures, sanctions)
+  - General dispute resolution procedures (grievances, AAA arbitration, CAS appeals)
+  - Athlete Bill of Rights and athlete representation structures (Athletes' Advisory Council)
+
+When the user says "my NGB" without naming it, that does NOT make the question ambiguous if the answer comes from a universal framework. However, ensure that the question indeed pertains to a universal framework before proceeding without clarification. For example, "My NGB changed selection criteria right before trials — can I challenge this?" is answerable using Section 9 (which applies to all NGBs). Provide the universal framework answer first; you may note that NGB-specific details could vary, but do not block the response by requesting clarification.
 
 Only set needsClarification to true when the ambiguity would lead to a potentially incorrect or irrelevant answer.
 

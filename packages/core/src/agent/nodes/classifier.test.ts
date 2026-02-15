@@ -405,6 +405,132 @@ describe("classifierNode", () => {
     });
   });
 
+  describe("universal framework questions do not request clarification", () => {
+    it("Section 9 selection dispute with unnamed NGB", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "dispute_resolution",
+          detectedNgbIds: [],
+          queryIntent: "procedural",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage(
+            "My NGB changed selection criteria right before trials. Can I challenge this?",
+          ),
+        ],
+      });
+      const result = await classifierNode(state);
+
+      expect(result.needsClarification).toBe(false);
+      expect(result.topicDomain).toBe("dispute_resolution");
+    });
+
+    it("NGB blocking competition over fees", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "dispute_resolution",
+          detectedNgbIds: [],
+          queryIntent: "procedural",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage(
+            "My NGB won't let me compete because of unresolved fees.",
+          ),
+        ],
+      });
+      const result = await classifierNode(state);
+
+      expect(result.needsClarification).toBe(false);
+    });
+
+    it("Paralympic board representation violation", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "governance",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage(
+            "I'm a Paralympic athlete — my NGB has no disabled athletes on the board. Is this a violation?",
+          ),
+        ],
+      });
+      const result = await classifierNode(state);
+
+      expect(result.needsClarification).toBe(false);
+      expect(result.topicDomain).toBe("governance");
+    });
+
+    it("NGB board athlete rep requirements", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "governance",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage(
+            "I want to run for my NGB's board as an athlete rep. What are the requirements?",
+          ),
+        ],
+      });
+      const result = await classifierNode(state);
+
+      expect(result.needsClarification).toBe(false);
+      expect(result.topicDomain).toBe("governance");
+    });
+
+    it("TUE and selection eligibility", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "anti_doping",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage(
+            "I need a TUE for ADHD medication — will it affect team selection eligibility?",
+          ),
+        ],
+      });
+      const result = await classifierNode(state);
+
+      expect(result.needsClarification).toBe(false);
+      expect(result.topicDomain).toBe("anti_doping");
+    });
+  });
+
   describe("CircuitBreakerError handling", () => {
     it("falls back to defaults when circuit breaker is open", async () => {
       mockInvoke.mockRejectedValueOnce(new CircuitBreakerError("anthropic"));
