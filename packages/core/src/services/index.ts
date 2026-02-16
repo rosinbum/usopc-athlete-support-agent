@@ -32,3 +32,13 @@ export {
   resetVectorStoreReadCircuit,
   resetVectorStoreWriteCircuit,
 } from "./vectorStoreService.js";
+
+export {
+  type SummaryStore,
+  InMemorySummaryStore,
+  getSummaryStore,
+  setSummaryStore,
+  loadSummary,
+  saveSummary,
+  generateSummary,
+} from "./conversationMemory.js";

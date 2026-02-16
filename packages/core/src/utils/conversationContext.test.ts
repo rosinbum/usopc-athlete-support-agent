@@ -1,49 +1,43 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 
-// Mock @usopc/shared before importing module under test
-vi.mock("@usopc/shared", () => ({
-  getOptionalSecretValue: vi.fn(),
-}));
-
 import {
   formatConversationHistory,
   buildContextualQuery,
   getMaxTurns,
 } from "./conversationContext.js";
-import { getOptionalSecretValue } from "@usopc/shared";
-
-const mockGetOptionalSecretValue = vi.mocked(getOptionalSecretValue);
 
 describe("conversationContext", () => {
+  const originalEnv = process.env;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default mock returns the default value "5"
-    mockGetOptionalSecretValue.mockReturnValue("5");
+    process.env = { ...originalEnv };
   });
 
   afterEach(() => {
+    process.env = originalEnv;
     vi.restoreAllMocks();
   });
 
   describe("getMaxTurns", () => {
-    it("returns default value of 5 when secret returns default", () => {
-      mockGetOptionalSecretValue.mockReturnValue("5");
+    it("returns default value of 5 when env var is not set", () => {
+      delete process.env.CONVERSATION_MAX_TURNS;
       expect(getMaxTurns()).toBe(5);
     });
 
-    it("returns parsed value from secret", () => {
-      mockGetOptionalSecretValue.mockReturnValue("10");
+    it("returns parsed value from env var", () => {
+      process.env.CONVERSATION_MAX_TURNS = "10";
       expect(getMaxTurns()).toBe(10);
     });
 
     it("returns default for invalid (non-numeric) value", () => {
-      mockGetOptionalSecretValue.mockReturnValue("invalid");
+      process.env.CONVERSATION_MAX_TURNS = "invalid";
       expect(getMaxTurns()).toBe(5);
     });
 
     it("returns default for empty string", () => {
-      mockGetOptionalSecretValue.mockReturnValue("");
+      process.env.CONVERSATION_MAX_TURNS = "";
       expect(getMaxTurns()).toBe(5);
     });
   });
@@ -186,6 +180,69 @@ describe("conversationContext", () => {
       expect(result.conversationContext).toContain("Third");
       expect(result.conversationContext).toContain("Third response");
       expect(result.conversationContext).not.toContain("Second response");
+    });
+
+    it("prepends conversation summary when provided", () => {
+      const messages = [
+        new HumanMessage("First"),
+        new AIMessage("First response"),
+        new HumanMessage("Second"),
+        new AIMessage("Second response"),
+        new HumanMessage("Third"),
+        new AIMessage("Third response"),
+        new HumanMessage("Current"),
+      ];
+
+      const summary = "The user is a swimmer asking about team selection.";
+      const result = buildContextualQuery(messages, {
+        conversationSummary: summary,
+      });
+
+      expect(result.currentMessage).toBe("Current");
+      expect(result.conversationContext).toContain("[Conversation Summary]");
+      expect(result.conversationContext).toContain(summary);
+    });
+
+    it("reduces maxTurns to 2 when summary is provided", () => {
+      const messages = [
+        new HumanMessage("First"),
+        new AIMessage("First response"),
+        new HumanMessage("Second"),
+        new AIMessage("Second response"),
+        new HumanMessage("Third"),
+        new AIMessage("Third response"),
+        new HumanMessage("Fourth"),
+        new AIMessage("Fourth response"),
+        new HumanMessage("Current"),
+      ];
+
+      const result = buildContextualQuery(messages, {
+        conversationSummary: "Summary text",
+      });
+
+      // With summary, maxTurns defaults to 2 — only last 2 turns
+      expect(result.conversationContext).toContain("Third");
+      expect(result.conversationContext).toContain("Fourth");
+      expect(result.conversationContext).not.toContain("First response");
+      expect(result.conversationContext).not.toContain("Second response");
+    });
+
+    it("does not alter behavior when conversationSummary is undefined", () => {
+      const messages = [
+        new HumanMessage("First"),
+        new AIMessage("First response"),
+        new HumanMessage("Current"),
+      ];
+
+      const withSummary = buildContextualQuery(messages, {
+        conversationSummary: undefined,
+      });
+      const without = buildContextualQuery(messages);
+
+      expect(withSummary.conversationContext).toBe(without.conversationContext);
+      expect(withSummary.conversationContext).not.toContain(
+        "[Conversation Summary]",
+      );
     });
   });
 });

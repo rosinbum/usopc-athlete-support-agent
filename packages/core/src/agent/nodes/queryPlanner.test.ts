@@ -64,6 +64,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     emotionalState: "neutral",
     qualityCheckResult: undefined,
     qualityRetryCount: 0,
+    conversationSummary: undefined,
     isComplexQuery: false,
     subQueries: [],
     ...overrides,
