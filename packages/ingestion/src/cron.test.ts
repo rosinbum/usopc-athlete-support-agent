@@ -38,9 +38,13 @@ vi.mock("sst", () => ({
 }));
 
 const mockStoreDocument = vi.fn();
+const mockDocumentExists = vi.fn();
+const mockGetKeyForSource = vi.fn();
 vi.mock("./services/documentStorage.js", () => ({
   DocumentStorageService: vi.fn(() => ({
     storeDocument: (...args: unknown[]) => mockStoreDocument(...args),
+    documentExists: (...args: unknown[]) => mockDocumentExists(...args),
+    getKeyForSource: (...args: unknown[]) => mockGetKeyForSource(...args),
   })),
 }));
 
@@ -144,7 +148,9 @@ describe("cron handler", () => {
       text: () => Promise.resolve("fetched content"),
     });
 
-    // Default S3 upload mock
+    // Default S3 mocks — document doesn't exist yet, upload succeeds
+    mockGetKeyForSource.mockReturnValue("sources/src-1/abc123.pdf");
+    mockDocumentExists.mockResolvedValue(false);
     mockStoreDocument.mockResolvedValue({
       key: "sources/src-1/abc123.pdf",
       versionId: "v1",
@@ -387,7 +393,9 @@ describe("cron handler (DynamoDB mode)", () => {
       text: () => Promise.resolve("fetched content"),
     });
 
-    // Default S3 upload mock
+    // Default S3 mocks — document doesn't exist yet, upload succeeds
+    mockGetKeyForSource.mockReturnValue("sources/src-ok/abc123.pdf");
+    mockDocumentExists.mockResolvedValue(false);
     mockStoreDocument.mockResolvedValue({
       key: "sources/src-ok/abc123.pdf",
       versionId: "v1",

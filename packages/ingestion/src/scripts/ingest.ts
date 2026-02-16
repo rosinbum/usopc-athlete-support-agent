@@ -147,15 +147,28 @@ async function main(): Promise<void> {
         const storage = new DocumentStorageService(
           Resource.DocumentsBucket.name,
         );
-        const s3Result = await storage.storeDocument(
+        const expectedKey = storage.getKeyForSource(
           source.id,
-          Buffer.from(rawContent),
           contentHash,
           source.format,
-          { title: source.title, documentType: source.documentType },
         );
-        s3Key = s3Result.key;
-        s3VersionId = s3Result.versionId;
+        const alreadyExists = await storage.documentExists(expectedKey);
+        if (alreadyExists) {
+          s3Key = expectedKey;
+          logger.info(
+            `S3 document already exists for ${source.id}, skipping upload`,
+          );
+        } else {
+          const s3Result = await storage.storeDocument(
+            source.id,
+            Buffer.from(rawContent),
+            contentHash,
+            source.format,
+            { title: source.title, documentType: source.documentType },
+          );
+          s3Key = s3Result.key;
+          s3VersionId = s3Result.versionId;
+        }
       } catch (s3Error) {
         logger.warn(
           `S3 upload failed for ${source.id}: ${s3Error instanceof Error ? s3Error.message : "Unknown S3 error"}`,
@@ -300,15 +313,28 @@ async function main(): Promise<void> {
           const storage = new DocumentStorageService(
             Resource.DocumentsBucket.name,
           );
-          const s3Result = await storage.storeDocument(
+          const expectedKey = storage.getKeyForSource(
             source.id,
-            Buffer.from(rawContent),
             batchContentHash,
             source.format,
-            { title: source.title, documentType: source.documentType },
           );
-          batchS3Key = s3Result.key;
-          batchS3VersionId = s3Result.versionId;
+          const alreadyExists = await storage.documentExists(expectedKey);
+          if (alreadyExists) {
+            batchS3Key = expectedKey;
+            logger.info(
+              `S3 document already exists for ${source.id}, skipping upload`,
+            );
+          } else {
+            const s3Result = await storage.storeDocument(
+              source.id,
+              Buffer.from(rawContent),
+              batchContentHash,
+              source.format,
+              { title: source.title, documentType: source.documentType },
+            );
+            batchS3Key = s3Result.key;
+            batchS3VersionId = s3Result.versionId;
+          }
         } catch (s3Error) {
           logger.warn(
             `S3 upload failed for ${source.id}: ${s3Error instanceof Error ? s3Error.message : "Unknown S3 error"}`,
