@@ -1,1 +1,1 @@
-export { getPool, closePool } from "@usopc/shared";
+export { getPool, closePool, getPoolStatus } from "@usopc/shared";
