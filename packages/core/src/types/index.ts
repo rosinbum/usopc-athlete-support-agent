@@ -9,6 +9,7 @@ export type {
   QualityIssueType,
   QualityIssue,
   QualityCheckResult,
+  SubQuery,
 } from "./agent.js";
 
 export type { Conversation, Message } from "./conversation.js";

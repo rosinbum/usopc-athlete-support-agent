@@ -35,6 +35,7 @@ export interface AgentInput {
   messages: BaseMessage[];
   userSport?: string;
   conversationId?: string;
+  conversationSummary?: string;
 }
 
 export interface AgentOutput {
@@ -156,6 +157,7 @@ export class AgentRunner {
       messages: input.messages,
       userSport: input.userSport,
       conversationId: input.conversationId,
+      conversationSummary: input.conversationSummary,
     };
   }
 }

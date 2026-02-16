@@ -30,6 +30,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     disclaimerRequired: true,
     hasTimeConstraint: false,
     conversationId: undefined,
+    conversationSummary: undefined,
     userSport: undefined,
     needsClarification: false,
     clarificationQuestion: undefined,
@@ -40,6 +41,8 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     qualityRetryCount: 0,
     expansionAttempted: false,
     reformulatedQueries: [],
+    isComplexQuery: false,
+    subQueries: [],
     ...overrides,
   };
 }

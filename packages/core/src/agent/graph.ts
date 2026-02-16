@@ -11,6 +11,7 @@ import {
   disclaimerGuardNode,
   qualityCheckerNode,
   createRetrievalExpanderNode,
+  queryPlannerNode,
 } from "./nodes/index.js";
 import type { VectorStoreLike } from "./nodes/index.js";
 import type { TavilySearchLike } from "./nodes/index.js";
@@ -40,6 +41,9 @@ export interface GraphDependencies {
  *   ...same as above, but:
  *     retriever -> (needsMoreInfo) -> synthesizer | retrievalExpander | researcher
  *     retrievalExpander -> (needsMoreInfoAfterExpansion) -> synthesizer | researcher
+ * Graph flow (query planner ON):
+ *   ...same as above, but classifier routes through queryPlanner before retriever:
+ *     classifier -> queryPlanner -> retriever
  *
  * Graph flow (quality checker ON):
  *   ...same as above, but:
@@ -80,12 +84,15 @@ export function createAgentGraph(deps: GraphDependencies) {
         "retrievalExpander",
         createRetrievalExpanderNode(deps.vectorStore),
       ),
-    );
+    )
+    .addNode("queryPlanner", withMetrics("queryPlanner", queryPlannerNode));
 
   // Edges
   builder.addEdge("__start__", "classifier");
   builder.addConditionalEdges("classifier", routeByDomain);
   builder.addEdge("clarify", "__end__");
+
+  builder.addEdge("queryPlanner", "retriever");
 
   if (flags.retrievalExpansion) {
     // Retriever routes to expander when confidence is low and expansion not attempted
@@ -98,7 +105,6 @@ export function createAgentGraph(deps: GraphDependencies) {
   } else {
     builder.addConditionalEdges("retriever", needsMoreInfo);
   }
-
   builder.addEdge("researcher", "synthesizer");
 
   if (flags.qualityChecker) {

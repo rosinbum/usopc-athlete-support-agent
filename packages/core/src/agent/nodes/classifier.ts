@@ -181,9 +181,9 @@ export async function classifierNode(
   state: AgentState,
 ): Promise<Partial<AgentState>> {
   // Build contextual query from conversation history
-  // TODO: Add conversation summarization for very long chats (#35)
   const { currentMessage, conversationContext } = buildContextualQuery(
     state.messages,
+    { conversationSummary: state.conversationSummary },
   );
 
   if (!currentMessage) {

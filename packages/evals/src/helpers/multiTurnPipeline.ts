@@ -80,6 +80,7 @@ export async function runMultiTurnPipeline(
       disclaimerRequired: true,
       hasTimeConstraint: false,
       conversationId: opts?.conversationId,
+      conversationSummary: undefined,
       userSport: opts?.userSport,
       needsClarification: false,
       clarificationQuestion: undefined,
@@ -90,6 +91,8 @@ export async function runMultiTurnPipeline(
       qualityRetryCount: 0,
       expansionAttempted: false,
       reformulatedQueries: [],
+      isComplexQuery: false,
+      subQueries: [],
     },
     trajectory,
   };

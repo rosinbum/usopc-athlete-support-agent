@@ -7,10 +7,11 @@ import { DisclaimerBanner } from "../../components/chat/DisclaimerBanner";
 
 export default function ChatPage() {
   const [userSport] = useState<string | undefined>();
+  const [conversationId] = useState(() => crypto.randomUUID());
   const { messages, input, handleInputChange, handleSubmit, isLoading } =
     useChat({
       api: "/api/chat",
-      body: { userSport },
+      body: { userSport, conversationId },
     });
 
   return (

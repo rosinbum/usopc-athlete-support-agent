@@ -5,6 +5,7 @@ export interface FeatureFlags {
   multiStepPlanner: boolean;
   feedbackLoop: boolean;
   retrievalExpansion: boolean;
+  queryPlanner: boolean;
 }
 
 /**
@@ -23,5 +24,6 @@ export function getFeatureFlags(): FeatureFlags {
     multiStepPlanner: process.env.FEATURE_MULTI_STEP_PLANNER === "true",
     feedbackLoop: process.env.FEATURE_FEEDBACK_LOOP === "true",
     retrievalExpansion: process.env.FEATURE_RETRIEVAL_EXPANSION === "true",
+    queryPlanner: process.env.FEATURE_QUERY_PLANNER === "true",
   };
 }

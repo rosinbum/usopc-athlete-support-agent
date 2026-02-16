@@ -57,6 +57,7 @@ export async function runPipeline(userMessage: string): Promise<{
       disclaimerRequired: true,
       hasTimeConstraint: false,
       conversationId: undefined,
+      conversationSummary: undefined,
       userSport: undefined,
       needsClarification: false,
       clarificationQuestion: undefined,
@@ -67,6 +68,8 @@ export async function runPipeline(userMessage: string): Promise<{
       qualityRetryCount: 0,
       expansionAttempted: false,
       reformulatedQueries: [],
+      isComplexQuery: false,
+      subQueries: [],
     },
     trajectory,
   };

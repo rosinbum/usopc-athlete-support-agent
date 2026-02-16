@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { routeByDomain } from "./routeByDomain.js";
 import type { AgentState } from "../state.js";
 
@@ -17,6 +17,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     disclaimerRequired: true,
     hasTimeConstraint: false,
     conversationId: undefined,
+    conversationSummary: undefined,
     userSport: undefined,
     needsClarification: false,
     clarificationQuestion: undefined,
@@ -27,11 +28,23 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     qualityRetryCount: 0,
     expansionAttempted: false,
     reformulatedQueries: [],
+    isComplexQuery: false,
+    subQueries: [],
     ...overrides,
   };
 }
 
 describe("routeByDomain", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
   it('returns "clarify" when needsClarification is true', () => {
     const state = makeState({ needsClarification: true });
     expect(routeByDomain(state)).toBe("clarify");
@@ -73,5 +86,31 @@ describe("routeByDomain", () => {
   it('returns "retriever" when queryIntent is undefined', () => {
     const state = makeState({ queryIntent: undefined });
     expect(routeByDomain(state)).toBe("retriever");
+  });
+
+  describe("queryPlanner feature flag", () => {
+    it('returns "queryPlanner" when flag is enabled', () => {
+      vi.stubEnv("FEATURE_QUERY_PLANNER", "true");
+      const state = makeState({ queryIntent: "factual" });
+      expect(routeByDomain(state)).toBe("queryPlanner");
+    });
+
+    it('returns "retriever" when flag is disabled', () => {
+      vi.stubEnv("FEATURE_QUERY_PLANNER", "false");
+      const state = makeState({ queryIntent: "factual" });
+      expect(routeByDomain(state)).toBe("retriever");
+    });
+
+    it('still returns "clarify" when flag is enabled but clarification needed', () => {
+      vi.stubEnv("FEATURE_QUERY_PLANNER", "true");
+      const state = makeState({ needsClarification: true });
+      expect(routeByDomain(state)).toBe("clarify");
+    });
+
+    it('still returns "escalate" when flag is enabled but escalation intent', () => {
+      vi.stubEnv("FEATURE_QUERY_PLANNER", "true");
+      const state = makeState({ queryIntent: "escalation" });
+      expect(routeByDomain(state)).toBe("escalate");
+    });
   });
 });
