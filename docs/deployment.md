@@ -77,6 +77,7 @@ sst secret set AnthropicMonthlyBudget 10 --stage production
 ```
 
 **Defaults:**
+
 - Tavily: 1000 credits/month
 - Anthropic: $10/month
 
@@ -121,6 +122,7 @@ Discovery sources are defined in `data/discovery-config.json`:
 ```
 
 **Fields:**
+
 - `domains`: Domains to crawl using Tavily Map API
 - `searchQueries`: Search queries for Tavily Search API
 - `maxResultsPerDomain`: Max results per domain crawl (default: 20)
@@ -153,11 +155,13 @@ aws lambda invoke \
 ### Cost Estimates
 
 **Tavily API:**
+
 - Map endpoint: 5 credits per domain
 - Search endpoint: 1 credit per query
 - Example: 7 domains + 5 queries = 40 credits/week = ~160 credits/month
 
 **Anthropic API (Claude Sonnet 4):**
+
 - Metadata evaluation: ~1000 input + 200 output tokens per URL
 - Content evaluation: ~2000 input + 500 output tokens per URL
 - Total per URL: ~3000 input + 700 output = ~$0.02
@@ -178,6 +182,7 @@ aws logs tail /aws/lambda/usopc-athlete-support-production-DiscoveryCron \
 ```
 
 Common issues:
+
 - Budget exceeded (check CloudWatch for budget alerts)
 - API keys expired or invalid
 - Network timeouts (increase Lambda timeout if needed)

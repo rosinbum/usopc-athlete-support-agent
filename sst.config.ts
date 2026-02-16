@@ -114,8 +114,7 @@ export default $config({
           timeout: "15 minutes",
           memory: "1024 MB",
           environment: {
-            TAVILY_MONTHLY_BUDGET:
-              process.env.TAVILY_MONTHLY_BUDGET ?? "1000",
+            TAVILY_MONTHLY_BUDGET: process.env.TAVILY_MONTHLY_BUDGET ?? "1000",
             ANTHROPIC_MONTHLY_BUDGET:
               process.env.ANTHROPIC_MONTHLY_BUDGET ?? "10",
             SLACK_WEBHOOK_URL: process.env.SLACK_WEBHOOK_URL ?? "",

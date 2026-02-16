@@ -141,6 +141,7 @@ The discovery pipeline runs automatically via EventBridge cron:
   - Error handling ensures failures don't stop processing of other discoveries
 
 **Workflow**:
+
 1. Discovery Lambda runs Monday 2 AM UTC, discovers URLs, evaluates relevance, stores in DynamoDB
 2. Ingestion Cron runs weekly (7 days later), auto-creates SourceConfigs for approved discoveries
 3. New sources are ingested into knowledge base via standard ingestion pipeline

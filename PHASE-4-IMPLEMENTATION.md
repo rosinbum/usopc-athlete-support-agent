@@ -17,10 +17,12 @@ This phase implements automated scheduling and cost tracking for the intelligent
 ## Files Created
 
 ### 1. Cost Tracking Service
+
 **File:** `packages/ingestion/src/services/costTracker.ts`
 **Test:** `packages/ingestion/src/services/costTracker.test.ts`
 
 **Features:**
+
 - Tracks Tavily API usage (calls and estimated credits: 1 per search, 5 per map)
 - Tracks Anthropic API usage (calls, tokens, cost based on Claude Sonnet 4 pricing)
 - Stores daily/weekly/monthly metrics in DynamoDB (UsageMetric entity)
@@ -28,6 +30,7 @@ This phase implements automated scheduling and cost tracking for the intelligent
 - Export functions: `trackTavilyCall()`, `trackAnthropicCall()`, `checkBudget()`, `getUsageStats()`
 
 **Environment Variables:**
+
 - `TAVILY_MONTHLY_BUDGET` (default: 1000 credits)
 - `ANTHROPIC_MONTHLY_BUDGET` (default: $10)
 
@@ -36,10 +39,12 @@ This phase implements automated scheduling and cost tracking for the intelligent
 ---
 
 ### 2. Notification Service
+
 **File:** `packages/ingestion/src/services/notificationService.ts`
 **Test:** `packages/ingestion/src/services/notificationService.test.ts`
 
 **Features:**
+
 - CloudWatch Logs (always enabled)
 - Optional Slack webhook integration (if `SLACK_WEBHOOK_URL` env var set)
 - Optional SES email notifications (if `NOTIFICATION_EMAIL` env var set)
@@ -48,6 +53,7 @@ This phase implements automated scheduling and cost tracking for the intelligent
 - Error notifications
 
 **Environment Variables:**
+
 - `SLACK_WEBHOOK_URL` (optional)
 - `NOTIFICATION_EMAIL` (optional)
 - `SES_FROM_EMAIL` (optional, default: noreply@usopc.org)
@@ -55,10 +61,12 @@ This phase implements automated scheduling and cost tracking for the intelligent
 ---
 
 ### 3. Discovery Lambda
+
 **File:** `packages/ingestion/src/functions/discovery.ts`
 **Test:** `packages/ingestion/src/functions/discovery.test.ts`
 
 **Features:**
+
 - EventBridge cron handler (runs every Monday at 2 AM UTC)
 - Loads discovery config from `data/discovery-config.json`
 - Creates DiscoveryOrchestrator instance
@@ -69,17 +77,20 @@ This phase implements automated scheduling and cost tracking for the intelligent
 - Comprehensive error handling
 
 **Environment Variables:**
+
 - `DISCOVERY_CONFIG_PATH` (optional, default: data/discovery-config.json)
 - All cost tracking and notification env vars
 
 ---
 
 ### 4. Ingestion Integration
+
 **File:** `packages/ingestion/src/cron.ts` (updated)
 
 **New Function:** `processApprovedDiscoveries()`
 
 **Features:**
+
 - Fetches newly approved discoveries since last run
 - Auto-creates SourceConfig for approved discoveries
 - Links DiscoveredSource.sourceConfigId after creation
@@ -93,9 +104,11 @@ This phase implements automated scheduling and cost tracking for the intelligent
 ## Files Modified
 
 ### 1. SST Configuration
+
 **File:** `sst.config.ts`
 
 **Added:**
+
 - `DiscoveryCron` EventBridge rule: `cron(0 2 ? * MON *)` (every Monday at 2 AM UTC)
 - DiscoveryFunction Lambda with:
   - Handler: `packages/ingestion/src/functions/discovery.handler`
@@ -107,9 +120,11 @@ This phase implements automated scheduling and cost tracking for the intelligent
 ---
 
 ### 2. DynamoDB Schema
+
 **File:** `packages/shared/src/entities/schema.ts`
 
 **Added:** `UsageMetric` model with:
+
 - `pk`: `Usage#{service}` (tavily or anthropic)
 - `sk`: `{period}#{date}` (daily/weekly/monthly)
 - `gsi1pk`: `Usage` (for cross-service queries)
@@ -119,36 +134,44 @@ This phase implements automated scheduling and cost tracking for the intelligent
 ---
 
 ### 3. DiscoveredSourceEntity
+
 **File:** `packages/shared/src/entities/DiscoveredSourceEntity.ts`
 
 **Added:** `getApprovedSince(since: string)` method
+
 - Queries gsi1 for approved discoveries since timestamp
 - Used by ingestion cron to fetch new approvals
 
 ---
 
 ### 4. Entities Index
+
 **File:** `packages/ingestion/src/entities/index.ts`
 
 **Added:**
+
 - Export `DiscoveredSourceEntity` and types
 - Factory function `createDiscoveredSourceEntity()`
 
 ---
 
 ### 5. Services Index
+
 **File:** `packages/ingestion/src/services/index.ts`
 
 **Added:**
+
 - Export `CostTracker`, `createCostTracker`, and related types
 - Export `NotificationService`, `createNotificationService`, and related types
 
 ---
 
 ### 6. Documentation
+
 **Files:** `docs/deployment.md`, `docs/architecture.md`
 
 **Added:**
+
 - Section on automated discovery scheduling
 - Budget configuration instructions
 - Notification setup (Slack/email)
@@ -161,6 +184,7 @@ This phase implements automated scheduling and cost tracking for the intelligent
 ## Testing Coverage
 
 ### Unit Tests Created:
+
 1. **costTracker.test.ts**: 15 tests covering:
    - Tavily and Anthropic call tracking
    - Budget checks (within/over budget)
@@ -195,18 +219,22 @@ This phase implements automated scheduling and cost tracking for the intelligent
 ## Environment Variables Summary
 
 ### Required (Production):
+
 None - all have sensible defaults
 
 ### Optional Budget Limits:
+
 - `TAVILY_MONTHLY_BUDGET`: Tavily credits limit (default: 1000)
 - `ANTHROPIC_MONTHLY_BUDGET`: Anthropic cost limit in dollars (default: $10)
 
 ### Optional Notifications:
+
 - `SLACK_WEBHOOK_URL`: Slack webhook for notifications
 - `NOTIFICATION_EMAIL`: Email for SES notifications
 - `SES_FROM_EMAIL`: From address for SES (default: noreply@usopc.org)
 
 ### Optional Config:
+
 - `DISCOVERY_CONFIG_PATH`: Path to discovery-config.json (default: data/discovery-config.json)
 
 ---
@@ -214,6 +242,7 @@ None - all have sensible defaults
 ## Workflow
 
 ### Automated Weekly Flow:
+
 1. **Monday 2 AM UTC:** DiscoveryCron Lambda runs
    - Checks budgets (halts if exceeded)
    - Discovers URLs from configured domains and search queries
@@ -230,6 +259,7 @@ None - all have sensible defaults
    - New sources are embedded and stored in vector database
 
 ### Budget Safety:
+
 - Budget checks run before discovery starts
 - Execution halts immediately if budget exceeded
 - Critical alert sent via all configured channels
@@ -237,6 +267,7 @@ None - all have sensible defaults
 - Monthly rollup for accurate tracking
 
 ### Notification Flow:
+
 - **Success:** Completion summary with stats, costs, duration
 - **Warning:** Budget at 80% threshold
 - **Critical:** Budget exceeded, discovery halted
@@ -247,12 +278,14 @@ None - all have sensible defaults
 ## Cost Estimates
 
 ### Tavily API:
+
 - Map endpoint: 5 credits per domain
 - Search endpoint: 1 credit per query
 - Example config (7 domains + 5 queries): 40 credits/week ≈ 160 credits/month
 - Well within 1000 credit default budget
 
 ### Anthropic API (Claude Sonnet 4):
+
 - Input: $3.00 per million tokens
 - Output: $15.00 per million tokens
 - Estimated per URL: ~3000 input + 700 output = ~$0.02
@@ -260,6 +293,7 @@ None - all have sensible defaults
 - Well within $10 default budget
 
 ### Total Estimated Cost:
+
 **$5-10/month** (assuming default discovery config)
 
 ---
@@ -269,6 +303,7 @@ None - all have sensible defaults
 ### Before Creating PR:
 
 1. **Create Worktree** (if not done):
+
    ```bash
    cd /Users/joelrosinbum/src/usopc-athlete-support-agent
    git worktree add ../usopc-issue-149 -b feat/discovery-automation
@@ -277,6 +312,7 @@ None - all have sensible defaults
    ```
 
 2. **Copy update-hours.mjs** (from MEMORY.md):
+
    ```bash
    cp /path/to/main/scripts/update-hours.mjs ../usopc-issue-149/scripts/
    ```
@@ -286,17 +322,20 @@ None - all have sensible defaults
    - All modified files
 
 4. **Run Tests**:
+
    ```bash
    pnpm --filter @usopc/ingestion test
    pnpm --filter @usopc/shared test
    ```
 
 5. **Type Check**:
+
    ```bash
    pnpm typecheck
    ```
 
 6. **Format**:
+
    ```bash
    npx prettier --write "packages/ingestion/src/**/*.ts"
    npx prettier --write "packages/shared/src/**/*.ts"
@@ -305,6 +344,7 @@ None - all have sensible defaults
    ```
 
 7. **Commit**:
+
    ```bash
    git add .
    git commit -m "feat: Add automated discovery scheduling and cost tracking
@@ -349,6 +389,7 @@ Before merging:
 After PR merge:
 
 1. Set secrets:
+
    ```bash
    sst secret set TavilyMonthlyBudget 1000 --stage production
    sst secret set AnthropicMonthlyBudget 10 --stage production
@@ -358,6 +399,7 @@ After PR merge:
    ```
 
 2. Deploy:
+
    ```bash
    sst deploy --stage production
    ```
@@ -365,6 +407,7 @@ After PR merge:
 3. Verify DiscoveryCron Lambda created and scheduled
 
 4. Test manually:
+
    ```bash
    aws lambda invoke \
      --function-name usopc-athlete-support-production-DiscoveryCron \
