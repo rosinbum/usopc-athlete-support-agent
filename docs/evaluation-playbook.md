@@ -269,7 +269,7 @@ Code evaluators run deterministic logic in a sandboxed environment (no internet 
 function performEval(run) {
   const answer = run.outputs?.answer ?? "";
   const hasSeparator = answer.includes("---");
-  const hasContact = /ombudsman|safesport|1-833-5US-SAFE|833-587-7233/i.test(
+  const hasContact = /ombuds|safesport|1-833-5US-SAFE|833-587-7233/i.test(
     answer,
   );
   return { online_disclaimer_present: hasSeparator && hasContact };

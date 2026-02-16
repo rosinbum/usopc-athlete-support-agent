@@ -29,7 +29,7 @@ const DISCLAIMER_SEPARATOR = "\n\n---\n\n";
 
 /** Patterns that indicate a safety disclaimer is present. */
 const DISCLAIMER_CONTACT_PATTERN =
-  /ombudsman|safesport|1-833-5US-SAFE|833-587-7233|usada|uscenterforsafesport/i;
+  /ombuds|safesport|1-833-5US-SAFE|833-587-7233|usada|uscenterforsafesport|athletes'?\s*commission/i;
 
 // ---------------------------------------------------------------------------
 // CLI arg parsing
