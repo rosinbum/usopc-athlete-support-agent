@@ -1,4 +1,7 @@
 import { createDataStreamResponse, formatDataStreamPart } from "ai";
+import { logger } from "@usopc/shared";
+
+const log = logger.child({ service: "chat-route" });
 
 // Cache a single runner instance per Lambda cold start
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,12 +23,14 @@ async function getRunner() {
     let langchainApiKey: string | undefined;
     try {
       langchainApiKey = getSecretValue("LANGCHAIN_API_KEY", "LangchainApiKey");
-      console.log("Found LangSmith API key from SST secret");
+      log.info("Found LangSmith API key from SST secret");
     } catch (e) {
-      console.log("LangSmith API key not found in SST secrets:", e);
+      log.info("LangSmith API key not found in SST secrets", {
+        error: String(e),
+      });
       langchainApiKey = getOptionalEnv("LANGCHAIN_API_KEY");
       if (langchainApiKey) {
-        console.log("Found LangSmith API key from env var");
+        log.info("Found LangSmith API key from env var");
       }
     }
 
@@ -34,12 +39,11 @@ async function getRunner() {
       process.env.LANGCHAIN_API_KEY = langchainApiKey;
       process.env.LANGCHAIN_PROJECT =
         getOptionalEnv("LANGCHAIN_PROJECT") ?? "usopc-athlete-support";
-      console.log(
-        "LangSmith tracing ENABLED for project:",
-        process.env.LANGCHAIN_PROJECT,
-      );
+      log.info("LangSmith tracing ENABLED", {
+        project: process.env.LANGCHAIN_PROJECT,
+      });
     } else {
-      console.log("LangSmith tracing DISABLED - no API key found");
+      log.info("LangSmith tracing DISABLED - no API key found");
     }
 
     // Now import the agent (which loads LangChain with env vars set)
@@ -55,13 +59,12 @@ async function getRunner() {
 }
 
 export async function POST(req: Request) {
-  console.log("POST /api/chat called");
+  log.info("POST /api/chat called");
   const { messages, userSport, conversationId } = await req.json();
   const runner = await getRunner();
-  console.log(
-    "Runner initialized, LANGCHAIN_TRACING_V2:",
-    process.env.LANGCHAIN_TRACING_V2,
-  );
+  log.info("Runner initialized", {
+    tracingEnabled: process.env.LANGCHAIN_TRACING_V2,
+  });
 
   // Dynamic import to ensure env vars are set first
   const {
@@ -100,7 +103,7 @@ export async function POST(req: Request) {
         } else if (event.type === "text-delta" && event.textDelta) {
           writer.write(formatDataStreamPart("text", event.textDelta));
         } else if (event.type === "error" && event.error) {
-          console.error("Agent stream error:", event.error);
+          log.error("Agent stream error", { error: String(event.error) });
           writer.write(formatDataStreamPart("error", event.error.message));
         }
       }
@@ -110,12 +113,14 @@ export async function POST(req: Request) {
         generateSummary(langchainMessages, conversationSummary)
           .then((summary: string) => saveSummary(conversationId, summary))
           .catch((err: unknown) =>
-            console.error("Failed to save conversation summary:", err),
+            log.error("Failed to save conversation summary", {
+              error: String(err),
+            }),
           );
       }
     },
     onError: (error) => {
-      console.error("Chat stream error:", error);
+      log.error("Chat stream error", { error: String(error) });
       return error instanceof Error ? error.message : "An error occurred";
     },
   });
