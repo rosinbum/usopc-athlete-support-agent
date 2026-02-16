@@ -37,7 +37,7 @@ describe("ESCALATION_TARGETS", () => {
       (t) => t.id === "athletes_commission",
     );
     expect(commission).toBeDefined();
-    expect(commission!.contactEmail).toBe("teamusaac@usopc.org");
+    expect(commission!.contactEmail).toBe("teamusa.ac@teamusa-ac.org");
   });
 });
 

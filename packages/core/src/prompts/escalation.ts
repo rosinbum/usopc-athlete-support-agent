@@ -61,8 +61,8 @@ export const ESCALATION_TARGETS: EscalationTarget[] = [
   {
     id: "athletes_commission",
     organization: "Team USA Athletes' Commission",
-    contactEmail: "teamusaac@usopc.org",
-    contactUrl: "https://www.usopc.org/voice-and-representation",
+    contactEmail: "teamusa.ac@teamusa-ac.org",
+    contactUrl: "https://www.usopc.org/teamusa-athletes-commission",
     domains: ["governance", "athlete_rights"],
     urgencyDefault: "standard",
     description:
