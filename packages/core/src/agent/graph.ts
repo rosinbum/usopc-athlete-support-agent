@@ -10,6 +10,7 @@ import {
   citationBuilderNode,
   disclaimerGuardNode,
   qualityCheckerNode,
+  queryPlannerNode,
 } from "./nodes/index.js";
 import type { VectorStoreLike } from "./nodes/index.js";
 import type { TavilySearchLike } from "./nodes/index.js";
@@ -34,6 +35,10 @@ export interface GraphDependencies {
  *     researcher -> synthesizer
  *     synthesizer -> citationBuilder -> disclaimerGuard -> END
  *     escalate -> citationBuilder -> disclaimerGuard -> END
+ *
+ * Graph flow (query planner ON):
+ *   ...same as above, but classifier routes through queryPlanner before retriever:
+ *     classifier -> queryPlanner -> retriever
  *
  * Graph flow (quality checker ON):
  *   ...same as above, but:
@@ -69,12 +74,14 @@ export function createAgentGraph(deps: GraphDependencies) {
     .addNode(
       "qualityChecker",
       withMetrics("qualityChecker", qualityCheckerNode),
-    );
+    )
+    .addNode("queryPlanner", withMetrics("queryPlanner", queryPlannerNode));
 
   // Edges
   builder.addEdge("__start__", "classifier");
   builder.addConditionalEdges("classifier", routeByDomain);
   builder.addEdge("clarify", "__end__");
+  builder.addEdge("queryPlanner", "retriever");
   builder.addConditionalEdges("retriever", needsMoreInfo);
   builder.addEdge("researcher", "synthesizer");
 

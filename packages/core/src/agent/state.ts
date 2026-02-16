@@ -7,6 +7,7 @@ import type {
   EscalationInfo,
   RetrievedDocument,
   QualityCheckResult,
+  SubQuery,
 } from "../types/index.js";
 
 /**
@@ -198,6 +199,25 @@ export const AgentStateAnnotation = Annotation.Root({
   qualityRetryCount: Annotation<number>({
     reducer: (_prev, next) => next,
     default: () => 0,
+  }),
+
+  /**
+   * Whether the query planner detected a complex multi-domain query.
+   * Set by the queryPlanner node.
+   */
+  isComplexQuery: Annotation<boolean>({
+    reducer: (_prev, next) => next,
+    default: () => false,
+  }),
+
+  /**
+   * Decomposed sub-queries for complex multi-domain questions.
+   * Each sub-query targets a specific domain with its own filters.
+   * Set by the queryPlanner node, consumed by the retriever.
+   */
+  subQueries: Annotation<SubQuery[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
   }),
 });
 

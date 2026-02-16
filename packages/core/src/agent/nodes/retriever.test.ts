@@ -47,6 +47,8 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     emotionalState: "neutral",
     qualityCheckResult: undefined,
     qualityRetryCount: 0,
+    isComplexQuery: false,
+    subQueries: [],
     ...overrides,
   };
 }
@@ -555,6 +557,156 @@ describe("createRetrieverNode", () => {
       >;
       const searchQuery = mockFn.mock.calls[0][0] as string;
       expect(searchQuery).toContain("eligibility requirements");
+    });
+  });
+
+  describe("sub-query retrieval", () => {
+    it("runs parallel search per sub-query", async () => {
+      const store = makeMockVectorStore([
+        // First sub-query results
+        [
+          makeSearchResult("anti-doping doc", 0.1, {
+            topicDomain: "anti_doping",
+          }),
+        ],
+        // Second sub-query results
+        [
+          makeSearchResult("team selection doc", 0.15, {
+            topicDomain: "team_selection",
+          }),
+        ],
+      ]);
+
+      const node = createRetrieverNode(store);
+      const state = makeState({
+        isComplexQuery: true,
+        subQueries: [
+          {
+            query: "anti-doping rules for team selection",
+            domain: "anti_doping",
+            intent: "factual",
+            ngbIds: [],
+          },
+          {
+            query: "team selection disqualification criteria",
+            domain: "team_selection",
+            intent: "procedural",
+            ngbIds: [],
+          },
+        ],
+      });
+
+      const result = await node(state);
+      expect(store.similaritySearchWithScore).toHaveBeenCalledTimes(2);
+      expect(result.retrievedDocuments!.length).toBe(2);
+      expect(result.retrievalStatus).toBe("success");
+    });
+
+    it("deduplicates across sub-queries", async () => {
+      const store = makeMockVectorStore([
+        [
+          makeSearchResult("shared doc about doping and selection", 0.1, {
+            topicDomain: "anti_doping",
+          }),
+          makeSearchResult("anti-doping specific doc", 0.15),
+        ],
+        [
+          makeSearchResult("shared doc about doping and selection", 0.12, {
+            topicDomain: "team_selection",
+          }),
+          makeSearchResult("team selection specific doc", 0.18),
+        ],
+      ]);
+
+      const node = createRetrieverNode(store);
+      const state = makeState({
+        isComplexQuery: true,
+        subQueries: [
+          {
+            query: "q1",
+            domain: "anti_doping",
+            intent: "factual",
+            ngbIds: [],
+          },
+          {
+            query: "q2",
+            domain: "team_selection",
+            intent: "factual",
+            ngbIds: [],
+          },
+        ],
+      });
+
+      const result = await node(state);
+      const contents = result.retrievedDocuments!.map((d) => d.content);
+      // "shared doc" should appear only once
+      expect(
+        contents.filter((c) => c === "shared doc about doping and selection")
+          .length,
+      ).toBe(1);
+    });
+
+    it("constructs filter per sub-query with domain and ngbIds", async () => {
+      const store = makeMockVectorStore([
+        [makeSearchResult("doc1", 0.1)],
+        [makeSearchResult("doc2", 0.15)],
+      ]);
+
+      const node = createRetrieverNode(store);
+      const state = makeState({
+        isComplexQuery: true,
+        subQueries: [
+          {
+            query: "q1",
+            domain: "anti_doping",
+            intent: "factual",
+            ngbIds: ["usa-swimming"],
+          },
+          {
+            query: "q2",
+            domain: "team_selection",
+            intent: "procedural",
+            ngbIds: [],
+          },
+        ],
+      });
+
+      await node(state);
+
+      // First sub-query: domain + NGB filter
+      expect(store.similaritySearchWithScore).toHaveBeenNthCalledWith(
+        1,
+        "q1",
+        5,
+        { topicDomain: "anti_doping", ngbId: "usa-swimming" },
+      );
+
+      // Second sub-query: domain-only filter
+      expect(store.similaritySearchWithScore).toHaveBeenNthCalledWith(
+        2,
+        "q2",
+        5,
+        { topicDomain: "team_selection" },
+      );
+    });
+
+    it("falls back to normal retrieval when subQueries is empty", async () => {
+      const store = makeMockVectorStore([
+        [
+          makeSearchResult("doc1", 0.1, { topicDomain: "team_selection" }),
+          makeSearchResult("doc2", 0.2, { topicDomain: "team_selection" }),
+        ],
+      ]);
+
+      const node = createRetrieverNode(store);
+      const state = makeState({
+        isComplexQuery: false,
+        subQueries: [],
+        topicDomain: "team_selection",
+      });
+
+      const result = await node(state);
+      expect(result.retrievedDocuments).toHaveLength(2);
     });
   });
 });
