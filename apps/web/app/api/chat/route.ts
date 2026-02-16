@@ -56,7 +56,7 @@ async function getRunner() {
 
 export async function POST(req: Request) {
   console.log("POST /api/chat called");
-  const { messages, userSport } = await req.json();
+  const { messages, userSport, conversationId } = await req.json();
   const runner = await getRunner();
   console.log(
     "Runner initialized, LANGCHAIN_TRACING_V2:",
@@ -64,11 +64,28 @@ export async function POST(req: Request) {
   );
 
   // Dynamic import to ensure env vars are set first
-  const { AgentRunner, agentStreamToEvents } = await import("@usopc/core");
+  const {
+    AgentRunner,
+    agentStreamToEvents,
+    getFeatureFlags,
+    loadSummary,
+    saveSummary,
+    generateSummary,
+  } = await import("@usopc/core");
 
+  // Load existing conversation summary if feature is enabled
+  const flags = getFeatureFlags();
+  let conversationSummary: string | undefined;
+  if (flags.conversationMemory && conversationId) {
+    conversationSummary = await loadSummary(conversationId);
+  }
+
+  const langchainMessages = AgentRunner.convertMessages(messages);
   const stateStream = runner.stream({
-    messages: AgentRunner.convertMessages(messages),
+    messages: langchainMessages,
     userSport,
+    conversationId,
+    conversationSummary,
   });
 
   const events = agentStreamToEvents(stateStream);
@@ -86,6 +103,15 @@ export async function POST(req: Request) {
           console.error("Agent stream error:", event.error);
           writer.write(formatDataStreamPart("error", event.error.message));
         }
+      }
+
+      // Fire-and-forget: generate and save updated summary after stream completes
+      if (flags.conversationMemory && conversationId) {
+        generateSummary(langchainMessages, conversationSummary)
+          .then((summary: string) => saveSummary(conversationId, summary))
+          .catch((err: unknown) =>
+            console.error("Failed to save conversation summary:", err),
+          );
       }
     },
     onError: (error) => {
