@@ -171,6 +171,33 @@ export const AppTableSchema = {
       updatedAt: { type: String },
       createdAt: { type: String },
     },
+    UsageMetric: {
+      pk: { type: String, value: "Usage#${service}" },
+      sk: { type: String, value: "${period}#${date}" }, // e.g., "daily#2026-02-15"
+      gsi1pk: { type: String, value: "Usage" },
+      gsi1sk: { type: String, value: "${date}" },
+      service: {
+        type: String,
+        required: true,
+        enum: ["tavily", "anthropic"] as const,
+      },
+      period: {
+        type: String,
+        required: true,
+        enum: ["daily", "weekly", "monthly"] as const,
+      },
+      date: { type: String, required: true }, // ISO date (YYYY-MM-DD)
+      // Tavily metrics
+      tavilyCalls: { type: Number, default: 0 },
+      tavilyCredits: { type: Number, default: 0 },
+      // Anthropic metrics
+      anthropicCalls: { type: Number, default: 0 },
+      anthropicInputTokens: { type: Number, default: 0 },
+      anthropicOutputTokens: { type: Number, default: 0 },
+      anthropicCost: { type: Number, default: 0 }, // in dollars
+      createdAt: { type: String },
+      updatedAt: { type: String },
+    },
   },
   params: {
     timestamps: false,

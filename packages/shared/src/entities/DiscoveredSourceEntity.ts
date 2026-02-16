@@ -218,6 +218,26 @@ export class DiscoveredSourceEntity {
   }
 
   /**
+   * Get approved discoveries since a given timestamp.
+   * Results are ordered by discoveredAt (newest first).
+   */
+  async getApprovedSince(since: string): Promise<DiscoveredSource[]> {
+    const items = await this.model.find(
+      {
+        gsi1pk: "Discovery#approved",
+        gsi1sk: { $gte: since },
+      } as never,
+      {
+        index: "gsi1",
+        reverse: true, // newest first
+      },
+    );
+    return items.map((item) =>
+      this.toExternal(item as unknown as Record<string, unknown>),
+    );
+  }
+
+  /**
    * Update a discovered source.
    */
   async update(
