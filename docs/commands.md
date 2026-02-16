@@ -64,11 +64,11 @@ pnpm sources disable <id>          # Disable a source
 ## Discovery
 
 ```bash
-pnpm --filter @usopc/ingestion discovery              # Run source discovery
-pnpm --filter @usopc/ingestion discovery -- --dry-run  # Preview without saving
-pnpm --filter @usopc/ingestion discovery -- --domain <domain>  # Specific domain
-pnpm --filter @usopc/ingestion discovery -- --query <query>    # Specific search query
-pnpm --filter @usopc/ingestion discovery -- --json     # JSON output
+pnpm --filter @usopc/ingestion discovery:run              # Run source discovery
+pnpm --filter @usopc/ingestion discovery:run -- --dry-run  # Preview without saving
+pnpm --filter @usopc/ingestion discovery:run -- --domain <domain>  # Specific domain
+pnpm --filter @usopc/ingestion discovery:run -- --query <query>    # Specific search query
+pnpm --filter @usopc/ingestion discovery:run -- --json     # JSON output
 ```
 
 ## Evaluations (@usopc/evals)
