@@ -132,7 +132,7 @@ pnpm --filter @usopc/evals quality:all       # Run + evaluate + setup (combined)
 
 - **Vitest mock hoisting**: Declare `vi.mock()` with inline factory functions, then use `vi.mocked()` after imports to get typed mocks. Don't declare `const mockFn = vi.fn()` above `vi.mock()` — hoisting causes "Cannot access before initialization" errors.
 - **Web test paths**: File paths for `pnpm --filter @usopc/web test` don't include `src/` prefix (e.g., `components/sources/...` not `src/components/...`).
-- **`vi.clearAllMocks()` clears mock results**: Access `MockConstructor.mock.results[0]` *after* the constructor is called in your test, not before — `clearAllMocks` empties the results array.
+- **`vi.clearAllMocks()` clears mock results**: Access `MockConstructor.mock.results[0]` _after_ the constructor is called in your test, not before — `clearAllMocks` empties the results array.
 
 ### CI Gotchas
 
