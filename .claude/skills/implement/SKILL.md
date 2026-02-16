@@ -147,6 +147,7 @@ Worktree: <path>
 
 ## Important notes
 
+- **Do NOT create a new issue.** You are implementing an existing issue — update it if the scope changes, never create a duplicate.
 - **Do NOT commit or push.** Stage changes and let the user decide when to commit.
 - **Do NOT close the issue.** The PR will close it when merged.
 - **Follow project conventions**: ESM imports with `.js` extensions, Vitest with co-located tests, inline `vi.mock()` factories.

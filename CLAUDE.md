@@ -45,7 +45,7 @@ Worktree naming convention: `../usopc-issue-<number>` (e.g., `../usopc-issue-23`
 
 For any implementation task:
 
-1. Create a GitHub issue describing the planned work **before starting** (`gh issue create`). The issue should cover all implementation, not just tests or cleanup.
+1. **If no issue exists**, create a GitHub issue describing the planned work **before starting**. If an issue already exists (e.g., you're running `/implement <number>`), **update** the existing issue to reflect the planned scope — do NOT create a duplicate.
 2. Create a git worktree with a feature branch off `main` (e.g., `git worktree add ../usopc-issue-<number> -b feat/short-description`)
 3. Navigate to the worktree directory and run `pnpm install`
 4. Write or update the corresponding `*.test.ts` file alongside the source (tests are co-located in `src/`)
