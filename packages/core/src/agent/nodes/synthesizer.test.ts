@@ -62,6 +62,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     escalationReason: undefined,
     retrievalStatus: "success",
     emotionalState: "neutral",
+    emotionalSupportContext: undefined,
     qualityCheckResult: undefined,
     qualityRetryCount: 0,
     expansionAttempted: false,
@@ -430,6 +431,101 @@ describe("synthesizerNode", () => {
       const humanMessage = invokeArgs[1];
       expect(humanMessage.content).not.toContain("## Quality Feedback");
       expect(result.qualityRetryCount).toBeUndefined();
+    });
+  });
+
+  describe("emotional support context", () => {
+    it("uses guidance and tone modifiers in prompt when emotionalSupportContext is present", async () => {
+      mockInvoke.mockResolvedValueOnce({
+        content: "Here are the steps you can take...",
+      });
+
+      const state = makeState({
+        emotionalState: "distressed",
+        emotionalSupportContext: {
+          acknowledgment: "I hear you, and your concerns are valid.",
+          guidance: "SafeSport provides confidential support.",
+          safetyResources: [
+            "SafeSport: 833-5US-SAFE",
+            "Mental Health: 1-888-602-9002",
+          ],
+          toneModifiers: [
+            "Use warm, supportive tone",
+            "Acknowledge feelings first",
+          ],
+        },
+        retrievedDocuments: [makeDoc("SafeSport procedures")],
+        messages: [new HumanMessage("I need help with a SafeSport issue")],
+      });
+
+      const result = await synthesizerNode(state);
+
+      // Prompt should include guidance and tone modifiers
+      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const humanMessage = invokeArgs[1];
+      expect(humanMessage.content).toContain("EMOTIONAL SUPPORT GUIDANCE");
+      expect(humanMessage.content).toContain(
+        "SafeSport provides confidential support",
+      );
+      expect(humanMessage.content).toContain("TONE REQUIREMENTS");
+      expect(humanMessage.content).toContain("Use warm, supportive tone");
+      // Should NOT include generic tone guidance
+      expect(humanMessage.content).not.toContain("IMPORTANT TONE GUIDANCE");
+
+      // Answer should include acknowledgment and resources
+      expect(result.answer).toContain(
+        "I hear you, and your concerns are valid.",
+      );
+      expect(result.answer).toContain("Here are the steps you can take...");
+      expect(result.answer).toContain("**Support Resources:**");
+      expect(result.answer).toContain("SafeSport: 833-5US-SAFE");
+      expect(result.answer).toContain("Mental Health: 1-888-602-9002");
+    });
+
+    it("falls back to withEmpathy when emotionalSupportContext is undefined", async () => {
+      mockInvoke.mockResolvedValueOnce({
+        content: "Here are your options...",
+      });
+
+      const state = makeState({
+        emotionalState: "distressed",
+        emotionalSupportContext: undefined,
+        retrievedDocuments: [makeDoc("context")],
+        messages: [new HumanMessage("I'm so upset about this")],
+      });
+
+      const result = await synthesizerNode(state);
+
+      // Should use generic empathy preamble
+      expect(result.answer).toContain("what you're feeling is valid");
+      expect(result.answer).toContain("Here are your options...");
+
+      // Prompt should use generic tone guidance
+      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const humanMessage = invokeArgs[1];
+      expect(humanMessage.content).toContain("IMPORTANT TONE GUIDANCE");
+    });
+
+    it("omits resource block when safetyResources is empty", async () => {
+      mockInvoke.mockResolvedValueOnce({
+        content: "Your answer here.",
+      });
+
+      const state = makeState({
+        emotionalState: "panicked",
+        emotionalSupportContext: {
+          acknowledgment: "Take a breath.",
+          guidance: "Steps to follow.",
+          safetyResources: [],
+          toneModifiers: ["Be calm"],
+        },
+        retrievedDocuments: [makeDoc("context")],
+      });
+
+      const result = await synthesizerNode(state);
+      expect(result.answer).not.toContain("**Support Resources:**");
+      expect(result.answer).toContain("Take a breath.");
+      expect(result.answer).toContain("Your answer here.");
     });
   });
 });

@@ -12,6 +12,7 @@ import {
   qualityCheckerNode,
   createRetrievalExpanderNode,
   queryPlannerNode,
+  emotionalSupportNode,
 } from "./nodes/index.js";
 import type { VectorStoreLike } from "./nodes/index.js";
 import type { TavilySearchLike } from "./nodes/index.js";
@@ -85,7 +86,20 @@ export function createAgentGraph(deps: GraphDependencies) {
         createRetrievalExpanderNode(deps.vectorStore),
       ),
     )
-    .addNode("queryPlanner", withMetrics("queryPlanner", queryPlannerNode));
+    .addNode("queryPlanner", withMetrics("queryPlanner", queryPlannerNode))
+    .addNode(
+      "emotionalSupport",
+      withMetrics("emotionalSupport", emotionalSupportNode),
+    );
+
+  // Determine pre-synthesizer target: emotional support node when flag is on
+  const preSynth = (
+    flags.emotionalSupport ? "emotionalSupport" : "synthesizer"
+  ) as "emotionalSupport" | "synthesizer";
+
+  if (flags.emotionalSupport) {
+    builder.addEdge("emotionalSupport", "synthesizer");
+  }
 
   // Edges
   builder.addEdge("__start__", "classifier");
@@ -94,23 +108,41 @@ export function createAgentGraph(deps: GraphDependencies) {
 
   builder.addEdge("queryPlanner", "retriever");
 
+  const needsMoreInfoPathMap = {
+    synthesizer: preSynth,
+    researcher: "researcher" as const,
+    retrievalExpander: "retrievalExpander" as const,
+  };
+
   if (flags.retrievalExpansion) {
     // Retriever routes to expander when confidence is low and expansion not attempted
-    builder.addConditionalEdges("retriever", createNeedsMoreInfo(true));
+    builder.addConditionalEdges(
+      "retriever",
+      createNeedsMoreInfo(true),
+      needsMoreInfoPathMap,
+    );
     // After expansion, route to synthesizer or researcher (never back to expander)
     builder.addConditionalEdges(
       "retrievalExpander",
       createNeedsMoreInfo(false),
+      needsMoreInfoPathMap,
     );
   } else {
-    builder.addConditionalEdges("retriever", needsMoreInfo);
+    builder.addConditionalEdges(
+      "retriever",
+      needsMoreInfo,
+      needsMoreInfoPathMap,
+    );
   }
-  builder.addEdge("researcher", "synthesizer");
+  builder.addEdge("researcher", preSynth);
 
   if (flags.qualityChecker) {
-    // Quality checker loop: synthesizer → qualityChecker → route → {citationBuilder | synthesizer}
+    // Quality checker loop: synthesizer → qualityChecker → route → {citationBuilder | synthesizer(retry)}
     builder.addEdge("synthesizer", "qualityChecker");
-    builder.addConditionalEdges("qualityChecker", routeByQuality);
+    builder.addConditionalEdges("qualityChecker", routeByQuality, {
+      citationBuilder: "citationBuilder" as const,
+      synthesizer: preSynth,
+    });
   } else {
     // Default: synthesizer → citationBuilder (no quality checking)
     builder.addEdge("synthesizer", "citationBuilder");

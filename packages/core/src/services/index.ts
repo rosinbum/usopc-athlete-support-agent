@@ -33,6 +33,8 @@ export {
   resetVectorStoreWriteCircuit,
 } from "./vectorStoreService.js";
 
+export { generateSupportContext } from "./emotionalSupport.js";
+
 export {
   type SummaryStore,
   InMemorySummaryStore,

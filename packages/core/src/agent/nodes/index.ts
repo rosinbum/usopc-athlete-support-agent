@@ -11,3 +11,4 @@ export { disclaimerGuardNode } from "./disclaimerGuard.js";
 export { qualityCheckerNode } from "./qualityChecker.js";
 export { createRetrievalExpanderNode } from "./retrievalExpander.js";
 export { queryPlannerNode, parseQueryPlannerResponse } from "./queryPlanner.js";
+export { emotionalSupportNode } from "./emotionalSupport.js";

@@ -6,6 +6,7 @@ export interface FeatureFlags {
   feedbackLoop: boolean;
   retrievalExpansion: boolean;
   queryPlanner: boolean;
+  emotionalSupport: boolean;
 }
 
 /**
@@ -25,5 +26,6 @@ export function getFeatureFlags(): FeatureFlags {
     feedbackLoop: process.env.FEATURE_FEEDBACK_LOOP === "true",
     retrievalExpansion: process.env.FEATURE_RETRIEVAL_EXPANSION === "true",
     queryPlanner: process.env.FEATURE_QUERY_PLANNER === "true",
+    emotionalSupport: process.env.FEATURE_EMOTIONAL_SUPPORT === "true",
   };
 }

@@ -27,6 +27,7 @@ export interface Citation {
   effectiveDate?: string;
   snippet: string;
   authorityLevel?: AuthorityLevel;
+  s3Key?: string;
 }
 
 export interface EscalationInfo {
@@ -55,6 +56,7 @@ export interface DocumentMetadata {
   effectiveDate?: string;
   ingestedAt?: string;
   authorityLevel?: AuthorityLevel;
+  s3Key?: string;
 }
 
 export type QualityIssueType =
@@ -81,6 +83,13 @@ export interface SubQuery {
   domain: TopicDomain;
   intent: QueryIntent;
   ngbIds: string[];
+}
+
+export interface EmotionalSupportContext {
+  guidance: string;
+  safetyResources: string[];
+  toneModifiers: string[];
+  acknowledgment: string;
 }
 
 export interface AgentState {
