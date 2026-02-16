@@ -27,6 +27,7 @@ export function makeTestState(overrides: Partial<AgentState> = {}): AgentState {
     escalationReason: undefined,
     retrievalStatus: "success",
     emotionalState: "neutral",
+    emotionalSupportContext: undefined,
     qualityCheckResult: undefined,
     qualityRetryCount: 0,
     expansionAttempted: false,

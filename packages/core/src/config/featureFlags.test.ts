@@ -8,6 +8,7 @@ const FLAG_ENV_VARS = [
   "FEATURE_MULTI_STEP_PLANNER",
   "FEATURE_FEEDBACK_LOOP",
   "FEATURE_QUERY_PLANNER",
+  "FEATURE_EMOTIONAL_SUPPORT",
 ] as const;
 
 describe("getFeatureFlags", () => {
@@ -26,6 +27,7 @@ describe("getFeatureFlags", () => {
     expect(flags.multiStepPlanner).toBe(false);
     expect(flags.feedbackLoop).toBe(false);
     expect(flags.queryPlanner).toBe(false);
+    expect(flags.emotionalSupport).toBe(false);
   });
 
   it.each([
@@ -35,6 +37,7 @@ describe("getFeatureFlags", () => {
     ["FEATURE_MULTI_STEP_PLANNER", "multiStepPlanner"],
     ["FEATURE_FEEDBACK_LOOP", "feedbackLoop"],
     ["FEATURE_QUERY_PLANNER", "queryPlanner"],
+    ["FEATURE_EMOTIONAL_SUPPORT", "emotionalSupport"],
   ] as const)("%s enables %s", (envVar, flagKey) => {
     process.env[envVar] = "true";
     const flags = getFeatureFlags();
@@ -51,6 +54,7 @@ describe("getFeatureFlags", () => {
     expect(flags.multiStepPlanner).toBe(false);
     expect(flags.feedbackLoop).toBe(false);
     expect(flags.queryPlanner).toBe(false);
+    expect(flags.emotionalSupport).toBe(false);
   });
 
   it.each(["false", "", "1", "TRUE", "yes", "on"])(

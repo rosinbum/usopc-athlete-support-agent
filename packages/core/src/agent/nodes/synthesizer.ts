@@ -81,8 +81,14 @@ export async function synthesizerNode(
     state.queryIntent,
     conversationContext,
   );
-  // Append emotional tone guidance when the user is in a non-neutral state
-  prompt += getEmotionalToneGuidance(state.emotionalState);
+  // Append emotional support guidance or generic tone guidance
+  if (state.emotionalSupportContext) {
+    const { guidance, toneModifiers } = state.emotionalSupportContext;
+    prompt += `\n\nEMOTIONAL SUPPORT GUIDANCE: ${guidance}`;
+    prompt += `\n\nTONE REQUIREMENTS:\n${toneModifiers.map((m) => `- ${m}`).join("\n")}`;
+  } else {
+    prompt += getEmotionalToneGuidance(state.emotionalState);
+  }
 
   // On retry after quality check failure, append critique as feedback
   const isRetry = state.qualityCheckResult && !state.qualityCheckResult.passed;
@@ -112,7 +118,19 @@ export async function synthesizerNode(
     ]);
 
     const rawAnswer = extractTextFromResponse(response);
-    const answer = withEmpathy(rawAnswer, state.emotionalState);
+
+    let answer: string;
+    if (state.emotionalSupportContext) {
+      const { acknowledgment, safetyResources } = state.emotionalSupportContext;
+      const resourceBlock =
+        safetyResources.length > 0
+          ? "\n\n**Support Resources:**\n" +
+            safetyResources.map((r) => `- ${r}`).join("\n")
+          : "";
+      answer = acknowledgment + "\n\n" + rawAnswer + resourceBlock;
+    } else {
+      answer = withEmpathy(rawAnswer, state.emotionalState);
+    }
 
     log.info("Synthesis complete", {
       answerLength: answer.length,
