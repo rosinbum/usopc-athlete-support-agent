@@ -240,91 +240,124 @@ Also update `docs/quality-review.md` to include the new codes in the failure mod
 
 ## Online Evaluators (LangSmith UI)
 
-In addition to the local `quality:evaluate` script, LangSmith supports **online evaluators** that auto-score traces as they arrive. These must be configured through the LangSmith UI (no SDK API).
+In addition to the local `quality:evaluate` script, LangSmith supports **online evaluators** that auto-score traces as they arrive. These must be configured through the LangSmith UI (no SDK API). Online evaluators are **reference-free** — they cannot access dataset examples or expected outputs, only the run's inputs and outputs.
 
-### Setup instructions
+### Setup instructions (shared across all evaluator types)
 
-1. Navigate to LangSmith → project `usopc-quality-review` → Settings → Online Evaluators
-2. Click "Add Evaluator"
-3. Configure each evaluator below
-4. Set "Sampling rate" to 1.0 (evaluate every trace)
-5. Save — evaluators will auto-run on all new traces going forward
+1. Navigate to **Tracing Projects** → `usopc-quality-review` → **Evaluators** tab
+2. Click **"+ New"** → **"New Evaluator"**
+3. Select the evaluator type: **Code** or **LLM-as-a-judge**
+4. Name the evaluator
+5. (Optional) Create a filter to restrict which traces are evaluated
+6. (Optional) Set a sampling rate (decimal 0–1; omit or use `1.0` for every trace)
+7. Configure the evaluator-specific settings (see below)
+8. Click **"Test Code"** (code) or **Preview** (LLM) to validate against a recent run
+9. Save — evaluators will auto-run on all new traces going forward
+
+To backfill existing traces, toggle **"Apply to past runs"** and set a start date.
 
 ### Code evaluators
 
-Paste these JavaScript functions into the LangSmith "Code" evaluator editor.
+Code evaluators run deterministic logic in a sandboxed environment (no internet access). The function **must be named `perform_eval`** and accepts a single `run` parameter for online evaluators. It returns a **dictionary** where keys are feedback names and values are scores (boolean or numeric).
+
+> **Note on `perform_eval`**: This is the required function name in the LangSmith sandbox — it is not JavaScript's `eval()` function.
 
 **1. Disclaimer Check** (`online_disclaimer_present`)
 
 ```javascript
-function evaluator({ run }) {
+// LangSmith code evaluator — function name must be perform_eval
+function perform_eval(run) {
   const answer = run.outputs?.answer ?? "";
   const hasSeparator = answer.includes("---");
   const hasContact = /ombudsman|safesport|1-833-5US-SAFE|833-587-7233/i.test(
     answer,
   );
-  return {
-    key: "online_disclaimer_present",
-    score: hasSeparator && hasContact ? 1.0 : 0.0,
-  };
+  return { online_disclaimer_present: hasSeparator && hasContact };
 }
 ```
 
 **2. Trajectory Match** (`online_trajectory_match`)
 
+Since `expected_path` is stored in trace metadata (not run inputs/outputs), online code evaluators may not be able to access it. For trajectory matching, prefer the local `quality:evaluate` script. If your pipeline echoes metadata into outputs, you can use:
+
 ```javascript
-function evaluator({ run }) {
-  const expected = run.extra?.metadata?.expected_path;
-  if (!expected) return { key: "online_trajectory_match", score: null };
-  const expectedNodes = expected.split(" \u2192 ");
+// LangSmith code evaluator — function name must be perform_eval
+function perform_eval(run) {
+  const expected = run.inputs?.expected_path;
+  if (!expected) return {};
+  const expectedNodes = expected.split(" → ");
   const actual = run.outputs?.trajectory ?? [];
   const match =
     actual.length === expectedNodes.length &&
     actual.every((n, i) => n === expectedNodes[i]);
-  return { key: "online_trajectory_match", score: match ? 1.0 : 0.0 };
+  return { online_trajectory_match: match };
 }
 ```
 
 ### LLM-as-judge evaluators
 
-Configure these as "LLM" evaluators in the LangSmith UI. Map input to `run.inputs.messages[-1].content` and output to `run.outputs.answer`.
+LLM-as-judge evaluators use a **structured UI configuration** — you do _not_ write a raw prompt that returns JSON. Instead, you configure three things separately:
 
-**3. Tone Score** (`online_tone`)
+1. **Prompt** with named template variables (e.g., `{question}`, `{response}`)
+2. **Variable mappings** — dropdown selectors that link each variable to a field in the run's inputs or outputs
+3. **Feedback keys** — each with an explicit scoring type (Boolean, Categorical, or Continuous) and optional reasoning
 
-- Model: Claude Haiku or GPT-4o-mini
-- Prompt:
+The LLM's scoring output is handled by structured output — the prompt should describe evaluation criteria but does _not_ need to instruct the model to return JSON.
+
+#### Creating an LLM-as-judge evaluator
+
+1. Select **"LLM-as-a-judge"** as the evaluator type
+2. **Write the prompt** using template variables. The prompt describes the evaluation criteria.
+3. **Map variables**: Click each variable in the prompt and use the dropdown to map it:
+   - Map to **Input** → select the field (e.g., `run.inputs.messages`)
+   - Map to **Output** → select the field (e.g., `run.outputs.answer`)
+4. **Configure feedback**: Add one or more feedback keys. For each key, set:
+   - **Name** — the feedback key (e.g., `online_tone`)
+   - **Description** — what the metric measures
+   - **Type** — `Boolean` (true/false), `Categorical` (predefined options), or `Continuous` (numeric range, e.g., 0.0–1.0)
+   - **Reasoning** — toggle on to have the LLM explain its score
+5. **Select a model** from the dropdown (e.g., GPT-4o-mini, Claude Haiku)
+6. **Preview** against a recent run to verify correctness before saving
+
+#### 3. Tone Score (`online_tone`)
+
+- **Model**: GPT-4o-mini or Claude Haiku
+- **Prompt**:
 
 ```
 You are evaluating an AI assistant's response to a U.S. Olympic/Paralympic athlete.
-Rate the TONE on a scale of 1-5:
-1 = Cold, dismissive, or robotic
-2 = Neutral but lacks warmth
-3 = Professional and adequate
-4 = Warm, supportive, and empathetic
-5 = Exceptional empathy, genuinely supportive
+Assess the TONE of the response. Consider whether it is empathetic, supportive,
+and appropriate for an athlete who may be stressed or in a difficult situation.
 
-Athlete's question: {input}
-Agent's response: {output}
-
-Return ONLY a JSON object: {"score": <1-5>, "reasoning": "<brief explanation>"}
+Athlete's question: {question}
+Agent's response: {response}
 ```
 
-**4. Completeness Score** (`online_completeness`)
+- **Variable mapping**:
+  - `{question}` → Input → `messages` (last user message)
+  - `{response}` → Output → `answer`
+- **Feedback key**: `online_tone`, type: **Continuous**, range: 0.0–1.0, reasoning: enabled
+- **Description**: "0 = cold/dismissive/robotic, 0.5 = professional but neutral, 1.0 = warm, empathetic, and genuinely supportive"
 
-- Model: Claude Haiku or GPT-4o-mini
-- Prompt:
+#### 4. Completeness Score (`online_completeness`)
+
+- **Model**: GPT-4o-mini or Claude Haiku
+- **Prompt**:
 
 ```
 You are evaluating an AI assistant's response for completeness.
-The athlete asked: {input}
-The agent responded: {output}
+The assistant helps U.S. Olympic and Paralympic athletes with governance,
+compliance, and rights questions.
 
-Rate completeness on 1-5:
-1 = Missing most relevant information
-2 = Covers some basics but misses key details
-3 = Covers the main points adequately
-4 = Comprehensive with good detail
-5 = Thorough and anticipates follow-up questions
+Athlete's question: {question}
+Agent's response: {response}
 
-Return ONLY a JSON object: {"score": <1-5>, "reasoning": "<brief explanation>"}
+Consider whether the response covers the main points, provides actionable
+next steps, and anticipates likely follow-up questions.
 ```
+
+- **Variable mapping**:
+  - `{question}` → Input → `messages` (last user message)
+  - `{response}` → Output → `answer`
+- **Feedback key**: `online_completeness`, type: **Continuous**, range: 0.0–1.0, reasoning: enabled
+- **Description**: "0 = missing most relevant information, 0.5 = covers main points adequately, 1.0 = thorough and anticipates follow-ups"
