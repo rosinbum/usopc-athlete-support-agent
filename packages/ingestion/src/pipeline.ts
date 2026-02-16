@@ -8,7 +8,6 @@ import {
 } from "@usopc/core/src/rag/index";
 import { loadPdf } from "./loaders/pdfLoader.js";
 import { loadWeb } from "./loaders/webLoader.js";
-import { loadHtml } from "./loaders/htmlLoader.js";
 import { cleanText } from "./transformers/cleaner.js";
 import { splitDocuments, createSplitter } from "./transformers/splitter.js";
 import { enrichMetadata } from "./transformers/metadataEnricher.js";

@@ -10,6 +10,11 @@ Assessed 2026-02-09. Items marked ~~strikethrough~~ have been resolved.
 - ~~**Move `@types/pg` to devDependencies** in `packages/shared`~~ (PR #77)
 - ~~**Extract `getLastUserMessage()` helper** — was duplicated in 4 agent nodes~~ (PR #77)
 - ~~**Add typed `SportOrganization` interface** to NGB router — was using `any` throughout~~ (PR #77)
+- ~~**Orphaned `shouldEscalate` edge function** — never used in graph.ts; escalation handled by classifier + routeByDomain~~ (PR #149)
+- ~~**Unused `loadHtml` import** in pipeline.ts — `loadDocuments()` uses `loadWeb()` for HTML format~~ (PR #149)
+- ~~**`.gitignore` had specific file path** instead of directory pattern for `data/sources/llm-generated-sources/`~~ (PR #149)
+- ~~**`@usopc/evals` undocumented** in architecture.md and commands.md~~ (PR #149)
+- ~~**Phantom `pnpm lint` and `pnpm db:migrate` commands** referenced in docs but no such scripts exist~~ (PR #149)
 
 ---
 
