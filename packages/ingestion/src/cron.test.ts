@@ -31,7 +31,21 @@ vi.mock("sst", () => ({
     IngestionQueue: {
       url: "https://sqs.us-east-1.amazonaws.com/123/queue.fifo",
     },
+    DocumentsBucket: {
+      name: "test-documents-bucket",
+    },
   },
+}));
+
+const mockStoreDocument = vi.fn();
+const mockDocumentExists = vi.fn();
+const mockGetKeyForSource = vi.fn();
+vi.mock("./services/documentStorage.js", () => ({
+  DocumentStorageService: vi.fn(() => ({
+    storeDocument: (...args: unknown[]) => mockStoreDocument(...args),
+    documentExists: (...args: unknown[]) => mockDocumentExists(...args),
+    getKeyForSource: (...args: unknown[]) => mockGetKeyForSource(...args),
+  })),
 }));
 
 const { mockLoggerInstance } = vi.hoisted(() => ({
@@ -132,6 +146,14 @@ describe("cron handler", () => {
     // Mock fetchWithRetry to return a response-like object
     mockFetchWithRetry.mockResolvedValue({
       text: () => Promise.resolve("fetched content"),
+    });
+
+    // Default S3 mocks — document doesn't exist yet, upload succeeds
+    mockGetKeyForSource.mockReturnValue("sources/src-1/abc123.pdf");
+    mockDocumentExists.mockResolvedValue(false);
+    mockStoreDocument.mockResolvedValue({
+      key: "sources/src-1/abc123.pdf",
+      versionId: "v1",
     });
   });
 
@@ -305,6 +327,52 @@ describe("cron handler", () => {
       expect(call[0]).not.toMatch(/ALERT:/);
     }
   });
+
+  it("uploads to S3 and includes s3Key/s3VersionId in SQS message", async () => {
+    mockGetLastContentHash.mockResolvedValueOnce(null);
+    mockStoreDocument.mockResolvedValueOnce({
+      key: "sources/src-1/hash.pdf",
+      versionId: "ver-1",
+    });
+
+    await handler();
+
+    expect(mockStoreDocument).toHaveBeenCalledOnce();
+    expect(mockStoreDocument).toHaveBeenCalledWith(
+      "src-1",
+      expect.any(Buffer),
+      expect.any(String),
+      "pdf",
+      { title: "Test Source", documentType: "policy" },
+    );
+
+    // Verify the SQS message body includes s3Key and s3VersionId
+    const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+    const callArgs = vi.mocked(SendMessageCommand).mock.calls[0][0];
+    const body = JSON.parse(callArgs.MessageBody as string);
+    expect(body.s3Key).toBe("sources/src-1/hash.pdf");
+    expect(body.s3VersionId).toBe("ver-1");
+  });
+
+  it("continues ingestion when S3 upload fails", async () => {
+    mockGetLastContentHash.mockResolvedValueOnce(null);
+    mockStoreDocument.mockRejectedValueOnce(new Error("S3 unavailable"));
+
+    await handler();
+
+    // Should still enqueue despite S3 failure
+    expect(mockSend).toHaveBeenCalledOnce();
+    expect(mockLoggerInstance.warn).toHaveBeenCalledWith(
+      expect.stringContaining("S3 upload failed"),
+    );
+
+    // Message should have undefined s3Key/s3VersionId
+    const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+    const callArgs = vi.mocked(SendMessageCommand).mock.calls[0][0];
+    const body = JSON.parse(callArgs.MessageBody as string);
+    expect(body.s3Key).toBeUndefined();
+    expect(body.s3VersionId).toBeUndefined();
+  });
 });
 
 describe("cron handler (DynamoDB mode)", () => {
@@ -323,6 +391,14 @@ describe("cron handler (DynamoDB mode)", () => {
     // Mock fetchWithRetry to return a response-like object
     mockFetchWithRetry.mockResolvedValue({
       text: () => Promise.resolve("fetched content"),
+    });
+
+    // Default S3 mocks — document doesn't exist yet, upload succeeds
+    mockGetKeyForSource.mockReturnValue("sources/src-ok/abc123.pdf");
+    mockDocumentExists.mockResolvedValue(false);
+    mockStoreDocument.mockResolvedValue({
+      key: "sources/src-ok/abc123.pdf",
+      versionId: "v1",
     });
   });
 

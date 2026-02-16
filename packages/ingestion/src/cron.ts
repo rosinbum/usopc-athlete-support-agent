@@ -14,6 +14,7 @@ import {
   type DiscoveredSource,
 } from "./entities/index.js";
 import { fetchWithRetry } from "./loaders/fetchWithRetry.js";
+import { DocumentStorageService } from "./services/documentStorage.js";
 
 const logger = createLogger({ service: "ingestion-cron" });
 
@@ -25,6 +26,8 @@ export interface IngestionMessage {
   source: IngestionSource;
   contentHash: string;
   triggeredAt: string;
+  s3Key?: string;
+  s3VersionId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -345,6 +348,43 @@ export async function handler(): Promise<void> {
 
         const contentHash = hashContent(rawContent);
 
+        // Upload original document to S3 for archival (skip if already exists)
+        let s3Key: string | undefined;
+        let s3VersionId: string | undefined;
+        try {
+          const storage = new DocumentStorageService(
+            Resource.DocumentsBucket.name,
+          );
+          const expectedKey = storage.getKeyForSource(
+            source.id,
+            contentHash,
+            source.format,
+          );
+          const alreadyExists = await storage.documentExists(expectedKey);
+          if (alreadyExists) {
+            s3Key = expectedKey;
+            logger.info(
+              `S3 document already exists for ${source.id}, skipping upload`,
+            );
+          } else {
+            const result = await storage.storeDocument(
+              source.id,
+              Buffer.from(rawContent),
+              contentHash,
+              source.format,
+              { title: source.title, documentType: source.documentType },
+            );
+            s3Key = result.key;
+            s3VersionId = result.versionId;
+          }
+        } catch (s3Error) {
+          const s3Msg =
+            s3Error instanceof Error ? s3Error.message : "Unknown S3 error";
+          logger.warn(
+            `S3 upload failed for ${source.id} — ingestion will continue: ${s3Msg}`,
+          );
+        }
+
         // Mark as ingesting in DynamoDB
         await upsertIngestionStatus(
           ingestionLogEntity,
@@ -358,6 +398,8 @@ export async function handler(): Promise<void> {
           source,
           contentHash,
           triggeredAt,
+          s3Key,
+          s3VersionId,
         };
 
         await sqs.send(

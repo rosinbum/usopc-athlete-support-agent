@@ -9,6 +9,7 @@ import type { IngestionSource } from "../pipeline.js";
 export function enrichMetadata(
   chunks: Document[],
   source: IngestionSource,
+  options?: { s3Key?: string },
 ): Document[] {
   return chunks.map((chunk, index) => ({
     ...chunk,
@@ -24,6 +25,7 @@ export function enrichMetadata(
       chunkIndex: index,
       ingestedAt: new Date().toISOString(),
       authorityLevel: source.authorityLevel,
+      ...(options?.s3Key ? { s3Key: options.s3Key } : {}),
     },
   }));
 }

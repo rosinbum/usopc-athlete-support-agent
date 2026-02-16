@@ -11,6 +11,7 @@ interface DocumentRow {
   effective_date: string | null;
   ingested_at: Date;
   chunk_count: string;
+  s3_key: string | null;
 }
 
 interface CountRow {
@@ -149,7 +150,8 @@ async function handleList(url: URL) {
       ${COL.authority_level} as authority_level,
       metadata->>'effectiveDate' as effective_date,
       MIN(ingested_at) as ingested_at,
-      COUNT(*) as chunk_count
+      COUNT(*) as chunk_count,
+      MAX(metadata->>'s3Key') as s3_key
     FROM document_chunks
     ${whereClause}
     GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
@@ -171,6 +173,7 @@ async function handleList(url: URL) {
     effectiveDate: row.effective_date,
     ingestedAt: row.ingested_at.toISOString(),
     chunkCount: parseInt(row.chunk_count, 10),
+    s3Key: row.s3_key,
   }));
 
   return NextResponse.json({
