@@ -1,6 +1,23 @@
 {
   "permissions": {
-    "additionalDirectories": ["/Users/joelrosinbum/src/usopc-issue-*"]
+    "additionalDirectories": ["/Users/joelrosinbum/src/usopc-issue-*"],
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Bash(pnpm *)",
+      "Bash(npx *)",
+      "Bash(git *)",
+      "Bash(gh *)",
+      "Bash(node *)",
+      "Bash(sleep *)",
+      "Bash(ls *)",
+      "Bash(cp *)",
+      "Bash(rm *)",
+      "Bash(mkdir *)"
+    ]
   },
   "enabledPlugins": {
     "code-simplifier@claude-plugins-official": true,
