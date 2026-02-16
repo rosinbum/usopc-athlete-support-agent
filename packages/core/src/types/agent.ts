@@ -57,6 +57,25 @@ export interface DocumentMetadata {
   authorityLevel?: AuthorityLevel;
 }
 
+export type QualityIssueType =
+  | "generic_response"
+  | "hallucination_signal"
+  | "incomplete"
+  | "missing_specificity";
+
+export interface QualityIssue {
+  type: QualityIssueType;
+  description: string;
+  severity: "critical" | "major" | "minor";
+}
+
+export interface QualityCheckResult {
+  passed: boolean;
+  score: number;
+  issues: QualityIssue[];
+  critique: string;
+}
+
 export interface AgentState {
   messages: BaseMessage[];
   topicDomain?: TopicDomain;

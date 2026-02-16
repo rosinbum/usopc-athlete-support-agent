@@ -6,6 +6,9 @@ export type {
   EscalationInfo,
   RetrievedDocument,
   DocumentMetadata,
+  QualityIssueType,
+  QualityIssue,
+  QualityCheckResult,
 } from "./agent.js";
 
 export type { Conversation, Message } from "./conversation.js";

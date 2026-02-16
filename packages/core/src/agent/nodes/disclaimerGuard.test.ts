@@ -36,6 +36,8 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     escalationReason: undefined,
     retrievalStatus: "success",
     emotionalState: "neutral",
+    qualityCheckResult: undefined,
+    qualityRetryCount: 0,
     ...overrides,
   };
 }
