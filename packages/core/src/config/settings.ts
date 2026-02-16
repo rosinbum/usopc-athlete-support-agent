@@ -28,3 +28,8 @@ export const TRUSTED_DOMAINS = [
   "tas-cas.org",
   // NGB domains are added dynamically from the registry
 ] as const;
+
+export const QUALITY_CHECKER_CONFIG = {
+  passThreshold: 0.6,
+  maxRetries: 1,
+} as const;
