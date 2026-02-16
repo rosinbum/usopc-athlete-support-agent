@@ -83,6 +83,13 @@ export interface SubQuery {
   ngbIds: string[];
 }
 
+export interface EmotionalSupportContext {
+  guidance: string;
+  safetyResources: string[];
+  toneModifiers: string[];
+  acknowledgment: string;
+}
+
 export interface AgentState {
   messages: BaseMessage[];
   topicDomain?: TopicDomain;

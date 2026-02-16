@@ -31,3 +31,9 @@ export {
   buildQueryPlannerPrompt,
 } from "./queryPlanner.js";
 export { buildSummaryPrompt } from "./conversationMemory.js";
+export {
+  getAcknowledgment,
+  getSafetyResources,
+  getToneModifiers,
+  getGuidance,
+} from "./emotionalSupport.js";
