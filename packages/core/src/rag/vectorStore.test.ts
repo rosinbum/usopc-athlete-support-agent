@@ -56,9 +56,9 @@ describe("createVectorStore", () => {
       expect(mockInitialize).toHaveBeenCalledWith(
         mockEmbeddings,
         expect.objectContaining({
-          postgresConnectionOptions: {
+          postgresConnectionOptions: expect.objectContaining({
             connectionString: "postgresql://custom:5432/db",
-          },
+          }),
         }),
       );
     });
@@ -71,9 +71,9 @@ describe("createVectorStore", () => {
       expect(mockInitialize).toHaveBeenCalledWith(
         mockEmbeddings,
         expect.objectContaining({
-          postgresConnectionOptions: {
+          postgresConnectionOptions: expect.objectContaining({
             connectionString: "postgresql://env:5432/envdb",
-          },
+          }),
         }),
       );
     });
@@ -94,9 +94,9 @@ describe("createVectorStore", () => {
       expect(mockInitialize).toHaveBeenCalledWith(
         mockEmbeddings,
         expect.objectContaining({
-          postgresConnectionOptions: {
+          postgresConnectionOptions: expect.objectContaining({
             connectionString: "postgresql://explicit:5432/explicitdb",
-          },
+          }),
         }),
       );
     });
@@ -188,6 +188,25 @@ describe("createVectorStore", () => {
           columns: {
             vectorColumnName: "my_embedding",
           },
+        }),
+      );
+    });
+  });
+
+  describe("pool configuration", () => {
+    it("should limit pool size and set timeouts", async () => {
+      await createVectorStore(mockEmbeddings, {
+        connectionString: "postgresql://test",
+      });
+
+      expect(mockInitialize).toHaveBeenCalledWith(
+        mockEmbeddings,
+        expect.objectContaining({
+          postgresConnectionOptions: expect.objectContaining({
+            max: 5,
+            idleTimeoutMillis: 30_000,
+            connectionTimeoutMillis: 5_000,
+          }),
         }),
       );
     });

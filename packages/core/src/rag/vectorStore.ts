@@ -37,6 +37,9 @@ export async function createVectorStore(
 
   const pgConfig: PoolConfig = {
     connectionString,
+    max: 5,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
   };
 
   return await PGVectorStore.initialize(embeddings, {

@@ -70,7 +70,10 @@ describe("AgentRunner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreateEmbeddings.mockReturnValue({ fake: "embeddings" });
-    mockCreateVectorStore.mockResolvedValue({ fake: "vectorStore" });
+    mockCreateVectorStore.mockResolvedValue({
+      fake: "vectorStore",
+      end: vi.fn().mockResolvedValue(undefined),
+    });
     mockCreateTavilySearchTool.mockReturnValue({ fake: "tavily" });
     mockCreateAgentGraph.mockReturnValue(makeFakeGraph());
   });
@@ -113,7 +116,7 @@ describe("AgentRunner", () => {
       });
 
       expect(mockCreateAgentGraph).toHaveBeenCalledWith({
-        vectorStore: { fake: "vectorStore" },
+        vectorStore: expect.objectContaining({ fake: "vectorStore" }),
         tavilySearch: { fake: "tavily" },
       });
     });
@@ -123,7 +126,7 @@ describe("AgentRunner", () => {
 
       expect(mockCreateAgentGraph).toHaveBeenCalledWith(
         expect.objectContaining({
-          vectorStore: { fake: "vectorStore" },
+          vectorStore: expect.objectContaining({ fake: "vectorStore" }),
           tavilySearch: expect.any(Object),
         }),
       );
@@ -334,6 +337,21 @@ describe("AgentRunner", () => {
       expect(updates).toHaveLength(1);
 
       vi.restoreAllMocks();
+    });
+  });
+
+  describe("close()", () => {
+    it("delegates to vectorStore.end()", async () => {
+      const mockEnd = vi.fn().mockResolvedValue(undefined);
+      mockCreateVectorStore.mockResolvedValue({
+        fake: "vectorStore",
+        end: mockEnd,
+      });
+
+      const runner = await AgentRunner.create(defaultConfig);
+      await runner.close();
+
+      expect(mockEnd).toHaveBeenCalledOnce();
     });
   });
 
