@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { createLogger, isProduction } from "@usopc/shared";
+import { createLogger, isProduction, type AuthorityLevel } from "@usopc/shared";
 import { createHash } from "node:crypto";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
@@ -185,7 +185,9 @@ export async function processApprovedDiscoveries(
           ngbId: discovery.ngbId ?? null,
           priority: discovery.priority ?? "medium",
           description: discovery.description ?? "",
-          authorityLevel: discovery.authorityLevel ?? "educational_guidance",
+          authorityLevel:
+            (discovery.authorityLevel as AuthorityLevel) ??
+            "educational_guidance",
         });
 
         // Link DiscoveredSource to SourceConfig
@@ -251,8 +253,10 @@ export async function handler(): Promise<void> {
       const lastRunTime = new Date(
         Date.now() - 7 * 24 * 60 * 60 * 1000,
       ).toISOString();
-      const createdCount =
-        await processApprovedDiscoveries(sourceConfigEntity, lastRunTime);
+      const createdCount = await processApprovedDiscoveries(
+        sourceConfigEntity,
+        lastRunTime,
+      );
       logger.info(
         `Processed approved discoveries: ${createdCount} SourceConfigs created`,
       );

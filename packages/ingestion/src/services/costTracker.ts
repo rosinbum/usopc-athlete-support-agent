@@ -1,8 +1,5 @@
-import { Table } from "dynamodb-onetable";
-import { createLogger, AppTableSchema } from "@usopc/shared";
-import { Resource } from "sst";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import Dynamo from "dynamodb-onetable/Dynamo";
+import { createLogger, createAppTable } from "@usopc/shared";
+import { getAppTableName } from "../entities/index.js";
 
 const logger = createLogger({ service: "cost-tracker" });
 
@@ -96,7 +93,8 @@ function calculateAnthropicCost(
   inputTokens: number,
   outputTokens: number,
 ): number {
-  const inputCost = (inputTokens / 1_000_000) * ANTHROPIC_INPUT_COST_PER_MILLION;
+  const inputCost =
+    (inputTokens / 1_000_000) * ANTHROPIC_INPUT_COST_PER_MILLION;
   const outputCost =
     (outputTokens / 1_000_000) * ANTHROPIC_OUTPUT_COST_PER_MILLION;
   return inputCost + outputCost;
@@ -117,23 +115,14 @@ function calculateAnthropicCost(
  * - Supports multiple periods for rollup queries
  */
 export class CostTracker {
-  private table: Table<typeof AppTableSchema>;
+  private table: ReturnType<typeof createAppTable>;
   private model;
 
-  constructor(table?: Table<typeof AppTableSchema>) {
+  constructor(table?: ReturnType<typeof createAppTable>) {
     if (table) {
       this.table = table;
     } else {
-      // Create default table instance
-      const client = new Dynamo({
-        client: new DynamoDBClient({}),
-      });
-      this.table = new Table({
-        name: Resource.AppTable.name,
-        client,
-        schema: AppTableSchema,
-        logger: false,
-      });
+      this.table = createAppTable(getAppTableName());
     }
 
     this.model = this.table.getModel("UsageMetric");
@@ -218,8 +207,6 @@ export class CostTracker {
           { service, period, date },
           {
             add: increments,
-          },
-          {
             exists: null, // Create if doesn't exist
           },
         );
@@ -245,9 +232,7 @@ export class CostTracker {
    * - TAVILY_MONTHLY_BUDGET (default: 1000 credits)
    * - ANTHROPIC_MONTHLY_BUDGET (default: $10)
    */
-  async checkBudget(
-    service: "tavily" | "anthropic",
-  ): Promise<BudgetStatus> {
+  async checkBudget(service: "tavily" | "anthropic"): Promise<BudgetStatus> {
     const budget =
       service === "tavily"
         ? parseInt(
@@ -393,7 +378,7 @@ export class CostTracker {
  * Useful for dependency injection and testing.
  */
 export function createCostTracker(
-  table?: Table<typeof AppTableSchema>,
+  table?: ReturnType<typeof createAppTable>,
 ): CostTracker {
   return new CostTracker(table);
 }

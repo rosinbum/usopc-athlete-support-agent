@@ -233,12 +233,13 @@ export async function handler(
       totalDiscovered: finalStats.discovered,
       byMethod: {
         map: domainStats.discovered,
-        search: searchStats.discovered,
+        search: searchStats.discovered - domainStats.discovered,
       },
       byStatus: {
         approved: finalStats.approved,
         rejected: finalStats.rejected,
-        pending: finalStats.evaluated - finalStats.approved - finalStats.rejected,
+        pending:
+          finalStats.evaluated - finalStats.approved - finalStats.rejected,
       },
       costSummary: {
         tavilyCredits: tavilyStats.tavily?.estimatedCredits ?? 0,
@@ -256,8 +257,7 @@ export async function handler(
       duration: Date.now() - startTime,
     });
   } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : String(error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
     logger.error("Discovery Lambda failed", {
       error: errorMsg,
       duration: Date.now() - startTime,

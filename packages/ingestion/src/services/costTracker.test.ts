@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { CostTracker } from "./costTracker.js";
-import { Table } from "dynamodb-onetable";
-import type { AppTableSchema } from "@usopc/shared";
+import { createAppTable } from "@usopc/shared";
 
 describe("CostTracker", () => {
   let costTracker: CostTracker;
@@ -9,7 +8,7 @@ describe("CostTracker", () => {
     update: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
   };
-  let mockTable: Table<typeof AppTableSchema>;
+  let mockTable: ReturnType<typeof createAppTable>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -23,7 +22,7 @@ describe("CostTracker", () => {
     // Mock table with getModel
     mockTable = {
       getModel: vi.fn(() => mockModel),
-    } as unknown as Table<typeof AppTableSchema>;
+    } as unknown as ReturnType<typeof createAppTable>;
 
     costTracker = new CostTracker(mockTable);
   });
