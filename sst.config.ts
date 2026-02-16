@@ -113,6 +113,12 @@ export default $config({
           link: [...linkables, database!, appTable],
           timeout: "15 minutes",
           memory: "1024 MB",
+          permissions: [
+            {
+              actions: ["ses:SendEmail", "ses:SendRawEmail"],
+              resources: ["*"],
+            },
+          ],
           environment: {
             TAVILY_MONTHLY_BUDGET: process.env.TAVILY_MONTHLY_BUDGET ?? "1000",
             ANTHROPIC_MONTHLY_BUDGET:

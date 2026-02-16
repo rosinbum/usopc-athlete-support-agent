@@ -249,9 +249,11 @@ export async function handler(): Promise<void> {
     // Step 1: Process approved discoveries (production only)
     if (isProduction()) {
       const sourceConfigEntity = createSourceConfigEntity();
-      // Look back 7 days for approved discoveries (same as cron schedule)
+      // Look back 14 days (deliberately overlapping the 7-day cron schedule)
+      // to tolerate scheduler drift. Idempotent — sourceConfigId check in
+      // processApprovedDiscoveries skips already-converted discoveries.
       const lastRunTime = new Date(
-        Date.now() - 7 * 24 * 60 * 60 * 1000,
+        Date.now() - 14 * 24 * 60 * 60 * 1000,
       ).toISOString();
       const createdCount = await processApprovedDiscoveries(
         sourceConfigEntity,
