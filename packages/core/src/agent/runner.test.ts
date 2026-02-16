@@ -201,6 +201,37 @@ describe("AgentRunner", () => {
           userSport: "swimming",
           conversationId: "conv-123",
         }),
+        { metadata: { session_id: "conv-123" } },
+      );
+    });
+
+    it("passes metadata.session_id when conversationId is provided", async () => {
+      const graph = makeFakeGraph();
+      mockCreateAgentGraph.mockReturnValue(graph);
+
+      const runner = await AgentRunner.create(defaultConfig);
+      await runner.invoke({
+        messages: [new HumanMessage("hello")],
+        conversationId: "conv-abc",
+      });
+
+      expect(graph.invoke).toHaveBeenCalledWith(expect.anything(), {
+        metadata: { session_id: "conv-abc" },
+      });
+    });
+
+    it("passes no config when conversationId is absent", async () => {
+      const graph = makeFakeGraph();
+      mockCreateAgentGraph.mockReturnValue(graph);
+
+      const runner = await AgentRunner.create(defaultConfig);
+      await runner.invoke({
+        messages: [new HumanMessage("hello")],
+      });
+
+      expect(graph.invoke).toHaveBeenCalledWith(
+        expect.objectContaining({ conversationId: undefined }),
+        undefined,
       );
     });
 
@@ -264,6 +295,46 @@ describe("AgentRunner", () => {
         expect.objectContaining({
           userSport: "track",
         }),
+        { streamMode: ["values", "messages"] },
+      );
+    });
+
+    it("passes metadata.session_id when conversationId is provided", async () => {
+      const graph = makeFakeGraph();
+      mockCreateAgentGraph.mockReturnValue(graph);
+
+      const runner = await AgentRunner.create(defaultConfig);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _ of runner.stream({
+        messages: [new HumanMessage("hello")],
+        conversationId: "conv-456",
+      })) {
+        // consume
+      }
+
+      expect(graph.stream).toHaveBeenCalledWith(
+        expect.objectContaining({ conversationId: "conv-456" }),
+        {
+          streamMode: ["values", "messages"],
+          metadata: { session_id: "conv-456" },
+        },
+      );
+    });
+
+    it("passes no metadata when conversationId is absent", async () => {
+      const graph = makeFakeGraph();
+      mockCreateAgentGraph.mockReturnValue(graph);
+
+      const runner = await AgentRunner.create(defaultConfig);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _ of runner.stream({
+        messages: [new HumanMessage("hello")],
+      })) {
+        // consume
+      }
+
+      expect(graph.stream).toHaveBeenCalledWith(
+        expect.objectContaining({ conversationId: undefined }),
         { streamMode: ["values", "messages"] },
       );
     });
