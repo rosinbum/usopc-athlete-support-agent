@@ -67,6 +67,44 @@ Fan-out architecture via SQS FIFO queue (production only):
 - **Worker** (`packages/ingestion/src/worker.ts`): Processes one source per SQS message. Pipeline: load (PDF/HTML/text) → clean → split → enrich metadata → extract sections → batch embed (OpenAI) → store in pgvector. Handles `QuotaExhaustedError` by purging the queue.
 - **Document storage**: Fetched documents cached in S3 (`DocumentsBucket`) for resilience and audit trail.
 
+### Intelligent Source Discovery
+
+Automated discovery pipeline to find new governance documents across NGB websites:
+
+**Discovery Pipeline** (`packages/ingestion/src/discoveryOrchestrator.ts`):
+
+1. **Discovery**: Find URLs via Tavily Map (site crawl) or Search (targeted queries)
+2. **Metadata Evaluation**: Fast LLM pre-filter based on URL, title, and domain (with context hints)
+3. **Content Extraction**: Load web content for relevant URLs
+4. **Content Evaluation**: Deep LLM analysis of extracted content (with context hints)
+5. **Storage**: Save to DynamoDB with evaluation results and auto-approval status
+
+**Context Hints** (`packages/ingestion/src/services/contextHints.ts`):
+
+- NGB-specific hints for 5 major NGBs (USA Swimming, USA Track & Field, USA Gymnastics, USA Basketball, USA Hockey)
+- Each NGB has URL patterns, document types, topic domains, and keywords
+- Topic keyword mappings for all 7 topic domains (team_selection, dispute_resolution, safesport, anti_doping, eligibility, governance, athlete_rights)
+- Context hints injected into LLM evaluation prompts to improve accuracy
+
+**Orchestration Features**:
+
+- Configurable concurrency (default: 3 URLs at a time)
+- Progress tracking with real-time stats (discovered/evaluated/approved/rejected/skipped/errors)
+- Error recovery: individual URL failures don't stop the pipeline
+- Dry run mode for testing without DB writes
+- Progress callbacks for live updates
+
+**Discovery CLI** (`packages/ingestion/src/scripts/discoveryCli.ts`):
+
+- `--dry-run`: Preview without saving to DynamoDB
+- `--domain <domain>`: Discover from specific domain only
+- `--query <query>`: Discover from specific search query only
+- `--concurrency <n>`: Control parallel processing
+- `--json`: Output results as JSON for scripting
+- Real-time progress display and comprehensive summary
+
+Configuration in `data/discovery-config.json` defines domains, search queries, and auto-approval threshold.
+
 ## Infrastructure (SST)
 
 Defined in `sst.config.ts`. Production uses Aurora Serverless v2 with pgvector; dev stages use local Docker Postgres at `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`.
