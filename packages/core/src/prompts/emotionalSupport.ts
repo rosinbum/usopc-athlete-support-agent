@@ -130,22 +130,27 @@ const SAFETY_RESOURCES: Record<string, string[]> = {
   ],
   dispute_resolution: [
     "Athlete Ombuds: 719-866-5000 — ombudsman@usathlete.org",
+    "TEAM USA Athletes' Commission: teamusaac@usopc.org",
     "USOPC Mental Health Support: 1-888-602-9002",
   ],
   team_selection: [
     "Athlete Ombuds: 719-866-5000 — ombudsman@usathlete.org",
+    "TEAM USA Athletes' Commission: teamusaac@usopc.org",
     "USOPC Mental Health Support: 1-888-602-9002",
   ],
   eligibility: [
     "Athlete Ombuds: 719-866-5000 — ombudsman@usathlete.org",
+    "TEAM USA Athletes' Commission: teamusaac@usopc.org",
     "USOPC Mental Health Support: 1-888-602-9002",
   ],
   governance: [
     "Athlete Ombuds: 719-866-5000 — ombudsman@usathlete.org",
+    "TEAM USA Athletes' Commission: teamusaac@usopc.org",
     "USOPC Mental Health Support: 1-888-602-9002",
   ],
   athlete_rights: [
     "Athlete Ombuds: 719-866-5000 — ombudsman@usathlete.org",
+    "TEAM USA Athletes' Commission: teamusaac@usopc.org",
     "USOPC Mental Health Support: 1-888-602-9002",
   ],
   _default: ["USOPC Mental Health Support: 1-888-602-9002"],

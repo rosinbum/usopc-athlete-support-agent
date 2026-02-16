@@ -88,6 +88,7 @@ export async function runMultiTurnPipeline(
         escalationReason: undefined,
         retrievalStatus: "success",
         emotionalState: "neutral",
+        emotionalSupportContext: undefined,
         qualityCheckResult: undefined,
         qualityRetryCount: 0,
         expansionAttempted: false,
