@@ -20,6 +20,7 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.981.0",
     "@aws-sdk/client-s3": "^3.981.0",
+    "@aws-sdk/client-ses": "^3.990.0",
     "@aws-sdk/client-sqs": "^3.981.0",
     "@langchain/anthropic": "^0.3.11",
     "@langchain/community": "^0.3.22",

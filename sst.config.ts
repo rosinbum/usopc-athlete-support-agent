@@ -104,6 +104,33 @@ export default $config({
       },
     });
 
+    // Source discovery (weekly) - production only
+    if (isProd) {
+      new sst.aws.Cron("DiscoveryCron", {
+        schedule: "cron(0 2 ? * MON *)", // Every Monday at 2 AM UTC
+        job: {
+          handler: "packages/ingestion/src/functions/discovery.handler",
+          link: [...linkables, database!, appTable],
+          timeout: "15 minutes",
+          memory: "1024 MB",
+          permissions: [
+            {
+              actions: ["ses:SendEmail", "ses:SendRawEmail"],
+              resources: ["*"],
+            },
+          ],
+          environment: {
+            TAVILY_MONTHLY_BUDGET: process.env.TAVILY_MONTHLY_BUDGET ?? "1000",
+            ANTHROPIC_MONTHLY_BUDGET:
+              process.env.ANTHROPIC_MONTHLY_BUDGET ?? "10",
+            SLACK_WEBHOOK_URL: process.env.SLACK_WEBHOOK_URL ?? "",
+            NOTIFICATION_EMAIL: process.env.NOTIFICATION_EMAIL ?? "",
+            SES_FROM_EMAIL: process.env.SES_FROM_EMAIL ?? "noreply@usopc.org",
+          },
+        },
+      });
+    }
+
     // Document ingestion (weekly) - production only
     // Declared before Web so the queue can be linked conditionally
     let ingestionQueue: sst.aws.Queue | undefined;

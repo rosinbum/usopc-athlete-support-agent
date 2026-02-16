@@ -7,6 +7,8 @@ import {
   type MarkSuccessOptions,
   IngestionLogEntity,
   type IngestionLog,
+  DiscoveredSourceEntity,
+  type DiscoveredSource,
 } from "@usopc/shared";
 
 export {
@@ -17,6 +19,8 @@ export {
 };
 
 export { IngestionLogEntity, type IngestionLog };
+
+export { DiscoveredSourceEntity, type DiscoveredSource };
 
 /**
  * Get the AppTable name from SST Resource.
@@ -46,4 +50,12 @@ export function createSourceConfigEntity(): SourceConfigEntity {
 export function createIngestionLogEntity(): IngestionLogEntity {
   const table = createAppTable(getAppTableName());
   return new IngestionLogEntity(table);
+}
+
+/**
+ * Factory function to create a DiscoveredSourceEntity with SST integration.
+ */
+export function createDiscoveredSourceEntity(): DiscoveredSourceEntity {
+  const table = createAppTable(getAppTableName());
+  return new DiscoveredSourceEntity(table);
 }

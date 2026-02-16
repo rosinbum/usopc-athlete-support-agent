@@ -139,14 +139,14 @@ See [docs/conventions.md](./docs/conventions.md) for the full list.
 
 Custom Claude Code skills that automate the development workflow. Use these instead of running the manual steps above.
 
-| Skill | Description |
-|-------|-------------|
-| `/worktree create <issue>` | Create a worktree for an issue — handles deps, hook script copy, branch naming |
-| `/worktree list` | List active worktrees with ahead/behind status |
-| `/worktree cleanup` | Remove worktrees for merged branches, prune refs |
-| `/pr-ready` | Pre-PR quality gate — tests, typecheck, prettier for changed packages |
-| `/eval-check` | Run agent evals after core code changes (fast + optional LLM evals) |
-| `/implement <issue>` | Full issue-to-code workflow — worktree setup, code exploration, test scaffolding, implementation |
+| Skill                      | Description                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `/worktree create <issue>` | Create a worktree for an issue — handles deps, hook script copy, branch naming                   |
+| `/worktree list`           | List active worktrees with ahead/behind status                                                   |
+| `/worktree cleanup`        | Remove worktrees for merged branches, prune refs                                                 |
+| `/pr-ready`                | Pre-PR quality gate — tests, typecheck, prettier for changed packages                            |
+| `/eval-check`              | Run agent evals after core code changes (fast + optional LLM evals)                              |
+| `/implement <issue>`       | Full issue-to-code workflow — worktree setup, code exploration, test scaffolding, implementation |
 
 ### Hooks
 

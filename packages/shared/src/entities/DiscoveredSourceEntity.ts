@@ -218,6 +218,31 @@ export class DiscoveredSourceEntity {
   }
 
   /**
+   * Get approved discoveries since a given timestamp.
+   * Queries all approved sources and filters by updatedAt (the timestamp
+   * when the status was set to "approved"), since the GSI1 sort key is
+   * discoveredAt which may differ from the approval time.
+   */
+  async getApprovedSince(since: string): Promise<DiscoveredSource[]> {
+    const items = await this.model.find(
+      {
+        gsi1pk: "Discovery#approved",
+      } as never,
+      {
+        index: "gsi1",
+        reverse: true, // newest first
+      },
+    );
+    const allApproved = items.map((item) =>
+      this.toExternal(item as unknown as Record<string, unknown>),
+    );
+    return allApproved.filter((item) => {
+      const approvalTime = item.reviewedAt ?? item.updatedAt;
+      return approvalTime != null && approvalTime >= since;
+    });
+  }
+
+  /**
    * Update a discovered source.
    */
   async update(

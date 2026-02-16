@@ -23,12 +23,15 @@ Print a brief summary of the issue for the user to confirm scope.
 ## Step 2: Set up worktree
 
 ### 2a: Determine the main repo root
+
 Use `git worktree list` to find the main repo root (first entry).
 
 ### 2b: Check if worktree already exists
+
 If `../usopc-issue-<number>` already exists, ask the user if they want to use the existing worktree or recreate it.
 
 ### 2c: Create worktree
+
 Derive a branch name from the issue title: `feat/<kebab-case-summary>` (max 50 chars).
 
 ```bash
@@ -37,16 +40,19 @@ git worktree add <path> -b <branch> origin/main
 ```
 
 ### 2d: Install and set up
+
 ```bash
 cd <worktree-path> && pnpm install
 ```
 
 Copy the hook script:
+
 ```bash
 cp <main-repo>/scripts/update-hours.mjs <worktree-path>/scripts/update-hours.mjs
 ```
 
 Print:
+
 ```
 Worktree ready: <path> (branch: <branch>)
 ```
@@ -61,6 +67,7 @@ Read the issue body carefully. Based on the issue description:
 4. Identify test patterns used in nearby test files
 
 Summarize what you found:
+
 ```
 Relevant code:
   - packages/core/src/agent/nodes/classifier.ts — current classifier logic
@@ -82,6 +89,7 @@ Present the plan to the user for approval before writing code.
 ## Step 5: Scaffold test files
 
 For each new source file planned, create a co-located test file (`*.test.ts`) with:
+
 - The correct import path
 - Describe blocks matching the planned functionality
 - Placeholder `it()` blocks for each planned test case
@@ -114,6 +122,7 @@ After implementation is complete:
 Stage all changed files with `git add` (specific files, not `-A`).
 
 Print a summary:
+
 ```
 ## Implementation Summary
 

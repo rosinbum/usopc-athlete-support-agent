@@ -11,11 +11,13 @@ allowed-tools: Bash(git *), Bash(pnpm install), Bash(cp *), Bash(gh issue view *
 You are managing git worktrees for the USOPC Athlete Support Agent monorepo. The argument is: `$ARGUMENTS`.
 
 Parse the argument to determine the subcommand:
+
 - `create <issue-number>` — Create a new worktree for an issue
 - `list` — List active worktrees with status
 - `cleanup` — Remove worktrees whose branches have been merged
 
 If no subcommand is provided or the argument is empty, print the usage:
+
 ```
 Usage: /worktree <command> [args]
   create <issue-number>  — Create worktree for a GitHub issue
@@ -104,6 +106,7 @@ Run `git worktree list` and identify non-main worktrees.
 ### Step 2: Check each branch
 
 For each worktree branch, check if it has been merged into `origin/main`:
+
 ```bash
 git branch --merged origin/main | grep <branch-name>
 ```
@@ -111,6 +114,7 @@ git branch --merged origin/main | grep <branch-name>
 ### Step 3: Remove merged worktrees
 
 For each merged worktree, remove it:
+
 ```bash
 git worktree remove <path>
 ```

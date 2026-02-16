@@ -13,16 +13,19 @@ Run evaluations to verify agent quality after code changes.
 ## Step 1: Detect changed agent files
 
 Run `git fetch origin main` then detect changes in agent code:
+
 ```bash
 git diff --name-only origin/main...HEAD -- packages/core/src/agent/ packages/core/src/tools/ packages/core/src/services/
 ```
 
 Also check for unstaged changes:
+
 ```bash
 git diff --name-only -- packages/core/src/agent/ packages/core/src/tools/ packages/core/src/services/
 ```
 
 Categorize the changes:
+
 - **Nodes**: `packages/core/src/agent/nodes/`
 - **Edges**: `packages/core/src/agent/edges/`
 - **Prompts**: files containing prompt templates or system messages
@@ -31,6 +34,7 @@ Categorize the changes:
 - **Graph structure**: `packages/core/src/agent/graph.ts` or similar
 
 If no agent files were changed, inform the user and stop:
+
 ```
 No agent code changes detected. Evals not needed.
 ```
@@ -48,6 +52,7 @@ pnpm --filter @usopc/evals eval:escalation
 ```
 
 Report results for each:
+
 ```
 Fast evals:
   classifier-accuracy   PASS (12/12)
@@ -61,6 +66,7 @@ If either fails, show the failure details.
 The following evals call LLMs and cost money. Ask the user before running them:
 
 Use AskUserQuestion to ask:
+
 ```
 Agent code was modified. Run expensive LLM-based evals?
 - Groundedness (tests answer grounding in retrieved docs)
@@ -71,12 +77,15 @@ Agent code was modified. Run expensive LLM-based evals?
 ```
 
 Options:
+
 1. **Run all** — run all LLM evals
 2. **Run relevant** — only run evals related to the changed code
 3. **Skip** — skip expensive evals
 
 ### If "Run all":
+
 Run each eval:
+
 ```bash
 pnpm --filter @usopc/evals eval:groundedness
 pnpm --filter @usopc/evals eval:correctness
@@ -86,7 +95,9 @@ pnpm --filter @usopc/evals eval:disclaimers
 ```
 
 ### If "Run relevant":
+
 Select evals based on what changed:
+
 - **Node changes** (classifier) → `eval:classifier`
 - **Node changes** (synthesizer, citationBuilder) → `eval:groundedness`, `eval:citations`
 - **Node changes** (escalate, disclaimerGuard) → `eval:escalation`, `eval:disclaimers`
@@ -96,6 +107,7 @@ Select evals based on what changed:
 - **Graph structure** → `eval:trajectory`
 
 ### If "Skip":
+
 Print a note and move on.
 
 ## Step 4: Print results summary
@@ -119,6 +131,7 @@ Print a note and move on.
 ```
 
 If all pass:
+
 ```
 All evals passed. Agent quality verified.
 ```

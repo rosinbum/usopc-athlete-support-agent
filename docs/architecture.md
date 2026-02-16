@@ -106,6 +106,48 @@ Automated discovery pipeline to find new governance documents across NGB website
 
 Configuration in `data/discovery-config.json` defines domains, search queries, and auto-approval threshold.
 
+**Automated Discovery & Scheduling** (Production Only):
+
+The discovery pipeline runs automatically via EventBridge cron:
+
+- **Discovery Lambda** (`packages/ingestion/src/functions/discovery.ts`): Scheduled EventBridge handler that runs every Monday at 2 AM UTC
+  - Loads discovery config from `data/discovery-config.json`
+  - Checks budget status before running (Tavily and Anthropic)
+  - Creates DiscoveryOrchestrator and runs discovery from configured domains and search queries
+  - Tracks API usage costs via CostTracker service
+  - Sends notifications via NotificationService (CloudWatch, Slack, SES)
+  - Includes error handling with proper notifications
+
+- **Cost Tracking** (`packages/ingestion/src/services/costTracker.ts`): Tracks API usage and enforces budgets
+  - Tracks Tavily API usage (calls and estimated credits: 1 per search, 5 per map)
+  - Tracks Anthropic API usage (calls, tokens, estimated cost based on Claude Sonnet 4 pricing)
+  - Stores daily/weekly/monthly metrics in DynamoDB (UsageMetric table)
+  - Budget threshold checks with environment variables (`TAVILY_MONTHLY_BUDGET`, `ANTHROPIC_MONTHLY_BUDGET`)
+  - Prevents budget overruns by halting execution when limits exceeded
+
+- **Notifications** (`packages/ingestion/src/services/notificationService.ts`): Multi-channel notification system
+  - CloudWatch Logs (always enabled)
+  - Optional Slack webhook integration (if `SLACK_WEBHOOK_URL` set)
+  - Optional SES email notifications (if `NOTIFICATION_EMAIL` set)
+  - Sends discovery completion summaries with stats (discovered/approved/rejected, costs, duration, errors)
+  - Sends budget alerts (warning at 80%, critical at 100%)
+  - Sends error notifications for failed discovery runs
+
+- **Ingestion Integration** (`packages/ingestion/src/cron.ts`): Auto-config creation for approved discoveries
+  - `processApprovedDiscoveries()`: Fetches newly approved discoveries since last run
+  - Automatically creates SourceConfig for each approved discovery
+  - Links DiscoveredSource.sourceConfigId after creation
+  - Integrated into weekly ingestion cron (runs before source loading)
+  - Error handling ensures failures don't stop processing of other discoveries
+
+**Workflow**:
+
+1. Discovery Lambda runs Monday 2 AM UTC, discovers URLs, evaluates relevance, stores in DynamoDB
+2. Ingestion Cron runs weekly (7 days later), auto-creates SourceConfigs for approved discoveries
+3. New sources are ingested into knowledge base via standard ingestion pipeline
+
+**Budget Safety**: Discovery halts if monthly budgets exceeded. Default budgets: 1000 Tavily credits, $10 Anthropic.
+
 ## Infrastructure (SST)
 
 Defined in `sst.config.ts`. Production uses Aurora Serverless v2 with pgvector; dev stages use local Docker Postgres at `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`.

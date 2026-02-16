@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { createLogger, isProduction } from "@usopc/shared";
+import { createLogger, isProduction, type AuthorityLevel } from "@usopc/shared";
 import { createHash } from "node:crypto";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
@@ -9,7 +9,9 @@ import { getLastContentHash, upsertIngestionStatus } from "./db.js";
 import {
   createSourceConfigEntity,
   createIngestionLogEntity,
+  createDiscoveredSourceEntity,
   type SourceConfig,
+  type DiscoveredSource,
 } from "./entities/index.js";
 import { fetchWithRetry } from "./loaders/fetchWithRetry.js";
 
@@ -136,16 +138,105 @@ function hashContent(content: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Approved discoveries processing
+// ---------------------------------------------------------------------------
+
+/**
+ * Process approved discoveries and create SourceConfigs for them.
+ * Links the DiscoveredSource.sourceConfigId after creation.
+ *
+ * @param sourceConfigEntity - The SourceConfigEntity instance
+ * @param lastRunTime - Timestamp of last cron run (ISO string)
+ * @returns Number of SourceConfigs created
+ */
+export async function processApprovedDiscoveries(
+  sourceConfigEntity: ReturnType<typeof createSourceConfigEntity>,
+  lastRunTime: string,
+): Promise<number> {
+  const discoveredSourceEntity = createDiscoveredSourceEntity();
+
+  try {
+    // Fetch newly approved discoveries since last run
+    const approvedSources =
+      await discoveredSourceEntity.getApprovedSince(lastRunTime);
+
+    logger.info(
+      `Found ${approvedSources.length} approved discoveries since ${lastRunTime}`,
+    );
+
+    let created = 0;
+
+    for (const discovery of approvedSources) {
+      // Skip if already has a SourceConfig
+      if (discovery.sourceConfigId) {
+        logger.debug(`Discovery ${discovery.id} already has SourceConfig`);
+        continue;
+      }
+
+      try {
+        // Create SourceConfig from discovery metadata
+        const sourceConfig = await sourceConfigEntity.create({
+          id: discovery.id,
+          title: discovery.title,
+          documentType: discovery.documentType ?? "Unknown",
+          topicDomains: discovery.topicDomains,
+          url: discovery.url,
+          format: discovery.format ?? "html",
+          ngbId: discovery.ngbId ?? null,
+          priority: discovery.priority ?? "medium",
+          description: discovery.description ?? "",
+          authorityLevel:
+            (discovery.authorityLevel as AuthorityLevel) ??
+            "educational_guidance",
+        });
+
+        // Link DiscoveredSource to SourceConfig
+        await discoveredSourceEntity.linkToSourceConfig(
+          discovery.id,
+          sourceConfig.id,
+        );
+
+        logger.info(`Created SourceConfig for discovery: ${discovery.id}`, {
+          discoveryId: discovery.id,
+          sourceConfigId: sourceConfig.id,
+          url: discovery.url,
+        });
+
+        created++;
+      } catch (error) {
+        logger.error(
+          `Failed to create SourceConfig for discovery: ${discovery.id}`,
+          {
+            discoveryId: discovery.id,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        );
+        // Continue processing other discoveries
+      }
+    }
+
+    logger.info(`Created ${created} SourceConfigs from approved discoveries`);
+    return created;
+  } catch (error) {
+    logger.error("Error processing approved discoveries", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Coordinator Lambda handler
 // ---------------------------------------------------------------------------
 
 /**
  * EventBridge-triggered coordinator Lambda.
  *
- * 1. Loads all enabled source configs (from DynamoDB in production, JSON files in dev).
- * 2. Skips sources that have already been ingested (only new sources are processed).
- * 3. For each new source, fetches the content (with retry) and computes a hash.
- * 4. Enqueues new sources to the SQS FIFO queue for the worker to process.
+ * 1. Processes newly approved discoveries and creates SourceConfigs (production only).
+ * 2. Loads all enabled source configs (from DynamoDB in production, JSON files in dev).
+ * 3. Skips sources that have already been ingested (only new sources are processed).
+ * 4. For each new source, fetches the content (with retry) and computes a hash.
+ * 5. Enqueues new sources to the SQS FIFO queue for the worker to process.
  *
  * To re-ingest existing sources, use the admin UI (single or bulk) or the
  * CLI with --resume (content-change detection) or --force (unconditional).
@@ -155,6 +246,25 @@ export async function handler(): Promise<void> {
   const ingestionLogEntity = createIngestionLogEntity();
 
   try {
+    // Step 1: Process approved discoveries (production only)
+    if (isProduction()) {
+      const sourceConfigEntity = createSourceConfigEntity();
+      // Look back 14 days (deliberately overlapping the 7-day cron schedule)
+      // to tolerate scheduler drift. Idempotent — sourceConfigId check in
+      // processApprovedDiscoveries skips already-converted discoveries.
+      const lastRunTime = new Date(
+        Date.now() - 14 * 24 * 60 * 60 * 1000,
+      ).toISOString();
+      const createdCount = await processApprovedDiscoveries(
+        sourceConfigEntity,
+        lastRunTime,
+      );
+      logger.info(
+        `Processed approved discoveries: ${createdCount} SourceConfigs created`,
+      );
+    }
+
+    // Step 2: Load source configs
     const { sources, entity } = await loadSourceConfigs();
     logger.info(`Loaded ${sources.length} source config(s)`);
 
