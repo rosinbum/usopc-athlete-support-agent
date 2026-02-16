@@ -64,6 +64,8 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     emotionalState: "neutral",
     qualityCheckResult: undefined,
     qualityRetryCount: 0,
+    expansionAttempted: false,
+    reformulatedQueries: [],
     isComplexQuery: false,
     subQueries: [],
     ...overrides,
@@ -367,6 +369,8 @@ describe("synthesizerNode", () => {
           critique: "The answer is too generic. Cite specific section numbers.",
         },
         qualityRetryCount: 0,
+        expansionAttempted: false,
+        reformulatedQueries: [],
       });
 
       const result = await synthesizerNode(state);

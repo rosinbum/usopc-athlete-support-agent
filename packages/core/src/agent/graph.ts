@@ -10,12 +10,13 @@ import {
   citationBuilderNode,
   disclaimerGuardNode,
   qualityCheckerNode,
+  createRetrievalExpanderNode,
   queryPlannerNode,
 } from "./nodes/index.js";
 import type { VectorStoreLike } from "./nodes/index.js";
 import type { TavilySearchLike } from "./nodes/index.js";
 import { routeByDomain } from "./edges/routeByDomain.js";
-import { needsMoreInfo } from "./edges/needsMoreInfo.js";
+import { needsMoreInfo, createNeedsMoreInfo } from "./edges/needsMoreInfo.js";
 import { routeByQuality } from "./edges/routeByQuality.js";
 import { withMetrics } from "./nodeMetrics.js";
 import { getFeatureFlags } from "../config/featureFlags.js";
@@ -28,7 +29,7 @@ export interface GraphDependencies {
 /**
  * Creates and compiles the full LangGraph agent.
  *
- * Graph flow (quality checker OFF — default):
+ * Graph flow (quality checker OFF, expansion OFF — default):
  *   START -> classifier -> (routeByDomain) -> clarify | retriever | escalate
  *     clarify -> END
  *     retriever -> (needsMoreInfo) -> synthesizer | researcher
@@ -36,6 +37,10 @@ export interface GraphDependencies {
  *     synthesizer -> citationBuilder -> disclaimerGuard -> END
  *     escalate -> citationBuilder -> disclaimerGuard -> END
  *
+ * Graph flow (expansion ON):
+ *   ...same as above, but:
+ *     retriever -> (needsMoreInfo) -> synthesizer | retrievalExpander | researcher
+ *     retrievalExpander -> (needsMoreInfoAfterExpansion) -> synthesizer | researcher
  * Graph flow (query planner ON):
  *   ...same as above, but classifier routes through queryPlanner before retriever:
  *     classifier -> queryPlanner -> retriever
@@ -48,8 +53,6 @@ export function createAgentGraph(deps: GraphDependencies) {
   const flags = getFeatureFlags();
 
   // All nodes registered unconditionally for TypeScript generic tracking.
-  // The qualityChecker node is always registered but only wired when the
-  // feature flag is enabled.
   const builder = new StateGraph(AgentStateAnnotation)
     .addNode("classifier", withMetrics("classifier", classifierNode))
     .addNode("clarify", withMetrics("clarify", clarifyNode))
@@ -75,14 +78,33 @@ export function createAgentGraph(deps: GraphDependencies) {
       "qualityChecker",
       withMetrics("qualityChecker", qualityCheckerNode),
     )
+    .addNode(
+      "retrievalExpander",
+      withMetrics(
+        "retrievalExpander",
+        createRetrievalExpanderNode(deps.vectorStore),
+      ),
+    )
     .addNode("queryPlanner", withMetrics("queryPlanner", queryPlannerNode));
 
   // Edges
   builder.addEdge("__start__", "classifier");
   builder.addConditionalEdges("classifier", routeByDomain);
   builder.addEdge("clarify", "__end__");
+
   builder.addEdge("queryPlanner", "retriever");
-  builder.addConditionalEdges("retriever", needsMoreInfo);
+
+  if (flags.retrievalExpansion) {
+    // Retriever routes to expander when confidence is low and expansion not attempted
+    builder.addConditionalEdges("retriever", createNeedsMoreInfo(true));
+    // After expansion, route to synthesizer or researcher (never back to expander)
+    builder.addConditionalEdges(
+      "retrievalExpander",
+      createNeedsMoreInfo(false),
+    );
+  } else {
+    builder.addConditionalEdges("retriever", needsMoreInfo);
+  }
   builder.addEdge("researcher", "synthesizer");
 
   if (flags.qualityChecker) {

@@ -171,7 +171,7 @@ function computeAuthorityBoost(authorityLevel: string | undefined): number {
  *
  * These are combined into a single 0-1 confidence value.
  */
-function computeConfidence(scores: number[]): number {
+export function computeConfidence(scores: number[]): number {
   if (scores.length === 0) return 0;
 
   const bestScore = scores[0];

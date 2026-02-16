@@ -70,13 +70,13 @@ Classify the suggestion as one of:
        }
      }'
    ```
-   Reply format: `"Applied — [brief description of what changed]."`
+   Reply format: `"From Claude: Applied — [brief description of what changed]."`
 
 **If declining:**
 
 1. Do NOT modify the code
 2. Reply to the thread explaining why:
-   Reply format: `"Respectfully declining — [clear reason]. [Optional: brief explanation of why the current approach is preferred]."`
+   Reply format: `"From Claude: Respectfully declining — [clear reason]. [Optional: brief explanation of why the current approach is preferred]."`
 
 ### 4d. Track changes
 

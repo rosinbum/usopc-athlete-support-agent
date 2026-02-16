@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { needsMoreInfo } from "./needsMoreInfo.js";
+import { needsMoreInfo, createNeedsMoreInfo } from "./needsMoreInfo.js";
 import type { AgentState } from "../state.js";
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {
@@ -26,13 +26,15 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     emotionalState: "neutral",
     qualityCheckResult: undefined,
     qualityRetryCount: 0,
+    expansionAttempted: false,
+    reformulatedQueries: [],
     isComplexQuery: false,
     subQueries: [],
     ...overrides,
   };
 }
 
-describe("needsMoreInfo", () => {
+describe("needsMoreInfo (backward-compatible export)", () => {
   it('returns "synthesizer" when confidence is at the threshold', () => {
     const state = makeState({ retrievalConfidence: 0.5 });
     expect(needsMoreInfo(state)).toBe("synthesizer");
@@ -65,5 +67,66 @@ describe("needsMoreInfo", () => {
       webSearchResults: [],
     });
     expect(needsMoreInfo(state)).toBe("researcher");
+  });
+});
+
+describe("createNeedsMoreInfo(true) — expansion enabled", () => {
+  const edgeFn = createNeedsMoreInfo(true);
+
+  it('routes to "retrievalExpander" when confidence low and expansion not attempted', () => {
+    const state = makeState({
+      retrievalConfidence: 0.3,
+      webSearchResults: [],
+      expansionAttempted: false,
+    });
+    expect(edgeFn(state)).toBe("retrievalExpander");
+  });
+
+  it('routes to "researcher" when confidence low and expansion already attempted', () => {
+    const state = makeState({
+      retrievalConfidence: 0.3,
+      webSearchResults: [],
+      expansionAttempted: true,
+    });
+    expect(edgeFn(state)).toBe("researcher");
+  });
+
+  it('routes to "synthesizer" when confidence high regardless of expansion flag', () => {
+    const state = makeState({
+      retrievalConfidence: 0.8,
+      expansionAttempted: false,
+    });
+    expect(edgeFn(state)).toBe("synthesizer");
+  });
+
+  it('routes to "synthesizer" when web results exist regardless of expansion', () => {
+    const state = makeState({
+      retrievalConfidence: 0.2,
+      webSearchResults: ["result"],
+      expansionAttempted: false,
+    });
+    expect(edgeFn(state)).toBe("synthesizer");
+  });
+
+  it('routes to "retrievalExpander" at zero confidence with no prior expansion', () => {
+    const state = makeState({
+      retrievalConfidence: 0,
+      webSearchResults: [],
+      expansionAttempted: false,
+    });
+    expect(edgeFn(state)).toBe("retrievalExpander");
+  });
+});
+
+describe("createNeedsMoreInfo(false) — expansion disabled", () => {
+  const edgeFn = createNeedsMoreInfo(false);
+
+  it('never routes to "retrievalExpander"', () => {
+    const state = makeState({
+      retrievalConfidence: 0.3,
+      webSearchResults: [],
+      expansionAttempted: false,
+    });
+    expect(edgeFn(state)).toBe("researcher");
   });
 });
