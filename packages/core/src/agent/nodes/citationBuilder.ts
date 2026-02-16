@@ -37,6 +37,7 @@ export async function citationBuilderNode(
       snippet:
         doc.content.slice(0, 200) + (doc.content.length > 200 ? "..." : ""),
       authorityLevel: doc.metadata.authorityLevel,
+      s3Key: doc.metadata.s3Key,
     });
   }
 

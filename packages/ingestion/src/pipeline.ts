@@ -242,6 +242,7 @@ export async function ingestSource(
   options: {
     databaseUrl: string;
     openaiApiKey: string;
+    s3Key?: string;
   },
 ): Promise<IngestionResult> {
   logger.info(`Starting ingestion for source: ${source.id}`, {
@@ -279,7 +280,9 @@ export async function ingestSource(
     });
 
     // 4. Enrich metadata
-    const enriched = enrichMetadata(chunks, source);
+    const enriched = enrichMetadata(chunks, source, {
+      s3Key: options.s3Key,
+    });
 
     // 5. Extract section titles
     const withSections = extractSections(enriched);

@@ -1,0 +1,44 @@
+import { NextResponse } from "next/server";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Resource } from "sst";
+
+/**
+ * GET /api/documents/:key/url
+ *
+ * Returns a presigned S3 URL for viewing an archived document.
+ * The key is URL-encoded in the path parameter.
+ */
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ key: string }> },
+) {
+  try {
+    const { key } = await params;
+    const s3Key = decodeURIComponent(key);
+
+    // Validate key format: must start with "sources/" and contain no traversal
+    if (!s3Key.startsWith("sources/") || s3Key.includes("..")) {
+      return NextResponse.json(
+        { error: "Invalid document key" },
+        { status: 400 },
+      );
+    }
+
+    const s3 = new S3Client({});
+    const command = new GetObjectCommand({
+      Bucket: Resource.DocumentsBucket.name,
+      Key: s3Key,
+    });
+
+    const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+
+    return NextResponse.json({ url });
+  } catch (error) {
+    console.error("Presigned URL error:", error);
+    return NextResponse.json(
+      { error: "Failed to generate document URL" },
+      { status: 500 },
+    );
+  }
+}

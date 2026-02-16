@@ -210,6 +210,7 @@ export default $config({
         gitHubClientSecret,
         adminEmails,
         appTable,
+        documentsBucket,
         ...(ingestionQueue ? [ingestionQueue] : []),
       ],
       environment: {

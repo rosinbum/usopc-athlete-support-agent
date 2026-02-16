@@ -29,6 +29,8 @@ import {
   fetchWithRetry,
   FetchWithRetryError,
 } from "../loaders/fetchWithRetry.js";
+import { DocumentStorageService } from "../services/documentStorage.js";
+import { Resource } from "sst";
 
 const logger = createLogger({ service: "ingestion-cli" });
 
@@ -127,19 +129,71 @@ async function main(): Promise<void> {
     }
 
     logger.info(`Ingesting single source: ${source.id} — ${source.title}`);
-    const result = await ingestSource(source, { databaseUrl, openaiApiKey });
+
+    // Pre-fetch content for hashing and S3 upload
+    let s3Key: string | undefined;
+    let s3VersionId: string | undefined;
+    let contentHash: string | undefined;
+    try {
+      const res = await fetchWithRetry(
+        source.url,
+        { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
+        { timeoutMs: 60000, maxRetries: 3 },
+      );
+      const rawContent = await res.text();
+      contentHash = hashContent(rawContent);
+
+      try {
+        const storage = new DocumentStorageService(
+          Resource.DocumentsBucket.name,
+        );
+        const expectedKey = storage.getKeyForSource(
+          source.id,
+          contentHash,
+          source.format,
+        );
+        const alreadyExists = await storage.documentExists(expectedKey);
+        if (alreadyExists) {
+          s3Key = expectedKey;
+          logger.info(
+            `S3 document already exists for ${source.id}, skipping upload`,
+          );
+        } else {
+          const s3Result = await storage.storeDocument(
+            source.id,
+            Buffer.from(rawContent),
+            contentHash,
+            source.format,
+            { title: source.title, documentType: source.documentType },
+          );
+          s3Key = s3Result.key;
+          s3VersionId = s3Result.versionId;
+        }
+      } catch (s3Error) {
+        logger.warn(
+          `S3 upload failed for ${source.id}: ${s3Error instanceof Error ? s3Error.message : "Unknown S3 error"}`,
+        );
+      }
+    } catch (fetchError) {
+      logger.warn(
+        `Pre-fetch for hash/S3 failed: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`,
+      );
+    }
+
+    const result = await ingestSource(source, {
+      databaseUrl,
+      openaiApiKey,
+      s3Key,
+    });
 
     // Update DynamoDB ingestion stats
     try {
-      if (result.status === "completed") {
-        const res = await fetchWithRetry(
-          source.url,
-          { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
-          { timeoutMs: 60000, maxRetries: 3 },
-        );
-        const rawContent = await res.text();
-        await entity.markSuccess(source.id, hashContent(rawContent));
-      } else {
+      if (result.status === "completed" && contentHash) {
+        await entity.markSuccess(source.id, contentHash, {
+          s3Key,
+          s3VersionId,
+        });
+      } else if (result.status === "failed") {
         await entity.markFailure(source.id, result.error ?? "Unknown error");
       }
     } catch (statsError) {
@@ -242,20 +296,71 @@ async function main(): Promise<void> {
         await sleep(60_000);
       }
 
-      const result = await ingestSource(source, { databaseUrl, openaiApiKey });
+      // Fetch content for hash and S3 upload
+      let batchS3Key: string | undefined;
+      let batchS3VersionId: string | undefined;
+      let batchContentHash: string | undefined;
+      try {
+        const res = await fetchWithRetry(
+          source.url,
+          { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
+          { timeoutMs: 60000, maxRetries: 3 },
+        );
+        const rawContent = await res.text();
+        batchContentHash = hashContent(rawContent);
+
+        try {
+          const storage = new DocumentStorageService(
+            Resource.DocumentsBucket.name,
+          );
+          const expectedKey = storage.getKeyForSource(
+            source.id,
+            batchContentHash,
+            source.format,
+          );
+          const alreadyExists = await storage.documentExists(expectedKey);
+          if (alreadyExists) {
+            batchS3Key = expectedKey;
+            logger.info(
+              `S3 document already exists for ${source.id}, skipping upload`,
+            );
+          } else {
+            const s3Result = await storage.storeDocument(
+              source.id,
+              Buffer.from(rawContent),
+              batchContentHash,
+              source.format,
+              { title: source.title, documentType: source.documentType },
+            );
+            batchS3Key = s3Result.key;
+            batchS3VersionId = s3Result.versionId;
+          }
+        } catch (s3Error) {
+          logger.warn(
+            `S3 upload failed for ${source.id}: ${s3Error instanceof Error ? s3Error.message : "Unknown S3 error"}`,
+          );
+        }
+      } catch (fetchError) {
+        logger.warn(
+          `Pre-fetch for hash/S3 failed for ${source.id}: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`,
+        );
+      }
+
+      const result = await ingestSource(source, {
+        databaseUrl,
+        openaiApiKey,
+        s3Key: batchS3Key,
+      });
       results.push(result);
 
       // Update DynamoDB ingestion stats
       try {
-        if (result.status === "completed") {
-          const res = await fetchWithRetry(
-            source.url,
-            { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
-            { timeoutMs: 60000, maxRetries: 3 },
-          );
-          const rawContent = await res.text();
-          await entity.markSuccess(source.id, hashContent(rawContent));
-        } else {
+        if (result.status === "completed" && batchContentHash) {
+          await entity.markSuccess(source.id, batchContentHash, {
+            s3Key: batchS3Key,
+            s3VersionId: batchS3VersionId,
+          });
+        } else if (result.status === "failed") {
           await entity.markFailure(source.id, result.error ?? "Unknown error");
         }
       } catch (statsError) {
