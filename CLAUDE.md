@@ -74,6 +74,8 @@ Detailed documentation is in the `docs/` folder:
 - [Commands](./docs/commands.md) — Full CLI commands reference
 - [Deployment](./docs/deployment.md) — Production deployment guide
 - [Conventions](./docs/conventions.md) — Formatting, testing, and technical conventions
+- [Quality Review](./docs/quality-review.md) — Round-by-round quality comparison framework
+- [Evaluation Playbook](./docs/evaluation-playbook.md) — Running and interpreting LangSmith evaluations
 
 ## Quick Reference
 
@@ -85,6 +87,10 @@ pnpm test                             # Run all tests
 pnpm --filter @usopc/<pkg> test       # Test single package
 pnpm typecheck                        # Type-check all packages
 npx prettier --write <files>          # Format files
+pnpm --filter @usopc/evals eval       # Run LangSmith evaluations
+pnpm --filter @usopc/evals quality:run       # Run quality review scenarios
+pnpm --filter @usopc/evals quality:evaluate  # Evaluate quality review results
+pnpm --filter @usopc/evals quality:all       # Run + evaluate + setup (combined)
 ```
 
 ### Key Conventions

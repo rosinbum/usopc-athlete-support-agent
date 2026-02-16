@@ -1,6 +1,6 @@
 # USOPC Athlete Support Agent
 
-> **Work in Progress**: This project is under active development and should be treated as a prototype. It represents approximately 47.6 hours of development time and is not yet production-ready. Features may be incomplete, APIs may change, and the knowledge base needs additional content and quality improvements.
+> **Work in Progress**: This project is under active development and should be treated as a prototype. It represents approximately 48.4 hours of development time and is not yet production-ready. Features may be incomplete, APIs may change, and the knowledge base needs additional content and quality improvements.
 
 An AI-powered governance and compliance assistant for U.S. Olympic and Paralympic athletes. Ask questions about anti-doping rules, athlete rights, competition eligibility, and other USOPC policies — get accurate, cited answers with appropriate disclaimers.
 
@@ -29,6 +29,8 @@ An AI-powered governance and compliance assistant for U.S. Olympic and Paralympi
 - [Commands](./docs/commands.md) — Full CLI commands reference
 - [Deployment](./docs/deployment.md) — Production deployment guide
 - [Conventions](./docs/conventions.md) — Formatting, testing, and technical conventions
+- [Quality Review](./docs/quality-review.md) — Round-by-round quality comparison framework
+- [Evaluation Playbook](./docs/evaluation-playbook.md) — Running and interpreting LangSmith evaluations
 
 ## Local Development Setup
 
@@ -61,7 +63,6 @@ The `.env` file configures local development settings. API keys are managed thro
 
 ```bash
 pnpm db:up        # Start PostgreSQL container with pgvector
-pnpm db:migrate   # Run database migrations
 ```
 
 To stop the database:
@@ -80,12 +81,22 @@ sst secret set OpenaiApiKey <your-openai-api-key>
 sst secret set TavilyApiKey <your-tavily-api-key>
 ```
 
+Auth secrets (required for web login):
+
+```bash
+sst secret set AuthSecret <secret>
+sst secret set GitHubClientId <id>
+sst secret set GitHubClientSecret <secret>
+sst secret set AdminEmails <comma-separated-emails>
+```
+
 Optional secrets:
 
 ```bash
-sst secret set LangchainApiKey <key>       # For LangSmith tracing
-sst secret set SlackBotToken <token>       # For Slack integration
-sst secret set SlackSigningSecret <secret> # For Slack integration
+sst secret set LangchainApiKey <key>              # For LangSmith tracing
+sst secret set SlackBotToken <token>              # For Slack integration
+sst secret set SlackSigningSecret <secret>        # For Slack integration
+sst secret set ConversationMaxTurns <number>      # Default: 5
 ```
 
 ### 5. Run Development Server
@@ -125,7 +136,7 @@ Slack integration is under development. See [#7](https://github.com/rosinbum/uso
 1. Create a GitHub issue describing the planned work
 2. Create a feature branch: `git checkout -b feat/your-feature`
 3. Make changes with tests
-4. Run `pnpm test && pnpm typecheck && pnpm lint`
+4. Run `pnpm test && pnpm typecheck`
 5. Format code: `npx prettier --write .`
 6. Open a pull request referencing the issue
 
@@ -133,10 +144,10 @@ See [CLAUDE.md](./CLAUDE.md) for detailed development guidelines.
 
 <!-- HOURS:START -->
 
-**Tracked build time:** 47.6 hours
+**Tracked build time:** 48.4 hours
 
 - Method: terminal-activity-based (idle cutoff: 10 min)
-- Last updated: 2026-02-16T00:22:04.268Z
+- Last updated: 2026-02-16T01:12:00.250Z
 <!-- HOURS:END -->
 
 ## License

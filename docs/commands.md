@@ -7,7 +7,6 @@ pnpm build          # Build all packages
 pnpm dev            # Run dev servers via SST (injects secrets)
 pnpm test           # Run all tests
 pnpm typecheck      # Type-check all packages
-pnpm lint           # Lint all packages
 ```
 
 ## Single-package Commands
@@ -30,7 +29,6 @@ pnpm --filter @usopc/api typecheck
 ```bash
 pnpm db:up          # Start Postgres container
 pnpm db:down        # Stop container
-pnpm db:migrate     # Run migrations (via @usopc/api)
 
 # Local development database URL
 export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/usopc_athlete_support
@@ -61,4 +59,32 @@ pnpm sources list                  # List source configs from DynamoDB
 pnpm sources show <id>             # Show source details
 pnpm sources enable <id>           # Enable a source
 pnpm sources disable <id>          # Disable a source
+```
+
+## Discovery
+
+```bash
+pnpm --filter @usopc/ingestion discovery:run              # Run source discovery
+pnpm --filter @usopc/ingestion discovery:run -- --dry-run  # Preview without saving
+pnpm --filter @usopc/ingestion discovery:run -- --domain <domain>  # Specific domain
+pnpm --filter @usopc/ingestion discovery:run -- --query <query>    # Specific search query
+pnpm --filter @usopc/ingestion discovery:run -- --json     # JSON output
+```
+
+## Evaluations (@usopc/evals)
+
+```bash
+pnpm --filter @usopc/evals eval                        # Run all LangSmith evaluations
+pnpm --filter @usopc/evals seed-langsmith              # Seed LangSmith datasets
+```
+
+## Quality Review (@usopc/evals)
+
+```bash
+pnpm --filter @usopc/evals quality:run                 # Run quality review scenarios
+pnpm --filter @usopc/evals quality:evaluate            # Evaluate quality review results
+pnpm --filter @usopc/evals quality:setup               # Set up annotation queue
+pnpm --filter @usopc/evals quality:report              # Generate quality report
+pnpm --filter @usopc/evals quality:seed                # Seed quality review data
+pnpm --filter @usopc/evals quality:all                 # Run + evaluate + setup (combined)
 ```

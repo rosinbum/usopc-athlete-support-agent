@@ -7,6 +7,7 @@ USOPC Athlete Support Agent is a serverless monorepo deployed to AWS via [SST v3
 ```
 packages/
   core/        @usopc/core       — LangGraph agent, RAG, vector store, tools
+  evals/       @usopc/evals      — LangSmith evaluations, quality review pipeline
   ingestion/   @usopc/ingestion  — Document ETL: load → clean → split → embed → store
   shared/      @usopc/shared     — Logger, env helpers, error classes, Zod schemas
 
@@ -118,9 +119,10 @@ Defined in `sst.config.ts`. Production uses Aurora Serverless v2 with pgvector; 
 
 **SST Resources:**
 
-- **Secrets**: `AnthropicApiKey`, `OpenaiApiKey`, `TavilyApiKey`, `LangchainApiKey`, `SlackBotToken`, `SlackSigningSecret`
-- **DynamoDB**: `SourceConfigs` table (source config management with GSIs for ngbId and enabled status)
+- **Secrets**: `AnthropicApiKey`, `OpenaiApiKey`, `TavilyApiKey`, `LangchainApiKey`, `SlackBotToken`, `SlackSigningSecret`, `AuthSecret`, `GitHubClientId`, `GitHubClientSecret`, `AdminEmails`, `ConversationMaxTurns`
+- **DynamoDB**: `AppTable` (single-table design for SourceConfigs, DiscoveredSources, UsageMetrics, and other entities with GSIs for querying by status, date, etc.)
 - **S3**: `DocumentsBucket` (cached documents with versioning)
 - **APIs**: `Api` (main tRPC), `SlackApi` (Slack events)
+- **Crons**: `DiscoveryCron` (weekly discovery), `IngestionCron` (weekly ingestion)
 
 Use `pnpm dev` (which runs `sst dev`) for local development to inject secrets. For scripts needing SST resources, use `sst shell -- <command>` or the wrapped npm scripts.

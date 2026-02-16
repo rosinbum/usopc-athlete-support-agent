@@ -14,6 +14,17 @@ sst secret set OpenaiApiKey <key> --stage production
 sst secret set TavilyApiKey <key> --stage production
 sst secret set SlackBotToken <token> --stage production
 sst secret set SlackSigningSecret <secret> --stage production
+sst secret set AuthSecret <secret> --stage production
+sst secret set GitHubClientId <id> --stage production
+sst secret set GitHubClientSecret <secret> --stage production
+sst secret set AdminEmails <comma-separated-emails> --stage production
+```
+
+Optional secrets:
+
+```bash
+sst secret set LangchainApiKey <key> --stage production          # LangSmith tracing
+sst secret set ConversationMaxTurns <number> --stage production  # Default: 5
 ```
 
 ## 2. Deploy
