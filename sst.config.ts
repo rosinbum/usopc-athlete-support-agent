@@ -82,6 +82,18 @@ export default $config({
 
     // tRPC API
     const api = new sst.aws.ApiGatewayV2("Api");
+    // Feature flags — passed through to Lambda environment
+    const featureFlags = {
+      FEATURE_QUALITY_CHECKER: process.env.FEATURE_QUALITY_CHECKER ?? "false",
+      FEATURE_CONVERSATION_MEMORY:
+        process.env.FEATURE_CONVERSATION_MEMORY ?? "false",
+      FEATURE_SOURCE_DISCOVERY: process.env.FEATURE_SOURCE_DISCOVERY ?? "false",
+      FEATURE_MULTI_STEP_PLANNER:
+        process.env.FEATURE_MULTI_STEP_PLANNER ?? "false",
+      FEATURE_FEEDBACK_LOOP: process.env.FEATURE_FEEDBACK_LOOP ?? "false",
+      FEATURE_QUERY_PLANNER: process.env.FEATURE_QUERY_PLANNER ?? "false",
+    };
+
     api.route("$default", {
       handler: "apps/api/src/lambda.handler",
       link: [...linkables, conversationMaxTurns, appTable],
@@ -89,6 +101,7 @@ export default $config({
       memory: "512 MB",
       environment: {
         ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+        ...featureFlags,
       },
     });
 
@@ -101,6 +114,7 @@ export default $config({
       memory: "512 MB",
       environment: {
         ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+        ...featureFlags,
       },
     });
 
