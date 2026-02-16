@@ -18,11 +18,17 @@ export type Severity = "critical" | "high" | "medium" | "low";
 
 export type FailureNode =
   | "classifier"
+  | "clarify"
   | "retriever"
+  | "researcher"
   | "synthesizer"
-  | "citation"
-  | "disclaimer"
-  | "escalation"
+  | "escalate"
+  | "citationBuilder"
+  | "disclaimerGuard"
+  | "queryPlanner"
+  | "retrievalExpander"
+  | "emotionalSupport"
+  | "qualityChecker"
   | "cross-cutting";
 
 // ---------------------------------------------------------------------------
@@ -96,6 +102,29 @@ export const FAILURE_MODES = {
       "Classifier failed to detect the relevant National Governing Body from the query.",
   },
 
+  // ---- Clarify ----
+  CLR_UNNECESSARY: {
+    code: "CLR_UNNECESSARY",
+    label: "Unnecessary clarification",
+    node: "clarify",
+    severity: "low",
+    description: "Asked for clarification on a clear query.",
+  },
+  CLR_WRONG_ASPECT: {
+    code: "CLR_WRONG_ASPECT",
+    label: "Clarified wrong dimension",
+    node: "clarify",
+    severity: "medium",
+    description: "Clarified the wrong dimension of an ambiguous query.",
+  },
+  CLR_LOOPING: {
+    code: "CLR_LOOPING",
+    label: "Clarification loop",
+    node: "clarify",
+    severity: "medium",
+    description: "Repeated clarification without progress.",
+  },
+
   // ---- Retriever ----
   RET_IRRELEVANT: {
     code: "RET_IRRELEVANT",
@@ -136,6 +165,29 @@ export const FAILURE_MODES = {
     severity: "medium",
     description:
       "Retrieved documents contain outdated information (superseded policies, old deadlines).",
+  },
+
+  // ---- Researcher ----
+  RSR_IRRELEVANT: {
+    code: "RSR_IRRELEVANT",
+    label: "Off-topic web results",
+    node: "researcher",
+    severity: "high",
+    description: "Web search returned off-topic results.",
+  },
+  RSR_OUTDATED_WEB: {
+    code: "RSR_OUTDATED_WEB",
+    label: "Stale web results",
+    node: "researcher",
+    severity: "medium",
+    description: "Web search returned stale information.",
+  },
+  RSR_UNNECESSARY: {
+    code: "RSR_UNNECESSARY",
+    label: "Unnecessary web search",
+    node: "researcher",
+    severity: "low",
+    description: "Searched web when KB had sufficient content.",
   },
 
   // ---- Synthesizer ----
@@ -203,71 +255,11 @@ export const FAILURE_MODES = {
       "Answer presents outdated policy, deadlines, or contact info as current.",
   },
 
-  // ---- Citation ----
-  CIT_MISSING: {
-    code: "CIT_MISSING",
-    label: "No citations provided",
-    node: "citation",
-    severity: "high",
-    description:
-      "Answer lacks any citations when specific policy or procedure was referenced.",
-  },
-  CIT_WRONG_SOURCE: {
-    code: "CIT_WRONG_SOURCE",
-    label: "Citations don't match claims",
-    node: "citation",
-    severity: "high",
-    description:
-      "Citations point to documents that don't actually support the claims made.",
-  },
-  CIT_BROKEN_URL: {
-    code: "CIT_BROKEN_URL",
-    label: "Broken citation URL",
-    node: "citation",
-    severity: "medium",
-    description:
-      "Citation URL is malformed, empty, or points to a non-existent resource.",
-  },
-  CIT_INSUFFICIENT: {
-    code: "CIT_INSUFFICIENT",
-    label: "Too few citations",
-    node: "citation",
-    severity: "medium",
-    description:
-      "Answer makes multiple distinct claims but only cites a source for some of them.",
-  },
-
-  // ---- Disclaimer ----
-  DIS_MISSING: {
-    code: "DIS_MISSING",
-    label: "Missing required disclaimer",
-    node: "disclaimer",
-    severity: "high",
-    description:
-      "Answer lacks the required domain-specific disclaimer (e.g., legal, medical, SafeSport).",
-  },
-  DIS_WRONG_DOMAIN: {
-    code: "DIS_WRONG_DOMAIN",
-    label: "Wrong disclaimer domain",
-    node: "disclaimer",
-    severity: "medium",
-    description:
-      "Disclaimer is present but does not match the topic domain of the answer.",
-  },
-  DIS_MISSING_SAFETY: {
-    code: "DIS_MISSING_SAFETY",
-    label: "Missing safety contact info",
-    node: "disclaimer",
-    severity: "critical",
-    description:
-      "SafeSport or anti-doping response missing required emergency contact information.",
-  },
-
-  // ---- Escalation ----
+  // ---- Escalate ----
   ESC_WRONG_TARGET: {
     code: "ESC_WRONG_TARGET",
     label: "Escalated to wrong authority",
-    node: "escalation",
+    node: "escalate",
     severity: "critical",
     description:
       "Escalation routed to the wrong authority (e.g., SafeSport issue sent to anti-doping).",
@@ -275,7 +267,7 @@ export const FAILURE_MODES = {
   ESC_WRONG_URGENCY: {
     code: "ESC_WRONG_URGENCY",
     label: "Wrong urgency level",
-    node: "escalation",
+    node: "escalate",
     severity: "high",
     description:
       "Escalation urgency level is incorrect (e.g., immediate marked as standard or vice versa).",
@@ -283,10 +275,148 @@ export const FAILURE_MODES = {
   ESC_MISSING_CONTACT: {
     code: "ESC_MISSING_CONTACT",
     label: "Missing escalation contact",
-    node: "escalation",
+    node: "escalate",
     severity: "high",
     description:
       "Escalation response missing critical contact information (phone, email, URL).",
+  },
+
+  // ---- CitationBuilder ----
+  CIT_MISSING: {
+    code: "CIT_MISSING",
+    label: "No citations provided",
+    node: "citationBuilder",
+    severity: "high",
+    description:
+      "Answer lacks any citations when specific policy or procedure was referenced.",
+  },
+  CIT_WRONG_SOURCE: {
+    code: "CIT_WRONG_SOURCE",
+    label: "Citations don't match claims",
+    node: "citationBuilder",
+    severity: "high",
+    description:
+      "Citations point to documents that don't actually support the claims made.",
+  },
+  CIT_BROKEN_URL: {
+    code: "CIT_BROKEN_URL",
+    label: "Broken citation URL",
+    node: "citationBuilder",
+    severity: "medium",
+    description:
+      "Citation URL is malformed, empty, or points to a non-existent resource.",
+  },
+  CIT_INSUFFICIENT: {
+    code: "CIT_INSUFFICIENT",
+    label: "Too few citations",
+    node: "citationBuilder",
+    severity: "medium",
+    description:
+      "Answer makes multiple distinct claims but only cites a source for some of them.",
+  },
+
+  // ---- DisclaimerGuard ----
+  DIS_MISSING: {
+    code: "DIS_MISSING",
+    label: "Missing required disclaimer",
+    node: "disclaimerGuard",
+    severity: "high",
+    description:
+      "Answer lacks the required domain-specific disclaimer (e.g., legal, medical, SafeSport).",
+  },
+  DIS_WRONG_DOMAIN: {
+    code: "DIS_WRONG_DOMAIN",
+    label: "Wrong disclaimer domain",
+    node: "disclaimerGuard",
+    severity: "medium",
+    description:
+      "Disclaimer is present but does not match the topic domain of the answer.",
+  },
+  DIS_MISSING_SAFETY: {
+    code: "DIS_MISSING_SAFETY",
+    label: "Missing safety contact info",
+    node: "disclaimerGuard",
+    severity: "critical",
+    description:
+      "SafeSport or anti-doping response missing required emergency contact information.",
+  },
+
+  // ---- QueryPlanner (flag-gated) ----
+  QPL_WRONG_DECOMPOSITION: {
+    code: "QPL_WRONG_DECOMPOSITION",
+    label: "Wrong query decomposition",
+    node: "queryPlanner",
+    severity: "high",
+    description: "Split query incorrectly or missed sub-questions.",
+  },
+  QPL_REDUNDANT_SPLITS: {
+    code: "QPL_REDUNDANT_SPLITS",
+    label: "Redundant sub-queries",
+    node: "queryPlanner",
+    severity: "low",
+    description: "Decomposed into overlapping sub-queries.",
+  },
+
+  // ---- RetrievalExpander (flag-gated) ----
+  RXP_POOR_REFORMULATION: {
+    code: "RXP_POOR_REFORMULATION",
+    label: "Poor query reformulation",
+    node: "retrievalExpander",
+    severity: "medium",
+    description: "Reformulated query drifted from intent.",
+  },
+  RXP_UNNECESSARY: {
+    code: "RXP_UNNECESSARY",
+    label: "Unnecessary expansion",
+    node: "retrievalExpander",
+    severity: "low",
+    description: "Expanded when original retrieval was adequate.",
+  },
+
+  // ---- EmotionalSupport (flag-gated) ----
+  EMO_TONE_MISS: {
+    code: "EMO_TONE_MISS",
+    label: "Failed to acknowledge distress",
+    node: "emotionalSupport",
+    severity: "high",
+    description: "Failed to acknowledge distress.",
+  },
+  EMO_OVER_CLINICAL: {
+    code: "EMO_OVER_CLINICAL",
+    label: "Too clinical response",
+    node: "emotionalSupport",
+    severity: "medium",
+    description: "Recognized distress but responded too clinically.",
+  },
+  EMO_MISSING_RESOURCES: {
+    code: "EMO_MISSING_RESOURCES",
+    label: "Missing crisis contacts",
+    node: "emotionalSupport",
+    severity: "high",
+    description: "Missing mental health/crisis contacts.",
+  },
+
+  // ---- QualityChecker (flag-gated) ----
+  QCK_FALSE_PASS: {
+    code: "QCK_FALSE_PASS",
+    label: "Approved low-quality answer",
+    node: "qualityChecker",
+    severity: "high",
+    description: "Approved a low-quality answer.",
+  },
+  QCK_FALSE_FAIL: {
+    code: "QCK_FALSE_FAIL",
+    label: "Rejected adequate answer",
+    node: "qualityChecker",
+    severity: "medium",
+    description: "Rejected an adequate answer causing unnecessary retry.",
+  },
+  QCK_RETRY_DEGRADATION: {
+    code: "QCK_RETRY_DEGRADATION",
+    label: "Retry degraded answer",
+    node: "qualityChecker",
+    severity: "medium",
+    description: "Retry loop produced worse answer than original.",
   },
 
   // ---- Cross-cutting ----
@@ -338,22 +468,18 @@ export type FailureCode = keyof typeof FAILURE_MODES;
 // LangSmith feedback keys
 // ---------------------------------------------------------------------------
 
-/** Feedback keys used in annotation queue scoring. */
+/** Feedback keys used in scoring. */
 export const FEEDBACK_KEYS = {
-  /** Overall quality score 1–5 */
-  quality: "quality_score",
-  /** Helpfulness for an athlete 1–5 */
-  helpfulness: "helpfulness_score",
-  /** Factual accuracy 1–5 */
-  accuracy: "accuracy_score",
-  /** Completeness of answer 1–5 */
-  completeness: "completeness_score",
-  /** Tone appropriateness 1–5 */
-  tone: "tone_score",
-  /** Comma-separated failure mode codes */
-  failureModes: "failure_modes",
-  /** Free-text reviewer notes */
-  notes: "reviewer_notes",
+  /** Overall quality score 0–1 */
+  quality: "quality",
+  /** Helpfulness for an athlete 0–1 */
+  helpfulness: "helpfulness",
+  /** Factual accuracy 0–1 */
+  accuracy: "accuracy",
+  /** Completeness of answer 0–1 */
+  completeness: "completeness",
+  /** Tone appropriateness 0–1 */
+  tone: "tone",
 } as const;
 
 export type FeedbackKey = (typeof FEEDBACK_KEYS)[keyof typeof FEEDBACK_KEYS];
@@ -380,31 +506,31 @@ export const SCORING_RUBRIC: ScoringDimension[] = [
     name: "Overall Quality",
     levels: [
       {
-        score: 1,
+        score: 0.0,
         label: "Unusable",
         description:
           "Response is wrong, harmful, or completely misses the question.",
       },
       {
-        score: 2,
+        score: 0.25,
         label: "Poor",
         description:
           "Response addresses the topic but has significant errors or omissions.",
       },
       {
-        score: 3,
+        score: 0.5,
         label: "Acceptable",
         description:
           "Response is roughly correct but missing important details or nuance.",
       },
       {
-        score: 4,
+        score: 0.75,
         label: "Good",
         description:
           "Response is accurate, helpful, and well-structured with minor issues.",
       },
       {
-        score: 5,
+        score: 1.0,
         label: "Excellent",
         description:
           "Response is accurate, comprehensive, well-cited, and athlete-appropriate.",
@@ -416,29 +542,29 @@ export const SCORING_RUBRIC: ScoringDimension[] = [
     name: "Helpfulness",
     levels: [
       {
-        score: 1,
+        score: 0.0,
         label: "Not helpful",
         description: "Athlete would get no value from this response.",
       },
       {
-        score: 2,
+        score: 0.25,
         label: "Slightly helpful",
         description:
           "Points in the right direction but athlete would need significant additional research.",
       },
       {
-        score: 3,
+        score: 0.5,
         label: "Moderately helpful",
         description:
           "Gives useful information but athlete may need to follow up on specifics.",
       },
       {
-        score: 4,
+        score: 0.75,
         label: "Very helpful",
         description: "Athlete can act on this with minimal additional effort.",
       },
       {
-        score: 5,
+        score: 1.0,
         label: "Exceptionally helpful",
         description:
           "Athlete has everything needed to take action, including contacts and next steps.",
@@ -450,29 +576,29 @@ export const SCORING_RUBRIC: ScoringDimension[] = [
     name: "Factual Accuracy",
     levels: [
       {
-        score: 1,
+        score: 0.0,
         label: "Incorrect",
         description: "Contains fabricated or fundamentally wrong information.",
       },
       {
-        score: 2,
+        score: 0.25,
         label: "Mostly incorrect",
         description: "More wrong than right; key facts are inaccurate.",
       },
       {
-        score: 3,
+        score: 0.5,
         label: "Mixed",
         description:
           "Core facts are right but some claims are unsupported or wrong.",
       },
       {
-        score: 4,
+        score: 0.75,
         label: "Mostly accurate",
         description:
           "Facts are correct with only minor inaccuracies or imprecisions.",
       },
       {
-        score: 5,
+        score: 1.0,
         label: "Fully accurate",
         description:
           "All claims are supported by source documents or known policy.",
@@ -484,27 +610,27 @@ export const SCORING_RUBRIC: ScoringDimension[] = [
     name: "Completeness",
     levels: [
       {
-        score: 1,
+        score: 0.0,
         label: "Incomplete",
         description: "Misses the core of what was asked.",
       },
       {
-        score: 2,
+        score: 0.25,
         label: "Partial",
         description: "Addresses part of the question but skips major aspects.",
       },
       {
-        score: 3,
+        score: 0.5,
         label: "Adequate",
         description: "Covers the main point but misses supporting details.",
       },
       {
-        score: 4,
+        score: 0.75,
         label: "Thorough",
         description: "Covers the question well with only minor gaps.",
       },
       {
-        score: 5,
+        score: 1.0,
         label: "Comprehensive",
         description:
           "Fully addresses all aspects of the question with appropriate depth.",
@@ -516,31 +642,31 @@ export const SCORING_RUBRIC: ScoringDimension[] = [
     name: "Tone",
     levels: [
       {
-        score: 1,
+        score: 0.0,
         label: "Inappropriate",
         description:
           "Dismissive, condescending, or insensitive to the athlete's situation.",
       },
       {
-        score: 2,
+        score: 0.25,
         label: "Off-putting",
         description:
           "Too robotic, overly formal, or fails to acknowledge emotional context.",
       },
       {
-        score: 3,
+        score: 0.5,
         label: "Neutral",
         description:
           "Professional but lacks warmth or empathy where appropriate.",
       },
       {
-        score: 4,
+        score: 0.75,
         label: "Good",
         description:
           "Professional, empathetic, and appropriate for the context.",
       },
       {
-        score: 5,
+        score: 1.0,
         label: "Excellent",
         description:
           "Perfectly calibrated tone — supportive, clear, and athlete-centered.",

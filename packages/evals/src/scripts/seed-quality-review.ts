@@ -23,10 +23,15 @@ async function main(): Promise<void> {
       messages: s.input.messages,
       userSport: s.input.userSport,
       scenarioId: s.id,
+      description: s.metadata.description,
     },
     outputs: {
-      metadata: s.metadata,
-      ...(s.expectedOutput ?? {}),
+      expected_path: s.expectedOutput?.expectedPath ?? null,
+      required_facts: s.expectedOutput?.requiredFacts ?? null,
+      reference_answer: s.expectedOutput?.referenceAnswer ?? null,
+      category: s.metadata.category,
+      difficulty: s.metadata.difficulty,
+      domains: s.metadata.domains,
     },
   }));
 
