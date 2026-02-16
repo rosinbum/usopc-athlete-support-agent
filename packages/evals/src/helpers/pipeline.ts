@@ -32,47 +32,51 @@ export async function runPipeline(userMessage: string): Promise<{
     tavilyApiKey: process.env.TAVILY_API_KEY,
   });
 
-  const output = await runner.invoke({
-    messages: [new HumanMessage(userMessage)],
-  });
-
-  // Extract trajectory from the metrics collector
-  const trajectory = nodeMetrics.getAll().map((entry) => entry.name);
-
-  return {
-    state: {
+  try {
+    const output = await runner.invoke({
       messages: [new HumanMessage(userMessage)],
-      answer: output.answer,
-      citations: output.citations,
-      escalation: output.escalation,
-      // These fields aren't directly available from AgentOutput,
-      // so we set sensible defaults. Full state is available through
-      // the graph's stream mode if needed.
-      topicDomain: undefined,
-      detectedNgbIds: [],
-      queryIntent: undefined,
-      retrievedDocuments: [],
-      webSearchResults: [],
-      retrievalConfidence: 0,
-      disclaimerRequired: true,
-      hasTimeConstraint: false,
-      conversationId: undefined,
-      conversationSummary: undefined,
-      userSport: undefined,
-      needsClarification: false,
-      clarificationQuestion: undefined,
-      escalationReason: undefined,
-      retrievalStatus: "success",
-      emotionalState: "neutral",
-      qualityCheckResult: undefined,
-      qualityRetryCount: 0,
-      expansionAttempted: false,
-      reformulatedQueries: [],
-      isComplexQuery: false,
-      subQueries: [],
-    },
-    trajectory,
-  };
+    });
+
+    // Extract trajectory from the metrics collector
+    const trajectory = nodeMetrics.getAll().map((entry) => entry.name);
+
+    return {
+      state: {
+        messages: [new HumanMessage(userMessage)],
+        answer: output.answer,
+        citations: output.citations,
+        escalation: output.escalation,
+        // These fields aren't directly available from AgentOutput,
+        // so we set sensible defaults. Full state is available through
+        // the graph's stream mode if needed.
+        topicDomain: undefined,
+        detectedNgbIds: [],
+        queryIntent: undefined,
+        retrievedDocuments: [],
+        webSearchResults: [],
+        retrievalConfidence: 0,
+        disclaimerRequired: true,
+        hasTimeConstraint: false,
+        conversationId: undefined,
+        conversationSummary: undefined,
+        userSport: undefined,
+        needsClarification: false,
+        clarificationQuestion: undefined,
+        escalationReason: undefined,
+        retrievalStatus: "success",
+        emotionalState: "neutral",
+        qualityCheckResult: undefined,
+        qualityRetryCount: 0,
+        expansionAttempted: false,
+        reformulatedQueries: [],
+        isComplexQuery: false,
+        subQueries: [],
+      },
+      trajectory,
+    };
+  } finally {
+    await runner.close();
+  }
 }
 
 /**

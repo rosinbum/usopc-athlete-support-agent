@@ -54,46 +54,50 @@ export async function runMultiTurnPipeline(
 
   const baseMessages = toBaseMessages(messages);
 
-  const output = await runner.invoke({
-    messages: baseMessages,
-    userSport: opts?.userSport,
-    conversationId: opts?.conversationId,
-  });
-
-  const trajectory = nodeMetrics.getAll().map((entry) => entry.name);
-
-  return {
-    state: {
+  try {
+    const output = await runner.invoke({
       messages: baseMessages,
-      answer: output.answer,
-      citations: output.citations,
-      escalation: output.escalation,
-      // These fields aren't directly available from AgentOutput,
-      // so we set sensible defaults. Full state is available through
-      // the graph's stream mode if needed.
-      topicDomain: undefined,
-      detectedNgbIds: [],
-      queryIntent: undefined,
-      retrievedDocuments: [],
-      webSearchResults: [],
-      retrievalConfidence: 0,
-      disclaimerRequired: true,
-      hasTimeConstraint: false,
-      conversationId: opts?.conversationId,
-      conversationSummary: undefined,
       userSport: opts?.userSport,
-      needsClarification: false,
-      clarificationQuestion: undefined,
-      escalationReason: undefined,
-      retrievalStatus: "success",
-      emotionalState: "neutral",
-      qualityCheckResult: undefined,
-      qualityRetryCount: 0,
-      expansionAttempted: false,
-      reformulatedQueries: [],
-      isComplexQuery: false,
-      subQueries: [],
-    },
-    trajectory,
-  };
+      conversationId: opts?.conversationId,
+    });
+
+    const trajectory = nodeMetrics.getAll().map((entry) => entry.name);
+
+    return {
+      state: {
+        messages: baseMessages,
+        answer: output.answer,
+        citations: output.citations,
+        escalation: output.escalation,
+        // These fields aren't directly available from AgentOutput,
+        // so we set sensible defaults. Full state is available through
+        // the graph's stream mode if needed.
+        topicDomain: undefined,
+        detectedNgbIds: [],
+        queryIntent: undefined,
+        retrievedDocuments: [],
+        webSearchResults: [],
+        retrievalConfidence: 0,
+        disclaimerRequired: true,
+        hasTimeConstraint: false,
+        conversationId: opts?.conversationId,
+        conversationSummary: undefined,
+        userSport: opts?.userSport,
+        needsClarification: false,
+        clarificationQuestion: undefined,
+        escalationReason: undefined,
+        retrievalStatus: "success",
+        emotionalState: "neutral",
+        qualityCheckResult: undefined,
+        qualityRetryCount: 0,
+        expansionAttempted: false,
+        reformulatedQueries: [],
+        isComplexQuery: false,
+        subQueries: [],
+      },
+      trajectory,
+    };
+  } finally {
+    await runner.close();
+  }
 }

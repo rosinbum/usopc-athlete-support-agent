@@ -1,6 +1,7 @@
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { createEmbeddings } from "../rag/embeddings.js";
+import type { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import { createVectorStore } from "../rag/vectorStore.js";
 import { createTavilySearchTool } from "./nodes/researcher.js";
 import type { TavilySearchLike } from "./nodes/researcher.js";
@@ -66,9 +67,14 @@ export function convertMessages(
  */
 export class AgentRunner {
   private graph: ReturnType<typeof createAgentGraph>;
+  private vectorStore: PGVectorStore;
 
-  private constructor(graph: ReturnType<typeof createAgentGraph>) {
+  private constructor(
+    graph: ReturnType<typeof createAgentGraph>,
+    vectorStore: PGVectorStore,
+  ) {
     this.graph = graph;
+    this.vectorStore = vectorStore;
   }
 
   /**
@@ -92,7 +98,15 @@ export class AgentRunner {
 
     const graph = createAgentGraph({ vectorStore, tavilySearch });
 
-    return new AgentRunner(graph);
+    return new AgentRunner(graph, vectorStore);
+  }
+
+  /**
+   * Close the underlying vector store connection pool.
+   * Call this when the runner is no longer needed to prevent connection leaks.
+   */
+  async close(): Promise<void> {
+    await this.vectorStore.end();
   }
 
   /**
