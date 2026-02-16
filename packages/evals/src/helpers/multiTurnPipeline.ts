@@ -88,6 +88,8 @@ export async function runMultiTurnPipeline(
       emotionalState: "neutral",
       qualityCheckResult: undefined,
       qualityRetryCount: 0,
+      isComplexQuery: false,
+      subQueries: [],
     },
     trajectory,
   };
