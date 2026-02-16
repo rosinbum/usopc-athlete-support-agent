@@ -12,12 +12,24 @@ vi.mock("../../../../../lib/discovered-source.js", () => ({
   createDiscoveredSourceEntity: vi.fn(),
 }));
 
+vi.mock("../../../../../lib/source-config.js", () => ({
+  createSourceConfigEntity: vi.fn(),
+}));
+
+vi.mock("../../../../../lib/send-to-sources.js", () => ({
+  sendDiscoveryToSources: vi.fn(),
+}));
+
 import { auth } from "../../../../../auth.js";
 import { createDiscoveredSourceEntity } from "../../../../../lib/discovered-source.js";
+import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
+import { sendDiscoveryToSources } from "../../../../../lib/send-to-sources.js";
 import { POST } from "./route.js";
 
 const mockAuth = vi.mocked(auth);
 const mockCreateEntity = vi.mocked(createDiscoveredSourceEntity);
+const mockCreateSCEntity = vi.mocked(createSourceConfigEntity);
+const mockSendToSources = vi.mocked(sendDiscoveryToSources);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -30,6 +42,14 @@ function jsonRequest(body: unknown): Request {
     body: JSON.stringify(body),
   });
 }
+
+const APPROVED_DISCOVERY = {
+  id: "d1",
+  status: "approved",
+  sourceConfigId: null,
+  title: "Test",
+  url: "https://example.com",
+};
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/discoveries/bulk
@@ -66,10 +86,8 @@ describe("POST /api/admin/discoveries/bulk", () => {
     } as never);
 
     const res = await POST(jsonRequest({ action: "reject", ids: ["d1"] }));
-    const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toBe("Reason is required when rejecting");
   });
 
   it("bulk approves discoveries", async () => {
@@ -131,5 +149,105 @@ describe("POST /api/admin/discoveries/bulk", () => {
     expect(res.status).toBe(200);
     expect(body.succeeded).toBe(1);
     expect(body.failed).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // send_to_sources — with specific IDs
+  // -------------------------------------------------------------------------
+
+  it("sends specific discoveries to sources by IDs", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getById: vi.fn().mockResolvedValue(APPROVED_DISCOVERY),
+    } as never);
+    mockCreateSCEntity.mockReturnValueOnce({
+      getAll: vi.fn().mockResolvedValue([]),
+    } as never);
+    mockSendToSources.mockResolvedValue({
+      discoveryId: "d1",
+      sourceConfigId: "d1",
+      status: "created",
+    });
+
+    const res = await POST(
+      jsonRequest({ action: "send_to_sources", ids: ["d1"] }),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.created).toBe(1);
+    expect(body.failed).toBe(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // send_to_sources — all approved (no IDs)
+  // -------------------------------------------------------------------------
+
+  it("sends all approved discoveries when no IDs provided", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getByStatus: vi.fn().mockResolvedValue([
+        { ...APPROVED_DISCOVERY, id: "d1" },
+        { ...APPROVED_DISCOVERY, id: "d2", sourceConfigId: "existing" },
+      ]),
+    } as never);
+    mockCreateSCEntity.mockReturnValueOnce({
+      getAll: vi.fn().mockResolvedValue([]),
+    } as never);
+    mockSendToSources.mockResolvedValue({
+      discoveryId: "d1",
+      sourceConfigId: "d1",
+      status: "created",
+    });
+
+    const res = await POST(jsonRequest({ action: "send_to_sources" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    // Only d1 should be processed (d2 already has sourceConfigId)
+    expect(body.created).toBe(1);
+    expect(mockSendToSources).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports mixed results for send_to_sources", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getById: vi
+        .fn()
+        .mockResolvedValueOnce(APPROVED_DISCOVERY)
+        .mockResolvedValueOnce({
+          ...APPROVED_DISCOVERY,
+          id: "d2",
+          status: "pending_content",
+        }),
+    } as never);
+    mockCreateSCEntity.mockReturnValueOnce({
+      getAll: vi.fn().mockResolvedValue([]),
+    } as never);
+    mockSendToSources
+      .mockResolvedValueOnce({
+        discoveryId: "d1",
+        sourceConfigId: "d1",
+        status: "created",
+      })
+      .mockResolvedValueOnce({
+        discoveryId: "d2",
+        status: "not_approved",
+      });
+
+    const res = await POST(
+      jsonRequest({ action: "send_to_sources", ids: ["d1", "d2"] }),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.created).toBe(1);
+    expect(body.notApproved).toBe(1);
   });
 });

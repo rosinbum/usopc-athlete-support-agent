@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { DiscoveriesAdminClient } from "./DiscoveriesAdminClient.js";
 
 // ---------------------------------------------------------------------------
@@ -175,6 +180,43 @@ describe("DiscoveriesAdminClient", () => {
     });
 
     expect(screen.getByText("Try again")).toBeInTheDocument();
+  });
+
+  it("shows Sent badge for discoveries linked to a source", async () => {
+    render(<DiscoveriesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Athlete Rights FAQ")).toBeInTheDocument();
+    });
+
+    // disc-2 has sourceConfigId: "src-faq" → should show "Sent" badge
+    expect(screen.getByText("Sent")).toBeInTheDocument();
+    // Summary card for "Sent to Sources" appears
+    expect(
+      screen.getAllByText(/Sent to Sources/).length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it("filters by source link status", async () => {
+    const user = userEvent.setup();
+    render(<DiscoveriesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    });
+
+    // Filter to "Sent to Sources" only
+    const sourceFilter = screen.getByDisplayValue("All Sources");
+    await user.selectOptions(sourceFilter, "linked");
+
+    expect(screen.queryByText("USOPC Governance Page")).not.toBeInTheDocument();
+    expect(screen.getByText("Athlete Rights FAQ")).toBeInTheDocument();
+
+    // Filter to "Not Sent" only
+    await user.selectOptions(sourceFilter, "unlinked");
+
+    expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    expect(screen.queryByText("Athlete Rights FAQ")).not.toBeInTheDocument();
   });
 
   it("selects and shows bulk action bar", async () => {
