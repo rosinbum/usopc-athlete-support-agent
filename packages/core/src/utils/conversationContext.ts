@@ -26,6 +26,9 @@ export function getMaxTurns(): number {
   return isNaN(parsed) ? parseInt(DEFAULT_MAX_TURNS, 10) : parsed;
 }
 
+/** Reduced turn count when a rolling summary provides earlier context. */
+const SUMMARY_MAX_TURNS = 2;
+
 /**
  * Options for formatting conversation history.
  */
@@ -36,6 +39,13 @@ export interface FormatHistoryOptions {
    * Defaults to getMaxTurns() (5 by default).
    */
   maxTurns?: number;
+
+  /**
+   * Rolling conversation summary from earlier turns.
+   * When provided, maxTurns is reduced to 2 and the summary is
+   * prepended to the conversation context.
+   */
+  conversationSummary?: string;
 }
 
 /**
@@ -138,8 +148,20 @@ export function buildContextualQuery(
   const lastMessage = messages[messages.length - 1];
   const currentMessage = getMessageContent(lastMessage);
 
-  // Format prior history
-  const conversationContext = formatConversationHistory(messages, options);
+  // When a summary is available, reduce raw history and prepend the summary
+  const effectiveOptions = options?.conversationSummary
+    ? { ...options, maxTurns: options.maxTurns ?? SUMMARY_MAX_TURNS }
+    : options;
+
+  const rawHistory = formatConversationHistory(messages, effectiveOptions);
+
+  let conversationContext = rawHistory;
+  if (options?.conversationSummary) {
+    const summaryBlock = `[Conversation Summary]\n${options.conversationSummary}`;
+    conversationContext = rawHistory
+      ? `${summaryBlock}\n\n${rawHistory}`
+      : summaryBlock;
+  }
 
   return { currentMessage, conversationContext };
 }
