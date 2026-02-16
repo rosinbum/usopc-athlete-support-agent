@@ -114,6 +114,12 @@ async function runScenario(
   if (scenario.input.userSport) {
     metadata.user_sport = scenario.input.userSport;
   }
+  if (scenario.expectedOutput?.expectedPath) {
+    metadata.expected_path = scenario.expectedOutput.expectedPath;
+  }
+  if (scenario.expectedOutput?.requiredFacts) {
+    metadata.required_facts = scenario.expectedOutput.requiredFacts;
+  }
 
   const traced = traceable(
     async (input: {
