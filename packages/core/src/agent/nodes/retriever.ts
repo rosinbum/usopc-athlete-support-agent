@@ -4,7 +4,7 @@ import { RETRIEVAL_CONFIG } from "../../config/index.js";
 import { vectorStoreSearch } from "../../services/vectorStoreService.js";
 import { buildContextualQuery, stateContext } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
-import type { RetrievedDocument } from "../../types/index.js";
+import type { RetrievedDocument, SubQuery } from "../../types/index.js";
 
 const log = logger.child({ service: "retriever-node" });
 
@@ -114,6 +114,26 @@ function buildBroadFilter(
   return {
     $or: [ngbCondition, { ngbId: null }],
   };
+}
+
+/**
+ * Builds a metadata filter from a sub-query's domain and NGB IDs.
+ */
+function buildSubQueryFilter(
+  subQuery: SubQuery,
+): Record<string, unknown> | undefined {
+  const conditions: Record<string, unknown> = {};
+
+  if (subQuery.ngbIds.length > 0) {
+    conditions["ngbId"] =
+      subQuery.ngbIds.length === 1
+        ? subQuery.ngbIds[0]
+        : { $in: subQuery.ngbIds };
+  }
+
+  conditions["topicDomain"] = subQuery.domain;
+
+  return Object.keys(conditions).length > 0 ? conditions : undefined;
 }
 
 /**
@@ -331,10 +351,104 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
     },
   }).withConfig({ runName: "retriever:score_and_rank" });
 
+  /**
+   * Maps raw search results to RetrievedDocument format.
+   */
+  function mapToRetrievedDocuments(
+    results: SearchResult[],
+  ): RetrievedDocument[] {
+    return results.map(([doc, score]) => ({
+      content: doc.pageContent,
+      metadata: {
+        ngbId: doc.metadata.ngbId as string | undefined,
+        topicDomain: doc.metadata.topicDomain as
+          | RetrievedDocument["metadata"]["topicDomain"]
+          | undefined,
+        documentType: doc.metadata.documentType as string | undefined,
+        sourceUrl: doc.metadata.sourceUrl as string | undefined,
+        documentTitle: doc.metadata.documentTitle as string | undefined,
+        sectionTitle: doc.metadata.sectionTitle as string | undefined,
+        effectiveDate: doc.metadata.effectiveDate as string | undefined,
+        ingestedAt: doc.metadata.ingestedAt as string | undefined,
+        authorityLevel: doc.metadata.authorityLevel as
+          | AuthorityLevel
+          | undefined,
+      },
+      score,
+    }));
+  }
+
   return async (
     state: AgentState,
     config?: RunnableConfig,
   ): Promise<Partial<AgentState>> => {
+    // Sub-query retrieval: run parallel searches per sub-query
+    if (state.subQueries && state.subQueries.length > 0) {
+      try {
+        log.info("Running sub-query retrieval", {
+          subQueryCount: state.subQueries.length,
+          domains: state.subQueries.map((sq) => sq.domain),
+          ...stateContext(state),
+        });
+
+        const subQueryResults = await Promise.all(
+          state.subQueries.map(async (subQuery) => {
+            const filter = buildSubQueryFilter(subQuery);
+            return vectorStoreSearch(
+              () =>
+                vectorStore.similaritySearchWithScore(
+                  subQuery.query,
+                  RETRIEVAL_CONFIG.narrowFilterTopK,
+                  filter,
+                ),
+              [],
+            );
+          }),
+        );
+
+        // Merge and deduplicate by content
+        const seen = new Set<string>();
+        const mergedResults: SearchResult[] = [];
+        for (const results of subQueryResults) {
+          for (const result of results) {
+            if (!seen.has(result[0].pageContent)) {
+              seen.add(result[0].pageContent);
+              mergedResults.push(result);
+            }
+          }
+        }
+
+        const { topResults, confidence, topScore } =
+          await scoreAndRankSpan.invoke({ results: mergedResults }, config);
+
+        const retrievedDocuments = mapToRetrievedDocuments(topResults);
+
+        log.info("Sub-query retrieval complete", {
+          documentCount: retrievedDocuments.length,
+          confidence: confidence.toFixed(3),
+          topScore: topScore?.toFixed(3) ?? "N/A",
+          ...stateContext(state),
+        });
+
+        return {
+          retrievedDocuments,
+          retrievalConfidence: confidence,
+          retrievalStatus: "success" as const,
+        };
+      } catch (error) {
+        log.error("Sub-query retrieval failed", {
+          error: error instanceof Error ? error.message : String(error),
+          ...stateContext(state),
+        });
+        return {
+          retrievedDocuments: [],
+          retrievalConfidence: 0,
+          retrievalStatus: "error" as const,
+        };
+      }
+    }
+
+    // Standard single-domain retrieval
     const { query } = await buildQuerySpan.invoke({ state }, config);
 
     if (!query) {
@@ -358,27 +472,7 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
       const { topResults, confidence, topScore } =
         await scoreAndRankSpan.invoke({ results }, config);
 
-      const retrievedDocuments: RetrievedDocument[] = topResults.map(
-        ([doc, score]) => ({
-          content: doc.pageContent,
-          metadata: {
-            ngbId: doc.metadata.ngbId as string | undefined,
-            topicDomain: doc.metadata.topicDomain as
-              | RetrievedDocument["metadata"]["topicDomain"]
-              | undefined,
-            documentType: doc.metadata.documentType as string | undefined,
-            sourceUrl: doc.metadata.sourceUrl as string | undefined,
-            documentTitle: doc.metadata.documentTitle as string | undefined,
-            sectionTitle: doc.metadata.sectionTitle as string | undefined,
-            effectiveDate: doc.metadata.effectiveDate as string | undefined,
-            ingestedAt: doc.metadata.ingestedAt as string | undefined,
-            authorityLevel: doc.metadata.authorityLevel as
-              | AuthorityLevel
-              | undefined,
-          },
-          score,
-        }),
-      );
+      const retrievedDocuments = mapToRetrievedDocuments(topResults);
 
       log.info("Retrieval complete", {
         documentCount: retrievedDocuments.length,

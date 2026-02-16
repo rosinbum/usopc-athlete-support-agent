@@ -25,4 +25,8 @@ export {
 } from "./empathy.js";
 export { initPromptLoader, loadPrompt } from "./loader.js";
 export { buildQualityCheckerPrompt } from "./qualityChecker.js";
+export {
+  QUERY_PLANNER_PROMPT,
+  buildQueryPlannerPrompt,
+} from "./queryPlanner.js";
 export { buildSummaryPrompt } from "./conversationMemory.js";

@@ -76,6 +76,13 @@ export interface QualityCheckResult {
   critique: string;
 }
 
+export interface SubQuery {
+  query: string;
+  domain: TopicDomain;
+  intent: QueryIntent;
+  ngbIds: string[];
+}
+
 export interface AgentState {
   messages: BaseMessage[];
   topicDomain?: TopicDomain;

@@ -31,6 +31,8 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     emotionalState: "neutral",
     qualityCheckResult: undefined,
     qualityRetryCount: 0,
+    isComplexQuery: false,
+    subQueries: [],
     ...overrides,
   };
 }

@@ -66,6 +66,8 @@ export async function runPipeline(userMessage: string): Promise<{
       emotionalState: "neutral",
       qualityCheckResult: undefined,
       qualityRetryCount: 0,
+      isComplexQuery: false,
+      subQueries: [],
     },
     trajectory,
   };
