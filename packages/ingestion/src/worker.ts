@@ -5,7 +5,10 @@ import { createLogger, getDatabaseUrl, getSecretValue } from "@usopc/shared";
 import { ingestSource, QuotaExhaustedError } from "./pipeline.js";
 import { upsertIngestionStatus } from "./db.js";
 import type { IngestionMessage } from "./cron.js";
-import { createIngestionLogEntity } from "./entities/index.js";
+import {
+  createIngestionLogEntity,
+  createSourceConfigEntity,
+} from "./entities/index.js";
 
 const logger = createLogger({ service: "ingestion-worker" });
 
@@ -50,6 +53,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
         const result = await ingestSource(message.source, {
           databaseUrl,
           openaiApiKey,
+          s3Key: message.s3Key,
         });
 
         if (result.status === "completed") {
@@ -63,6 +67,20 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
               chunksCount: result.chunksCount,
             },
           );
+
+          // Update DynamoDB with S3 info and content hash
+          try {
+            const entity = createSourceConfigEntity();
+            await entity.markSuccess(message.source.id, message.contentHash, {
+              s3Key: message.s3Key,
+              s3VersionId: message.s3VersionId,
+            });
+          } catch (statsError) {
+            logger.warn(
+              `Failed to update DynamoDB stats for ${message.source.id}: ${statsError instanceof Error ? statsError.message : "Unknown error"}`,
+            );
+          }
+
           logger.info(
             `Ingestion completed for ${message.source.id} (${result.chunksCount} chunks)`,
           );

@@ -1,4 +1,4 @@
-import { ExternalLink, Calendar, FileText, Building2 } from "lucide-react";
+import { ExternalLink, Eye, Calendar, FileText, Building2 } from "lucide-react";
 
 export interface SourceDocument {
   sourceUrl: string;
@@ -10,6 +10,7 @@ export interface SourceDocument {
   effectiveDate: string | null;
   ingestedAt: string;
   chunkCount: number;
+  s3Key?: string | null;
 }
 
 interface SourceCardProps {
@@ -67,15 +68,37 @@ export function SourceCard({ source }: SourceCardProps) {
           </div>
         </div>
 
-        <a
-          href={source.sourceUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:text-blue-800 shrink-0 p-1"
-          title="View source document"
-        >
-          <ExternalLink className="w-4 h-4" />
-        </a>
+        <div className="flex items-center gap-1 shrink-0">
+          {source.s3Key && (
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch(
+                    `/api/documents/${encodeURIComponent(source.s3Key!)}/url`,
+                  );
+                  if (!res.ok) throw new Error("Failed to get document URL");
+                  const { url } = await res.json();
+                  window.open(url, "_blank", "noopener,noreferrer");
+                } catch {
+                  // Fall back silently — external link is always available
+                }
+              }}
+              className="text-green-600 hover:text-green-800 p-1"
+              title="View archived document"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          )}
+          <a
+            href={source.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 p-1"
+            title="View source document"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+        </div>
       </div>
 
       <div className="mt-3 text-xs text-gray-500 space-y-1">
