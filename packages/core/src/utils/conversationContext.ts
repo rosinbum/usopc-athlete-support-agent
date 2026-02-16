@@ -1,10 +1,9 @@
 import type { BaseMessage } from "@langchain/core/messages";
-import { getOptionalSecretValue } from "@usopc/shared";
 
 /**
  * Default number of conversation turns to include in context.
  */
-const DEFAULT_MAX_TURNS = "5";
+const DEFAULT_MAX_TURNS = 5;
 
 /**
  * Maximum length for individual messages before truncation.
@@ -12,22 +11,31 @@ const DEFAULT_MAX_TURNS = "5";
 const MAX_MESSAGE_LENGTH = 500;
 
 /**
+ * Default reduced turn count when a rolling summary provides earlier context.
+ */
+const DEFAULT_SUMMARY_MAX_TURNS = 2;
+
+/**
  * Returns the maximum number of conversation turns to include in context.
- * Configurable via CONVERSATION_MAX_TURNS env var or ConversationMaxTurns SST secret.
+ * Configurable via CONVERSATION_MAX_TURNS env var (set in sst.config.ts).
  */
 export function getMaxTurns(): number {
-  const value = getOptionalSecretValue(
-    "CONVERSATION_MAX_TURNS",
-    "ConversationMaxTurns",
-    DEFAULT_MAX_TURNS,
-  );
-
+  const value = process.env.CONVERSATION_MAX_TURNS;
+  if (!value) return DEFAULT_MAX_TURNS;
   const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? parseInt(DEFAULT_MAX_TURNS, 10) : parsed;
+  return isNaN(parsed) ? DEFAULT_MAX_TURNS : parsed;
 }
 
-/** Reduced turn count when a rolling summary provides earlier context. */
-const SUMMARY_MAX_TURNS = 2;
+/**
+ * Returns the max turns to include when a conversation summary is available.
+ * Configurable via SUMMARY_MAX_TURNS env var (set in sst.config.ts).
+ */
+export function getSummaryMaxTurns(): number {
+  const value = process.env.SUMMARY_MAX_TURNS;
+  if (!value) return DEFAULT_SUMMARY_MAX_TURNS;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? DEFAULT_SUMMARY_MAX_TURNS : parsed;
+}
 
 /**
  * Options for formatting conversation history.
@@ -150,7 +158,7 @@ export function buildContextualQuery(
 
   // When a summary is available, reduce raw history and prepend the summary
   const effectiveOptions = options?.conversationSummary
-    ? { ...options, maxTurns: options.maxTurns ?? SUMMARY_MAX_TURNS }
+    ? { ...options, maxTurns: options.maxTurns ?? getSummaryMaxTurns() }
     : options;
 
   const rawHistory = formatConversationHistory(messages, effectiveOptions);

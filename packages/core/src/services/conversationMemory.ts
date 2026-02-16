@@ -11,8 +11,19 @@ import { buildSummaryPrompt } from "../prompts/conversationMemory.js";
 
 const log = logger.child({ service: "conversation-memory" });
 
-/** TTL for cached summaries (1 hour). */
-const SUMMARY_TTL_MS = 60 * 60 * 1000;
+/** Default TTL for cached summaries (1 hour in ms). */
+const DEFAULT_SUMMARY_TTL_MS = 3_600_000;
+
+/**
+ * Returns the summary TTL in ms.
+ * Configurable via SUMMARY_TTL_MS env var (set in sst.config.ts).
+ */
+export function getSummaryTtlMs(): number {
+  const value = process.env.SUMMARY_TTL_MS;
+  if (!value) return DEFAULT_SUMMARY_TTL_MS;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? DEFAULT_SUMMARY_TTL_MS : parsed;
+}
 
 /**
  * Abstraction for swapping summary storage backends (in-memory, Redis, etc.).
@@ -47,7 +58,7 @@ export class InMemorySummaryStore implements SummaryStore {
   async set(conversationId: string, summary: string): Promise<void> {
     this.cache.set(conversationId, {
       summary,
-      expiresAt: Date.now() + SUMMARY_TTL_MS,
+      expiresAt: Date.now() + getSummaryTtlMs(),
     });
   }
 }

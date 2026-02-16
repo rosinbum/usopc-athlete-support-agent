@@ -41,7 +41,7 @@ ${transcript}
 Produce a concise rolling summary (maximum 300 words) that captures:
 
 1. **Key entities**: Sport(s), NGB(s), specific rules/sections/bylaws discussed, named individuals or organizations
-2. **Topics covered**: What governance/compliance questions were asked and what answers were provided
+2. **Topics covered**: What governance/compliance/team selection questions were asked and what answers were provided
 3. **Emotional state**: Any emotional signals from the user (distress, urgency, fear, frustration) and how they evolved
 4. **Unresolved items**: Follow-up questions the user asked, topics that need further clarification, or promises the assistant made
 5. **User context**: The user's sport, role, or situation if mentioned
