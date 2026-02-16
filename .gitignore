@@ -34,3 +34,4 @@ coverage/
 
 # misc
 *.tsbuildinfo
+data/sources/llm-generated-sources/
