@@ -25,3 +25,4 @@ export {
 } from "./empathy.js";
 export { initPromptLoader, loadPrompt } from "./loader.js";
 export { buildQualityCheckerPrompt } from "./qualityChecker.js";
+export { buildRetrievalExpanderPrompt } from "./retrievalExpander.js";

@@ -9,3 +9,4 @@ export { escalateNode } from "./escalate.js";
 export { citationBuilderNode } from "./citationBuilder.js";
 export { disclaimerGuardNode } from "./disclaimerGuard.js";
 export { qualityCheckerNode } from "./qualityChecker.js";
+export { createRetrievalExpanderNode } from "./retrievalExpander.js";
