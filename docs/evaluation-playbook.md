@@ -266,7 +266,7 @@ Code evaluators run deterministic logic in a sandboxed environment (no internet 
 
 ```javascript
 // LangSmith code evaluator — function name must be perform_eval
-function perform_eval(run) {
+function performEval(run) {
   const answer = run.outputs?.answer ?? "";
   const hasSeparator = answer.includes("---");
   const hasContact = /ombudsman|safesport|1-833-5US-SAFE|833-587-7233/i.test(
@@ -282,7 +282,7 @@ Since `expected_path` is stored in trace metadata (not run inputs/outputs), onli
 
 ```javascript
 // LangSmith code evaluator — function name must be perform_eval
-function perform_eval(run) {
+function performEval(run) {
   const expected = run.inputs?.expected_path;
   if (!expected) return {};
   const expectedNodes = expected.split(" → ");
