@@ -133,9 +133,7 @@ export class NotificationService {
       `  Anthropic Cost: $${summary.costSummary.anthropicCost.toFixed(4)}`,
     );
     lines.push("");
-    lines.push(
-      `Duration: ${(summary.duration / 1000).toFixed(2)} seconds`,
-    );
+    lines.push(`Duration: ${(summary.duration / 1000).toFixed(2)} seconds`);
 
     if (summary.errors.length > 0) {
       lines.push("");
@@ -226,8 +224,7 @@ export class NotificationService {
     error: Error | string,
     metadata?: Record<string, unknown>,
   ): Promise<void> {
-    const errorMessage =
-      typeof error === "string" ? error : error.message;
+    const errorMessage = typeof error === "string" ? error : error.message;
     const stack = typeof error === "string" ? undefined : error.stack;
 
     // CloudWatch (always enabled)
@@ -246,11 +243,7 @@ export class NotificationService {
     // Email
     if (this.channels.email && this.sesClient) {
       const message = `Error in ${context}\n\n${errorMessage}${stack ? `\n\nStack:\n${stack}` : ""}\n\nMetadata:\n${JSON.stringify(metadata, null, 2)}`;
-      await this.sendEmail(
-        this.channels.email,
-        `Error: ${context}`,
-        message,
-      );
+      await this.sendEmail(this.channels.email, `Error: ${context}`, message);
     }
   }
 
@@ -261,10 +254,7 @@ export class NotificationService {
   /**
    * Send message to Slack via webhook.
    */
-  private async sendSlackMessage(
-    text: string,
-    title?: string,
-  ): Promise<void> {
+  private async sendSlackMessage(text: string, title?: string): Promise<void> {
     if (!this.channels.slack) return;
 
     try {

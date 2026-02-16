@@ -73,9 +73,8 @@ describe("Discovery Lambda", () => {
       getStats: vi.fn(),
     };
 
-    const { createDiscoveryOrchestrator } = await import(
-      "../discoveryOrchestrator.js"
-    );
+    const { createDiscoveryOrchestrator } =
+      await import("../discoveryOrchestrator.js");
     vi.mocked(createDiscoveryOrchestrator).mockReturnValue(
       mockOrchestrator as any,
     );
@@ -98,9 +97,8 @@ describe("Discovery Lambda", () => {
       sendError: vi.fn(),
     };
 
-    const { createNotificationService } = await import(
-      "../services/notificationService.js"
-    );
+    const { createNotificationService } =
+      await import("../services/notificationService.js");
     vi.mocked(createNotificationService).mockReturnValue(
       mockNotificationService as any,
     );
@@ -193,10 +191,11 @@ describe("Discovery Lambda", () => {
       expect(mockCostTracker.trackAnthropicCall).toHaveBeenCalled();
 
       // Should send completion notification
-      expect(mockNotificationService.sendDiscoveryCompletion).toHaveBeenCalled();
-      const summary = vi.mocked(
+      expect(
         mockNotificationService.sendDiscoveryCompletion,
-      ).mock.calls[0][0];
+      ).toHaveBeenCalled();
+      const summary = vi.mocked(mockNotificationService.sendDiscoveryCompletion)
+        .mock.calls[0][0];
       expect(summary.totalDiscovered).toBe(25);
       expect(summary.byStatus.approved).toBe(15);
     });
@@ -322,9 +321,8 @@ describe("Discovery Lambda", () => {
       expect(mockOrchestrator.discoverFromSearchQueries).toHaveBeenCalled();
 
       // Should include error in summary
-      const summary = vi.mocked(
-        mockNotificationService.sendDiscoveryCompletion,
-      ).mock.calls[0][0];
+      const summary = vi.mocked(mockNotificationService.sendDiscoveryCompletion)
+        .mock.calls[0][0];
       expect(summary.errors).toContain(
         "Domain discovery failed: Domain discovery failed",
       );
@@ -338,24 +336,25 @@ describe("Discovery Lambda", () => {
       await handler(mockEvent);
 
       // Should still send completion notification
-      expect(mockNotificationService.sendDiscoveryCompletion).toHaveBeenCalled();
+      expect(
+        mockNotificationService.sendDiscoveryCompletion,
+      ).toHaveBeenCalled();
 
       // Should include error in summary
-      const summary = vi.mocked(
-        mockNotificationService.sendDiscoveryCompletion,
-      ).mock.calls[0][0];
-      expect(summary.errors).toContain("Search query discovery failed: Search failed");
+      const summary = vi.mocked(mockNotificationService.sendDiscoveryCompletion)
+        .mock.calls[0][0];
+      expect(summary.errors).toContain(
+        "Search query discovery failed: Search failed",
+      );
     });
 
     it("should send error notification if Lambda fails", async () => {
-      vi.mocked(mockOrchestrator.discoverFromDomains).mockRejectedValue(
-        new Error("Fatal error"),
-      );
-      vi.mocked(mockOrchestrator.discoverFromSearchQueries).mockRejectedValue(
+      // Trigger a fatal error in the outer try block (e.g. cost tracking fails)
+      vi.mocked(mockCostTracker.getUsageStats).mockRejectedValue(
         new Error("Fatal error"),
       );
 
-      await expect(handler(mockEvent)).rejects.toThrow();
+      await expect(handler(mockEvent)).rejects.toThrow("Fatal error");
 
       expect(mockNotificationService.sendError).toHaveBeenCalled();
     });
@@ -369,7 +368,10 @@ describe("Discovery Lambda", () => {
 
       await handler(mockEvent);
 
-      expect(readFile).toHaveBeenCalledWith("/custom/path/config.json", "utf-8");
+      expect(readFile).toHaveBeenCalledWith(
+        "/custom/path/config.json",
+        "utf-8",
+      );
 
       delete process.env.DISCOVERY_CONFIG_PATH;
     });

@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { NotificationService } from "./notificationService.js";
-import type { DiscoveryCompletionSummary, BudgetAlert } from "./notificationService.js";
+import type {
+  DiscoveryCompletionSummary,
+  BudgetAlert,
+} from "./notificationService.js";
 
 // Mock AWS SES
 vi.mock("@aws-sdk/client-ses", () => {
@@ -38,7 +41,9 @@ describe("NotificationService", () => {
     });
 
     it("should initialize with Slack when webhook URL provided", () => {
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
       expect(service.hasExternalChannels()).toBe(true);
     });
 
@@ -87,7 +92,9 @@ describe("NotificationService", () => {
     it("should send to Slack when configured", async () => {
       mockFetch.mockResolvedValue({ ok: true });
 
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
       await service.sendDiscoveryCompletion(mockSummary);
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -98,19 +105,29 @@ describe("NotificationService", () => {
         }),
       );
 
-      const body = JSON.parse(vi.mocked(mockFetch).mock.calls[0][1]!.body as string);
+      const body = JSON.parse(
+        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+      );
       expect(body.text).toContain("Source Discovery Run Complete");
       expect(body.text).toContain("Total Discovered: 25");
       expect(body.text).toContain("Tavily Credits: 105");
     });
 
     it("should handle Slack errors gracefully", async () => {
-      mockFetch.mockResolvedValue({ ok: false, status: 500, text: async () => "Internal Server Error" });
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: async () => "Internal Server Error",
+      });
 
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
 
       // Should not throw
-      await expect(service.sendDiscoveryCompletion(mockSummary)).resolves.toBeUndefined();
+      await expect(
+        service.sendDiscoveryCompletion(mockSummary),
+      ).resolves.toBeUndefined();
     });
 
     it("should include errors in message", async () => {
@@ -121,21 +138,27 @@ describe("NotificationService", () => {
         errors: ["Failed to fetch example.com", "Timeout on test.org"],
       };
 
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
       await service.sendDiscoveryCompletion(summaryWithErrors);
 
-      const body = JSON.parse(vi.mocked(mockFetch).mock.calls[0][1]!.body as string);
+      const body = JSON.parse(
+        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+      );
       expect(body.text).toContain("Errors:");
       expect(body.text).toContain("Failed to fetch example.com");
       expect(body.text).toContain("Timeout on test.org");
     });
 
     it("should send email when configured", async () => {
+      // Create service first so SESClient constructor is called
+      service = new NotificationService({ email: "admin@test.com" });
+
       const { SESClient } = await import("@aws-sdk/client-ses");
-      const mockSend = vi.mocked(SESClient).mock.results[0]?.value.send ?? vi.fn();
+      const mockSend = vi.mocked(SESClient).mock.results[0].value.send;
       vi.mocked(mockSend).mockResolvedValue({});
 
-      service = new NotificationService({ email: "admin@test.com" });
       await service.sendDiscoveryCompletion(mockSummary);
 
       expect(mockSend).toHaveBeenCalled();
@@ -162,10 +185,14 @@ describe("NotificationService", () => {
     it("should send warning alert to Slack", async () => {
       mockFetch.mockResolvedValue({ ok: true });
 
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
       await service.sendBudgetAlert(warningAlert);
 
-      const body = JSON.parse(vi.mocked(mockFetch).mock.calls[0][1]!.body as string);
+      const body = JSON.parse(
+        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+      );
       expect(body.text).toContain("Budget Warning");
       expect(body.text).toContain("tavily");
       expect(body.text).toContain("800 credits");
@@ -175,10 +202,14 @@ describe("NotificationService", () => {
     it("should send critical alert to Slack", async () => {
       mockFetch.mockResolvedValue({ ok: true });
 
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
       await service.sendBudgetAlert(criticalAlert);
 
-      const body = JSON.parse(vi.mocked(mockFetch).mock.calls[0][1]!.body as string);
+      const body = JSON.parse(
+        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+      );
       expect(body.text).toContain("Budget CRITICAL");
       expect(body.text).toContain("anthropic");
       expect(body.text).toContain("$12.5000");
@@ -189,10 +220,14 @@ describe("NotificationService", () => {
     it("should format Tavily budget in credits", async () => {
       mockFetch.mockResolvedValue({ ok: true });
 
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
       await service.sendBudgetAlert(warningAlert);
 
-      const body = JSON.parse(vi.mocked(mockFetch).mock.calls[0][1]!.body as string);
+      const body = JSON.parse(
+        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+      );
       expect(body.text).toContain("Usage: 800 credits");
       expect(body.text).toContain("Budget: 1000 credits");
     });
@@ -200,10 +235,14 @@ describe("NotificationService", () => {
     it("should format Anthropic budget in dollars", async () => {
       mockFetch.mockResolvedValue({ ok: true });
 
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
       await service.sendBudgetAlert(criticalAlert);
 
-      const body = JSON.parse(vi.mocked(mockFetch).mock.calls[0][1]!.body as string);
+      const body = JSON.parse(
+        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+      );
       expect(body.text).toContain("Usage: $12.5000");
       expect(body.text).toContain("Budget: $10.00");
     });
@@ -213,10 +252,14 @@ describe("NotificationService", () => {
     it("should send error notification with string message", async () => {
       mockFetch.mockResolvedValue({ ok: true });
 
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
       await service.sendError("discovery-lambda", "Database connection failed");
 
-      const body = JSON.parse(vi.mocked(mockFetch).mock.calls[0][1]!.body as string);
+      const body = JSON.parse(
+        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+      );
       expect(body.text).toContain("Error: discovery-lambda");
       expect(body.text).toContain("Database connection failed");
     });
@@ -225,10 +268,14 @@ describe("NotificationService", () => {
       mockFetch.mockResolvedValue({ ok: true });
 
       const error = new Error("Something went wrong");
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
       await service.sendError("discovery-lambda", error);
 
-      const body = JSON.parse(vi.mocked(mockFetch).mock.calls[0][1]!.body as string);
+      const body = JSON.parse(
+        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+      );
       expect(body.text).toContain("Error: discovery-lambda");
       expect(body.text).toContain("Something went wrong");
     });
@@ -237,17 +284,23 @@ describe("NotificationService", () => {
       mockFetch.mockResolvedValue({ ok: true });
 
       const error = new Error("Test error");
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
       await service.sendError("test-context", error);
 
-      const body = JSON.parse(vi.mocked(mockFetch).mock.calls[0][1]!.body as string);
+      const body = JSON.parse(
+        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+      );
       expect(body.text).toContain("Stack:");
     });
 
     it("should handle notification failures gracefully", async () => {
       mockFetch.mockRejectedValue(new Error("Network error"));
 
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
 
       // Should not throw
       await expect(
@@ -263,7 +316,9 @@ describe("NotificationService", () => {
     });
 
     it("should return true with Slack configured", () => {
-      service = new NotificationService({ slack: "https://hooks.slack.com/test" });
+      service = new NotificationService({
+        slack: "https://hooks.slack.com/test",
+      });
       expect(service.hasExternalChannels()).toBe(true);
     });
 

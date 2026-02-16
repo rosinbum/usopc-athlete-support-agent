@@ -41,6 +41,7 @@ describe("CostTracker", () => {
           tavilyCalls: 1,
           tavilyCredits: 1,
         },
+        exists: null,
       });
     });
 
@@ -55,6 +56,7 @@ describe("CostTracker", () => {
           tavilyCalls: 1,
           tavilyCredits: 5,
         },
+        exists: null,
       });
     });
 
