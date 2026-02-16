@@ -3,6 +3,12 @@ import { getDatabaseUrl } from "./env.js";
 
 let pool: Pool | null = null;
 
+export interface PoolStatus {
+  totalConnections: number;
+  idleConnections: number;
+  waitingRequests: number;
+}
+
 /**
  * Returns a singleton database pool instance.
  * Uses getDatabaseUrl() to resolve the connection string from
@@ -18,6 +24,18 @@ export function getPool(): Pool {
     });
   }
   return pool;
+}
+
+/**
+ * Returns pool connection metrics, or null if the pool has not been created yet.
+ */
+export function getPoolStatus(): PoolStatus | null {
+  if (!pool) return null;
+  return {
+    totalConnections: pool.totalCount,
+    idleConnections: pool.idleCount,
+    waitingRequests: pool.waitingCount,
+  };
 }
 
 /**

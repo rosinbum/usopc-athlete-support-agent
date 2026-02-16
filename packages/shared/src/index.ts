@@ -34,7 +34,7 @@ export {
   isDevelopment,
 } from "./env.js";
 
-export { getPool, closePool } from "./pool.js";
+export { getPool, closePool, getPoolStatus, type PoolStatus } from "./pool.js";
 
 export {
   deleteChunksBySourceId,
