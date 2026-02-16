@@ -15,6 +15,7 @@ import type { TavilySearchLike } from "./nodes/index.js";
 import { routeByDomain } from "./edges/routeByDomain.js";
 import { needsMoreInfo } from "./edges/needsMoreInfo.js";
 import { withMetrics } from "./nodeMetrics.js";
+import { getFeatureFlags } from "../config/featureFlags.js";
 
 export interface GraphDependencies {
   vectorStore: VectorStoreLike;
@@ -33,7 +34,10 @@ export interface GraphDependencies {
  *     escalate -> citationBuilder -> disclaimerGuard -> END
  */
 export function createAgentGraph(deps: GraphDependencies) {
-  const compiled = new StateGraph(AgentStateAnnotation)
+  const flags = getFeatureFlags();
+
+  // Base nodes — chained for TypeScript generic tracking
+  const builder = new StateGraph(AgentStateAnnotation)
     .addNode("classifier", withMetrics("classifier", classifierNode))
     .addNode("clarify", withMetrics("clarify", clarifyNode))
     .addNode(
@@ -53,17 +57,23 @@ export function createAgentGraph(deps: GraphDependencies) {
     .addNode(
       "disclaimerGuard",
       withMetrics("disclaimerGuard", disclaimerGuardNode),
-    )
-    .addEdge("__start__", "classifier")
-    .addConditionalEdges("classifier", routeByDomain)
-    .addEdge("clarify", "__end__")
-    .addConditionalEdges("retriever", needsMoreInfo)
-    .addEdge("researcher", "synthesizer")
-    .addEdge("synthesizer", "citationBuilder")
-    .addEdge("escalate", "citationBuilder")
-    .addEdge("citationBuilder", "disclaimerGuard")
-    .addEdge("disclaimerGuard", "__end__")
-    .compile();
+    );
+
+  // Edges
+  builder.addEdge("__start__", "classifier");
+  builder.addConditionalEdges("classifier", routeByDomain);
+  builder.addEdge("clarify", "__end__");
+  builder.addConditionalEdges("retriever", needsMoreInfo);
+  builder.addEdge("researcher", "synthesizer");
+  builder.addEdge("synthesizer", "citationBuilder");
+  builder.addEdge("escalate", "citationBuilder");
+  builder.addEdge("citationBuilder", "disclaimerGuard");
+  builder.addEdge("disclaimerGuard", "__end__");
+
+  // TODO: Use `flags` for conditional node/edge insertion (#155-#160)
+  void flags;
+
+  const compiled = builder.compile();
 
   return compiled;
 }
