@@ -1,4 +1,8 @@
-import { createDataStreamResponse, formatDataStreamPart } from "ai";
+import {
+  createDataStreamResponse,
+  formatDataStreamPart,
+  type JSONValue,
+} from "ai";
 import { logger } from "@usopc/shared";
 
 const log = logger.child({ service: "chat-route" });
@@ -105,6 +109,12 @@ export async function POST(req: Request) {
         } else if (event.type === "error" && event.error) {
           log.error("Agent stream error", { error: String(event.error) });
           writer.write(formatDataStreamPart("error", event.error.message));
+        } else if (event.type === "citations" && event.citations) {
+          writer.write(
+            formatDataStreamPart("message_annotations", [
+              { type: "citations", citations: event.citations },
+            ] as unknown as JSONValue[]),
+          );
         }
       }
 
