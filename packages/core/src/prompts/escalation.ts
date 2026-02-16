@@ -61,6 +61,7 @@ export const ESCALATION_TARGETS: EscalationTarget[] = [
   {
     id: "athletes_commission",
     organization: "Team USA Athletes' Commission",
+    contactEmail: "teamusaac@usopc.org",
     contactUrl: "https://www.usopc.org/voice-and-representation",
     domains: ["governance", "athlete_rights"],
     urgencyDefault: "standard",
@@ -172,8 +173,12 @@ function formatTargetForPrompt(target: EscalationTarget): string {
   lines.push(`### ${target.organization}`);
   lines.push(target.description);
   if (target.contactPhone) lines.push(`- Phone: ${target.contactPhone}`);
-  if (target.contactEmail) lines.push(`- Email: ${target.contactEmail}`);
-  if (target.contactUrl) lines.push(`- Website: ${target.contactUrl}`);
+  if (target.contactEmail)
+    lines.push(
+      `- Email: [${target.contactEmail}](mailto:${target.contactEmail})`,
+    );
+  if (target.contactUrl)
+    lines.push(`- Website: [${target.organization}](${target.contactUrl})`);
   return lines.join("\n");
 }
 

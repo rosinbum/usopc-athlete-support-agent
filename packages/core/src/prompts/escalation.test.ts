@@ -31,6 +31,14 @@ describe("ESCALATION_TARGETS", () => {
     expect(ombuds).toBeDefined();
     expect(ombuds!.contactEmail).toBe("ombudsman@usathlete.org");
   });
+
+  it("includes Athletes' Commission email", () => {
+    const commission = ESCALATION_TARGETS.find(
+      (t) => t.id === "athletes_commission",
+    );
+    expect(commission).toBeDefined();
+    expect(commission!.contactEmail).toBe("teamusaac@usopc.org");
+  });
 });
 
 describe("getEscalationTargets", () => {
@@ -143,6 +151,45 @@ describe("buildEscalationPrompt", () => {
     );
     expect(prompt).toContain("U.S. Center for SafeSport");
     expect(prompt).toContain("833-5US-SAFE");
+  });
+
+  it("renders emails as mailto markdown links", () => {
+    const targets = getEscalationTargets("dispute_resolution");
+    const prompt = buildEscalationPrompt(
+      "test",
+      "dispute_resolution",
+      "standard",
+      "test reason",
+      targets,
+    );
+    expect(prompt).toContain(
+      "[ombudsman@usathlete.org](mailto:ombudsman@usathlete.org)",
+    );
+  });
+
+  it("renders websites as markdown links with organization name", () => {
+    const targets = getEscalationTargets("dispute_resolution");
+    const prompt = buildEscalationPrompt(
+      "test",
+      "dispute_resolution",
+      "standard",
+      "test reason",
+      targets,
+    );
+    expect(prompt).toContain("[Athlete Ombuds](https://www.usathlete.org)");
+  });
+
+  it("keeps phone numbers as plain text", () => {
+    const targets = getEscalationTargets("dispute_resolution");
+    const prompt = buildEscalationPrompt(
+      "test",
+      "dispute_resolution",
+      "standard",
+      "test reason",
+      targets,
+    );
+    expect(prompt).toContain("Phone: 719-866-5000");
+    expect(prompt).not.toContain("[719-866-5000]");
   });
 
   it("includes domain guidance for the given domain", () => {
