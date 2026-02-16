@@ -9,6 +9,10 @@ export interface FeatureFlags {
 /**
  * Reads feature flags from environment variables.
  * All flags default to `false` — only the string "true" enables a flag.
+ *
+ * These flags are set via the `environment` block in sst.config.ts and baked
+ * into the Lambda configuration at deploy time. Changing a flag value requires
+ * a redeployment — they are not runtime-configurable.
  */
 export function getFeatureFlags(): FeatureFlags {
   return {
