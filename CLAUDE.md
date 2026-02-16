@@ -35,6 +35,12 @@ Worktree naming convention: `../usopc-issue-<number>` (e.g., `../usopc-issue-23`
 
 **Important**: After creating a worktree, run `pnpm install` in the new directory to set up `node_modules`.
 
+### Worktree Gotchas
+
+- **Copy `update-hours.mjs`**: The main repo has an untracked `scripts/update-hours.mjs` used by a pre-commit hook. Copy it to new worktrees or commits will fail: `cp /path/to/main/scripts/update-hours.mjs /path/to/worktree/scripts/`
+- **README merge conflicts**: The hours timestamp in README.md causes merge conflicts on nearly every PR. Resolve by keeping the later timestamp (from `origin/main`).
+- **`gh pr merge` from worktrees**: Fails with "main is already used by worktree". Use `--repo owner/repo` flag or run from the main repo directory.
+
 ### Implementation Steps
 
 For any implementation task:
@@ -48,6 +54,8 @@ For any implementation task:
 7. Type-check: `pnpm --filter @usopc/<package> typecheck`
 8. Commit, push, and open a PR referencing the issue (`gh pr create`)
 9. After PR is merged, remove the worktree: `git worktree remove ../usopc-issue-<number>`
+
+**Workflow skills** automate these steps — see [Workflow Skills](#workflow-skills) below.
 
 **Keeping issues and PRs accurate:**
 
@@ -66,6 +74,20 @@ Each issue should include a clear title, a description of what needs to be done 
 
 When writing code that is intentionally incomplete or deferred, add a `// TODO:` comment in the source with a short explanation and reference the GitHub issue number (e.g., `// TODO: Wire to agent graph (#5)`). This keeps the codebase searchable and links inline markers to tracked work.
 
+## Monorepo Structure
+
+```
+apps/
+  api/          # tRPC API server (Lambda)
+  web/          # Next.js chat UI
+  slack/        # Slack bot (Lambda)
+packages/
+  core/         # LangGraph agent, tools, services
+  shared/       # DB pool, entities, logger, validation, circuit breaker
+  ingestion/    # Document ingestion pipeline, source discovery
+  evals/        # LangSmith evaluations and quality reviews
+```
+
 ## Documentation
 
 Detailed documentation is in the `docs/` folder:
@@ -76,6 +98,7 @@ Detailed documentation is in the `docs/` folder:
 - [Conventions](./docs/conventions.md) — Formatting, testing, and technical conventions
 - [Quality Review](./docs/quality-review.md) — Round-by-round quality comparison framework
 - [Evaluation Playbook](./docs/evaluation-playbook.md) — Running and interpreting LangSmith evaluations
+- [Tech Debt](./docs/tech-debt.md) — Known technical debt and prioritized fixes
 
 ## Quick Reference
 
@@ -87,6 +110,10 @@ pnpm test                             # Run all tests
 pnpm --filter @usopc/<pkg> test       # Test single package
 pnpm typecheck                        # Type-check all packages
 npx prettier --write <files>          # Format files
+pnpm db:up                            # Start local PostgreSQL with pgvector
+pnpm db:migrate                       # Run database migrations
+pnpm db:down                          # Stop local database
+pnpm --filter @usopc/ingestion discovery:run  # Run source discovery pipeline
 pnpm --filter @usopc/evals eval       # Run LangSmith evaluations
 pnpm --filter @usopc/evals quality:run       # Run quality review scenarios
 pnpm --filter @usopc/evals quality:evaluate  # Evaluate quality review results
@@ -101,4 +128,31 @@ pnpm --filter @usopc/evals quality:all       # Run + evaluate + setup (combined)
 - **SST secret naming**: PascalCase for SST (`OpenaiApiKey`), SCREAMING_SNAKE_CASE for env vars (`OPENAI_API_KEY`).
 - **Scripts needing AWS**: Wrap with `sst shell --` in package.json.
 
+### Testing Gotchas
+
+- **Vitest mock hoisting**: Declare `vi.mock()` with inline factory functions, then use `vi.mocked()` after imports to get typed mocks. Don't declare `const mockFn = vi.fn()` above `vi.mock()` — hoisting causes "Cannot access before initialization" errors.
+- **Web test paths**: File paths for `pnpm --filter @usopc/web test` don't include `src/` prefix (e.g., `components/sources/...` not `src/components/...`).
+
 See [docs/conventions.md](./docs/conventions.md) for the full list.
+
+## Workflow Skills
+
+Custom Claude Code skills that automate the development workflow. Use these instead of running the manual steps above.
+
+| Skill | Description |
+|-------|-------------|
+| `/worktree create <issue>` | Create a worktree for an issue — handles deps, hook script copy, branch naming |
+| `/worktree list` | List active worktrees with ahead/behind status |
+| `/worktree cleanup` | Remove worktrees for merged branches, prune refs |
+| `/pr-ready` | Pre-PR quality gate — tests, typecheck, prettier for changed packages |
+| `/eval-check` | Run agent evals after core code changes (fast + optional LLM evals) |
+| `/implement <issue>` | Full issue-to-code workflow — worktree setup, code exploration, test scaffolding, implementation |
+
+### Hooks
+
+Two PostToolUse hooks fire automatically:
+
+- **Agent-change guard** — When `Edit` or `Write` modifies a file in `packages/core/src/agent/`, prints a reminder to run `/eval-check`.
+- **Test-coverage reminder** — When `Write` creates a new `.ts` file in `src/` without a corresponding `.test.ts`, prints a reminder to add tests.
+
+Hook scripts live in `.claude/hooks/` and are registered in `.claude/settings.json`.
