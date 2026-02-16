@@ -7,6 +7,7 @@ import {
   ExternalLink,
   CheckCircle2,
   XCircle,
+  Upload,
 } from "lucide-react";
 import type { DiscoveredSource, DiscoveryStatus } from "@usopc/shared";
 
@@ -110,6 +111,18 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
   }, [fetchDiscovery]);
 
   // -------------------------------------------------------------------------
+  // Build back link preserving selection params
+  // -------------------------------------------------------------------------
+
+  function backHref(): string {
+    if (typeof window === "undefined") return "/admin/discoveries";
+    const params = new URLSearchParams(window.location.search);
+    const selected = params.get("selected");
+    if (selected) return `/admin/discoveries?selected=${selected}`;
+    return "/admin/discoveries";
+  }
+
+  // -------------------------------------------------------------------------
   // Actions
   // -------------------------------------------------------------------------
 
@@ -152,6 +165,27 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
     }
   }
 
+  async function handleSendToSources() {
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/admin/discoveries/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send_to_sources" }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to send to sources");
+      }
+      const data = await res.json();
+      setDiscovery(data.discovery);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Send to sources failed");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
@@ -170,7 +204,7 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
       <div className="text-center py-12">
         <p className="text-red-600">{error ?? "Discovery not found"}</p>
         <a
-          href="/admin/discoveries"
+          href={backHref()}
           className="mt-4 inline-block text-blue-600 hover:text-blue-800"
         >
           Back to Discoveries
@@ -181,6 +215,8 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
 
   const badge = statusBadge(discovery.status);
   const isPending = PENDING_STATUSES.has(discovery.status);
+  const canSendToSources =
+    discovery.status === "approved" && !discovery.sourceConfigId;
 
   const sections: Record<string, Record<string, React.ReactNode>> = {
     Identity: {
@@ -298,7 +334,7 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
       {/* Back link + Title */}
       <div className="mb-6">
         <a
-          href="/admin/discoveries"
+          href={backHref()}
           className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Discoveries
@@ -314,55 +350,74 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
       </div>
 
       {/* Action Buttons */}
-      {isPending && (
+      {(isPending || canSendToSources) && (
         <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={handleApprove}
-            disabled={actionLoading}
-            className="px-4 py-2 text-sm rounded-lg font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
-          >
-            {actionLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4" />
-            )}
-            Approve
-          </button>
+          {isPending && (
+            <>
+              <button
+                onClick={handleApprove}
+                disabled={actionLoading}
+                className="px-4 py-2 text-sm rounded-lg font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+              >
+                {actionLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" />
+                )}
+                Approve
+              </button>
 
-          {showRejectInput ? (
-            <div className="flex items-center gap-2 flex-1">
-              <input
-                type="text"
-                placeholder="Rejection reason..."
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
-              <button
-                onClick={handleReject}
-                disabled={actionLoading || !rejectReason.trim()}
-                className="px-4 py-2 text-sm rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                Confirm Reject
-              </button>
-              <button
-                onClick={() => {
-                  setShowRejectInput(false);
-                  setRejectReason("");
-                }}
-                className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
+              {showRejectInput ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <input
+                    type="text"
+                    placeholder="Rejection reason..."
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                  <button
+                    onClick={handleReject}
+                    disabled={actionLoading || !rejectReason.trim()}
+                    className="px-4 py-2 text-sm rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    Confirm Reject
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowRejectInput(false);
+                      setRejectReason("");
+                    }}
+                    className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowRejectInput(true)}
+                  disabled={actionLoading}
+                  className="px-4 py-2 text-sm rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-1"
+                >
+                  <XCircle className="w-4 h-4" />
+                  Reject
+                </button>
+              )}
+            </>
+          )}
+
+          {canSendToSources && (
             <button
-              onClick={() => setShowRejectInput(true)}
+              onClick={handleSendToSources}
               disabled={actionLoading}
-              className="px-4 py-2 text-sm rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-1"
+              className="px-4 py-2 text-sm rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1"
             >
-              <XCircle className="w-4 h-4" />
-              Reject
+              {actionLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Upload className="w-4 h-4" />
+              )}
+              Send to Sources
             </button>
           )}
         </div>

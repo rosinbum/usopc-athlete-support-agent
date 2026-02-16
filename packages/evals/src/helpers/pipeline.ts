@@ -63,6 +63,8 @@ export async function runPipeline(userMessage: string): Promise<{
       escalationReason: undefined,
       retrievalStatus: "success",
       emotionalState: "neutral",
+      qualityCheckResult: undefined,
+      qualityRetryCount: 0,
     },
     trajectory,
   };

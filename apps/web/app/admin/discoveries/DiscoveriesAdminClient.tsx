@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Loader2,
   Search,
@@ -10,6 +11,7 @@ import {
   XCircle,
   Clock,
   Eye,
+  Upload,
 } from "lucide-react";
 import type { DiscoveredSource, DiscoveryStatus } from "@usopc/shared";
 
@@ -31,6 +33,7 @@ interface Filters {
   discoveryMethod: string;
   minConfidence: string;
   maxConfidence: string;
+  sourceLink: "" | "linked" | "unlinked";
 }
 
 const ITEMS_PER_PAGE = 25;
@@ -104,6 +107,8 @@ function statusWeight(s: DiscoveryStatus): number {
 // ---------------------------------------------------------------------------
 
 export function DiscoveriesAdminClient() {
+  const searchParams = useSearchParams();
+
   const [discoveries, setDiscoveries] = useState<DiscoveredSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,12 +118,27 @@ export function DiscoveriesAdminClient() {
     discoveryMethod: "",
     minConfidence: "",
     maxConfidence: "",
+    sourceLink: "",
   });
   const [sortField, setSortField] = useState<SortField>("combinedConfidence");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => {
+    const param = searchParams.get("selected");
+    return param ? new Set(param.split(",").filter(Boolean)) : new Set();
+  });
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  // Sync selection to URL params (without triggering re-renders)
+  const syncSelectionToUrl = useCallback((sel: Set<string>) => {
+    const url = new URL(window.location.href);
+    if (sel.size > 0) {
+      url.searchParams.set("selected", Array.from(sel).join(","));
+    } else {
+      url.searchParams.delete("selected");
+    }
+    window.history.replaceState({}, "", url.toString());
+  }, []);
 
   // -------------------------------------------------------------------------
   // Fetch
@@ -158,7 +178,18 @@ export function DiscoveriesAdminClient() {
     ).length;
     const approved = discoveries.filter((d) => d.status === "approved").length;
     const rejected = discoveries.filter((d) => d.status === "rejected").length;
-    return { total, pendingReview, approved, rejected };
+    const sentToSources = discoveries.filter((d) => d.sourceConfigId).length;
+    const approvedUnlinked = discoveries.filter(
+      (d) => d.status === "approved" && !d.sourceConfigId,
+    ).length;
+    return {
+      total,
+      pendingReview,
+      approved,
+      rejected,
+      sentToSources,
+      approvedUnlinked,
+    };
   }, [discoveries]);
 
   // -------------------------------------------------------------------------
@@ -181,6 +212,8 @@ export function DiscoveriesAdminClient() {
         d.discoveryMethod !== filters.discoveryMethod
       )
         return false;
+      if (filters.sourceLink === "linked" && !d.sourceConfigId) return false;
+      if (filters.sourceLink === "unlinked" && d.sourceConfigId) return false;
       if (filters.minConfidence) {
         const min = parseFloat(filters.minConfidence);
         if (
@@ -243,15 +276,14 @@ export function DiscoveriesAdminClient() {
     paginated.length > 0 && paginated.every((d) => selected.has(d.id));
 
   function toggleSelectAll() {
+    const next = new Set(selected);
     if (allOnPageSelected) {
-      const next = new Set(selected);
       paginated.forEach((d) => next.delete(d.id));
-      setSelected(next);
     } else {
-      const next = new Set(selected);
       paginated.forEach((d) => next.add(d.id));
-      setSelected(next);
     }
+    setSelected(next);
+    syncSelectionToUrl(next);
   }
 
   function toggleSelect(id: string) {
@@ -259,6 +291,7 @@ export function DiscoveriesAdminClient() {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelected(next);
+    syncSelectionToUrl(next);
   }
 
   // -------------------------------------------------------------------------
@@ -291,9 +324,49 @@ export function DiscoveriesAdminClient() {
         throw new Error(data.error || "Bulk action failed");
       }
       setSelected(new Set());
+      syncSelectionToUrl(new Set());
       await fetchDiscoveries();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bulk action failed");
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  async function bulkSendToSources(ids?: string[]) {
+    setBulkLoading(true);
+    try {
+      const res = await fetch("/api/admin/discoveries/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_to_sources",
+          ...(ids ? { ids } : {}),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Send to sources failed");
+      }
+      const data = await res.json();
+      const parts: string[] = [];
+      if (data.created > 0) parts.push(`${data.created} created`);
+      if (data.alreadyLinked > 0)
+        parts.push(`${data.alreadyLinked} already linked`);
+      if (data.duplicateUrl > 0)
+        parts.push(`${data.duplicateUrl} linked to existing source (same URL)`);
+      if (data.notApproved > 0) parts.push(`${data.notApproved} not approved`);
+      if (data.failed > 0) parts.push(`${data.failed} failed`);
+      window.alert(
+        parts.length > 0
+          ? `Send to Sources: ${parts.join(", ")}`
+          : "No discoveries to process",
+      );
+      setSelected(new Set());
+      syncSelectionToUrl(new Set());
+      await fetchDiscoveries();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Send to sources failed");
     } finally {
       setBulkLoading(false);
     }
@@ -321,6 +394,16 @@ export function DiscoveriesAdminClient() {
     ) : (
       <ChevronDown className="w-3 h-3" />
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // Build selection query string for detail page links
+  // -------------------------------------------------------------------------
+
+  function detailHref(id: string): string {
+    const base = `/admin/discoveries/${id}`;
+    if (selected.size === 0) return base;
+    return `${base}?selected=${Array.from(selected).join(",")}`;
   }
 
   // -------------------------------------------------------------------------
@@ -353,7 +436,7 @@ export function DiscoveriesAdminClient() {
   return (
     <div>
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-1">
             <Eye className="w-4 h-4" />
@@ -387,7 +470,33 @@ export function DiscoveriesAdminClient() {
           </div>
           <p className="text-2xl font-bold">{stats.rejected}</p>
         </div>
+
+        <div className="border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-indigo-600 mb-1">
+            <Upload className="w-4 h-4" />
+            <span className="text-sm">Sent to Sources</span>
+          </div>
+          <p className="text-2xl font-bold">{stats.sentToSources}</p>
+        </div>
       </div>
+
+      {/* Send All Approved to Sources */}
+      {stats.approvedUnlinked > 0 && (
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => bulkSendToSources()}
+            disabled={bulkLoading}
+            className="px-4 py-2 text-sm rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            {bulkLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4" />
+            )}
+            Send All Approved to Sources ({stats.approvedUnlinked})
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -436,6 +545,22 @@ export function DiscoveriesAdminClient() {
           <option value="search">Search</option>
           <option value="manual">Manual</option>
         </select>
+
+        <select
+          value={filters.sourceLink}
+          onChange={(e) => {
+            setFilters((f) => ({
+              ...f,
+              sourceLink: e.target.value as "" | "linked" | "unlinked",
+            }));
+            setPage(1);
+          }}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">All Sources</option>
+          <option value="linked">Sent to Sources</option>
+          <option value="unlinked">Not Sent</option>
+        </select>
       </div>
 
       {/* Bulk Action Bar */}
@@ -457,6 +582,14 @@ export function DiscoveriesAdminClient() {
             className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
           >
             Reject
+          </button>
+          <button
+            onClick={() => bulkSendToSources(Array.from(selected))}
+            disabled={bulkLoading}
+            className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1"
+          >
+            <Upload className="w-3 h-3" />
+            Send to Sources
           </button>
           {bulkLoading && <Loader2 className="w-4 h-4 animate-spin" />}
         </div>
@@ -527,7 +660,7 @@ export function DiscoveriesAdminClient() {
                   className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                   onClick={(e) => {
                     if ((e.target as HTMLElement).tagName === "INPUT") return;
-                    window.location.href = `/admin/discoveries/${d.id}`;
+                    window.location.href = detailHref(d.id);
                   }}
                 >
                   <td className="px-3 py-3">
@@ -564,6 +697,11 @@ export function DiscoveriesAdminClient() {
                     >
                       {badge.label}
                     </span>
+                    {d.sourceConfigId && (
+                      <span className="inline-block ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                        Sent
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-gray-500">
                     {formatDate(d.discoveredAt)}

@@ -3,20 +3,26 @@ import { z } from "zod";
 import { auth } from "../../../../../auth.js";
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createDiscoveredSourceEntity } from "../../../../../lib/discovered-source.js";
+import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
+import { sendDiscoveryToSources } from "../../../../../lib/send-to-sources.js";
 
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
 
-const patchSchema = z
-  .object({
-    action: z.enum(["approve", "reject"]),
-    reason: z.string().min(1, "Reason is required for rejection").optional(),
-  })
-  .refine((data) => data.action !== "reject" || !!data.reason, {
-    message: "Reason is required when rejecting",
-    path: ["reason"],
-  });
+const patchSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("approve"),
+    reason: z.string().optional(),
+  }),
+  z.object({
+    action: z.literal("reject"),
+    reason: z.string().min(1, "Reason is required for rejection"),
+  }),
+  z.object({
+    action: z.literal("send_to_sources"),
+  }),
+]);
 
 // ---------------------------------------------------------------------------
 // GET — discovery detail
@@ -52,7 +58,7 @@ export async function GET(
 }
 
 // ---------------------------------------------------------------------------
-// PATCH — approve or reject a discovery
+// PATCH — approve, reject, or send to sources
 // ---------------------------------------------------------------------------
 
 export async function PATCH(
@@ -81,13 +87,47 @@ export async function PATCH(
       );
     }
 
+    const { action } = result.data;
+
+    // -----------------------------------------------------------------------
+    // send_to_sources
+    // -----------------------------------------------------------------------
+    if (action === "send_to_sources") {
+      if (existing.status !== "approved") {
+        return NextResponse.json(
+          { error: "Discovery must be approved before sending to sources" },
+          { status: 400 },
+        );
+      }
+
+      const scEntity = createSourceConfigEntity();
+      const sendResult = await sendDiscoveryToSources(
+        existing,
+        scEntity,
+        entity,
+      );
+
+      if (sendResult.status === "failed") {
+        return NextResponse.json(
+          { error: sendResult.error ?? "Failed to create source config" },
+          { status: 500 },
+        );
+      }
+
+      const discovery = await entity.getById(id);
+      return NextResponse.json({ discovery, result: sendResult });
+    }
+
+    // -----------------------------------------------------------------------
+    // approve / reject
+    // -----------------------------------------------------------------------
     const session = await auth();
     const reviewedBy = session?.user?.email ?? "unknown";
 
-    if (result.data.action === "approve") {
+    if (action === "approve") {
       await entity.approve(id, reviewedBy);
     } else {
-      await entity.reject(id, reviewedBy, result.data.reason!);
+      await entity.reject(id, reviewedBy, result.data.reason);
     }
 
     const discovery = await entity.getById(id);

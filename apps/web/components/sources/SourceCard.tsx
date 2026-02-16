@@ -19,7 +19,13 @@ interface SourceCardProps {
 function formatDate(dateString: string | null): string {
   if (!dateString) return "";
   try {
-    return new Date(dateString).toLocaleDateString("en-US", {
+    // Date-only strings (e.g. "2024-01-15") are parsed as UTC by spec,
+    // causing off-by-one day errors in local timezones. Append T00:00:00
+    // to force local timezone interpretation.
+    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(dateString)
+      ? new Date(dateString + "T00:00:00")
+      : new Date(dateString);
+    return parsed.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
