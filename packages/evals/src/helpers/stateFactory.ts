@@ -28,6 +28,8 @@ export function makeTestState(overrides: Partial<AgentState> = {}): AgentState {
     emotionalState: "neutral",
     qualityCheckResult: undefined,
     qualityRetryCount: 0,
+    expansionAttempted: false,
+    reformulatedQueries: [],
     ...overrides,
   };
 }
