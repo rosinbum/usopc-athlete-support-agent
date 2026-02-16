@@ -9,11 +9,13 @@ import {
   escalateNode,
   citationBuilderNode,
   disclaimerGuardNode,
+  qualityCheckerNode,
 } from "./nodes/index.js";
 import type { VectorStoreLike } from "./nodes/index.js";
 import type { TavilySearchLike } from "./nodes/index.js";
 import { routeByDomain } from "./edges/routeByDomain.js";
 import { needsMoreInfo } from "./edges/needsMoreInfo.js";
+import { routeByQuality } from "./edges/routeByQuality.js";
 import { withMetrics } from "./nodeMetrics.js";
 import { getFeatureFlags } from "../config/featureFlags.js";
 
@@ -25,18 +27,24 @@ export interface GraphDependencies {
 /**
  * Creates and compiles the full LangGraph agent.
  *
- * Graph flow:
+ * Graph flow (quality checker OFF — default):
  *   START -> classifier -> (routeByDomain) -> clarify | retriever | escalate
  *     clarify -> END
  *     retriever -> (needsMoreInfo) -> synthesizer | researcher
  *     researcher -> synthesizer
  *     synthesizer -> citationBuilder -> disclaimerGuard -> END
  *     escalate -> citationBuilder -> disclaimerGuard -> END
+ *
+ * Graph flow (quality checker ON):
+ *   ...same as above, but:
+ *     synthesizer -> qualityChecker -> (routeByQuality) -> citationBuilder | synthesizer(retry)
  */
 export function createAgentGraph(deps: GraphDependencies) {
   const flags = getFeatureFlags();
 
-  // Base nodes — chained for TypeScript generic tracking
+  // All nodes registered unconditionally for TypeScript generic tracking.
+  // The qualityChecker node is always registered but only wired when the
+  // feature flag is enabled.
   const builder = new StateGraph(AgentStateAnnotation)
     .addNode("classifier", withMetrics("classifier", classifierNode))
     .addNode("clarify", withMetrics("clarify", clarifyNode))
@@ -57,6 +65,10 @@ export function createAgentGraph(deps: GraphDependencies) {
     .addNode(
       "disclaimerGuard",
       withMetrics("disclaimerGuard", disclaimerGuardNode),
+    )
+    .addNode(
+      "qualityChecker",
+      withMetrics("qualityChecker", qualityCheckerNode),
     );
 
   // Edges
@@ -65,13 +77,19 @@ export function createAgentGraph(deps: GraphDependencies) {
   builder.addEdge("clarify", "__end__");
   builder.addConditionalEdges("retriever", needsMoreInfo);
   builder.addEdge("researcher", "synthesizer");
-  builder.addEdge("synthesizer", "citationBuilder");
+
+  if (flags.qualityChecker) {
+    // Quality checker loop: synthesizer → qualityChecker → route → {citationBuilder | synthesizer}
+    builder.addEdge("synthesizer", "qualityChecker");
+    builder.addConditionalEdges("qualityChecker", routeByQuality);
+  } else {
+    // Default: synthesizer → citationBuilder (no quality checking)
+    builder.addEdge("synthesizer", "citationBuilder");
+  }
+
   builder.addEdge("escalate", "citationBuilder");
   builder.addEdge("citationBuilder", "disclaimerGuard");
   builder.addEdge("disclaimerGuard", "__end__");
-
-  // TODO: Use `flags` for conditional node/edge insertion (#155-#160)
-  void flags;
 
   const compiled = builder.compile();
 

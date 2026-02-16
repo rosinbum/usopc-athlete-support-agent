@@ -5,7 +5,13 @@ import type { AgentState } from "./state.js";
 import type { StreamChunk } from "./runner.js";
 
 export interface AgentStreamEvent {
-  type: "text-delta" | "citations" | "escalation" | "error" | "done";
+  type:
+    | "text-delta"
+    | "citations"
+    | "escalation"
+    | "answer-reset"
+    | "error"
+    | "done";
   textDelta?: string;
   citations?: Citation[];
   escalation?: EscalationInfo;
@@ -98,6 +104,19 @@ export async function* agentStreamToEvents(
       } else if (mode === "values") {
         // State update after a node completes
         const state = data as Partial<AgentState>;
+
+        // When quality check fails after synthesizer has streamed tokens,
+        // emit answer-reset so the frontend knows to clear the old answer
+        // before the retry streams new tokens.
+        if (
+          state.qualityCheckResult &&
+          !state.qualityCheckResult.passed &&
+          seenSynthesizerTokens
+        ) {
+          yield { type: "answer-reset" };
+          seenSynthesizerTokens = false;
+          previousAnswerFromValues = "";
+        }
 
         // Emit answer changes from nodes that don't use LLM streaming
         // (clarify, escalate, error handlers). Only if we haven't seen

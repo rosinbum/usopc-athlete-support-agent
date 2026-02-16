@@ -6,6 +6,7 @@ import type {
   Citation,
   EscalationInfo,
   RetrievedDocument,
+  QualityCheckResult,
 } from "../types/index.js";
 
 /**
@@ -179,6 +180,24 @@ export const AgentStateAnnotation = Annotation.Root({
   retrievalStatus: Annotation<"success" | "error">({
     reducer: (_prev, next) => next,
     default: () => "success",
+  }),
+
+  /**
+   * Result from the quality checker node evaluating the synthesized answer.
+   * When `passed` is false, the synthesizer retries with the critique as feedback.
+   */
+  qualityCheckResult: Annotation<QualityCheckResult | undefined>({
+    reducer: (_prev, next) => next,
+    default: () => undefined,
+  }),
+
+  /**
+   * Number of times the synthesizer has retried after quality check failure.
+   * Capped at QUALITY_CHECKER_CONFIG.maxRetries to prevent infinite loops.
+   */
+  qualityRetryCount: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => 0,
   }),
 });
 

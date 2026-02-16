@@ -363,6 +363,107 @@ describe("agentStreamToEvents (dual-mode)", () => {
     expect(errorEvents[0].error?.code).toBe("RETRIEVAL_ERROR");
   });
 
+  it("emits answer-reset when quality check fails after synthesizer tokens", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        [
+          "messages",
+          [{ content: "Generic " }, { langgraph_node: "synthesizer" }],
+        ],
+        [
+          "messages",
+          [{ content: "answer" }, { langgraph_node: "synthesizer" }],
+        ],
+        [
+          "values",
+          {
+            qualityCheckResult: {
+              passed: false,
+              score: 0.3,
+              issues: [
+                {
+                  type: "generic_response",
+                  description: "Too generic",
+                  severity: "major",
+                },
+              ],
+              critique: "Be more specific.",
+            },
+          },
+        ],
+        // After reset, new synthesizer tokens should flow
+        [
+          "messages",
+          [{ content: "Specific " }, { langgraph_node: "synthesizer" }],
+        ],
+        [
+          "messages",
+          [{ content: "answer" }, { langgraph_node: "synthesizer" }],
+        ],
+      ]),
+    );
+
+    const types = events.map((e) => e.type);
+    expect(types).toContain("answer-reset");
+
+    // Should have text-delta before reset, then answer-reset, then more text-deltas
+    const resetIndex = types.indexOf("answer-reset");
+    const textDeltasBefore = events
+      .slice(0, resetIndex)
+      .filter((e) => e.type === "text-delta");
+    const textDeltasAfter = events
+      .slice(resetIndex + 1)
+      .filter((e) => e.type === "text-delta");
+    expect(textDeltasBefore.length).toBeGreaterThan(0);
+    expect(textDeltasAfter.length).toBeGreaterThan(0);
+  });
+
+  it("does not emit answer-reset when quality check passes", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        [
+          "messages",
+          [{ content: "Good answer" }, { langgraph_node: "synthesizer" }],
+        ],
+        [
+          "values",
+          {
+            qualityCheckResult: {
+              passed: true,
+              score: 0.9,
+              issues: [],
+              critique: "",
+            },
+          },
+        ],
+      ]),
+    );
+
+    const types = events.map((e) => e.type);
+    expect(types).not.toContain("answer-reset");
+  });
+
+  it("does not emit answer-reset when no synthesizer tokens seen", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        [
+          "values",
+          {
+            qualityCheckResult: {
+              passed: false,
+              score: 0.3,
+              issues: [],
+              critique: "Bad",
+            },
+          },
+        ],
+      ]),
+    );
+
+    const types = events.map((e) => e.type);
+    expect(types).not.toContain("answer-reset");
+  });
+
   it("emits text deltas before error event when stream partially succeeds", async () => {
     async function* partialStream(): AsyncGenerator<StreamChunk> {
       yield [

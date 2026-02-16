@@ -61,6 +61,8 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     escalationReason: undefined,
     retrievalStatus: "success",
     emotionalState: "neutral",
+    qualityCheckResult: undefined,
+    qualityRetryCount: 0,
     ...overrides,
   };
 }
@@ -338,6 +340,89 @@ describe("synthesizerNode", () => {
       const result = await synthesizerNode(state);
       expect(result.answer).toContain("encountered an error");
       expect(result.answer).not.toContain("high demand");
+    });
+  });
+
+  describe("quality check retry", () => {
+    it("appends critique to prompt when qualityCheckResult is failed", async () => {
+      mockInvoke.mockResolvedValue({
+        content: "Improved specific answer citing Section 9.2...",
+      });
+
+      const state = makeState({
+        retrievedDocuments: [makeDoc("Section 9 procedures...")],
+        qualityCheckResult: {
+          passed: false,
+          score: 0.3,
+          issues: [
+            {
+              type: "generic_response",
+              description: "Too generic",
+              severity: "major",
+            },
+          ],
+          critique: "The answer is too generic. Cite specific section numbers.",
+        },
+        qualityRetryCount: 0,
+      });
+
+      const result = await synthesizerNode(state);
+
+      // Verify critique was appended to prompt
+      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const humanMessage = invokeArgs[1];
+      expect(humanMessage.content).toContain("## Quality Feedback");
+      expect(humanMessage.content).toContain(
+        "The answer is too generic. Cite specific section numbers.",
+      );
+      expect(humanMessage.content).toContain(
+        "Revise your response to address these issues.",
+      );
+
+      // Should increment retryCount
+      expect(result.qualityRetryCount).toBe(1);
+      expect(result.answer).toBeDefined();
+    });
+
+    it("does not append feedback when qualityCheckResult is undefined", async () => {
+      mockInvoke.mockResolvedValue({
+        content: "Normal answer...",
+      });
+
+      const state = makeState({
+        retrievedDocuments: [makeDoc("context")],
+        qualityCheckResult: undefined,
+      });
+
+      const result = await synthesizerNode(state);
+
+      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const humanMessage = invokeArgs[1];
+      expect(humanMessage.content).not.toContain("## Quality Feedback");
+      expect(result.qualityRetryCount).toBeUndefined();
+    });
+
+    it("does not append feedback when qualityCheckResult passed", async () => {
+      mockInvoke.mockResolvedValue({
+        content: "Normal answer...",
+      });
+
+      const state = makeState({
+        retrievedDocuments: [makeDoc("context")],
+        qualityCheckResult: {
+          passed: true,
+          score: 0.9,
+          issues: [],
+          critique: "",
+        },
+      });
+
+      const result = await synthesizerNode(state);
+
+      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const humanMessage = invokeArgs[1];
+      expect(humanMessage.content).not.toContain("## Quality Feedback");
+      expect(result.qualityRetryCount).toBeUndefined();
     });
   });
 });

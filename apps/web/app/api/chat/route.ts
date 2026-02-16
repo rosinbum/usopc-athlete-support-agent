@@ -76,7 +76,11 @@ export async function POST(req: Request) {
   return createDataStreamResponse({
     async execute(writer) {
       for await (const event of events) {
-        if (event.type === "text-delta" && event.textDelta) {
+        if (event.type === "answer-reset") {
+          writer.write(
+            formatDataStreamPart("data", [{ type: "answer-reset" }]),
+          );
+        } else if (event.type === "text-delta" && event.textDelta) {
           writer.write(formatDataStreamPart("text", event.textDelta));
         } else if (event.type === "error" && event.error) {
           console.error("Agent stream error:", event.error);
