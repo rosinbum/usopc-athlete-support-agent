@@ -115,8 +115,11 @@ export class AgentRunner {
    */
   async invoke(input: AgentInput): Promise<AgentOutput> {
     const initialState = this.buildInitialState(input);
+    const config = initialState.conversationId
+      ? { metadata: { session_id: initialState.conversationId } }
+      : undefined;
     const finalState = await withTimeout(
-      this.graph.invoke(initialState),
+      this.graph.invoke(initialState, config),
       GRAPH_CONFIG.invokeTimeoutMs,
       "graph.invoke",
     );
@@ -150,6 +153,9 @@ export class AgentRunner {
     // Dual stream mode: "values" for state after each node, "messages" for token streaming
     const stream = await this.graph.stream(initialState, {
       streamMode: ["values", "messages"],
+      ...(initialState.conversationId
+        ? { metadata: { session_id: initialState.conversationId } }
+        : {}),
     });
 
     for await (const chunk of stream) {
