@@ -63,21 +63,12 @@ export async function persistDiscoveredUrls(
   let skipped = 0;
 
   for (const result of results) {
+    const normalized = normalizeUrl(result.url);
+    const id = urlToId(normalized);
+
     try {
-      const normalized = normalizeUrl(result.url);
-      const id = urlToId(normalized);
-
-      // Dedup check
-      const existing = await entity.getById(id);
-      if (existing) {
-        log.info("Skipping existing discovered URL", {
-          url: normalized,
-          id,
-        });
-        skipped++;
-        continue;
-      }
-
+      // create() uses a conditional put (exists: null) — throws if the
+      // item already exists, so we don't need a separate getById dedup check.
       await entity.create({
         id,
         url: normalized,
@@ -104,10 +95,18 @@ export async function persistDiscoveredUrls(
       });
       persisted++;
     } catch (error) {
-      log.error("Failed to persist discovered URL", {
-        url: result.url,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      // Conditional put failure means the URL already exists — count as skipped.
+      // Other errors (network, etc.) are also caught here and logged.
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("Conditional")) {
+        log.info("Skipping existing discovered URL", { url: normalized, id });
+        skipped++;
+      } else {
+        log.error("Failed to persist discovered URL", {
+          url: result.url,
+          error: msg,
+        });
+      }
     }
   }
 

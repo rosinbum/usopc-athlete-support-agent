@@ -146,14 +146,16 @@ describe("persistDiscoveredUrls", () => {
     );
   });
 
-  it("skips existing URLs (dedup)", async () => {
-    mockEntity.getById.mockResolvedValueOnce({ id: "existing" });
+  it("skips existing URLs via conditional put failure (dedup)", async () => {
+    mockEntity.create.mockRejectedValueOnce(
+      new Error("Conditional check failed"),
+    );
     const results = makeResults("https://usopc.org/existing-doc");
 
     const output = await persistDiscoveredUrls(results, "test-table");
 
     expect(output).toEqual({ persisted: 0, skipped: 1 });
-    expect(mockEntity.create).not.toHaveBeenCalled();
+    expect(mockEntity.markMetadataEvaluated).not.toHaveBeenCalled();
   });
 
   it("individual URL errors don't block others", async () => {
@@ -199,7 +201,7 @@ describe("persistDiscoveredUrls", () => {
     );
   });
 
-  it("high score (>= 0.5) results in pending_content status", async () => {
+  it("passes high Tavily score (>= 0.5) to markMetadataEvaluated", async () => {
     const results = makeResults({
       url: "https://usopc.org/high-score",
       score: 0.85,
@@ -217,7 +219,7 @@ describe("persistDiscoveredUrls", () => {
     );
   });
 
-  it("low score (< 0.5) results in rejected status", async () => {
+  it("passes low Tavily score (< 0.5) to markMetadataEvaluated", async () => {
     const results = makeResults({
       url: "https://usopc.org/low-score",
       score: 0.3,

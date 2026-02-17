@@ -134,6 +134,8 @@ export async function POST(req: Request) {
               ] as unknown as JSONValue[]),
             );
           } else if (event.type === "discovered-urls" && event.discoveredUrls) {
+            // Captured server-side only for fire-and-forget persistence.
+            // Not forwarded to the client — no UX signal for discovery.
             discoveredUrls = event.discoveredUrls;
           }
         }

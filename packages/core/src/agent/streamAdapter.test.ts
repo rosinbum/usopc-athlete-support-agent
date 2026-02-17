@@ -443,6 +443,52 @@ describe("agentStreamToEvents (dual-mode)", () => {
     expect(types).not.toContain("answer-reset");
   });
 
+  it("emits discovered-urls event at end of stream when URLs are present", async () => {
+    const discoveredUrls = [
+      {
+        url: "https://usopc.org/doc1",
+        title: "Selection Procedures",
+        content: "result content",
+        score: 0.9,
+      },
+    ];
+
+    const events = await collectEvents(
+      mockDualStream([
+        ["values", { webSearchResultUrls: discoveredUrls }],
+        [
+          "messages",
+          [{ content: "Answer text" }, { langgraph_node: "synthesizer" }],
+        ],
+      ]),
+    );
+
+    const discoveredEvents = events.filter((e) => e.type === "discovered-urls");
+    expect(discoveredEvents).toHaveLength(1);
+    expect(discoveredEvents[0].discoveredUrls).toEqual(discoveredUrls);
+
+    // discovered-urls should come before done
+    const types = events.map((e) => e.type);
+    const discoveredIndex = types.indexOf("discovered-urls");
+    const doneIndex = types.indexOf("done");
+    expect(discoveredIndex).toBeLessThan(doneIndex);
+  });
+
+  it("does not emit discovered-urls when no URLs are present", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        ["values", { webSearchResultUrls: [] }],
+        [
+          "messages",
+          [{ content: "Answer" }, { langgraph_node: "synthesizer" }],
+        ],
+      ]),
+    );
+
+    const discoveredEvents = events.filter((e) => e.type === "discovered-urls");
+    expect(discoveredEvents).toHaveLength(0);
+  });
+
   it("does not emit answer-reset when no synthesizer tokens seen", async () => {
     const events = await collectEvents(
       mockDualStream([
