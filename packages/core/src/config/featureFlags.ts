@@ -7,6 +7,7 @@ export interface FeatureFlags {
   retrievalExpansion: boolean;
   queryPlanner: boolean;
   emotionalSupport: boolean;
+  parallelResearch: boolean;
 }
 
 /**
@@ -27,5 +28,6 @@ export function getFeatureFlags(): FeatureFlags {
     retrievalExpansion: process.env.FEATURE_RETRIEVAL_EXPANSION === "true",
     queryPlanner: process.env.FEATURE_QUERY_PLANNER === "true",
     emotionalSupport: process.env.FEATURE_EMOTIONAL_SUPPORT === "true",
+    parallelResearch: process.env.FEATURE_PARALLEL_RESEARCH !== "false",
   };
 }

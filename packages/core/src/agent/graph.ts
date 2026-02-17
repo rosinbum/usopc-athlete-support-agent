@@ -17,7 +17,7 @@ import {
 import type { VectorStoreLike } from "./nodes/index.js";
 import type { TavilySearchLike } from "./nodes/index.js";
 import { routeByDomain } from "./edges/routeByDomain.js";
-import { needsMoreInfo, createNeedsMoreInfo } from "./edges/needsMoreInfo.js";
+import { createNeedsMoreInfo } from "./edges/needsMoreInfo.js";
 import { routeByQuality } from "./edges/routeByQuality.js";
 import { withMetrics } from "./nodeMetrics.js";
 import { getFeatureFlags } from "../config/featureFlags.js";
@@ -37,6 +37,10 @@ export interface GraphDependencies {
  *     researcher -> synthesizer
  *     synthesizer -> citationBuilder -> disclaimerGuard -> END
  *     escalate -> citationBuilder -> disclaimerGuard -> END
+ *
+ * Graph flow (parallelResearch ON):
+ *   ...same as above, but gray-zone confidence (0.5 ≤ c < 0.75) routes to
+ *   researcher before synthesizer so web results supplement borderline retrieval.
  *
  * Graph flow (expansion ON):
  *   ...same as above, but:
@@ -118,19 +122,19 @@ export function createAgentGraph(deps: GraphDependencies) {
     // Retriever routes to expander when confidence is low and expansion not attempted
     builder.addConditionalEdges(
       "retriever",
-      createNeedsMoreInfo(true),
+      createNeedsMoreInfo(true, flags.parallelResearch),
       needsMoreInfoPathMap,
     );
     // After expansion, route to synthesizer or researcher (never back to expander)
     builder.addConditionalEdges(
       "retrievalExpander",
-      createNeedsMoreInfo(false),
+      createNeedsMoreInfo(false, flags.parallelResearch),
       needsMoreInfoPathMap,
     );
   } else {
     builder.addConditionalEdges(
       "retriever",
-      needsMoreInfo,
+      createNeedsMoreInfo(false, flags.parallelResearch),
       needsMoreInfoPathMap,
     );
   }
