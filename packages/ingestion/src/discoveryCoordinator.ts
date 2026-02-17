@@ -43,7 +43,7 @@ export class DiscoveryCoordinator {
     });
 
     this.evaluationService = new EvaluationService({
-      anthropicApiKey: config.anthropicApiKey,
+      anthropicApiKey: config.anthropicApiKey ?? "",
     });
 
     const table = createAppTable(Resource.AppTable.name);

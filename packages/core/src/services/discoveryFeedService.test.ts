@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const { mockSqsSend } = vi.hoisted(() => ({
+  mockSqsSend: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock("@aws-sdk/client-sqs", () => ({
-  SQSClient: vi.fn(),
+  SQSClient: vi.fn(() => ({ send: mockSqsSend })),
   SendMessageCommand: vi.fn(),
 }));
 
@@ -20,11 +24,10 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import { publishDiscoveredUrls, normalizeUrl } from "./discoveryFeedService.js";
 import type { WebSearchResult } from "../types/index.js";
 
-const MockSQSClient = vi.mocked(SQSClient);
 const MockSendMessageCommand = vi.mocked(SendMessageCommand);
 
 // ---------------------------------------------------------------------------
@@ -85,11 +88,8 @@ describe("normalizeUrl", () => {
 });
 
 describe("publishDiscoveredUrls", () => {
-  const mockSend = vi.fn().mockResolvedValue({});
-
   beforeEach(() => {
     vi.clearAllMocks();
-    MockSQSClient.mockImplementation(() => ({ send: mockSend }) as any);
   });
 
   it("returns early for empty input without sending SQS message", async () => {
@@ -98,8 +98,7 @@ describe("publishDiscoveredUrls", () => {
       "https://sqs.us-east-1.amazonaws.com/queue",
     );
 
-    expect(MockSQSClient).not.toHaveBeenCalled();
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockSqsSend).not.toHaveBeenCalled();
   });
 
   it("sends SQS message with correct queue URL", async () => {
@@ -108,7 +107,7 @@ describe("publishDiscoveredUrls", () => {
 
     await publishDiscoveredUrls(results, queueUrl);
 
-    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSqsSend).toHaveBeenCalledTimes(1);
     expect(MockSendMessageCommand).toHaveBeenCalledWith(
       expect.objectContaining({
         QueueUrl: queueUrl,
@@ -147,7 +146,7 @@ describe("publishDiscoveredUrls", () => {
   });
 
   it("does not throw on SQS errors", async () => {
-    mockSend.mockRejectedValueOnce(new Error("SQS error"));
+    mockSqsSend.mockRejectedValueOnce(new Error("SQS error"));
     const results = makeResults("https://usopc.org/doc1");
 
     await expect(

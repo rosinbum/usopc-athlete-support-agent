@@ -81,6 +81,7 @@ export async function* agentStreamToEvents(
   let citationsEmitted = false;
   let escalationEmitted = false;
   let lastDiscoveredUrls: WebSearchResult[] = [];
+  let streamErrored = false;
   // Track answer from values mode for nodes that don't use LLM streaming
   // (like clarify, escalate fallbacks, error handlers)
   let previousAnswerFromValues = "";
@@ -165,11 +166,12 @@ export async function* agentStreamToEvents(
       error instanceof Error ? error.message : "An unexpected error occurred";
     const code = errorToCode(error);
 
+    streamErrored = true;
     yield { type: "error", error: { message, code } };
   }
 
-  // Emit discovered URLs once at the end of the stream
-  if (lastDiscoveredUrls.length > 0) {
+  // Emit discovered URLs once at the end of the stream (skip on error)
+  if (!streamErrored && lastDiscoveredUrls.length > 0) {
     yield { type: "discovered-urls", discoveredUrls: lastDiscoveredUrls };
   }
 

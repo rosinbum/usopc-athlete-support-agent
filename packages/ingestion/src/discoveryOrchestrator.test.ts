@@ -14,14 +14,21 @@ vi.mock("@usopc/shared", () => ({
 vi.mock("sst", () => ({
   Resource: {
     TavilyApiKey: { value: "test-tavily-key" },
-    AnthropicApiKey: { value: "test-anthropic-key" },
     DiscoveryFeedQueue: { url: "https://sqs.us-east-1.amazonaws.com/queue" },
   },
 }));
 
+// Mock @usopc/core
+vi.mock("@usopc/core", () => ({
+  normalizeUrl: vi.fn((url: string) => url),
+}));
+
 // Mock SQS
+const { mockSqsSend } = vi.hoisted(() => ({
+  mockSqsSend: vi.fn().mockResolvedValue({}),
+}));
 vi.mock("@aws-sdk/client-sqs", () => ({
-  SQSClient: vi.fn(),
+  SQSClient: vi.fn(() => ({ send: mockSqsSend })),
   SendMessageCommand: vi.fn(),
 }));
 
@@ -31,20 +38,15 @@ vi.mock("./services/discoveryService.js", () => ({
 }));
 
 // Import after mocks
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import { DiscoveryOrchestrator } from "./discoveryOrchestrator.js";
 import { DiscoveryService } from "./services/discoveryService.js";
 
-const MockSQSClient = vi.mocked(SQSClient);
 const MockSendMessageCommand = vi.mocked(SendMessageCommand);
 
 describe("DiscoveryOrchestrator", () => {
-  const mockSend = vi.fn().mockResolvedValue({});
-
   beforeEach(() => {
     vi.clearAllMocks();
-
-    MockSQSClient.mockImplementation(() => ({ send: mockSend }) as any);
 
     vi.mocked(DiscoveryService).mockImplementation(
       () =>
@@ -60,7 +62,7 @@ describe("DiscoveryOrchestrator", () => {
     it("should initialize with default config", () => {
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
-        anthropicApiKey: "test-key",
+
         autoApprovalThreshold: 0.85,
       });
 
@@ -74,7 +76,7 @@ describe("DiscoveryOrchestrator", () => {
     it("should reset stats", () => {
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
-        anthropicApiKey: "test-key",
+
         autoApprovalThreshold: 0.85,
       });
 
@@ -89,7 +91,7 @@ describe("DiscoveryOrchestrator", () => {
     it("should handle empty discovery results", async () => {
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
-        anthropicApiKey: "test-key",
+
         autoApprovalThreshold: 0.85,
       });
 
@@ -97,7 +99,7 @@ describe("DiscoveryOrchestrator", () => {
 
       expect(stats.discovered).toBe(0);
       expect(stats.enqueued).toBe(0);
-      expect(mockSend).not.toHaveBeenCalled();
+      expect(mockSqsSend).not.toHaveBeenCalled();
     });
 
     it("should enqueue discovered URLs via SQS", async () => {
@@ -118,7 +120,7 @@ describe("DiscoveryOrchestrator", () => {
 
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
-        anthropicApiKey: "test-key",
+
         autoApprovalThreshold: 0.85,
       });
 
@@ -126,7 +128,7 @@ describe("DiscoveryOrchestrator", () => {
 
       expect(stats.discovered).toBe(1);
       expect(stats.enqueued).toBe(1);
-      expect(mockSend).toHaveBeenCalledTimes(1);
+      expect(mockSqsSend).toHaveBeenCalledTimes(1);
       expect(MockSendMessageCommand).toHaveBeenCalledWith(
         expect.objectContaining({
           QueueUrl: "https://sqs.us-east-1.amazonaws.com/queue",
@@ -146,7 +148,7 @@ describe("DiscoveryOrchestrator", () => {
 
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
-        anthropicApiKey: "test-key",
+
         autoApprovalThreshold: 0.85,
       });
 
@@ -174,7 +176,7 @@ describe("DiscoveryOrchestrator", () => {
 
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
-        anthropicApiKey: "test-key",
+
         autoApprovalThreshold: 0.85,
       });
 
@@ -192,7 +194,7 @@ describe("DiscoveryOrchestrator", () => {
     it("should handle empty search results", async () => {
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
-        anthropicApiKey: "test-key",
+
         autoApprovalThreshold: 0.85,
       });
 
@@ -223,7 +225,7 @@ describe("DiscoveryOrchestrator", () => {
 
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
-        anthropicApiKey: "test-key",
+
         autoApprovalThreshold: 0.85,
       });
 
@@ -234,7 +236,7 @@ describe("DiscoveryOrchestrator", () => {
 
       expect(stats.discovered).toBe(1);
       expect(stats.enqueued).toBe(1);
-      expect(mockSend).toHaveBeenCalledTimes(1);
+      expect(mockSqsSend).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -257,7 +259,7 @@ describe("DiscoveryOrchestrator", () => {
 
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
-        anthropicApiKey: "test-key",
+
         autoApprovalThreshold: 0.85,
         dryRun: true,
       });
@@ -266,7 +268,7 @@ describe("DiscoveryOrchestrator", () => {
 
       expect(stats.discovered).toBe(1);
       expect(stats.enqueued).toBe(1);
-      expect(mockSend).not.toHaveBeenCalled();
+      expect(mockSqsSend).not.toHaveBeenCalled();
     });
   });
 
@@ -275,7 +277,7 @@ describe("DiscoveryOrchestrator", () => {
       const progressCallback = vi.fn();
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
-        anthropicApiKey: "test-key",
+
         autoApprovalThreshold: 0.85,
         onProgress: progressCallback,
       });
@@ -305,7 +307,7 @@ describe("DiscoveryOrchestrator", () => {
 
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
-        anthropicApiKey: "test-key",
+
         autoApprovalThreshold: 0.9,
       });
 

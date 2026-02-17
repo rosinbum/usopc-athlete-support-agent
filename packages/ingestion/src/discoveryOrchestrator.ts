@@ -1,11 +1,13 @@
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { createLogger } from "@usopc/shared";
+import { normalizeUrl } from "@usopc/core";
 import type { DiscoveryFeedMessage } from "@usopc/core";
 import { Resource } from "sst";
 import { DiscoveryService } from "./services/discoveryService.js";
 import { DiscoveryConfig } from "./types.js";
 
 const logger = createLogger({ service: "discovery-orchestrator" });
+const sqs = new SQSClient({});
 
 export interface DiscoveryStats {
   discovered: number;
@@ -169,13 +171,14 @@ export class DiscoveryOrchestrator {
       discoveredFrom: string;
     }>,
   ): Promise<void> {
-    // Dedup within this run
+    // Dedup within this run (using normalized URLs for consistency with worker)
     const newUrls = urls.filter((u) => {
-      if (this.seenUrls.has(u.url)) {
+      const normalized = normalizeUrl(u.url);
+      if (this.seenUrls.has(normalized)) {
         this.stats.skipped++;
         return false;
       }
-      this.seenUrls.add(u.url);
+      this.seenUrls.add(normalized);
       return true;
     });
 
@@ -209,7 +212,6 @@ export class DiscoveryOrchestrator {
         Resource as unknown as { DiscoveryFeedQueue: { url: string } }
       ).DiscoveryFeedQueue.url;
 
-      const sqs = new SQSClient({});
       await sqs.send(
         new SendMessageCommand({
           QueueUrl: queueUrl,
@@ -242,15 +244,12 @@ export class DiscoveryOrchestrator {
  * Factory function to create a DiscoveryOrchestrator with secrets loaded from SST.
  */
 export function createDiscoveryOrchestrator(
-  config: Omit<OrchestratorConfig, "tavilyApiKey" | "anthropicApiKey">,
+  config: Omit<OrchestratorConfig, "tavilyApiKey">,
 ): DiscoveryOrchestrator {
   const tavilyApiKey = Resource.TavilyApiKey.value;
-  // anthropicApiKey still required by DiscoveryConfig but not used in orchestrator
-  const anthropicApiKey = Resource.AnthropicApiKey.value;
 
   return new DiscoveryOrchestrator({
     ...config,
     tavilyApiKey,
-    anthropicApiKey,
   });
 }

@@ -4,6 +4,7 @@ import { logger } from "@usopc/shared";
 import type { WebSearchResult, DiscoveryFeedMessage } from "../types/index.js";
 
 const log = logger.child({ service: "discovery-feed" });
+const sqs = new SQSClient({});
 
 /**
  * Normalizes a URL for deduplication:
@@ -62,7 +63,6 @@ export async function publishDiscoveredUrls(
   };
 
   try {
-    const sqs = new SQSClient({});
     await sqs.send(
       new SendMessageCommand({
         QueueUrl: queueUrl,

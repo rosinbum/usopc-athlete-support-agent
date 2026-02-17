@@ -25,6 +25,14 @@ const DEFAULT_AUTO_APPROVAL_THRESHOLD = 0.7;
 export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
   const batchItemFailures: { itemIdentifier: string }[] = [];
 
+  const anthropicApiKey = getSecretValue(
+    "ANTHROPIC_API_KEY",
+    "AnthropicApiKey",
+  );
+  const evaluationService = new EvaluationService({ anthropicApiKey });
+  const table = createAppTable(Resource.AppTable.name);
+  const entity = new DiscoveredSourceEntity(table);
+
   for (const record of event.Records) {
     let message: DiscoveryFeedMessage;
     try {
@@ -37,13 +45,6 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
       continue;
     }
 
-    const anthropicApiKey = getSecretValue(
-      "ANTHROPIC_API_KEY",
-      "AnthropicApiKey",
-    );
-    const evaluationService = new EvaluationService({ anthropicApiKey });
-    const table = createAppTable(Resource.AppTable.name);
-    const entity = new DiscoveredSourceEntity(table);
     const autoApprovalThreshold =
       message.autoApprovalThreshold ?? DEFAULT_AUTO_APPROVAL_THRESHOLD;
 

@@ -489,6 +489,38 @@ describe("agentStreamToEvents (dual-mode)", () => {
     expect(discoveredEvents).toHaveLength(0);
   });
 
+  it("does not emit discovered-urls when stream errors after researcher populates URLs", async () => {
+    async function* errorAfterUrls(): AsyncGenerator<StreamChunk> {
+      yield [
+        "values",
+        {
+          webSearchResultUrls: [
+            {
+              url: "https://usopc.org/doc1",
+              title: "Doc",
+              content: "content",
+              score: 0.9,
+            },
+          ],
+        },
+      ];
+      throw new Error("Stream broke after researcher");
+    }
+
+    const events: AgentStreamEvent[] = [];
+    for await (const event of agentStreamToEvents(errorAfterUrls())) {
+      events.push(event);
+    }
+
+    const discoveredEvents = events.filter((e) => e.type === "discovered-urls");
+    expect(discoveredEvents).toHaveLength(0);
+
+    const errorEvents = events.filter((e) => e.type === "error");
+    expect(errorEvents).toHaveLength(1);
+
+    expect(events[events.length - 1].type).toBe("done");
+  });
+
   it("does not emit answer-reset when no synthesizer tokens seen", async () => {
     const events = await collectEvents(
       mockDualStream([

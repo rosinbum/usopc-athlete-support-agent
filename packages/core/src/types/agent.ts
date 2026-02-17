@@ -1,4 +1,3 @@
-import { BaseMessage } from "@langchain/core/messages";
 import type { AuthorityLevel } from "@usopc/shared";
 
 export type TopicDomain =
@@ -108,25 +107,4 @@ export interface DiscoveryFeedMessage {
   }>;
   autoApprovalThreshold?: number;
   timestamp: string;
-}
-
-export interface AgentState {
-  messages: BaseMessage[];
-  topicDomain?: TopicDomain;
-  detectedNgbIds: string[];
-  queryIntent?: QueryIntent;
-  retrievedDocuments: RetrievedDocument[];
-  webSearchResults: string[];
-  webSearchResultUrls: WebSearchResult[];
-  retrievalConfidence: number;
-  citations: Citation[];
-  answer?: string;
-  escalation?: EscalationInfo;
-  disclaimerRequired: boolean;
-  hasTimeConstraint: boolean;
-  conversationId?: string;
-  userSport?: string;
-  emotionalState: EmotionalState;
-  escalationReason?: string;
-  retrievalStatus: "success" | "error";
 }
