@@ -22,7 +22,7 @@
       "Bash(tail *)",
       "Bash(grep *)",
       "Bash(for *)",
-      "Bash(cd /Users/joelrosinbum/src/usopc-issue-* *)"
+      "Bash(cd ~/src/usopc-issue-* *)"
     ]
   },
   "enableAllProjectMcpServers": true,

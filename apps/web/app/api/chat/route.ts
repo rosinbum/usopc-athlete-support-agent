@@ -3,9 +3,13 @@ import {
   formatDataStreamPart,
   type JSONValue,
 } from "ai";
+import { Resource } from "sst";
 import { logger } from "@usopc/shared";
 
 const log = logger.child({ service: "chat-route" });
+
+const tableName = (Resource as unknown as { AppTable: { name: string } })
+  .AppTable.name;
 
 // Cache a single runner instance per Lambda cold start
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -153,18 +157,12 @@ export async function POST(req: Request) {
 
         // Fire-and-forget: persist discovered URLs to source pipeline
         if (discoveredUrls.length > 0) {
-          import("sst")
-            .then(({ Resource }) => {
-              const tableName = (
-                Resource as unknown as { AppTable: { name: string } }
-              ).AppTable.name;
-              return persistDiscoveredUrls(discoveredUrls, tableName);
-            })
-            .catch((err: unknown) =>
+          persistDiscoveredUrls(discoveredUrls, tableName).catch(
+            (err: unknown) =>
               log.error("Failed to persist discovered URLs", {
                 error: String(err),
               }),
-            );
+          );
         }
       },
       onError: (error) => {
