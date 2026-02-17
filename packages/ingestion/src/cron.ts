@@ -404,6 +404,7 @@ export async function handler(): Promise<void> {
 
         await sqs.send(
           new SendMessageCommand({
+            // @ts-expect-error - IngestionQueue exists at runtime from SST
             QueueUrl: Resource.IngestionQueue.url,
             MessageBody: JSON.stringify(message),
             MessageGroupId: "ingestion",
