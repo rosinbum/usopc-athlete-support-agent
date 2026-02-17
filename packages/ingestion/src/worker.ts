@@ -115,6 +115,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
           const sqs = new SQSClient({});
           await sqs.send(
             new PurgeQueueCommand({
+              // @ts-expect-error - IngestionQueue exists at runtime from SST
               QueueUrl: Resource.IngestionQueue.url,
             }),
           );

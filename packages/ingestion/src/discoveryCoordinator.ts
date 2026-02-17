@@ -46,7 +46,6 @@ export class DiscoveryCoordinator {
       anthropicApiKey: config.anthropicApiKey,
     });
 
-    // @ts-expect-error - AppTable exists at runtime from SST
     const table = createAppTable(Resource.AppTable.name);
     this.discoveredSourceEntity = new DiscoveredSourceEntity(table);
   }
