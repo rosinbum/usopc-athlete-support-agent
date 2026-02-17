@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "docs-langchain": {
+      "type": "http",
+      "url": "https://docs.langchain.com/mcp"
+    },
+    "langsmith-mcp": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["langsmith-mcp-server"]
+    }
+  }
+}

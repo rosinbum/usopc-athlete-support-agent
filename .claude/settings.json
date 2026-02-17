@@ -16,9 +16,16 @@
       "Bash(ls *)",
       "Bash(cp *)",
       "Bash(rm *)",
-      "Bash(mkdir *)"
+      "Bash(mkdir *)",
+      "Bash(cd *)",
+      "Bash(sed *)",
+      "Bash(tail *)",
+      "Bash(grep *)",
+      "Bash(for *)",
+      "Bash(cd /Users/joelrosinbum/src/usopc-issue-* *)"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledPlugins": {
     "code-simplifier@claude-plugins-official": true,
     "feature-dev@claude-plugins-official": true,
