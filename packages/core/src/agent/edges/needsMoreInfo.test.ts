@@ -71,8 +71,8 @@ describe("needsMoreInfo (backward-compatible export)", () => {
   });
 });
 
-describe("createNeedsMoreInfo(true) — expansion enabled", () => {
-  const edgeFn = createNeedsMoreInfo(true);
+describe("createNeedsMoreInfo(true, false) — expansion enabled, parallel research off", () => {
+  const edgeFn = createNeedsMoreInfo(true, false);
 
   it('routes to "retrievalExpander" when confidence low and expansion not attempted', () => {
     const state = makeState({
@@ -119,8 +119,8 @@ describe("createNeedsMoreInfo(true) — expansion enabled", () => {
   });
 });
 
-describe("createNeedsMoreInfo(false) — expansion disabled", () => {
-  const edgeFn = createNeedsMoreInfo(false);
+describe("createNeedsMoreInfo(false, false) — both disabled", () => {
+  const edgeFn = createNeedsMoreInfo(false, false);
 
   it('never routes to "retrievalExpander"', () => {
     const state = makeState({
@@ -129,5 +129,97 @@ describe("createNeedsMoreInfo(false) — expansion disabled", () => {
       expansionAttempted: false,
     });
     expect(edgeFn(state)).toBe("researcher");
+  });
+});
+
+describe("createNeedsMoreInfo(false, true) — parallel research enabled", () => {
+  const edgeFn = createNeedsMoreInfo(false, true);
+
+  it('routes to "researcher" in gray zone (confidence 0.6)', () => {
+    const state = makeState({
+      retrievalConfidence: 0.6,
+      webSearchResults: [],
+    });
+    expect(edgeFn(state)).toBe("researcher");
+  });
+
+  it('routes to "researcher" at lower gray-zone boundary (confidence 0.5)', () => {
+    const state = makeState({
+      retrievalConfidence: 0.5,
+      webSearchResults: [],
+    });
+    expect(edgeFn(state)).toBe("researcher");
+  });
+
+  it('routes to "synthesizer" above gray zone (confidence 0.75)', () => {
+    const state = makeState({
+      retrievalConfidence: 0.75,
+      webSearchResults: [],
+    });
+    expect(edgeFn(state)).toBe("synthesizer");
+  });
+
+  it('routes to "synthesizer" well above gray zone (confidence 0.9)', () => {
+    const state = makeState({
+      retrievalConfidence: 0.9,
+      webSearchResults: [],
+    });
+    expect(edgeFn(state)).toBe("synthesizer");
+  });
+
+  it('routes to "researcher" below threshold (confidence 0.3)', () => {
+    const state = makeState({
+      retrievalConfidence: 0.3,
+      webSearchResults: [],
+    });
+    expect(edgeFn(state)).toBe("researcher");
+  });
+
+  it('routes to "synthesizer" in gray zone when web results already exist', () => {
+    const state = makeState({
+      retrievalConfidence: 0.6,
+      webSearchResults: ["result"],
+    });
+    expect(edgeFn(state)).toBe("synthesizer");
+  });
+});
+
+describe("createNeedsMoreInfo(true, true) — expansion + parallel research", () => {
+  const edgeFn = createNeedsMoreInfo(true, true);
+
+  it('routes to "researcher" in gray zone (not expander)', () => {
+    const state = makeState({
+      retrievalConfidence: 0.6,
+      webSearchResults: [],
+      expansionAttempted: false,
+    });
+    expect(edgeFn(state)).toBe("researcher");
+  });
+
+  it('routes to "retrievalExpander" below threshold when expansion not attempted', () => {
+    const state = makeState({
+      retrievalConfidence: 0.3,
+      webSearchResults: [],
+      expansionAttempted: false,
+    });
+    expect(edgeFn(state)).toBe("retrievalExpander");
+  });
+
+  it('routes to "researcher" below threshold when expansion already attempted', () => {
+    const state = makeState({
+      retrievalConfidence: 0.3,
+      webSearchResults: [],
+      expansionAttempted: true,
+    });
+    expect(edgeFn(state)).toBe("researcher");
+  });
+
+  it('routes to "synthesizer" above gray zone upper threshold', () => {
+    const state = makeState({
+      retrievalConfidence: 0.8,
+      webSearchResults: [],
+      expansionAttempted: false,
+    });
+    expect(edgeFn(state)).toBe("synthesizer");
   });
 });

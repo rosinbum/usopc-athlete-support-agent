@@ -1,6 +1,7 @@
 export const RETRIEVAL_CONFIG = {
   topK: 10,
   confidenceThreshold: 0.5,
+  grayZoneUpperThreshold: 0.75,
   narrowFilterTopK: 5,
   broadenFilterTopK: 10,
   chunkSize: 1500,

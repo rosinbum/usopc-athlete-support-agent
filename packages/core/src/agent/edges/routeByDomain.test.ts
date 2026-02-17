@@ -64,29 +64,29 @@ describe("routeByDomain", () => {
     expect(routeByDomain(state)).toBe("escalate");
   });
 
-  it('returns "retriever" for factual intent', () => {
+  it('returns "queryPlanner" for factual intent (queryPlanner defaults on)', () => {
     const state = makeState({ queryIntent: "factual" });
-    expect(routeByDomain(state)).toBe("retriever");
+    expect(routeByDomain(state)).toBe("queryPlanner");
   });
 
-  it('returns "retriever" for procedural intent', () => {
+  it('returns "queryPlanner" for procedural intent', () => {
     const state = makeState({ queryIntent: "procedural" });
-    expect(routeByDomain(state)).toBe("retriever");
+    expect(routeByDomain(state)).toBe("queryPlanner");
   });
 
-  it('returns "retriever" for deadline intent', () => {
+  it('returns "queryPlanner" for deadline intent', () => {
     const state = makeState({ queryIntent: "deadline" });
-    expect(routeByDomain(state)).toBe("retriever");
+    expect(routeByDomain(state)).toBe("queryPlanner");
   });
 
-  it('returns "retriever" for general intent', () => {
+  it('returns "queryPlanner" for general intent', () => {
     const state = makeState({ queryIntent: "general" });
-    expect(routeByDomain(state)).toBe("retriever");
+    expect(routeByDomain(state)).toBe("queryPlanner");
   });
 
-  it('returns "retriever" when queryIntent is undefined', () => {
+  it('returns "queryPlanner" when queryIntent is undefined', () => {
     const state = makeState({ queryIntent: undefined });
-    expect(routeByDomain(state)).toBe("retriever");
+    expect(routeByDomain(state)).toBe("queryPlanner");
   });
 
   describe("queryPlanner feature flag", () => {

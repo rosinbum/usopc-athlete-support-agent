@@ -7,8 +7,10 @@ const FLAG_ENV_VARS = [
   "FEATURE_SOURCE_DISCOVERY",
   "FEATURE_MULTI_STEP_PLANNER",
   "FEATURE_FEEDBACK_LOOP",
+  "FEATURE_RETRIEVAL_EXPANSION",
   "FEATURE_QUERY_PLANNER",
   "FEATURE_EMOTIONAL_SUPPORT",
+  "FEATURE_PARALLEL_RESEARCH",
 ] as const;
 
 describe("getFeatureFlags", () => {
@@ -18,16 +20,18 @@ describe("getFeatureFlags", () => {
     }
   });
 
-  it("defaults all flags to false when no env vars are set", () => {
+  it("defaults all flags to true when no env vars are set", () => {
     const flags = getFeatureFlags();
 
-    expect(flags.qualityChecker).toBe(false);
-    expect(flags.conversationMemory).toBe(false);
-    expect(flags.sourceDiscovery).toBe(false);
-    expect(flags.multiStepPlanner).toBe(false);
-    expect(flags.feedbackLoop).toBe(false);
-    expect(flags.queryPlanner).toBe(false);
-    expect(flags.emotionalSupport).toBe(false);
+    expect(flags.qualityChecker).toBe(true);
+    expect(flags.conversationMemory).toBe(true);
+    expect(flags.sourceDiscovery).toBe(true);
+    expect(flags.multiStepPlanner).toBe(true);
+    expect(flags.feedbackLoop).toBe(true);
+    expect(flags.retrievalExpansion).toBe(true);
+    expect(flags.queryPlanner).toBe(true);
+    expect(flags.emotionalSupport).toBe(true);
+    expect(flags.parallelResearch).toBe(true);
   });
 
   it.each([
@@ -36,43 +40,47 @@ describe("getFeatureFlags", () => {
     ["FEATURE_SOURCE_DISCOVERY", "sourceDiscovery"],
     ["FEATURE_MULTI_STEP_PLANNER", "multiStepPlanner"],
     ["FEATURE_FEEDBACK_LOOP", "feedbackLoop"],
+    ["FEATURE_RETRIEVAL_EXPANSION", "retrievalExpansion"],
     ["FEATURE_QUERY_PLANNER", "queryPlanner"],
     ["FEATURE_EMOTIONAL_SUPPORT", "emotionalSupport"],
-  ] as const)("%s enables %s", (envVar, flagKey) => {
-    process.env[envVar] = "true";
+    ["FEATURE_PARALLEL_RESEARCH", "parallelResearch"],
+  ] as const)("%s disables %s when set to 'false'", (envVar, flagKey) => {
+    process.env[envVar] = "false";
     const flags = getFeatureFlags();
-    expect(flags[flagKey]).toBe(true);
+    expect(flags[flagKey]).toBe(false);
   });
 
-  it("only enables the flag that is set, others remain false", () => {
-    process.env.FEATURE_QUALITY_CHECKER = "true";
+  it("only disables the flag that is set to 'false', others remain true", () => {
+    process.env.FEATURE_QUALITY_CHECKER = "false";
     const flags = getFeatureFlags();
 
-    expect(flags.qualityChecker).toBe(true);
-    expect(flags.conversationMemory).toBe(false);
-    expect(flags.sourceDiscovery).toBe(false);
-    expect(flags.multiStepPlanner).toBe(false);
-    expect(flags.feedbackLoop).toBe(false);
-    expect(flags.queryPlanner).toBe(false);
-    expect(flags.emotionalSupport).toBe(false);
+    expect(flags.qualityChecker).toBe(false);
+    expect(flags.conversationMemory).toBe(true);
+    expect(flags.sourceDiscovery).toBe(true);
+    expect(flags.multiStepPlanner).toBe(true);
+    expect(flags.feedbackLoop).toBe(true);
+    expect(flags.retrievalExpansion).toBe(true);
+    expect(flags.queryPlanner).toBe(true);
+    expect(flags.emotionalSupport).toBe(true);
+    expect(flags.parallelResearch).toBe(true);
   });
 
-  it.each(["false", "", "1", "TRUE", "yes", "on"])(
-    "treats %j as false (only exact 'true' enables)",
+  it.each(["true", "", "1", "FALSE", "yes", "on"])(
+    "treats %j as true (only exact 'false' disables)",
     (value) => {
       process.env.FEATURE_QUALITY_CHECKER = value;
       const flags = getFeatureFlags();
-      expect(flags.qualityChecker).toBe(false);
+      expect(flags.qualityChecker).toBe(true);
     },
   );
 
-  it("enables multiple flags simultaneously", () => {
-    process.env.FEATURE_QUALITY_CHECKER = "true";
-    process.env.FEATURE_FEEDBACK_LOOP = "true";
+  it("disables multiple flags simultaneously", () => {
+    process.env.FEATURE_QUALITY_CHECKER = "false";
+    process.env.FEATURE_FEEDBACK_LOOP = "false";
     const flags = getFeatureFlags();
 
-    expect(flags.qualityChecker).toBe(true);
-    expect(flags.feedbackLoop).toBe(true);
-    expect(flags.conversationMemory).toBe(false);
+    expect(flags.qualityChecker).toBe(false);
+    expect(flags.feedbackLoop).toBe(false);
+    expect(flags.conversationMemory).toBe(true);
   });
 });
