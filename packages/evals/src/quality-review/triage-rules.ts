@@ -94,6 +94,52 @@ export function extractScores(
 }
 
 // ---------------------------------------------------------------------------
+// Composite triage score
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute a weighted composite triage score from individual dimension scores.
+ * Matches the logic originally planned for the LangSmith online evaluator.
+ *
+ * - Hard gate: disclaimer_present == 0 → score 0.0
+ * - Weighted average: accuracy 30%, completeness 25%, quality 20%, helpfulness 15%, tone 10%
+ * - Penalty: both trajectory_match and trajectory_subset == 0 → multiply by 0.8
+ */
+export function computeTriageScore(scores: RunScores): number | null {
+  // Hard gate: missing disclaimer
+  if (scores.disclaimer_present === 0) return 0.0;
+
+  const weights: Array<[keyof RunScores, number]> = [
+    ["accuracy", 0.3],
+    ["completeness", 0.25],
+    ["quality", 0.2],
+    ["helpfulness", 0.15],
+    ["tone", 0.1],
+  ];
+
+  let totalWeight = 0;
+  let weightedSum = 0;
+  for (const [key, weight] of weights) {
+    const val = scores[key];
+    if (val !== null) {
+      weightedSum += val * weight;
+      totalWeight += weight;
+    }
+  }
+
+  if (totalWeight === 0) return null;
+
+  let score = weightedSum / totalWeight;
+
+  // Trajectory penalty
+  if (scores.trajectory_match === 0 && scores.trajectory_subset === 0) {
+    score *= 0.8;
+  }
+
+  return Math.round(score * 10000) / 10000;
+}
+
+// ---------------------------------------------------------------------------
 // Failure inference rules (priority order)
 // ---------------------------------------------------------------------------
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   extractScores,
+  computeTriageScore,
   inferFailureCode,
   groupByFailureCode,
   shouldCreateIssue,
@@ -91,6 +92,80 @@ describe("extractScores", () => {
     };
     const scores = extractScores(stats);
     expect(scores.accuracy).toBe(0.9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeTriageScore
+// ---------------------------------------------------------------------------
+
+describe("computeTriageScore", () => {
+  it("returns 0.0 when disclaimer_present is 0", () => {
+    const scores = makeScores({ disclaimer_present: 0 });
+    expect(computeTriageScore(scores)).toBe(0.0);
+  });
+
+  it("returns null when all dimension scores are null", () => {
+    const scores = makeScores({
+      accuracy: null,
+      completeness: null,
+      quality: null,
+      helpfulness: null,
+      tone: null,
+    });
+    expect(computeTriageScore(scores)).toBeNull();
+  });
+
+  it("computes weighted average of available scores", () => {
+    // All scores 0.8, all weights sum to 1.0 → result should be 0.8
+    const scores = makeScores({
+      accuracy: 0.8,
+      completeness: 0.8,
+      quality: 0.8,
+      helpfulness: 0.8,
+      tone: 0.8,
+    });
+    expect(computeTriageScore(scores)).toBe(0.8);
+  });
+
+  it("applies trajectory penalty when both are 0", () => {
+    const scores = makeScores({
+      accuracy: 1.0,
+      completeness: 1.0,
+      quality: 1.0,
+      helpfulness: 1.0,
+      tone: 1.0,
+      trajectory_match: 0,
+      trajectory_subset: 0,
+    });
+    expect(computeTriageScore(scores)).toBe(0.8);
+  });
+
+  it("does not apply trajectory penalty when only one is 0", () => {
+    const scores = makeScores({
+      accuracy: 1.0,
+      completeness: 1.0,
+      quality: 1.0,
+      helpfulness: 1.0,
+      tone: 1.0,
+      trajectory_match: 0,
+      trajectory_subset: 0.5,
+    });
+    expect(computeTriageScore(scores)).toBe(1.0);
+  });
+
+  it("handles partial scores (some null)", () => {
+    // Only accuracy (weight 0.3) and completeness (weight 0.25) present
+    const scores = makeScores({
+      accuracy: 0.6,
+      completeness: 0.4,
+      quality: null,
+      helpfulness: null,
+      tone: null,
+    });
+    // weighted = (0.6*0.3 + 0.4*0.25) / (0.3+0.25) = (0.18+0.10)/0.55 ≈ 0.5091
+    const result = computeTriageScore(scores)!;
+    expect(result).toBeCloseTo(0.5091, 3);
   });
 });
 

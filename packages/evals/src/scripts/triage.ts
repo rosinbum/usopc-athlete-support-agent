@@ -15,6 +15,7 @@ import { getLangSmithClient, QUALITY_REVIEW_PROJECT } from "../config.js";
 import { FAILURE_MODES, type FailureCode } from "../quality-review/taxonomy.js";
 import {
   extractScores,
+  computeTriageScore,
   inferFailureCode,
   groupByFailureCode,
   shouldCreateIssue,
@@ -67,12 +68,13 @@ interface FeedbackStats {
   [key: string]: { avg?: number; mean?: number };
 }
 
-async function fetchFailingRuns(
+async function fetchAndScoreRuns(
   tag: string,
   threshold: number,
-): Promise<TriageResult[]> {
+): Promise<{ failing: TriageResult[]; totalScored: number }> {
   const client = getLangSmithClient();
-  const results: TriageResult[] = [];
+  const failing: TriageResult[] = [];
+  let totalScored = 0;
 
   const runs = client.listRuns({
     projectName: QUALITY_REVIEW_PROJECT,
@@ -86,8 +88,22 @@ async function fetchFailingRuns(
     const extra = (run.extra ?? {}) as Record<string, unknown>;
     const metadata = (extra.metadata ?? {}) as Record<string, unknown>;
 
-    // Determine triage score (composite or fallback to min quality score)
-    const triageScore = scores.triage_score ?? computeFallbackScore(scores);
+    // Compute composite triage score from existing evaluator feedback
+    const triageScore = scores.triage_score ?? computeTriageScore(scores);
+
+    // Post triage_score as feedback if we computed it (and it wasn't already set)
+    if (triageScore !== null && scores.triage_score === null && run.id) {
+      try {
+        await client.createFeedback(run.id, "triage_score", {
+          score: triageScore,
+          comment: `Computed by quality:triage (tag=${tag})`,
+        });
+      } catch {
+        // Non-fatal — score is still used locally
+      }
+    }
+
+    totalScored++;
 
     // Skip runs above the threshold
     if (triageScore !== null && triageScore >= threshold) continue;
@@ -97,7 +113,7 @@ async function fetchFailingRuns(
 
     const traceUrl = `https://smith.langchain.com/runs/${run.id}`;
 
-    results.push({
+    failing.push({
       code,
       meta: {
         scenarioId: (metadata.scenario_id as string) ?? run.name ?? run.id,
@@ -110,21 +126,7 @@ async function fetchFailingRuns(
     });
   }
 
-  return results;
-}
-
-/** Fallback: use minimum of available quality scores. */
-function computeFallbackScore(scores: RunScores): number | null {
-  const values = [
-    scores.accuracy,
-    scores.completeness,
-    scores.quality,
-    scores.helpfulness,
-    scores.tone,
-  ].filter((v): v is number => v !== null);
-
-  if (values.length === 0) return null;
-  return Math.min(...values);
+  return { failing, totalScored };
 }
 
 // ---------------------------------------------------------------------------
@@ -292,16 +294,18 @@ async function main(): Promise<void> {
     `Fetching runs from "${QUALITY_REVIEW_PROJECT}" with tag "${tag}"...`,
   );
 
-  const failingRuns = await fetchFailingRuns(tag, threshold);
+  const { failing, totalScored } = await fetchAndScoreRuns(tag, threshold);
 
-  if (failingRuns.length === 0) {
+  console.log(`Scored ${totalScored} runs, ${failing.length} below threshold.`);
+
+  if (failing.length === 0) {
     console.log("\nNo failing runs found. All scenarios passed triage.");
     return;
   }
 
-  const groups = groupByFailureCode(failingRuns);
+  const groups = groupByFailureCode(failing);
 
-  printReport(groups, tag, threshold, failingRuns.length);
+  printReport(groups, tag, threshold, failing.length);
 
   if (dryRun) {
     const issueGroups = groups.filter(shouldCreateIssue);
