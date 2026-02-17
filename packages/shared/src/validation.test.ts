@@ -128,10 +128,12 @@ describe("topicDomainSchema", () => {
     expect(TOPIC_DOMAINS).toContain("eligibility");
     expect(TOPIC_DOMAINS).toContain("governance");
     expect(TOPIC_DOMAINS).toContain("athlete_rights");
+    expect(TOPIC_DOMAINS).toContain("athlete_safety");
+    expect(TOPIC_DOMAINS).toContain("financial_assistance");
   });
 
-  it("has exactly 7 domains", () => {
-    expect(TOPIC_DOMAINS.length).toBe(7);
+  it("has exactly 9 domains", () => {
+    expect(TOPIC_DOMAINS.length).toBe(9);
   });
 
   it("rejects invalid domain", () => {

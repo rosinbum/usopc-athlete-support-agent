@@ -208,6 +208,12 @@ const DOMAIN_GUIDANCE: Record<TopicDomain, string> = {
   athlete_rights:
     "This involves athlete rights or representation. The Athletes' Commission handles " +
     "representation on boards/committees, and the Athlete Ombuds can advise on rights-related disputes.",
+  athlete_safety:
+    "This involves an athlete safety concern. The U.S. Center for SafeSport handles misconduct " +
+    "reports, and the Athlete Ombuds can advise on safety-related issues and protections.",
+  financial_assistance:
+    "This involves athlete financial support or benefits. The Athlete Ombuds can advise on " +
+    "available funding programs, stipends, and grant eligibility.",
 };
 
 /**

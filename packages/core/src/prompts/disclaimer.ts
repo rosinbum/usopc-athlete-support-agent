@@ -66,6 +66,8 @@ const DISCLAIMER_MAP: Record<TopicDomain | "general", string> = {
   eligibility: ELIGIBILITY_DISCLAIMER,
   governance: GOVERNANCE_DISCLAIMER,
   athlete_rights: ATHLETE_RIGHTS_DISCLAIMER,
+  athlete_safety: GENERAL_DISCLAIMER,
+  financial_assistance: GENERAL_DISCLAIMER,
 };
 
 /**

@@ -22,6 +22,8 @@ describe("getDisclaimer", () => {
     eligibility: "Eligibility requirements vary",
     governance: "Athletes' Commission",
     athlete_rights: "Athlete Bill of Rights",
+    athlete_safety: "educational purposes only",
+    financial_assistance: "educational purposes only",
   };
 
   for (const [domain, keyword] of Object.entries(domainKeywords)) {
@@ -40,6 +42,8 @@ describe("getDisclaimer", () => {
       "eligibility",
       "governance",
       "athlete_rights",
+      "athlete_safety",
+      "financial_assistance",
     ];
 
     for (const domain of domains) {
@@ -50,9 +54,9 @@ describe("getDisclaimer", () => {
 });
 
 describe("getAllDisclaimers", () => {
-  it("returns all 8 disclaimer templates (7 domains + general)", () => {
+  it("returns all 10 disclaimer templates (9 domains + general)", () => {
     const all = getAllDisclaimers();
-    expect(all).toHaveLength(8);
+    expect(all).toHaveLength(10);
   });
 
   it("includes a general disclaimer", () => {

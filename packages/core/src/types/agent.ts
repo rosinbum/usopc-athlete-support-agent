@@ -7,7 +7,9 @@ export type TopicDomain =
   | "anti_doping"
   | "eligibility"
   | "governance"
-  | "athlete_rights";
+  | "athlete_rights"
+  | "athlete_safety"
+  | "financial_assistance";
 
 export type QueryIntent =
   | "factual"

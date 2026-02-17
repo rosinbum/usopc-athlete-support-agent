@@ -6,7 +6,21 @@
     "usaswimming.org",
     "usagym.org",
     "usabasketball.com",
-    "usahockey.com"
+    "usahockey.com",
+    "usawrestling.org",
+    "usavolleyball.org",
+    "usacycling.org",
+    "usrowing.org",
+    "usafencing.org",
+    "usadiving.org",
+    "ussoccer.com",
+    "usta.com",
+    "usatriathlon.org",
+    "usskiandsnowboard.org",
+    "usaweightlifting.org",
+    "usajudo.com",
+    "usaboxing.org",
+    "usfigureskating.org"
   ],
   "searchQueries": [
     "USOPC team selection procedures 2026",
@@ -16,7 +30,13 @@
     "USADA anti-doping policy",
     "USOPC Dispute Resolution",
     "Olympic Selection Prodedure",
-    "National Team Selection Procedure"
+    "National Team Selection Procedure",
+    "USOPC athlete financial support stipend grant",
+    "NGB athlete funding travel reimbursement",
+    "Team USA athlete benefits insurance",
+    "Paralympic classification rules procedures",
+    "IPC athlete classification appeal",
+    "Paralympic athlete eligibility disability accommodation"
   ],
   "maxResultsPerDomain": 45,
   "maxResultsPerQuery": 10,
