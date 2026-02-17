@@ -20,6 +20,7 @@
     "seed-langsmith": "sst shell -- tsx src/scripts/seed-datasets.ts",
     "quality:seed": "sst shell -- tsx src/scripts/seed-quality-review.ts",
     "quality:run": "sst shell -- tsx src/scripts/run-quality-review.ts",
+    "quality:triage": "tsx src/scripts/triage.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {
