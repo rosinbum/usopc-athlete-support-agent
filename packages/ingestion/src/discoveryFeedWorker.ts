@@ -4,8 +4,9 @@ import {
   getSecretValue,
   DiscoveredSourceEntity,
   createAppTable,
+  normalizeUrl,
+  urlToId,
 } from "@usopc/shared";
-import { normalizeUrl, urlToId } from "@usopc/core";
 import type { DiscoveryFeedMessage } from "@usopc/core";
 import { Resource } from "sst";
 import { EvaluationService } from "./services/evaluationService.js";

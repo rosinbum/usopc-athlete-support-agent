@@ -1,6 +1,10 @@
 import { tavily } from "@tavily/core";
-import { CircuitBreaker, createLogger } from "@usopc/shared";
-import crypto from "crypto";
+import {
+  CircuitBreaker,
+  createLogger,
+  normalizeUrl,
+  urlToId,
+} from "@usopc/shared";
 
 const logger = createLogger({ service: "discovery-service" });
 
@@ -143,7 +147,7 @@ export class DiscoveryService {
     const normalized: DiscoveredURL[] = [];
 
     for (const url of results) {
-      const normalizedUrl = this.normalizeUrl(url);
+      const normalizedUrl = normalizeUrl(url);
       if (seen.has(normalizedUrl)) continue;
 
       seen.add(normalizedUrl);
@@ -169,7 +173,7 @@ export class DiscoveryService {
     const normalized: DiscoveredURL[] = [];
 
     for (const result of results) {
-      const url = this.normalizeUrl(result.url);
+      const url = normalizeUrl(result.url);
       if (seen.has(url)) continue;
 
       seen.add(url);
@@ -182,24 +186,6 @@ export class DiscoveryService {
     }
 
     return normalized;
-  }
-
-  /**
-   * Normalize URL (remove fragments, trailing slashes, www prefix).
-   */
-  private normalizeUrl(url: string): string {
-    try {
-      const parsed = new URL(url);
-      // Remove fragment and trailing slash
-      parsed.hash = "";
-      let normalized = parsed.toString().replace(/\/$/, "");
-      // Remove www. prefix for deduplication
-      normalized = normalized.replace(/^(https?:\/\/)www\./, "$1");
-      return normalized;
-    } catch {
-      // If URL parsing fails, return as-is
-      return url;
-    }
   }
 
   /**
@@ -227,8 +213,7 @@ export class DiscoveryService {
    * Uses SHA-256 hash of the normalized URL.
    */
   generateId(url: string): string {
-    const normalized = this.normalizeUrl(url);
-    return crypto.createHash("sha256").update(normalized).digest("hex");
+    return urlToId(normalizeUrl(url));
   }
 
   /**

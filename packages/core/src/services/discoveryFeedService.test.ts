@@ -25,7 +25,7 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 });
 
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
-import { publishDiscoveredUrls, normalizeUrl } from "./discoveryFeedService.js";
+import { publishDiscoveredUrls } from "./discoveryFeedService.js";
 import type { WebSearchResult } from "../types/index.js";
 
 const MockSendMessageCommand = vi.mocked(SendMessageCommand);
@@ -52,40 +52,6 @@ function makeResults(
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-
-describe("normalizeUrl", () => {
-  it("strips fragment", () => {
-    expect(normalizeUrl("https://usopc.org/page#section")).toBe(
-      "https://usopc.org/page",
-    );
-  });
-
-  it("strips trailing slash on paths", () => {
-    expect(normalizeUrl("https://usopc.org/page/")).toBe(
-      "https://usopc.org/page",
-    );
-  });
-
-  it("preserves root path trailing slash", () => {
-    expect(normalizeUrl("https://usopc.org/")).toBe("https://usopc.org/");
-  });
-
-  it("strips www. prefix", () => {
-    expect(normalizeUrl("https://www.usopc.org/page")).toBe(
-      "https://usopc.org/page",
-    );
-  });
-
-  it("handles all normalizations together", () => {
-    expect(normalizeUrl("https://www.usopc.org/page/#section")).toBe(
-      "https://usopc.org/page",
-    );
-  });
-
-  it("returns invalid URLs as-is", () => {
-    expect(normalizeUrl("not-a-url")).toBe("not-a-url");
-  });
-});
 
 describe("publishDiscoveredUrls", () => {
   beforeEach(() => {
