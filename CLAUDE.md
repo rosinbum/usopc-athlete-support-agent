@@ -51,7 +51,7 @@ For any implementation task:
 4. Write or update the corresponding `*.test.ts` file alongside the source (tests are co-located in `src/`)
 5. Run the relevant tests: `pnpm --filter @usopc/<package> test`
 6. Format changed files: `npx prettier --write <files>`
-7. Type-check: `pnpm --filter @usopc/<package> typecheck`
+7. Type-check **all packages**: `pnpm typecheck` (CI runs this across the full monorepo — never use `--filter` for typecheck)
 8. Commit, push, and open a PR referencing the issue (`gh pr create`)
 9. After PR is merged, remove the worktree: `git worktree remove ../usopc-issue-<number>`
 

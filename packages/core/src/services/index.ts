@@ -44,3 +44,9 @@ export {
   saveSummary,
   generateSummary,
 } from "./conversationMemory.js";
+
+export {
+  publishDiscoveredUrls,
+  normalizeUrl,
+  urlToId,
+} from "./discoveryFeedService.js";

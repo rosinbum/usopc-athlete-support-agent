@@ -1,4 +1,3 @@
-import { BaseMessage } from "@langchain/core/messages";
 import type { AuthorityLevel } from "@usopc/shared";
 
 export type TopicDomain =
@@ -92,22 +91,20 @@ export interface EmotionalSupportContext {
   acknowledgment: string;
 }
 
-export interface AgentState {
-  messages: BaseMessage[];
-  topicDomain?: TopicDomain;
-  detectedNgbIds: string[];
-  queryIntent?: QueryIntent;
-  retrievedDocuments: RetrievedDocument[];
-  webSearchResults: string[];
-  retrievalConfidence: number;
-  citations: Citation[];
-  answer?: string;
-  escalation?: EscalationInfo;
-  disclaimerRequired: boolean;
-  hasTimeConstraint: boolean;
-  conversationId?: string;
-  userSport?: string;
-  emotionalState: EmotionalState;
-  escalationReason?: string;
-  retrievalStatus: "success" | "error";
+export interface WebSearchResult {
+  url: string;
+  title: string;
+  content: string;
+  score: number;
+}
+
+export interface DiscoveryFeedMessage {
+  urls: Array<{
+    url: string;
+    title: string;
+    discoveryMethod: "agent" | "map" | "search";
+    discoveredFrom: string;
+  }>;
+  autoApprovalThreshold?: number;
+  timestamp: string;
 }

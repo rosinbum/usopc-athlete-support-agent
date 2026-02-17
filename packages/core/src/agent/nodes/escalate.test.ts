@@ -45,6 +45,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     queryIntent: "escalation",
     retrievedDocuments: [],
     webSearchResults: [],
+    webSearchResultUrls: [],
     retrievalConfidence: 0,
     citations: [],
     answer: undefined,

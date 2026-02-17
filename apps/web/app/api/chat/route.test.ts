@@ -38,6 +38,14 @@ vi.mock("@usopc/core", () => ({
   generateSummary: vi.fn(),
 }));
 
+vi.mock("sst", () => ({
+  Resource: {
+    DiscoveryFeedQueue: {
+      url: "https://sqs.us-east-1.amazonaws.com/test-queue",
+    },
+  },
+}));
+
 vi.mock("ai", () => ({
   createDataStreamResponse: vi.fn(({ execute }) => {
     // Execute the writer callback to exercise the code path

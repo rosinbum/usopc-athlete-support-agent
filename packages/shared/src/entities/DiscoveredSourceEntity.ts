@@ -8,7 +8,7 @@ const logger = createLogger({ service: "discovered-source-entity" });
 // Types
 // ---------------------------------------------------------------------------
 
-export type DiscoveryMethod = "map" | "search" | "manual";
+export type DiscoveryMethod = "map" | "search" | "manual" | "agent";
 export type DiscoveryStatus =
   | "pending_metadata"
   | "pending_content"

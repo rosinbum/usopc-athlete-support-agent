@@ -48,6 +48,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     queryIntent: "procedural",
     retrievedDocuments: [],
     webSearchResults: [],
+    webSearchResultUrls: [],
     retrievalConfidence: 0.7,
     citations: [],
     answer: undefined,
@@ -158,6 +159,7 @@ describe("synthesizerNode", () => {
     const state = makeState({
       retrievedDocuments: [],
       webSearchResults: [],
+      webSearchResultUrls: [],
     });
 
     await synthesizerNode(state);
@@ -199,6 +201,7 @@ describe("synthesizerNode", () => {
         retrievalStatus: "error",
         retrievedDocuments: [],
         webSearchResults: [],
+        webSearchResultUrls: [],
       });
 
       const result = await synthesizerNode(state);
@@ -216,6 +219,7 @@ describe("synthesizerNode", () => {
         retrievalStatus: "error",
         retrievedDocuments: [makeDoc("some doc")],
         webSearchResults: [],
+        webSearchResultUrls: [],
       });
 
       const result = await synthesizerNode(state);

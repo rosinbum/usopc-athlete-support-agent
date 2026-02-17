@@ -31,6 +31,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     queryIntent: undefined,
     retrievedDocuments: [],
     webSearchResults: [],
+    webSearchResultUrls: [],
     retrievalConfidence: 0,
     citations: [],
     answer: undefined,
@@ -76,6 +77,7 @@ describe("createResearcherNode", () => {
 
     const result = await node(state);
     expect(result.webSearchResults).toEqual([]);
+    expect(result.webSearchResultUrls).toEqual([]);
     expect(tavily.invoke).not.toHaveBeenCalled();
   });
 
@@ -114,16 +116,45 @@ describe("createResearcherNode", () => {
     expect(invokeArg.query).toBe("What are USADA whereabouts requirements?");
   });
 
-  it("handles object results from Tavily", async () => {
+  it("handles structured Tavily results with URLs", async () => {
     const tavily = makeMockTavily({
-      results: [{ content: "result 1" }, { content: "result 2" }],
+      results: [
+        {
+          url: "https://usopc.org/doc1",
+          title: "Selection Procedures",
+          content: "result 1 content",
+          score: 0.95,
+        },
+        {
+          url: "https://teamusa.org/doc2",
+          title: "Athlete Rights",
+          content: "result 2 content",
+          score: 0.82,
+        },
+      ],
     });
     const node = createResearcherNode(tavily);
     const state = makeState();
 
     const result = await node(state);
-    // Object is JSON.stringify'd and then split
-    expect(result.webSearchResults!.length).toBeGreaterThanOrEqual(1);
+    expect(result.webSearchResults).toEqual([
+      "result 1 content",
+      "result 2 content",
+    ]);
+    expect(result.webSearchResultUrls).toEqual([
+      {
+        url: "https://usopc.org/doc1",
+        title: "Selection Procedures",
+        content: "result 1 content",
+        score: 0.95,
+      },
+      {
+        url: "https://teamusa.org/doc2",
+        title: "Athlete Rights",
+        content: "result 2 content",
+        score: 0.82,
+      },
+    ]);
   });
 
   it("limits results to MAX_SEARCH_RESULTS (5)", async () => {
@@ -148,6 +179,40 @@ describe("createResearcherNode", () => {
 
     const result = await node(state);
     expect(result.webSearchResults).toEqual([]);
+    expect(result.webSearchResultUrls).toEqual([]);
+  });
+
+  it("returns empty webSearchResultUrls for string response", async () => {
+    const tavily = makeMockTavily(
+      "Result 1: USADA whereabouts info\n\nResult 2: Filing deadlines",
+    );
+    const node = createResearcherNode(tavily);
+    const state = makeState();
+
+    const result = await node(state);
+    expect(result.webSearchResults!.length).toBe(2);
+    expect(result.webSearchResultUrls).toEqual([]);
+  });
+
+  it("skips structured results with missing fields", async () => {
+    const tavily = makeMockTavily({
+      results: [
+        {
+          url: "https://usopc.org/doc1",
+          title: "Good result",
+          content: "has all fields",
+          score: 0.9,
+        },
+        { url: "https://usopc.org/doc2", content: "missing title" },
+        { title: "missing url", content: "no url field" },
+      ],
+    });
+    const node = createResearcherNode(tavily);
+    const state = makeState();
+
+    const result = await node(state);
+    expect(result.webSearchResultUrls).toHaveLength(1);
+    expect(result.webSearchResultUrls![0].url).toBe("https://usopc.org/doc1");
   });
 
   it("adds domain labels for each domain type", async () => {

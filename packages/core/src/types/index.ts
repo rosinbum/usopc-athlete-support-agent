@@ -11,6 +11,8 @@ export type {
   QualityCheckResult,
   SubQuery,
   EmotionalSupportContext,
+  WebSearchResult,
+  DiscoveryFeedMessage,
 } from "./agent.js";
 
 export type { Conversation, Message } from "./conversation.js";

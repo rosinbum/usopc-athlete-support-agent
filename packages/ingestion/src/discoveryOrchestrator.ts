@@ -1,33 +1,24 @@
-import {
-  createLogger,
-  createAppTable,
-  DiscoveredSourceEntity,
-} from "@usopc/shared";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { createLogger } from "@usopc/shared";
+import { normalizeUrl } from "@usopc/core";
+import type { DiscoveryFeedMessage } from "@usopc/core";
 import { Resource } from "sst";
 import { DiscoveryService } from "./services/discoveryService.js";
-import { EvaluationService } from "./services/evaluationService.js";
-import { loadWeb } from "./loaders/index.js";
 import { DiscoveryConfig } from "./types.js";
 
 const logger = createLogger({ service: "discovery-orchestrator" });
+const sqs = new SQSClient({});
 
 export interface DiscoveryStats {
   discovered: number;
-  evaluated: number;
-  approved: number;
-  rejected: number;
-  errors: number;
+  enqueued: number;
   skipped: number;
+  errors: number;
 }
 
 export interface OrchestratorConfig extends DiscoveryConfig {
   /**
-   * Maximum number of URLs to process concurrently.
-   * @default 3
-   */
-  concurrency?: number;
-  /**
-   * Dry run mode: evaluate URLs but don't save to DynamoDB.
+   * Dry run mode: discover URLs but don't enqueue to SQS.
    * @default false
    */
   dryRun?: boolean;
@@ -38,32 +29,22 @@ export interface OrchestratorConfig extends DiscoveryConfig {
 }
 
 /**
- * Orchestrates the intelligent source discovery pipeline.
+ * Orchestrates intelligent source discovery.
  *
- * Features:
- * - Progress tracking with stats aggregation
- * - Batch processing with configurable concurrency
- * - Error recovery: failures don't stop the pipeline
- * - Context hints integration for improved evaluation
- * - Dry run mode for testing
+ * Discovers URLs via Tavily Map/Search, deduplicates, and publishes
+ * to the DiscoveryFeedQueue for async evaluation by the worker Lambda.
  *
- * Phases:
- * 1. Discovery: Find URLs via Tavily Map/Search
- * 2. Metadata Evaluation: Fast pre-filter with context hints
- * 3. Content Extraction: Load web content for relevant URLs
- * 4. Content Evaluation: Deep LLM analysis with context hints
- * 5. Storage: Save to DynamoDB with evaluation results (unless dry run)
+ * The evaluation pipeline (metadata eval → content extraction → content eval)
+ * is handled entirely by the DiscoveryFeedWorker.
  */
 export class DiscoveryOrchestrator {
   private discoveryService: DiscoveryService;
-  private evaluationService: EvaluationService;
-  private discoveredSourceEntity: DiscoveredSourceEntity;
   private config: OrchestratorConfig;
   private stats: DiscoveryStats;
+  private seenUrls = new Set<string>();
 
   constructor(config: OrchestratorConfig) {
     this.config = {
-      concurrency: 3,
       dryRun: false,
       ...config,
     };
@@ -72,47 +53,23 @@ export class DiscoveryOrchestrator {
       apiKey: config.tavilyApiKey,
     });
 
-    this.evaluationService = new EvaluationService({
-      anthropicApiKey: config.anthropicApiKey,
-    });
-
-    const table = createAppTable(Resource.AppTable.name);
-    this.discoveredSourceEntity = new DiscoveredSourceEntity(table);
-
     this.stats = {
       discovered: 0,
-      evaluated: 0,
-      approved: 0,
-      rejected: 0,
-      errors: 0,
+      enqueued: 0,
       skipped: 0,
+      errors: 0,
     };
   }
 
-  /**
-   * Get current discovery statistics.
-   */
   getStats(): DiscoveryStats {
     return { ...this.stats };
   }
 
-  /**
-   * Reset statistics to zero.
-   */
   resetStats(): void {
-    this.stats = {
-      discovered: 0,
-      evaluated: 0,
-      approved: 0,
-      rejected: 0,
-      errors: 0,
-      skipped: 0,
-    };
+    this.stats = { discovered: 0, enqueued: 0, skipped: 0, errors: 0 };
+    this.seenUrls.clear();
   }
 
-  /**
-   * Discover and evaluate sources from configured domains.
-   */
   async discoverFromDomains(
     domains: string[],
     maxPerDomain: number,
@@ -120,7 +77,6 @@ export class DiscoveryOrchestrator {
     logger.info("Starting domain discovery", {
       domains: domains.length,
       maxPerDomain,
-      concurrency: this.config.concurrency,
       dryRun: this.config.dryRun,
     });
 
@@ -135,12 +91,12 @@ export class DiscoveryOrchestrator {
         this.stats.discovered += urls.length;
         this.notifyProgress();
 
-        // Process URLs in batches with concurrency control
-        await this.processBatch(
+        await this.enqueueUrls(
           urls.map((u) => ({
             url: u.url,
             title: u.title,
-            method: u.method,
+            discoveryMethod: u.method,
+            discoveredFrom: domain,
           })),
         );
       } catch (error) {
@@ -154,20 +110,10 @@ export class DiscoveryOrchestrator {
     }
 
     const stats = this.getStats();
-    logger.info("Domain discovery complete", {
-      discovered: stats.discovered,
-      evaluated: stats.evaluated,
-      approved: stats.approved,
-      rejected: stats.rejected,
-      errors: stats.errors,
-      skipped: stats.skipped,
-    });
+    logger.info("Domain discovery complete", { ...stats });
     return stats;
   }
 
-  /**
-   * Discover and evaluate sources from search queries.
-   */
   async discoverFromSearchQueries(
     queries: string[],
     maxPerQuery: number,
@@ -176,7 +122,6 @@ export class DiscoveryOrchestrator {
     logger.info("Starting search query discovery", {
       queries: queries.length,
       maxPerQuery,
-      concurrency: this.config.concurrency,
       dryRun: this.config.dryRun,
     });
 
@@ -192,12 +137,12 @@ export class DiscoveryOrchestrator {
         this.stats.discovered += urls.length;
         this.notifyProgress();
 
-        // Process URLs in batches with concurrency control
-        await this.processBatch(
+        await this.enqueueUrls(
           urls.map((u) => ({
             url: u.url,
             title: u.title,
-            method: u.method,
+            discoveryMethod: u.method,
+            discoveredFrom: query,
           })),
         );
       } catch (error) {
@@ -211,201 +156,83 @@ export class DiscoveryOrchestrator {
     }
 
     const stats = this.getStats();
-    logger.info("Search query discovery complete", {
-      discovered: stats.discovered,
-      evaluated: stats.evaluated,
-      approved: stats.approved,
-      rejected: stats.rejected,
-      errors: stats.errors,
-      skipped: stats.skipped,
-    });
+    logger.info("Search query discovery complete", { ...stats });
     return stats;
   }
 
   /**
-   * Process a batch of URLs with concurrency control.
+   * Dedup and enqueue discovered URLs to SQS.
    */
-  private async processBatch(
-    urls: Array<{ url: string; title: string; method: "map" | "search" }>,
+  private async enqueueUrls(
+    urls: Array<{
+      url: string;
+      title: string;
+      discoveryMethod: "map" | "search";
+      discoveredFrom: string;
+    }>,
   ): Promise<void> {
-    const concurrency = this.config.concurrency ?? 3;
-    const batches: (typeof urls)[] = [];
+    // Dedup within this run (using normalized URLs for consistency with worker)
+    const newUrls = urls.filter((u) => {
+      const normalized = normalizeUrl(u.url);
+      if (this.seenUrls.has(normalized)) {
+        this.stats.skipped++;
+        return false;
+      }
+      this.seenUrls.add(normalized);
+      return true;
+    });
 
-    // Split into batches
-    for (let i = 0; i < urls.length; i += concurrency) {
-      batches.push(urls.slice(i, i + concurrency));
+    if (newUrls.length === 0) {
+      this.notifyProgress();
+      return;
     }
 
-    // Process each batch
-    for (const batch of batches) {
-      await Promise.all(
-        batch.map(async ({ url, title, method }) => {
-          try {
-            const result = await this.processDiscoveredURL(url, title, method);
-            if (result === "evaluated") {
-              this.stats.evaluated++;
-            } else if (result === "approved") {
-              this.stats.evaluated++;
-              this.stats.approved++;
-            } else if (result === "rejected") {
-              this.stats.evaluated++;
-              this.stats.rejected++;
-            } else if (result === "skipped") {
-              this.stats.skipped++;
-            }
-            this.notifyProgress();
-          } catch (error) {
-            logger.error(`Error processing URL: ${url}`, {
-              url,
-              error: error instanceof Error ? error.message : String(error),
-            });
-            this.stats.errors++;
-            this.notifyProgress();
-          }
+    if (this.config.dryRun) {
+      for (const u of newUrls) {
+        logger.debug(`[DRY RUN] Would enqueue: ${u.url}`, { url: u.url });
+      }
+      this.stats.enqueued += newUrls.length;
+      this.notifyProgress();
+      return;
+    }
+
+    const message: DiscoveryFeedMessage = {
+      urls: newUrls.map((u) => ({
+        url: u.url,
+        title: u.title,
+        discoveryMethod: u.discoveryMethod,
+        discoveredFrom: u.discoveredFrom,
+      })),
+      autoApprovalThreshold: this.config.autoApprovalThreshold,
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      const queueUrl = (
+        Resource as unknown as { DiscoveryFeedQueue: { url: string } }
+      ).DiscoveryFeedQueue.url;
+
+      await sqs.send(
+        new SendMessageCommand({
+          QueueUrl: queueUrl,
+          MessageBody: JSON.stringify(message),
         }),
       );
+
+      this.stats.enqueued += newUrls.length;
+      logger.info(`Enqueued ${newUrls.length} URLs to discovery feed`, {
+        count: newUrls.length,
+      });
+    } catch (error) {
+      logger.error("Failed to enqueue URLs to discovery feed", {
+        error: error instanceof Error ? error.message : String(error),
+        count: newUrls.length,
+      });
+      this.stats.errors++;
     }
+    this.notifyProgress();
   }
 
-  /**
-   * Process a single discovered URL through the evaluation pipeline.
-   *
-   * @returns "evaluated" | "approved" | "rejected" | "skipped"
-   */
-  private async processDiscoveredURL(
-    url: string,
-    title: string,
-    method: "map" | "search",
-  ): Promise<"evaluated" | "approved" | "rejected" | "skipped"> {
-    const id = this.discoveryService.generateId(url);
-    const domain = new URL(url).hostname;
-
-    // Check if already discovered (skip in dry run mode)
-    if (!this.config.dryRun) {
-      const existing = await this.discoveredSourceEntity.getById(id);
-      if (existing) {
-        logger.debug(`URL already discovered, skipping: ${url}`, { url, id });
-        return "skipped";
-      }
-    }
-
-    // Create discovered source record (skip in dry run mode)
-    if (!this.config.dryRun) {
-      await this.discoveredSourceEntity.create({
-        id,
-        url,
-        title,
-        discoveryMethod: method,
-        discoveredFrom: domain,
-      });
-    } else {
-      logger.debug(`[DRY RUN] Would create discovered source: ${url}`, {
-        url,
-        id,
-      });
-    }
-
-    // Step 1: Metadata evaluation (with context hints)
-    const metadataEval = await this.evaluationService.evaluateMetadata(
-      url,
-      title,
-      domain,
-    );
-
-    if (!this.config.dryRun) {
-      await this.discoveredSourceEntity.markMetadataEvaluated(
-        id,
-        metadataEval.confidence,
-        metadataEval.reasoning,
-        metadataEval.suggestedTopicDomains,
-        metadataEval.preliminaryDocumentType,
-      );
-    } else {
-      logger.debug(`[DRY RUN] Metadata evaluation: ${url}`, {
-        url,
-        confidence: metadataEval.confidence,
-        isRelevant: metadataEval.isRelevant,
-      });
-    }
-
-    // If not relevant, reject and stop
-    if (!metadataEval.isRelevant || metadataEval.confidence < 0.5) {
-      logger.info(`URL rejected after metadata evaluation: ${url}`, {
-        url,
-        confidence: metadataEval.confidence,
-      });
-      return "rejected";
-    }
-
-    // Step 2: Content extraction
-    logger.info(`Extracting content from: ${url}`, { url });
-    const documents = await loadWeb(url);
-    const fullText = documents.map((doc) => doc.pageContent).join("\n");
-
-    // Step 3: Content evaluation (with context hints)
-    const contentEval = await this.evaluationService.evaluateContent(
-      url,
-      title,
-      fullText,
-    );
-
-    const combinedConfidence =
-      this.evaluationService.calculateCombinedConfidence(
-        metadataEval.confidence,
-        contentEval.confidence,
-      );
-
-    // Determine format from URL
-    const format = url.endsWith(".pdf")
-      ? "pdf"
-      : url.endsWith(".txt")
-        ? "text"
-        : "html";
-
-    if (!this.config.dryRun) {
-      await this.discoveredSourceEntity.markContentEvaluated(
-        id,
-        contentEval.confidence,
-        combinedConfidence,
-        {
-          documentType: contentEval.documentType,
-          topicDomains: contentEval.topicDomains,
-          authorityLevel: contentEval.authorityLevel,
-          priority: contentEval.priority,
-          description: contentEval.description,
-          ngbId: contentEval.ngbId,
-          format,
-        },
-        contentEval.description,
-        this.config.autoApprovalThreshold,
-      );
-    } else {
-      logger.debug(`[DRY RUN] Content evaluation: ${url}`, {
-        url,
-        confidence: contentEval.confidence,
-        combinedConfidence,
-        approved: combinedConfidence >= this.config.autoApprovalThreshold,
-      });
-    }
-
-    if (combinedConfidence >= this.config.autoApprovalThreshold) {
-      logger.info(`URL auto-approved: ${url}`, {
-        url,
-        combinedConfidence,
-      });
-      return "approved";
-    } else {
-      logger.info(`URL rejected after content evaluation: ${url}`, {
-        url,
-        combinedConfidence,
-      });
-      return "rejected";
-    }
-  }
-
-  /**
-   * Notify progress callback if configured.
-   */
   private notifyProgress(): void {
     if (this.config.onProgress) {
       this.config.onProgress(this.getStats());
@@ -417,14 +244,12 @@ export class DiscoveryOrchestrator {
  * Factory function to create a DiscoveryOrchestrator with secrets loaded from SST.
  */
 export function createDiscoveryOrchestrator(
-  config: Omit<OrchestratorConfig, "tavilyApiKey" | "anthropicApiKey">,
+  config: Omit<OrchestratorConfig, "tavilyApiKey">,
 ): DiscoveryOrchestrator {
   const tavilyApiKey = Resource.TavilyApiKey.value;
-  const anthropicApiKey = Resource.AnthropicApiKey.value;
 
   return new DiscoveryOrchestrator({
     ...config,
     tavilyApiKey,
-    anthropicApiKey,
   });
 }

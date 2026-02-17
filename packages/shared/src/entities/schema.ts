@@ -58,7 +58,7 @@ export const AppTableSchema = {
       discoveryMethod: {
         type: String,
         required: true,
-        enum: ["map", "search", "manual"] as const,
+        enum: ["map", "search", "manual", "agent"] as const,
       },
       discoveredAt: { type: String, required: true },
       discoveredFrom: { type: String },

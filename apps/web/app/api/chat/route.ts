@@ -3,9 +3,14 @@ import {
   formatDataStreamPart,
   type JSONValue,
 } from "ai";
+import { Resource } from "sst";
 import { logger } from "@usopc/shared";
 
 const log = logger.child({ service: "chat-route" });
+
+const discoveryFeedQueueUrl = (
+  Resource as unknown as { DiscoveryFeedQueue: { url: string } }
+).DiscoveryFeedQueue.url;
 
 // Cache a single runner instance per Lambda cold start
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,6 +93,7 @@ export async function POST(req: Request) {
       loadSummary,
       saveSummary,
       generateSummary,
+      publishDiscoveredUrls,
     } = await import("@usopc/core");
 
     // Load existing conversation summary if feature is enabled
@@ -109,6 +115,13 @@ export async function POST(req: Request) {
 
     return createDataStreamResponse({
       async execute(writer) {
+        let discoveredUrls: {
+          url: string;
+          title: string;
+          content: string;
+          score: number;
+        }[] = [];
+
         for await (const event of events) {
           if (event.type === "answer-reset") {
             writer.write(
@@ -125,6 +138,10 @@ export async function POST(req: Request) {
                 { type: "citations", citations: event.citations },
               ] as unknown as JSONValue[]),
             );
+          } else if (event.type === "discovered-urls" && event.discoveredUrls) {
+            // Captured server-side only for fire-and-forget persistence.
+            // Not forwarded to the client — no UX signal for discovery.
+            discoveredUrls = event.discoveredUrls;
           }
         }
 
@@ -137,6 +154,16 @@ export async function POST(req: Request) {
                 error: String(err),
               }),
             );
+        }
+
+        // Fire-and-forget: publish discovered URLs to SQS for async evaluation
+        if (discoveredUrls.length > 0) {
+          publishDiscoveredUrls(discoveredUrls, discoveryFeedQueueUrl).catch(
+            (err: unknown) =>
+              log.error("Failed to publish discovered URLs", {
+                error: String(err),
+              }),
+          );
         }
       },
       onError: (error) => {

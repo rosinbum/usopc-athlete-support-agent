@@ -132,10 +132,9 @@ export async function handler(
     // Load discovery configuration
     const config = await loadDiscoveryConfig();
 
-    // Create orchestrator
+    // Create orchestrator (enqueue-only; evaluation happens in worker Lambda)
     const orchestrator = createDiscoveryOrchestrator({
       autoApprovalThreshold: config.autoApprovalThreshold,
-      concurrency: 3,
       dryRun: false,
     });
 
@@ -164,9 +163,7 @@ export async function handler(
       );
       logger.info("Domain discovery complete", {
         discovered: domainStats.discovered,
-        evaluated: domainStats.evaluated,
-        approved: domainStats.approved,
-        rejected: domainStats.rejected,
+        enqueued: domainStats.enqueued,
         skipped: domainStats.skipped,
         errors: domainStats.errors,
       });
@@ -192,9 +189,7 @@ export async function handler(
       );
       logger.info("Search query discovery complete", {
         discovered: searchStats.discovered,
-        evaluated: searchStats.evaluated,
-        approved: searchStats.approved,
-        rejected: searchStats.rejected,
+        enqueued: searchStats.enqueued,
         skipped: searchStats.skipped,
         errors: searchStats.errors,
       });
@@ -208,27 +203,12 @@ export async function handler(
     // Get final stats
     const finalStats = orchestrator.getStats();
 
-    // Track Anthropic usage
-    // Estimate: Each evaluation uses ~2000 input + ~500 output tokens
-    const evaluatedCount = finalStats.evaluated;
-    const estimatedInputTokens = evaluatedCount * 2000;
-    const estimatedOutputTokens = evaluatedCount * 500;
-
-    if (evaluatedCount > 0) {
-      await costTracker.trackAnthropicCall(
-        estimatedInputTokens,
-        estimatedOutputTokens,
-      );
-    }
-
-    // Get cost summary
+    // Get cost summary (Tavily only — Anthropic eval happens async in worker)
     const tavilyStats = await costTracker.getUsageStats("tavily", "daily");
-    const anthropicStats = await costTracker.getUsageStats(
-      "anthropic",
-      "daily",
-    );
 
     // Build completion summary
+    // Note: evaluation stats (approved/rejected/pending) are no longer tracked
+    // here — they happen asynchronously in the DiscoveryFeedWorker Lambda.
     const summary: DiscoveryCompletionSummary = {
       totalDiscovered: finalStats.discovered,
       byMethod: {
@@ -236,14 +216,13 @@ export async function handler(
         search: searchStats.discovered - domainStats.discovered,
       },
       byStatus: {
-        approved: finalStats.approved,
-        rejected: finalStats.rejected,
-        pending:
-          finalStats.evaluated - finalStats.approved - finalStats.rejected,
+        approved: 0,
+        rejected: 0,
+        pending: finalStats.enqueued,
       },
       costSummary: {
         tavilyCredits: tavilyStats.tavily?.estimatedCredits ?? 0,
-        anthropicCost: anthropicStats.anthropic?.estimatedCost ?? 0,
+        anthropicCost: 0,
       },
       duration: Date.now() - startTime,
       errors,
