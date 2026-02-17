@@ -1,0 +1,6 @@
+{
+  "graphs": {
+    "agent": "./src/studio.ts:createGraph"
+  },
+  "env": ".env"
+}
