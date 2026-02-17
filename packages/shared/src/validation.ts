@@ -29,7 +29,7 @@ export const sportOrgIdSchema = z.string().trim().toLowerCase().min(1);
 export type SportOrgId = z.infer<typeof sportOrgIdSchema>;
 
 /**
- * The seven core topic domains the USOPC agent supports.
+ * The core topic domains the USOPC agent supports.
  */
 export const TOPIC_DOMAINS = [
   "team_selection",
@@ -39,6 +39,8 @@ export const TOPIC_DOMAINS = [
   "eligibility",
   "governance",
   "athlete_rights",
+  "athlete_safety",
+  "financial_assistance",
 ] as const;
 
 export const topicDomainSchema = z.enum(TOPIC_DOMAINS);

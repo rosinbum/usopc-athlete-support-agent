@@ -111,10 +111,10 @@ describe("contextHints", () => {
   });
 
   describe("getAllNgbHints", () => {
-    it("should return all 5 NGB hints", () => {
+    it("should return all 20 NGB hints", () => {
       const hints = getAllNgbHints();
 
-      expect(hints).toHaveLength(5);
+      expect(hints).toHaveLength(20);
       expect(hints.map((h) => h.ngbId)).toEqual(
         expect.arrayContaining([
           "usa-track-field",
@@ -122,6 +122,21 @@ describe("contextHints", () => {
           "usa-gymnastics",
           "usa-basketball",
           "usa-hockey",
+          "usa-wrestling",
+          "usa-volleyball",
+          "usa-cycling",
+          "us-rowing",
+          "us-fencing",
+          "usa-diving",
+          "us-soccer",
+          "usa-tennis",
+          "usa-triathlon",
+          "us-ski-snowboard",
+          "usa-weightlifting",
+          "usa-judo",
+          "usa-boxing",
+          "usa-taekwondo",
+          "us-figure-skating",
         ]),
       );
     });
@@ -205,10 +220,10 @@ describe("contextHints", () => {
   });
 
   describe("getAllTopicKeywords", () => {
-    it("should return mappings for all 7 topic domains", () => {
+    it("should return mappings for all 9 topic domains", () => {
       const mappings = getAllTopicKeywords();
 
-      expect(mappings).toHaveLength(7);
+      expect(mappings).toHaveLength(9);
       expect(mappings.map((m) => m.domain)).toEqual(
         expect.arrayContaining([
           "team_selection",
@@ -218,6 +233,8 @@ describe("contextHints", () => {
           "eligibility",
           "governance",
           "athlete_rights",
+          "athlete_safety",
+          "financial_assistance",
         ]),
       );
     });

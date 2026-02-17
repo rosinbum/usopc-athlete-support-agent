@@ -20,6 +20,11 @@ Relevant URLs typically include:
 - NGB bylaws, governance documents, and policies
 - USOPC governance and compliance frameworks
 - Athlete handbooks and codes of conduct
+- Athlete financial support programs (stipends, grants, travel reimbursement)
+- Athlete benefit guides and funding eligibility criteria
+- Paralympic classification rules and procedures
+- IPC eligibility and classification appeal processes
+- Disability accommodation policies for athletes
 
 Irrelevant URLs typically include:
 - News articles, press releases, blog posts
@@ -95,6 +100,8 @@ High-quality documents:
 - Come from authoritative sources (USOPC, NGBs, SafeSport, USADA)
 - Contain detailed policy language or legal frameworks
 - Are current and appear to be actively maintained
+- Describe athlete financial support programs, stipend amounts, or funding eligibility
+- Detail Paralympic classification procedures or disability accommodation policies
 
 Low-quality documents:
 - Are outdated or superseded by newer versions
@@ -121,6 +128,11 @@ A specific label for the document type. Examples:
 - "Code of Conduct"
 - "Athlete Agreement"
 - "Eligibility Requirements"
+- "Financial Support Guide"
+- "Athlete Benefits"
+- "Grant Program"
+- "Classification Rules"
+- "Paralympic Eligibility"
 
 ### topicDomains (required)
 An array of topic domains covered in this document. Use these values:
@@ -167,6 +179,18 @@ Common NGB IDs:
 - "us-ski-snowboard"
 - "usa-volleyball"
 - "usa-wrestling"
+- "usa-cycling"
+- "us-rowing"
+- "us-fencing"
+- "usa-diving"
+- "us-soccer"
+- "usa-tennis"
+- "usa-triathlon"
+- "usa-weightlifting"
+- "usa-judo"
+- "usa-boxing"
+- "usa-taekwondo"
+- "us-figure-skating"
 
 Return null if the document is not NGB-specific.
 
