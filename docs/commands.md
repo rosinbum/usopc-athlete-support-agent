@@ -1,6 +1,6 @@
 # Commands Reference
 
-## Monorepo-wide (via Turbo)
+## Monorepo-wide
 
 ```bash
 pnpm build          # Build all packages

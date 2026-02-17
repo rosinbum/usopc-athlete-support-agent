@@ -1,6 +1,6 @@
 # Technical Debt
 
-Assessed 2026-02-09. Items marked ~~strikethrough~~ have been resolved.
+Assessed 2026-02-17. Items marked ~~strikethrough~~ have been resolved.
 
 ---
 
@@ -10,17 +10,23 @@ Assessed 2026-02-09. Items marked ~~strikethrough~~ have been resolved.
 - ~~**Move `@types/pg` to devDependencies** in `packages/shared`~~ (PR #77)
 - ~~**Extract `getLastUserMessage()` helper** — was duplicated in 4 agent nodes~~ (PR #77)
 - ~~**Add typed `SportOrganization` interface** to NGB router — was using `any` throughout~~ (PR #77)
-- ~~**Orphaned `shouldEscalate` edge function** — never used in graph.ts; escalation handled by classifier + routeByDomain~~ (PR #149)
-- ~~**Unused `loadHtml` import** in pipeline.ts — `loadDocuments()` uses `loadWeb()` for HTML format~~ (PR #149)
-- ~~**`.gitignore` had specific file path** instead of directory pattern for `data/sources/llm-generated-sources/`~~ (PR #149)
+- ~~**Orphaned `shouldEscalate` edge function** — never used in graph.ts~~ (PR #149)
+- ~~**Unused `loadHtml` import** in pipeline.ts~~ (PR #149)
+- ~~**`.gitignore` had specific file path** instead of directory pattern~~ (PR #149)
 - ~~**`@usopc/evals` undocumented** in architecture.md and commands.md~~ (PR #149)
-- ~~**Phantom `pnpm lint` and `pnpm db:migrate` commands** referenced in docs but no such scripts exist~~ (PR #149)
+- ~~**Phantom `pnpm lint` and `pnpm db:migrate` commands** referenced in docs~~ (PR #149)
+- ~~**Ingestion metadata mapping broken** (#52, #53)~~
+- ~~**Conversation summarization for long chats** (#35)~~
+- ~~**Database persistence for conversations** (#36)~~
+- ~~**Dedicated query reformulation node** (#37)~~
+- ~~**Web chat route used `console.log`** — now uses structured logger~~
+- ~~**`apps/web` missing explicit `zod` dep** — now declared~~
 
 ---
 
 ## Incomplete Integrations (HIGH)
 
-The AI agent is not wired into the app surfaces yet. Handlers return placeholder responses.
+The AI agent is wired into the web UI but not into the API or Slack surfaces.
 
 | Location                                     | Issue                              | Tracked |
 | -------------------------------------------- | ---------------------------------- | ------- |
@@ -32,58 +38,30 @@ The AI agent is not wired into the app surfaces yet. Handlers return placeholder
 
 ## Test Coverage Gaps (HIGH)
 
-| Package              | Test Files | Source Files | Coverage | Priority                                          |
-| -------------------- | ---------- | ------------ | -------- | ------------------------------------------------- |
-| `apps/slack`         | 0          | 10           | 0%       | Critical                                          |
-| `apps/api`           | 2          | 11           | 18%      | High                                              |
-| `apps/web`           | 6          | 43           | 14%      | High                                              |
-| `packages/core`      | 31         | 61           | 51%      | Moderate (strong for logic, weak for config/data) |
-| `packages/ingestion` | 12         | 32           | 38%      | Moderate                                          |
-| `packages/shared`    | 5          | 8            | 63%      | Low                                               |
+| Package      | Test Files | Source Files | Priority |
+| ------------ | ---------- | ------------ | -------- |
+| `apps/slack` | 0          | 10           | Critical |
+| `apps/api`   | 3          | 11           | High     |
 
 Key untested files:
 
-- `packages/shared/src/pool.ts` — critical database singleton
 - `apps/slack/src/handlers/*` — all event handlers
 - `apps/api/src/routers/chat.ts` — core chat endpoint
-- `apps/web/app/api/chat/route.ts` — web chat endpoint
 
-## Dependency Issues (MEDIUM)
+## Dependency Issues (LOW)
 
 - **Vitest version drift**: `apps/web` on `^2.1.9` while everything else is `^2.1.8`
-- **Missing explicit dep**: `apps/web` uses `zod` transitively but doesn't declare it in `package.json`
-- **`@types/pg` version inconsistency**: `core` and `ingestion` on `^8.11.10`, `shared` on `^8.11.11`
-
-## Type Safety (MEDIUM)
-
-- **`Promise<any>` in chat route**: `apps/web/app/api/chat/route.ts` disables eslint rather than typing properly
-- **LangChain message casts**: `isUserMessage()` helper still uses `as unknown as Record<string, unknown>` internally — this is a LangChain type limitation, not easily fixable
-
-## Error Handling & Observability (MEDIUM)
-
-- **Silent error swallowing**: `apps/api/src/routers/ngbs.ts` catches file-read errors with bare `catch { continue }` — no logging
-- **Console instead of logger**: `apps/web/app/api/chat/route.ts` has 7 `console.log` calls instead of structured logger
-- **No retry for Slack posts**: Slack message delivery failures are fire-and-forget
+- **`@types/pg` version inconsistency**: `shared`/`api` on `^8.11.11`, `core`/`ingestion` on `^8.11.10`
 
 ## Architecture TODOs (MEDIUM)
 
-| Description                                 | Location                                          | Tracked |
-| ------------------------------------------- | ------------------------------------------------- | ------- |
-| Conversation summarization for long chats   | `packages/core/src/agent/nodes/classifier.ts:173` | #35     |
-| Dedicated query reformulation node          | `packages/core/src/agent/nodes/retriever.ts:53`   | #37     |
-| Database persistence for conversations      | —                                                 | #36     |
-| Error handling for API routes and streaming | —                                                 | #31     |
-
-## Code Duplication (LOW)
-
-- **Error message extraction**: Multiple files repeat `error instanceof Error ? error.message : String(error)` — could extract a shared helper
-- **NGB filtering in `ngbs.ts`**: Filtering logic could be simplified but is minor
+| Description                                 | Location                                        | Tracked |
+| ------------------------------------------- | ----------------------------------------------- | ------- |
+| Error handling for API routes and streaming | —                                               | #31     |
+| Stale TODO referencing closed #37           | `packages/core/src/agent/nodes/retriever.ts:54` | #37 ✅  |
 
 ## Critical Open Issues
 
-These should be prioritized before additional feature work:
-
-- **#53**: Narrow retrieval returns 0 results (affects core agent behavior)
-- **#52**: Ingestion metadata mapping broken (data quality)
-- **#5, #7**: Agent integration incomplete (partial functionality in API/Slack)
-- **#31**: Error handling missing from critical paths
+- **#5**: Wire LangGraph agent into tRPC API endpoints
+- **#7**: Wire LangGraph agent into Slack bot handlers
+- **#31**: Error handling missing from critical API paths
