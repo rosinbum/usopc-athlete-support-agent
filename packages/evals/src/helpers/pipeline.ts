@@ -54,6 +54,7 @@ export async function runPipeline(userMessage: string): Promise<{
         queryIntent: undefined,
         retrievedDocuments: [],
         webSearchResults: [],
+        webSearchResultUrls: [],
         retrievalConfidence: 0,
         disclaimerRequired: true,
         hasTimeConstraint: false,

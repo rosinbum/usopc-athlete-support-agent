@@ -77,6 +77,7 @@ export async function runMultiTurnPipeline(
         queryIntent: undefined,
         retrievedDocuments: [],
         webSearchResults: [],
+        webSearchResultUrls: [],
         retrievalConfidence: 0,
         disclaimerRequired: true,
         hasTimeConstraint: false,
