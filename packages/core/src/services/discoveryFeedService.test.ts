@@ -46,12 +46,19 @@ function makeMockEntity() {
   };
 }
 
-function makeResults(...urls: string[]): WebSearchResult[] {
-  return urls.map((url, i) => ({
-    url,
-    title: `Title ${i}`,
-    content: `Content ${i}`,
-  }));
+function makeResults(
+  ...entries: (string | { url: string; score: number })[]
+): WebSearchResult[] {
+  return entries.map((entry, i) => {
+    const url = typeof entry === "string" ? entry : entry.url;
+    const score = typeof entry === "string" ? 0.8 : entry.score;
+    return {
+      url,
+      title: `Title ${i}`,
+      content: `Content ${i}`,
+      score,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +118,7 @@ describe("persistDiscoveredUrls", () => {
     expect(mockCreateAppTable).not.toHaveBeenCalled();
   });
 
-  it("persists all URLs", async () => {
+  it("persists all URLs and calls markMetadataEvaluated", async () => {
     const results = makeResults(
       "https://usopc.org/doc1",
       "https://teamusa.org/doc2",
@@ -121,6 +128,7 @@ describe("persistDiscoveredUrls", () => {
 
     expect(output).toEqual({ persisted: 2, skipped: 0 });
     expect(mockEntity.create).toHaveBeenCalledTimes(2);
+    expect(mockEntity.markMetadataEvaluated).toHaveBeenCalledTimes(2);
   });
 
   it("creates entries with correct fields", async () => {
@@ -171,6 +179,59 @@ describe("persistDiscoveredUrls", () => {
       expect.objectContaining({
         url: "https://usopc.org/page",
       }),
+    );
+  });
+
+  it("calls markMetadataEvaluated with Tavily score and reasoning", async () => {
+    const results = makeResults({
+      url: "https://usopc.org/doc1",
+      score: 0.73,
+    });
+
+    await persistDiscoveredUrls(results, "test-table");
+
+    expect(mockEntity.markMetadataEvaluated).toHaveBeenCalledWith(
+      expect.any(String),
+      0.73,
+      "Auto-scored from Tavily relevance (agent web search)",
+      [],
+      "",
+    );
+  });
+
+  it("high score (>= 0.5) results in pending_content status", async () => {
+    const results = makeResults({
+      url: "https://usopc.org/high-score",
+      score: 0.85,
+    });
+
+    await persistDiscoveredUrls(results, "test-table");
+
+    // markMetadataEvaluated handles status: >= 0.5 → pending_content
+    expect(mockEntity.markMetadataEvaluated).toHaveBeenCalledWith(
+      expect.any(String),
+      0.85,
+      expect.any(String),
+      [],
+      "",
+    );
+  });
+
+  it("low score (< 0.5) results in rejected status", async () => {
+    const results = makeResults({
+      url: "https://usopc.org/low-score",
+      score: 0.3,
+    });
+
+    await persistDiscoveredUrls(results, "test-table");
+
+    // markMetadataEvaluated handles status: < 0.5 → rejected
+    expect(mockEntity.markMetadataEvaluated).toHaveBeenCalledWith(
+      expect.any(String),
+      0.3,
+      expect.any(String),
+      [],
+      "",
     );
   });
 

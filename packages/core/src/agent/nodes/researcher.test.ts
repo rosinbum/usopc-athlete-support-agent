@@ -123,11 +123,13 @@ describe("createResearcherNode", () => {
           url: "https://usopc.org/doc1",
           title: "Selection Procedures",
           content: "result 1 content",
+          score: 0.95,
         },
         {
           url: "https://teamusa.org/doc2",
           title: "Athlete Rights",
           content: "result 2 content",
+          score: 0.82,
         },
       ],
     });
@@ -144,11 +146,13 @@ describe("createResearcherNode", () => {
         url: "https://usopc.org/doc1",
         title: "Selection Procedures",
         content: "result 1 content",
+        score: 0.95,
       },
       {
         url: "https://teamusa.org/doc2",
         title: "Athlete Rights",
         content: "result 2 content",
+        score: 0.82,
       },
     ]);
   });
@@ -197,6 +201,7 @@ describe("createResearcherNode", () => {
           url: "https://usopc.org/doc1",
           title: "Good result",
           content: "has all fields",
+          score: 0.9,
         },
         { url: "https://usopc.org/doc2", content: "missing title" },
         { title: "missing url", content: "no url field" },

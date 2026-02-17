@@ -43,7 +43,9 @@ function urlToId(normalizedUrl: string): string {
  *
  * - Normalizes URLs for consistent dedup
  * - Skips URLs that already exist in the table
- * - Creates entries with discoveryMethod: "agent" and status: "pending_metadata"
+ * - Creates entries with discoveryMethod: "agent"
+ * - Uses Tavily's relevance score as metadataConfidence (skips LLM eval)
+ * - Score >= 0.5 → pending_content; < 0.5 → rejected
  * - Individual failures don't block other URLs
  * - Never throws — logs all operations
  */
@@ -84,7 +86,22 @@ export async function persistDiscoveredUrls(
         discoveredFrom: "agent-web-search",
       });
 
-      log.info("Persisted discovered URL", { url: normalized, id });
+      // Use Tavily relevance score as metadata confidence, skipping the
+      // LLM metadata evaluation step entirely. markMetadataEvaluated
+      // handles the status transition: >= 0.5 → pending_content, < 0.5 → rejected.
+      await entity.markMetadataEvaluated(
+        id,
+        result.score,
+        "Auto-scored from Tavily relevance (agent web search)",
+        [],
+        "",
+      );
+
+      log.info("Persisted discovered URL", {
+        url: normalized,
+        id,
+        tavilyScore: result.score,
+      });
       persisted++;
     } catch (error) {
       log.error("Failed to persist discovered URL", {

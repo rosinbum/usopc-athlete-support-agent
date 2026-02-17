@@ -110,8 +110,12 @@ export async function POST(req: Request) {
 
     return createDataStreamResponse({
       async execute(writer) {
-        let discoveredUrls: { url: string; title: string; content: string }[] =
-          [];
+        let discoveredUrls: {
+          url: string;
+          title: string;
+          content: string;
+          score: number;
+        }[] = [];
 
         for await (const event of events) {
           if (event.type === "answer-reset") {

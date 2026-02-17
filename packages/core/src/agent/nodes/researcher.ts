@@ -77,6 +77,7 @@ function extractStructuredResults(rawResult: unknown): WebSearchResult[] {
         url: r.url as string,
         title: r.title as string,
         content: r.content as string,
+        score: typeof r.score === "number" ? (r.score as number) : 0,
       }));
   }
   return [];
