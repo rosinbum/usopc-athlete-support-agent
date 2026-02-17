@@ -8,6 +8,7 @@ vi.mock("@usopc/shared", () => ({
     warn: vi.fn(),
     debug: vi.fn(),
   })),
+  normalizeUrl: vi.fn((url: string) => url),
 }));
 
 // Mock SST Resource
@@ -16,11 +17,6 @@ vi.mock("sst", () => ({
     TavilyApiKey: { value: "test-tavily-key" },
     DiscoveryFeedQueue: { url: "https://sqs.us-east-1.amazonaws.com/queue" },
   },
-}));
-
-// Mock @usopc/core
-vi.mock("@usopc/core", () => ({
-  normalizeUrl: vi.fn((url: string) => url),
 }));
 
 // Mock SQS

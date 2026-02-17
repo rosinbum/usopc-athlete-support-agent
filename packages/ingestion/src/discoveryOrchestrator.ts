@@ -1,6 +1,5 @@
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { createLogger } from "@usopc/shared";
-import { normalizeUrl } from "@usopc/core";
+import { createLogger, normalizeUrl } from "@usopc/shared";
 import type { DiscoveryFeedMessage } from "@usopc/core";
 import { Resource } from "sst";
 import { DiscoveryService } from "./services/discoveryService.js";

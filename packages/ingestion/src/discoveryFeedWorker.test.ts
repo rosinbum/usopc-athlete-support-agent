@@ -13,6 +13,8 @@ vi.mock("@usopc/shared", () => ({
   getSecretValue: vi.fn(() => "test-anthropic-key"),
   createAppTable: vi.fn(() => ({})),
   DiscoveredSourceEntity: vi.fn(),
+  normalizeUrl: vi.fn((url: string) => url),
+  urlToId: vi.fn(() => "test-id-hash"),
 }));
 
 // Mock SST Resource
@@ -20,12 +22,6 @@ vi.mock("sst", () => ({
   Resource: {
     AppTable: { name: "test-table" },
   },
-}));
-
-// Mock @usopc/core
-vi.mock("@usopc/core", () => ({
-  normalizeUrl: vi.fn((url: string) => url),
-  urlToId: vi.fn(() => "test-id-hash"),
 }));
 
 // Mock EvaluationService
@@ -38,8 +34,7 @@ vi.mock("./loaders/index.js", () => ({
   loadWeb: vi.fn(),
 }));
 
-import { DiscoveredSourceEntity } from "@usopc/shared";
-import { normalizeUrl } from "@usopc/core";
+import { DiscoveredSourceEntity, normalizeUrl } from "@usopc/shared";
 import { EvaluationService } from "./services/evaluationService.js";
 import { loadWeb } from "./loaders/index.js";
 import { handler } from "./discoveryFeedWorker.js";
