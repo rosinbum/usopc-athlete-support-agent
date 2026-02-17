@@ -84,14 +84,14 @@ export default $config({
     const api = new sst.aws.ApiGatewayV2("Api");
     // Feature flags — passed through to Lambda environment
     const featureFlags = {
-      FEATURE_QUALITY_CHECKER: process.env.FEATURE_QUALITY_CHECKER ?? "false",
+      FEATURE_QUALITY_CHECKER: process.env.FEATURE_QUALITY_CHECKER ?? "true",
       FEATURE_CONVERSATION_MEMORY:
-        process.env.FEATURE_CONVERSATION_MEMORY ?? "false",
-      FEATURE_SOURCE_DISCOVERY: process.env.FEATURE_SOURCE_DISCOVERY ?? "false",
+        process.env.FEATURE_CONVERSATION_MEMORY ?? "true",
+      FEATURE_SOURCE_DISCOVERY: process.env.FEATURE_SOURCE_DISCOVERY ?? "true",
       FEATURE_MULTI_STEP_PLANNER:
-        process.env.FEATURE_MULTI_STEP_PLANNER ?? "false",
-      FEATURE_FEEDBACK_LOOP: process.env.FEATURE_FEEDBACK_LOOP ?? "false",
-      FEATURE_QUERY_PLANNER: process.env.FEATURE_QUERY_PLANNER ?? "false",
+        process.env.FEATURE_MULTI_STEP_PLANNER ?? "true",
+      FEATURE_FEEDBACK_LOOP: process.env.FEATURE_FEEDBACK_LOOP ?? "true",
+      FEATURE_QUERY_PLANNER: process.env.FEATURE_QUERY_PLANNER ?? "true",
     };
 
     api.route("$default", {

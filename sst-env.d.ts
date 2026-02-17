@@ -6,6 +6,10 @@
 
 declare module "sst" {
   export interface Resource {
+    "AdminEmails": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "AnthropicApiKey": {
       "type": "sst.sst.Secret"
       "value": string
@@ -14,7 +18,27 @@ declare module "sst" {
       "type": "sst.aws.ApiGatewayV2"
       "url": string
     }
+    "AppTable": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "AuthSecret": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "ConversationMaxTurns": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "DocumentsBucket": {
+      "name": string
+      "type": "sst.aws.Bucket"
+    }
+    "GitHubClientId": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "GitHubClientSecret": {
       "type": "sst.sst.Secret"
       "value": string
     }
@@ -45,33 +69,6 @@ declare module "sst" {
     "Web": {
       "type": "sst.aws.Nextjs"
       "url": string
-    }
-    "SourceConfigs": {
-      "type": "sst.aws.Dynamo"
-      "name": string
-    }
-    "DocumentsBucket": {
-      "type": "sst.aws.Bucket"
-      "name": string
-    }
-    "IngestionQueue": {
-      "type": "sst.aws.Queue"
-      "url": string
-    }
-    "IngestionDLQ": {
-      "type": "sst.aws.Queue"
-      "url": string
-    }
-    "IngestionCron": {
-      "type": "sst.aws.Cron"
-    }
-    "Database": {
-      "type": "sst.aws.Postgres"
-      "host": string
-      "port": number
-      "username": string
-      "password": string
-      "database": string
     }
   }
 }
