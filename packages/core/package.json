@@ -13,6 +13,7 @@
     "studio": "npx @langchain/langgraph-cli dev"
   },
   "dependencies": {
+    "@aws-sdk/client-sqs": "^3.981.0",
     "@langchain/anthropic": "^0.3.12",
     "@langchain/community": "^0.3.22",
     "@langchain/core": "^0.3.28",

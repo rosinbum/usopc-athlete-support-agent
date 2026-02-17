@@ -19,7 +19,6 @@ interface CliOptions {
   domain?: string;
   query?: string;
   json: boolean;
-  concurrency: number;
 }
 
 /**
@@ -30,7 +29,6 @@ function parseArgs(): CliOptions {
   const options: CliOptions = {
     dryRun: false,
     json: false,
-    concurrency: 3,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -47,12 +45,6 @@ function parseArgs(): CliOptions {
       options.domain = args[++i];
     } else if (arg === "--query") {
       options.query = args[++i];
-    } else if (arg === "--concurrency") {
-      options.concurrency = parseInt(args[++i], 10);
-      if (isNaN(options.concurrency) || options.concurrency < 1) {
-        console.error("Error: --concurrency must be a positive integer");
-        process.exit(1);
-      }
     } else {
       console.error(`Unknown argument: ${arg}`);
       printHelp();
@@ -74,10 +66,9 @@ USAGE:
   pnpm --filter @usopc/ingestion discovery [OPTIONS]
 
 OPTIONS:
-  --dry-run          Run discovery without saving to DynamoDB (useful for testing)
+  --dry-run          Run discovery without enqueuing to SQS (useful for testing)
   --domain <domain>  Discover from a specific domain only (e.g., "usaswimming.org")
   --query <query>    Discover from a specific search query only
-  --concurrency <n>  Number of URLs to process concurrently (default: 3)
   --json             Output results as JSON
   --help, -h         Show this help message
 
@@ -85,7 +76,7 @@ EXAMPLES:
   # Full discovery run (all domains and queries)
   pnpm --filter @usopc/ingestion discovery
 
-  # Dry run to preview without saving
+  # Dry run to preview without enqueuing
   pnpm --filter @usopc/ingestion discovery --dry-run
 
   # Discover from a specific domain
@@ -93,9 +84,6 @@ EXAMPLES:
 
   # Discover from a specific query
   pnpm --filter @usopc/ingestion discovery --query "USOPC team selection"
-
-  # Increase concurrency for faster processing
-  pnpm --filter @usopc/ingestion discovery --concurrency 5
 
   # Output as JSON for scripting
   pnpm --filter @usopc/ingestion discovery --json
@@ -112,8 +100,7 @@ function displayProgress(stats: DiscoveryStats): void {
   // Clear line and move cursor to start
   process.stdout.write("\r\x1b[K");
   process.stdout.write(
-    `Progress: ${stats.discovered} discovered | ${stats.evaluated} evaluated | ` +
-      `${stats.approved} approved | ${stats.rejected} rejected | ` +
+    `Progress: ${stats.discovered} discovered | ${stats.enqueued} enqueued | ` +
       `${stats.skipped} skipped | ${stats.errors} errors`,
   );
 }
@@ -136,17 +123,13 @@ function displaySummary(
   console.log(dryRun ? "Discovery Dry Run Complete" : "Discovery Run Complete");
   console.log("=".repeat(60));
   console.log(`Discovered:  ${stats.discovered} URLs`);
-  console.log(`Evaluated:   ${stats.evaluated} URLs`);
-  console.log(`Approved:    ${stats.approved} URLs`);
-  console.log(`Rejected:    ${stats.rejected} URLs`);
-  console.log(`Skipped:     ${stats.skipped} URLs (already discovered)`);
+  console.log(`Enqueued:    ${stats.enqueued} URLs`);
+  console.log(`Skipped:     ${stats.skipped} URLs (duplicates)`);
   console.log(`Errors:      ${stats.errors}`);
   console.log("=".repeat(60));
 
   if (dryRun) {
-    console.log(
-      "\nNote: This was a dry run. No changes were saved to DynamoDB.",
-    );
+    console.log("\nNote: This was a dry run. No URLs were enqueued to SQS.");
   }
 }
 
@@ -168,14 +151,12 @@ async function main() {
         domains: domains.length,
         queries: queries.length,
         dryRun: options.dryRun,
-        concurrency: options.concurrency,
       });
 
       console.log("\nDiscovery Configuration:");
       console.log(`  Domains: ${domains.length}`);
       console.log(`  Queries: ${queries.length}`);
       console.log(`  Auto-approval threshold: ${config.autoApprovalThreshold}`);
-      console.log(`  Concurrency: ${options.concurrency}`);
       console.log(`  Dry run: ${options.dryRun ? "Yes" : "No"}`);
       console.log("");
     }
@@ -183,7 +164,6 @@ async function main() {
     // Create orchestrator with progress callback
     const orchestrator = createDiscoveryOrchestrator({
       autoApprovalThreshold: config.autoApprovalThreshold,
-      concurrency: options.concurrency,
       dryRun: options.dryRun,
       onProgress: options.json ? undefined : displayProgress,
     });
@@ -217,9 +197,7 @@ async function main() {
     if (!options.json) {
       logger.info("Discovery run complete", {
         discovered: stats.discovered,
-        evaluated: stats.evaluated,
-        approved: stats.approved,
-        rejected: stats.rejected,
+        enqueued: stats.enqueued,
         errors: stats.errors,
         skipped: stats.skipped,
       });

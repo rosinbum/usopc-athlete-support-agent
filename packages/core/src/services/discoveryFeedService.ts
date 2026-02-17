@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { createAppTable, DiscoveredSourceEntity, logger } from "@usopc/shared";
-import type { WebSearchResult } from "../types/index.js";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { logger } from "@usopc/shared";
+import type { WebSearchResult, DiscoveryFeedMessage } from "../types/index.js";
 
 const log = logger.child({ service: "discovery-feed" });
 
@@ -33,83 +34,50 @@ export function normalizeUrl(raw: string): string {
 /**
  * Generates a deterministic SHA-256 ID from a normalized URL.
  */
-function urlToId(normalizedUrl: string): string {
+export function urlToId(normalizedUrl: string): string {
   return createHash("sha256").update(normalizedUrl).digest("hex");
 }
 
 /**
- * Persists discovered URLs from the researcher's web search results
- * into the DiscoveredSource DynamoDB table for the ingestion pipeline.
+ * Publishes discovered URLs from the researcher's web search results
+ * to the DiscoveryFeedQueue for async evaluation by the worker Lambda.
  *
- * - Normalizes URLs for consistent dedup
- * - Skips URLs that already exist in the table
- * - Creates entries with discoveryMethod: "agent"
- * - Uses Tavily's relevance score as metadataConfidence (skips LLM eval)
- * - Score >= 0.5 → pending_content; < 0.5 → rejected
- * - Individual failures don't block other URLs
  * - Never throws — logs all operations
+ * - Returns immediately for empty input
  */
-export async function persistDiscoveredUrls(
+export async function publishDiscoveredUrls(
   results: WebSearchResult[],
-  tableName: string,
-): Promise<{ persisted: number; skipped: number }> {
-  if (results.length === 0) {
-    return { persisted: 0, skipped: 0 };
+  queueUrl: string,
+): Promise<void> {
+  if (results.length === 0) return;
+
+  const message: DiscoveryFeedMessage = {
+    urls: results.map((r) => ({
+      url: r.url,
+      title: r.title,
+      discoveryMethod: "agent" as const,
+      discoveredFrom: "agent-web-search",
+    })),
+    timestamp: new Date().toISOString(),
+  };
+
+  try {
+    const sqs = new SQSClient({});
+    await sqs.send(
+      new SendMessageCommand({
+        QueueUrl: queueUrl,
+        MessageBody: JSON.stringify(message),
+      }),
+    );
+
+    log.info("Published discovered URLs to queue", {
+      count: results.length,
+      queueUrl,
+    });
+  } catch (error) {
+    log.error("Failed to publish discovered URLs", {
+      error: error instanceof Error ? error.message : String(error),
+      count: results.length,
+    });
   }
-
-  const table = createAppTable(tableName);
-  const entity = new DiscoveredSourceEntity(table);
-  let persisted = 0;
-  let skipped = 0;
-
-  for (const result of results) {
-    const normalized = normalizeUrl(result.url);
-    const id = urlToId(normalized);
-
-    try {
-      // create() uses a conditional put (exists: null) — throws if the
-      // item already exists, so we don't need a separate getById dedup check.
-      await entity.create({
-        id,
-        url: normalized,
-        title: result.title,
-        discoveryMethod: "agent",
-        discoveredFrom: "agent-web-search",
-      });
-
-      // Use Tavily relevance score as metadata confidence, skipping the
-      // LLM metadata evaluation step entirely. markMetadataEvaluated
-      // handles the status transition: >= 0.5 → pending_content, < 0.5 → rejected.
-      await entity.markMetadataEvaluated(
-        id,
-        result.score,
-        "Auto-scored from Tavily relevance (agent web search)",
-        [],
-        "",
-      );
-
-      log.info("Persisted discovered URL", {
-        url: normalized,
-        id,
-        tavilyScore: result.score,
-      });
-      persisted++;
-    } catch (error) {
-      // Conditional put failure means the URL already exists — count as skipped.
-      // Other errors (network, etc.) are also caught here and logged.
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes("Conditional")) {
-        log.info("Skipping existing discovered URL", { url: normalized, id });
-        skipped++;
-      } else {
-        log.error("Failed to persist discovered URL", {
-          url: result.url,
-          error: msg,
-        });
-      }
-    }
-  }
-
-  log.info("Discovery feed complete", { persisted, skipped });
-  return { persisted, skipped };
 }

@@ -118,13 +118,37 @@ export default $config({
       },
     });
 
+    // Discovery feed queue — processes discovered URLs through the evaluation
+    // pipeline asynchronously (metadata eval → content extraction → content eval).
+    // Available in all stages so both the agent (Web) and discovery cron can publish.
+    const discoveryFeedDlq = new sst.aws.Queue("DiscoveryFeedDLQ");
+    const discoveryFeedQueue = new sst.aws.Queue("DiscoveryFeedQueue", {
+      visibilityTimeout: "10 minutes",
+      dlq: {
+        queue: discoveryFeedDlq.arn,
+        retry: 2,
+      },
+    });
+
+    discoveryFeedQueue.subscribe(
+      {
+        handler: "packages/ingestion/src/discoveryFeedWorker.handler",
+        link: [...linkables, appTable],
+        timeout: "10 minutes",
+        memory: "512 MB",
+      },
+      {
+        batch: { size: 1 },
+      },
+    );
+
     // Source discovery (weekly) - production only
     if (isProd) {
       new sst.aws.Cron("DiscoveryCron", {
         schedule: "cron(0 2 ? * MON *)", // Every Monday at 2 AM UTC
         job: {
           handler: "packages/ingestion/src/functions/discovery.handler",
-          link: [...linkables, database!, appTable],
+          link: [...linkables, database!, appTable, discoveryFeedQueue],
           timeout: "15 minutes",
           memory: "1024 MB",
           permissions: [
@@ -211,6 +235,7 @@ export default $config({
         adminEmails,
         appTable,
         documentsBucket,
+        discoveryFeedQueue,
         ...(ingestionQueue ? [ingestionQueue] : []),
       ],
       environment: {

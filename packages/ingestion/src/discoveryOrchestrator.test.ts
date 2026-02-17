@@ -8,17 +8,21 @@ vi.mock("@usopc/shared", () => ({
     warn: vi.fn(),
     debug: vi.fn(),
   })),
-  createAppTable: vi.fn(() => ({})),
-  DiscoveredSourceEntity: vi.fn(),
 }));
 
 // Mock SST Resource
 vi.mock("sst", () => ({
   Resource: {
-    AppTable: { name: "test-table" },
     TavilyApiKey: { value: "test-tavily-key" },
     AnthropicApiKey: { value: "test-anthropic-key" },
+    DiscoveryFeedQueue: { url: "https://sqs.us-east-1.amazonaws.com/queue" },
   },
+}));
+
+// Mock SQS
+vi.mock("@aws-sdk/client-sqs", () => ({
+  SQSClient: vi.fn(),
+  SendMessageCommand: vi.fn(),
 }));
 
 // Mock DiscoveryService
@@ -26,37 +30,21 @@ vi.mock("./services/discoveryService.js", () => ({
   DiscoveryService: vi.fn(),
 }));
 
-// Mock EvaluationService
-vi.mock("./services/evaluationService.js", () => ({
-  EvaluationService: vi.fn(),
-}));
-
-// Mock loadWeb
-vi.mock("./loaders/index.js", () => ({
-  loadWeb: vi.fn(),
-}));
-
 // Import after mocks
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { DiscoveryOrchestrator } from "./discoveryOrchestrator.js";
-import { DiscoveredSourceEntity } from "@usopc/shared";
 import { DiscoveryService } from "./services/discoveryService.js";
-import { EvaluationService } from "./services/evaluationService.js";
-import { loadWeb } from "./loaders/index.js";
+
+const MockSQSClient = vi.mocked(SQSClient);
+const MockSendMessageCommand = vi.mocked(SendMessageCommand);
 
 describe("DiscoveryOrchestrator", () => {
+  const mockSend = vi.fn().mockResolvedValue({});
+
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Setup mock implementations
-    vi.mocked(DiscoveredSourceEntity).mockImplementation(
-      () =>
-        ({
-          create: vi.fn(),
-          getById: vi.fn().mockResolvedValue(null),
-          markMetadataEvaluated: vi.fn(),
-          markContentEvaluated: vi.fn(),
-        }) as any,
-    );
+    MockSQSClient.mockImplementation(() => ({ send: mockSend }) as any);
 
     vi.mocked(DiscoveryService).mockImplementation(
       () =>
@@ -66,19 +54,6 @@ describe("DiscoveryOrchestrator", () => {
           generateId: vi.fn().mockReturnValue("test-id"),
         }) as any,
     );
-
-    vi.mocked(EvaluationService).mockImplementation(
-      () =>
-        ({
-          evaluateMetadata: vi.fn(),
-          evaluateContent: vi.fn(),
-          calculateCombinedConfidence: vi.fn(),
-        }) as any,
-    );
-
-    vi.mocked(loadWeb).mockResolvedValue([
-      { pageContent: "Test content", metadata: {} } as any,
-    ]);
   });
 
   describe("constructor and stats", () => {
@@ -91,9 +66,7 @@ describe("DiscoveryOrchestrator", () => {
 
       const stats = orchestrator.getStats();
       expect(stats.discovered).toBe(0);
-      expect(stats.evaluated).toBe(0);
-      expect(stats.approved).toBe(0);
-      expect(stats.rejected).toBe(0);
+      expect(stats.enqueued).toBe(0);
       expect(stats.errors).toBe(0);
       expect(stats.skipped).toBe(0);
     });
@@ -123,16 +96,49 @@ describe("DiscoveryOrchestrator", () => {
       const stats = await orchestrator.discoverFromDomains(["example.com"], 10);
 
       expect(stats.discovered).toBe(0);
-      expect(stats.evaluated).toBe(0);
+      expect(stats.enqueued).toBe(0);
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("should enqueue discovered URLs via SQS", async () => {
+      vi.mocked(DiscoveryService).mockImplementation(
+        () =>
+          ({
+            discoverFromMap: vi.fn().mockResolvedValue([
+              {
+                url: "https://usopc.org/doc1",
+                title: "Doc 1",
+                method: "map",
+              },
+            ]),
+            discoverFromSearch: vi.fn().mockResolvedValue([]),
+            generateId: vi.fn(),
+          }) as any,
+      );
+
+      const orchestrator = new DiscoveryOrchestrator({
+        tavilyApiKey: "test-key",
+        anthropicApiKey: "test-key",
+        autoApprovalThreshold: 0.85,
+      });
+
+      const stats = await orchestrator.discoverFromDomains(["usopc.org"], 10);
+
+      expect(stats.discovered).toBe(1);
+      expect(stats.enqueued).toBe(1);
+      expect(mockSend).toHaveBeenCalledTimes(1);
+      expect(MockSendMessageCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          QueueUrl: "https://sqs.us-east-1.amazonaws.com/queue",
+        }),
+      );
     });
 
     it("should handle discovery errors gracefully", async () => {
-      const mockError = new Error("API error");
-      const DiscoveryServiceMock = vi.mocked(DiscoveryService);
-      DiscoveryServiceMock.mockImplementation(
+      vi.mocked(DiscoveryService).mockImplementation(
         () =>
           ({
-            discoverFromMap: vi.fn().mockRejectedValue(mockError),
+            discoverFromMap: vi.fn().mockRejectedValue(new Error("API error")),
             discoverFromSearch: vi.fn(),
             generateId: vi.fn(),
           }) as any,
@@ -148,6 +154,37 @@ describe("DiscoveryOrchestrator", () => {
 
       expect(stats.errors).toBe(1);
       expect(stats.discovered).toBe(0);
+    });
+
+    it("should dedup URLs across batches", async () => {
+      vi.mocked(DiscoveryService).mockImplementation(
+        () =>
+          ({
+            discoverFromMap: vi.fn().mockResolvedValue([
+              {
+                url: "https://usopc.org/doc1",
+                title: "Doc 1",
+                method: "map",
+              },
+            ]),
+            discoverFromSearch: vi.fn().mockResolvedValue([]),
+            generateId: vi.fn(),
+          }) as any,
+      );
+
+      const orchestrator = new DiscoveryOrchestrator({
+        tavilyApiKey: "test-key",
+        anthropicApiKey: "test-key",
+        autoApprovalThreshold: 0.85,
+      });
+
+      // Discover from two domains that return the same URL
+      await orchestrator.discoverFromDomains(["usopc.org", "usopc.org"], 10);
+
+      const stats = orchestrator.getStats();
+      expect(stats.discovered).toBe(2);
+      expect(stats.enqueued).toBe(1);
+      expect(stats.skipped).toBe(1);
     });
   });
 
@@ -167,21 +204,57 @@ describe("DiscoveryOrchestrator", () => {
 
       expect(stats.discovered).toBe(0);
     });
-  });
 
-  describe("config options", () => {
-    it("should accept custom concurrency", () => {
+    it("should enqueue search results", async () => {
+      vi.mocked(DiscoveryService).mockImplementation(
+        () =>
+          ({
+            discoverFromMap: vi.fn().mockResolvedValue([]),
+            discoverFromSearch: vi.fn().mockResolvedValue([
+              {
+                url: "https://usopc.org/search-result",
+                title: "Search Result",
+                method: "search",
+              },
+            ]),
+            generateId: vi.fn(),
+          }) as any,
+      );
+
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
         anthropicApiKey: "test-key",
         autoApprovalThreshold: 0.85,
-        concurrency: 5,
       });
 
-      expect(orchestrator).toBeDefined();
-    });
+      const stats = await orchestrator.discoverFromSearchQueries(
+        ["USOPC governance"],
+        10,
+      );
 
-    it("should accept dry run mode", () => {
+      expect(stats.discovered).toBe(1);
+      expect(stats.enqueued).toBe(1);
+      expect(mockSend).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("dry run mode", () => {
+    it("should not send SQS messages in dry run", async () => {
+      vi.mocked(DiscoveryService).mockImplementation(
+        () =>
+          ({
+            discoverFromMap: vi.fn().mockResolvedValue([
+              {
+                url: "https://usopc.org/doc1",
+                title: "Doc 1",
+                method: "map",
+              },
+            ]),
+            discoverFromSearch: vi.fn().mockResolvedValue([]),
+            generateId: vi.fn(),
+          }) as any,
+      );
+
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
         anthropicApiKey: "test-key",
@@ -189,10 +262,16 @@ describe("DiscoveryOrchestrator", () => {
         dryRun: true,
       });
 
-      expect(orchestrator).toBeDefined();
-    });
+      const stats = await orchestrator.discoverFromDomains(["usopc.org"], 10);
 
-    it("should accept progress callback", () => {
+      expect(stats.discovered).toBe(1);
+      expect(stats.enqueued).toBe(1);
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("config options", () => {
+    it("should accept progress callback", async () => {
       const progressCallback = vi.fn();
       const orchestrator = new DiscoveryOrchestrator({
         tavilyApiKey: "test-key",
@@ -201,7 +280,42 @@ describe("DiscoveryOrchestrator", () => {
         onProgress: progressCallback,
       });
 
-      expect(orchestrator).toBeDefined();
+      await orchestrator.discoverFromDomains(["example.com"], 10);
+
+      expect(progressCallback).toHaveBeenCalled();
+    });
+  });
+
+  describe("SQS message format", () => {
+    it("includes autoApprovalThreshold in message", async () => {
+      vi.mocked(DiscoveryService).mockImplementation(
+        () =>
+          ({
+            discoverFromMap: vi.fn().mockResolvedValue([
+              {
+                url: "https://usopc.org/doc1",
+                title: "Doc 1",
+                method: "map",
+              },
+            ]),
+            discoverFromSearch: vi.fn().mockResolvedValue([]),
+            generateId: vi.fn(),
+          }) as any,
+      );
+
+      const orchestrator = new DiscoveryOrchestrator({
+        tavilyApiKey: "test-key",
+        anthropicApiKey: "test-key",
+        autoApprovalThreshold: 0.9,
+      });
+
+      await orchestrator.discoverFromDomains(["usopc.org"], 10);
+
+      const commandArg = MockSendMessageCommand.mock.calls[0][0];
+      const body = JSON.parse(commandArg.MessageBody!);
+      expect(body.autoApprovalThreshold).toBe(0.9);
+      expect(body.urls).toHaveLength(1);
+      expect(body.timestamp).toBeDefined();
     });
   });
 });

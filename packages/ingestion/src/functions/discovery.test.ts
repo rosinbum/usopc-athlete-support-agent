@@ -126,29 +126,23 @@ describe("Discovery Lambda", () => {
     // Default stats
     vi.mocked(mockOrchestrator.getStats).mockReturnValue({
       discovered: 25,
-      evaluated: 20,
-      approved: 15,
-      rejected: 5,
+      enqueued: 20,
       errors: 0,
-      skipped: 0,
+      skipped: 5,
     });
 
     vi.mocked(mockOrchestrator.discoverFromDomains).mockResolvedValue({
       discovered: 20,
-      evaluated: 16,
-      approved: 12,
-      rejected: 4,
+      enqueued: 16,
       errors: 0,
-      skipped: 0,
+      skipped: 4,
     });
 
     vi.mocked(mockOrchestrator.discoverFromSearchQueries).mockResolvedValue({
       discovered: 5,
-      evaluated: 4,
-      approved: 3,
-      rejected: 1,
+      enqueued: 4,
       errors: 0,
-      skipped: 0,
+      skipped: 1,
     });
 
     // Default usage stats
@@ -187,9 +181,6 @@ describe("Discovery Lambda", () => {
         mockConfig.domains,
       );
 
-      // Should track Anthropic usage
-      expect(mockCostTracker.trackAnthropicCall).toHaveBeenCalled();
-
       // Should send completion notification
       expect(
         mockNotificationService.sendDiscoveryCompletion,
@@ -197,10 +188,10 @@ describe("Discovery Lambda", () => {
       const summary = vi.mocked(mockNotificationService.sendDiscoveryCompletion)
         .mock.calls[0][0];
       expect(summary.totalDiscovered).toBe(25);
-      expect(summary.byStatus.approved).toBe(15);
+      expect(summary.byStatus.pending).toBe(20);
     });
 
-    it("should track costs correctly", async () => {
+    it("should track Tavily costs correctly", async () => {
       await handler(mockEvent);
 
       // 2 map calls (2 domains)
@@ -214,27 +205,6 @@ describe("Discovery Lambda", () => {
         .mocked(mockCostTracker.trackTavilyCall)
         .mock.calls.filter((call) => call[0] === "search");
       expect(searchCalls).toHaveLength(1);
-
-      // Should track Anthropic based on evaluated count (20)
-      expect(mockCostTracker.trackAnthropicCall).toHaveBeenCalledWith(
-        20 * 2000, // estimated input tokens
-        20 * 500, // estimated output tokens
-      );
-    });
-
-    it("should not track Anthropic if no evaluations", async () => {
-      vi.mocked(mockOrchestrator.getStats).mockReturnValue({
-        discovered: 0,
-        evaluated: 0,
-        approved: 0,
-        rejected: 0,
-        errors: 0,
-        skipped: 0,
-      });
-
-      await handler(mockEvent);
-
-      expect(mockCostTracker.trackAnthropicCall).not.toHaveBeenCalled();
     });
   });
 

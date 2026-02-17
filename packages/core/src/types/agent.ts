@@ -99,6 +99,17 @@ export interface WebSearchResult {
   score: number;
 }
 
+export interface DiscoveryFeedMessage {
+  urls: Array<{
+    url: string;
+    title: string;
+    discoveryMethod: "agent" | "map" | "search";
+    discoveredFrom: string;
+  }>;
+  autoApprovalThreshold?: number;
+  timestamp: string;
+}
+
 export interface AgentState {
   messages: BaseMessage[];
   topicDomain?: TopicDomain;

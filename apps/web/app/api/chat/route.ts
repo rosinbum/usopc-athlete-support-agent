@@ -8,8 +8,9 @@ import { logger } from "@usopc/shared";
 
 const log = logger.child({ service: "chat-route" });
 
-const tableName = (Resource as unknown as { AppTable: { name: string } })
-  .AppTable.name;
+const discoveryFeedQueueUrl = (
+  Resource as unknown as { DiscoveryFeedQueue: { url: string } }
+).DiscoveryFeedQueue.url;
 
 // Cache a single runner instance per Lambda cold start
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
       loadSummary,
       saveSummary,
       generateSummary,
-      persistDiscoveredUrls,
+      publishDiscoveredUrls,
     } = await import("@usopc/core");
 
     // Load existing conversation summary if feature is enabled
@@ -155,11 +156,11 @@ export async function POST(req: Request) {
             );
         }
 
-        // Fire-and-forget: persist discovered URLs to source pipeline
+        // Fire-and-forget: publish discovered URLs to SQS for async evaluation
         if (discoveredUrls.length > 0) {
-          persistDiscoveredUrls(discoveredUrls, tableName).catch(
+          publishDiscoveredUrls(discoveredUrls, discoveryFeedQueueUrl).catch(
             (err: unknown) =>
-              log.error("Failed to persist discovered URLs", {
+              log.error("Failed to publish discovered URLs", {
                 error: String(err),
               }),
           );
