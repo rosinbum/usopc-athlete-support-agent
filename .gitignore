@@ -35,3 +35,9 @@ coverage/
 # misc
 *.tsbuildinfo
 data/sources/llm-generated-sources/
+
+# LangGraph API
+.langgraph_api
+
+# Studio env (contains real API keys)
+packages/core/.env
