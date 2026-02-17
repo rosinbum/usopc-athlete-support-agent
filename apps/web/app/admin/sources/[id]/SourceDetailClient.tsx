@@ -75,6 +75,18 @@ export function SourceDetailClient({ id }: { id: string }) {
   }, [fetchSource]);
 
   // -------------------------------------------------------------------------
+  // Build back link preserving selection params
+  // -------------------------------------------------------------------------
+
+  function backHref(): string {
+    if (typeof window === "undefined") return "/admin/sources";
+    const params = new URLSearchParams(window.location.search);
+    const sel = params.get("selected");
+    if (sel) return `/admin/sources?selected=${sel}`;
+    return "/admin/sources";
+  }
+
+  // -------------------------------------------------------------------------
   // Actions
   // -------------------------------------------------------------------------
 
@@ -157,7 +169,7 @@ export function SourceDetailClient({ id }: { id: string }) {
       <div className="text-center py-12">
         <p className="text-red-600">{error ?? "Source not found"}</p>
         <a
-          href="/admin/sources"
+          href={backHref()}
           className="mt-4 inline-block text-blue-600 hover:text-blue-800"
         >
           Back to Sources
@@ -228,7 +240,7 @@ export function SourceDetailClient({ id }: { id: string }) {
       {/* Back link + Title */}
       <div className="mb-6">
         <a
-          href="/admin/sources"
+          href={backHref()}
           className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Sources

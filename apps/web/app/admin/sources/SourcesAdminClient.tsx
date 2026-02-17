@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Loader2,
   AlertTriangle,
@@ -67,6 +68,8 @@ function priorityWeight(p: string): number {
 // ---------------------------------------------------------------------------
 
 export function SourcesAdminClient() {
+  const searchParams = useSearchParams();
+
   const [sources, setSources] = useState<SourceConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,8 +83,22 @@ export function SourcesAdminClient() {
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => {
+    const param = searchParams.get("selected");
+    return param ? new Set(param.split(",").filter(Boolean)) : new Set();
+  });
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  // Sync selection to URL params (without triggering re-renders)
+  const syncSelectionToUrl = useCallback((sel: Set<string>) => {
+    const url = new URL(window.location.href);
+    if (sel.size > 0) {
+      url.searchParams.set("selected", Array.from(sel).join(","));
+    } else {
+      url.searchParams.delete("selected");
+    }
+    window.history.replaceState({}, "", url.toString());
+  }, []);
 
   // -------------------------------------------------------------------------
   // Fetch
@@ -206,15 +223,14 @@ export function SourcesAdminClient() {
     paginated.length > 0 && paginated.every((s) => selected.has(s.id));
 
   function toggleSelectAll() {
+    const next = new Set(selected);
     if (allOnPageSelected) {
-      const next = new Set(selected);
       paginated.forEach((s) => next.delete(s.id));
-      setSelected(next);
     } else {
-      const next = new Set(selected);
       paginated.forEach((s) => next.add(s.id));
-      setSelected(next);
     }
+    setSelected(next);
+    syncSelectionToUrl(next);
   }
 
   function toggleSelect(id: string) {
@@ -222,6 +238,7 @@ export function SourcesAdminClient() {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelected(next);
+    syncSelectionToUrl(next);
   }
 
   // -------------------------------------------------------------------------
@@ -251,7 +268,9 @@ export function SourcesAdminClient() {
         const data = await res.json();
         throw new Error(data.error || "Bulk action failed");
       }
-      setSelected(new Set());
+      const empty = new Set<string>();
+      setSelected(empty);
+      syncSelectionToUrl(empty);
       await fetchSources();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bulk action failed");
@@ -272,6 +291,16 @@ export function SourcesAdminClient() {
       setSortDir("asc");
     }
     setPage(1);
+  }
+
+  // -------------------------------------------------------------------------
+  // Build selection query string for detail page links
+  // -------------------------------------------------------------------------
+
+  function detailHref(sourceId: string): string {
+    const base = `/admin/sources/${sourceId}`;
+    if (selected.size === 0) return base;
+    return `${base}?selected=${Array.from(selected).join(",")}`;
   }
 
   function SortIcon({ field }: { field: SortField }) {
@@ -566,7 +595,7 @@ export function SourcesAdminClient() {
                 onClick={(e) => {
                   // Don't navigate if clicking checkbox
                   if ((e.target as HTMLElement).tagName === "INPUT") return;
-                  window.location.href = `/admin/sources/${source.id}`;
+                  window.location.href = detailHref(source.id);
                 }}
               >
                 <td className="px-3 py-3">

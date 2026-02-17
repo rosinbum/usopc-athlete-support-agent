@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { SourcesAdminClient } from "./SourcesAdminClient.js";
 
 // ---------------------------------------------------------------------------
@@ -133,5 +138,29 @@ describe("SourcesAdminClient", () => {
     expect(screen.getByText("Enable")).toBeInTheDocument();
     expect(screen.getByText("Disable")).toBeInTheDocument();
     expect(screen.getByText("Trigger Ingestion")).toBeInTheDocument();
+  });
+
+  it("persists selections in URL after toggling checkboxes", async () => {
+    // Mock replaceState to avoid jsdom SecurityError
+    const replaceStateSpy = vi
+      .spyOn(window.history, "replaceState")
+      .mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<SourcesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
+    });
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    await user.click(checkboxes[1]); // select first visible row
+
+    expect(replaceStateSpy).toHaveBeenCalledWith(
+      {},
+      "",
+      expect.stringContaining("selected="),
+    );
+
+    replaceStateSpy.mockRestore();
   });
 });
