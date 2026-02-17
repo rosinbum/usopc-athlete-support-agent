@@ -103,6 +103,11 @@ async function runScenario(
   scenario: QualityReviewScenario,
   tag?: string,
 ): Promise<{ answer: string; trajectory: string[]; durationMs: number }> {
+  const multiTurn = isMultiTurn(scenario);
+  const threadId = multiTurn
+    ? `quality-review:${tag ?? "untagged"}:${scenario.id}`
+    : undefined;
+
   const metadata: Record<string, unknown> = {
     scenario_id: scenario.id,
     category: scenario.metadata.category,
@@ -120,6 +125,12 @@ async function runScenario(
   if (scenario.expectedOutput?.requiredFacts) {
     metadata.required_facts = scenario.expectedOutput.requiredFacts;
   }
+  if (threadId) {
+    // LangSmith thread/group views recognize these metadata keys.
+    metadata.session_id = threadId;
+    metadata.conversation_id = threadId;
+    metadata.thread_id = threadId;
+  }
 
   const traced = traceable(
     async (input: {
@@ -130,9 +141,10 @@ async function runScenario(
     }) => {
       const start = Date.now();
 
-      const result = isMultiTurn(scenario)
+      const result = multiTurn
         ? await runMultiTurnPipeline(input.messages, {
             userSport: input.userSport,
+            conversationId: threadId,
           })
         : await runPipeline(input.messages[0].content);
 
@@ -144,6 +156,7 @@ async function runScenario(
         required_facts: scenario.expectedOutput?.requiredFacts ?? null,
         category: scenario.metadata.category,
         difficulty: scenario.metadata.difficulty,
+        thread_id: threadId ?? null,
       };
     },
     {

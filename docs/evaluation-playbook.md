@@ -33,8 +33,8 @@ pnpm --filter @usopc/evals quality:run -- --tag round-N --category emotional_urg
 
 This executes each scenario through the full agent pipeline and logs traces to the `usopc-quality-review` LangSmith project. Each trace includes:
 
-- Full run outputs: `answer`, `trajectory`, `durationMs`, `expected_path`, `required_facts`, `category`, `difficulty`
-- Metadata: scenario ID, domains, description, sport
+- Full run outputs: `answer`, `trajectory`, `durationMs`, `expected_path`, `required_facts`, `category`, `difficulty`, `thread_id` (multi-turn only)
+- Metadata: scenario ID, domains, description, sport, and thread keys (`session_id`, `conversation_id`, `thread_id`) for `multi_turn` scenarios
 - Tags: category, difficulty, and your custom tag
 
 Online evaluators fire automatically on new traces (see below).
@@ -59,14 +59,16 @@ To backfill existing traces, toggle **"Apply to past runs"** and set a start dat
 
 ### Code evaluators
 
-Code evaluators run deterministic logic. The function **must be named `perform_eval`** and accepts a single `run` parameter. Returns a dictionary where keys are feedback names and values are scores.
+Code evaluators run deterministic logic. In JavaScript, the function **must be named `performEval`** (Python uses `perform_eval`) and accepts a single `run` parameter. Returns a dictionary where keys are feedback names and values are scores.
 
 **1. `online_disclaimer_present`** — Binary 0/1
 
 ```javascript
 function performEval(run) {
   const answer = run.outputs?.answer ?? "";
-  const trajectory = run.outputs?.trajectory ?? [];
+  const trajectory = Array.isArray(run.outputs?.trajectory)
+    ? run.outputs.trajectory
+    : [];
   // Auto-pass for clarify trajectories
   if (
     trajectory.length > 0 &&
@@ -86,10 +88,16 @@ function performEval(run) {
 
 ```javascript
 function performEval(run) {
-  const expected = run.outputs?.expected_path;
-  if (!expected) return {};
-  const expectedNodes = expected.split(" \u2192 ");
-  const actual = run.outputs?.trajectory ?? [];
+  const expected =
+    run.outputs?.expected_path ?? run.extra?.metadata?.expected_path ?? null;
+  if (typeof expected !== "string" || expected.trim().length === 0) return {};
+  const expectedNodes = expected
+    .split(" \u2192 ")
+    .map((n) => n.trim())
+    .filter(Boolean);
+  const actual = Array.isArray(run.outputs?.trajectory)
+    ? run.outputs.trajectory
+    : [];
   const match =
     actual.length === expectedNodes.length &&
     actual.every((n, i) => n === expectedNodes[i]);
@@ -97,14 +105,22 @@ function performEval(run) {
 }
 ```
 
+If **Test Code** returns `{}`, the selected run likely has no `expected_path` in either outputs or metadata.
+
 **3. `online_trajectory_subset`** — Binary 0/1 (only fires when expected_path is non-null)
 
 ```javascript
 function performEval(run) {
-  const expected = run.outputs?.expected_path;
-  if (!expected) return {};
-  const expectedNodes = expected.split(" \u2192 ");
-  const actual = run.outputs?.trajectory ?? [];
+  const expected =
+    run.outputs?.expected_path ?? run.extra?.metadata?.expected_path ?? null;
+  if (typeof expected !== "string" || expected.trim().length === 0) return {};
+  const expectedNodes = expected
+    .split(" \u2192 ")
+    .map((n) => n.trim())
+    .filter(Boolean);
+  const actual = Array.isArray(run.outputs?.trajectory)
+    ? run.outputs.trajectory
+    : [];
   const subset = expectedNodes.every((n) => actual.includes(n));
   return { online_trajectory_subset: subset };
 }
@@ -114,7 +130,8 @@ function performEval(run) {
 
 ```javascript
 function performEval(run) {
-  const facts = run.outputs?.required_facts;
+  const facts =
+    run.outputs?.required_facts ?? run.extra?.metadata?.required_facts;
   if (!facts || !Array.isArray(facts) || facts.length === 0) return {};
   const answer = (run.outputs?.answer ?? "").toLowerCase();
   const found = facts.filter((f) => answer.includes(f.toLowerCase())).length;
@@ -126,7 +143,7 @@ function performEval(run) {
 
 All use Claude Haiku or GPT-4o-mini. Continuous 0–1 with reasoning enabled.
 
-**Variable mapping** (shared across all 5):
+**Variable mapping** (single-turn evaluators `online_quality` through `online_tone`):
 
 - `{question}` > Input > `messages` (last user message)
 - `{response}` > Output > `answer`
@@ -135,6 +152,14 @@ All use Claude Haiku or GPT-4o-mini. Continuous 0–1 with reasoning enabled.
 
 - Type: **Continuous**, range: 0.0–1.0
 - Reasoning: **enabled**
+
+**Guarding filters** (set at evaluator level in LangSmith):
+
+- Single-turn evaluators (`online_quality`, `online_helpfulness`, `online_accuracy`, `online_completeness`, `online_tone`): filter to `metadata.category != "multi_turn"`
+- Multi-turn thread evaluators (defined below): filter to `metadata.category == "multi_turn"` and require `metadata.thread_id` to be present
+- If metadata is missing on some runs, add a backup condition based on inputs (evaluate as thread only when the conversation has more than one message)
+
+Do not rely on prompt wording alone to "skip" runs; use evaluator filters so irrelevant runs are not scored.
 
 **5. `online_quality`**
 
@@ -258,6 +283,62 @@ Rate tone on a 0-1 scale.
 
 Athlete's question: {question}
 Agent's response: {response}
+```
+
+### Multi-turn (thread) LLM-as-judge evaluators
+
+Create thread-specific evaluators for metrics where conversation history changes the score:
+
+- `online_thread_quality`
+- `online_thread_helpfulness`
+- `online_thread_accuracy`
+- `online_thread_completeness`
+- `online_thread_tone`
+
+Use the same 0–1 continuous scoring configuration and reasoning.
+
+**Thread variable mapping** (shared across all thread evaluators):
+
+- `{thread}` > Input > `messages` (full conversation array)
+- `{question}` > Input > `messages` (last user message)
+- `{response}` > Output > `answer`
+
+**Required guard filter**:
+
+- `metadata.category == "multi_turn"`
+
+**Prompt pattern for all thread evaluators**:
+
+Prepend this block to each corresponding single-turn evaluator prompt (`quality`, `helpfulness`, `accuracy`, `completeness`, `tone`), then keep the same scoring anchors.
+
+```
+You are evaluating the final agent response in a multi-turn conversation.
+
+Score based on the full thread, not only the final user message.
+- Penalize contradictions with earlier turns.
+- Penalize loss of user-provided constraints (sport, timeline, governing body, procedural stage, urgency).
+- Reward explicit continuity ("Based on what you shared earlier...") when it improves clarity.
+
+Conversation thread:
+{thread}
+
+Final user question:
+{question}
+
+Final agent response:
+{response}
+```
+
+For `online_thread_completeness`, include this extra rule:
+
+```
+Evaluate whether the final response resolves the latest request while correctly carrying forward unresolved requirements from earlier turns.
+```
+
+For `online_thread_helpfulness`, include this extra rule:
+
+```
+Actionability must reflect the user's previously stated constraints (for example deadlines, current appeal stage, and sport/NGB context).
 ```
 
 ## Comparing Rounds in LangSmith

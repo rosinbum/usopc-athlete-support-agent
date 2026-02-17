@@ -9,13 +9,16 @@
     "usahockey.com"
   ],
   "searchQueries": [
-    "USOPC team selection procedures 2024",
+    "USOPC team selection procedures 2026",
     "NGB athlete eligibility requirements",
     "USOPC grievance policy",
     "SafeSport reporting procedures",
-    "USADA anti-doping policy"
+    "USADA anti-doping policy",
+    "USOPC Dispute Resolution",
+    "Olympic Selection Prodedure",
+    "National Team Selection Procedure"
   ],
-  "maxResultsPerDomain": 20,
+  "maxResultsPerDomain": 45,
   "maxResultsPerQuery": 10,
   "autoApprovalThreshold": 0.85
 }

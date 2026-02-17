@@ -155,7 +155,7 @@ async function main() {
     const options = parseArgs();
 
     // Load discovery config
-    const configPath = join(process.cwd(), "data/discovery-config.json");
+    const configPath = join(process.cwd(), "../../data/discovery-config.json");
     const configFile = await readFile(configPath, "utf-8");
     const config: DiscoveryConfigFile = JSON.parse(configFile);
 
