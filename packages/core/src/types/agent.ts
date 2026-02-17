@@ -92,6 +92,12 @@ export interface EmotionalSupportContext {
   acknowledgment: string;
 }
 
+export interface WebSearchResult {
+  url: string;
+  title: string;
+  content: string;
+}
+
 export interface AgentState {
   messages: BaseMessage[];
   topicDomain?: TopicDomain;
@@ -99,6 +105,7 @@ export interface AgentState {
   queryIntent?: QueryIntent;
   retrievedDocuments: RetrievedDocument[];
   webSearchResults: string[];
+  webSearchResultUrls: WebSearchResult[];
   retrievalConfidence: number;
   citations: Citation[];
   answer?: string;

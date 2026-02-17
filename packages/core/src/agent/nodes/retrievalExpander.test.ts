@@ -55,6 +55,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
       },
     ],
     webSearchResults: [],
+    webSearchResultUrls: [],
     retrievalConfidence: 0.3,
     citations: [],
     answer: undefined,

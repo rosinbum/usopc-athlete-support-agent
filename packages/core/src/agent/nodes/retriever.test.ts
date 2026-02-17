@@ -32,6 +32,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     queryIntent: undefined,
     retrievedDocuments: [],
     webSearchResults: [],
+    webSearchResultUrls: [],
     retrievalConfidence: 0,
     citations: [],
     answer: undefined,

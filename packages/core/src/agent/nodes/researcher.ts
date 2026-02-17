@@ -4,6 +4,7 @@ import { TRUSTED_DOMAINS } from "../../config/index.js";
 import { searchWithTavily } from "../../services/tavilyService.js";
 import { getLastUserMessage, stateContext } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
+import type { WebSearchResult } from "../../types/index.js";
 
 const log = logger.child({ service: "researcher-node" });
 
@@ -52,6 +53,36 @@ function buildSearchQuery(state: AgentState, userMessage: string): string {
 }
 
 /**
+ * Extracts structured WebSearchResult entries from a Tavily response.
+ * Returns an empty array if the response is not in the expected format.
+ */
+function extractStructuredResults(rawResult: unknown): WebSearchResult[] {
+  if (
+    rawResult != null &&
+    typeof rawResult === "object" &&
+    "results" in rawResult &&
+    Array.isArray((rawResult as Record<string, unknown>).results)
+  ) {
+    const results = (rawResult as Record<string, unknown>).results as Array<
+      Record<string, unknown>
+    >;
+    return results
+      .filter(
+        (r) =>
+          typeof r.url === "string" &&
+          typeof r.title === "string" &&
+          typeof r.content === "string",
+      )
+      .map((r) => ({
+        url: r.url as string,
+        title: r.title as string,
+        content: r.content as string,
+      }));
+  }
+  return [];
+}
+
+/**
  * Factory function that creates a RESEARCHER node bound to a specific
  * Tavily search instance.
  *
@@ -59,6 +90,7 @@ function buildSearchQuery(state: AgentState, userMessage: string): string {
  * 1. Builds a search query from the user message + domain context
  * 2. Runs the Tavily web search scoped to trusted domains
  * 3. Parses and returns the results as webSearchResults on state
+ * 4. Extracts structured URL results for the source discovery pipeline
  *
  * This node is only invoked when retrieval confidence is below the
  * threshold, providing a fallback information source.
@@ -69,7 +101,7 @@ export function createResearcherNode(tavilySearch: TavilySearchLike) {
 
     if (!userMessage) {
       log.warn("Researcher received empty user message");
-      return { webSearchResults: [] };
+      return { webSearchResults: [], webSearchResultUrls: [] };
     }
 
     const query = buildSearchQuery(state, userMessage);
@@ -85,31 +117,40 @@ export function createResearcherNode(tavilySearch: TavilySearchLike) {
       // The call is protected by a circuit breaker for resilience.
       const rawResult = await searchWithTavily(tavilySearch, query);
 
-      // The Tavily tool may return a string or structured result.
-      // Normalize to string then parse into individual result strings.
-      const resultText =
-        typeof rawResult === "string"
-          ? rawResult
-          : JSON.stringify(rawResult, null, 2);
+      // Extract structured results (url, title, content) when available
+      const structuredResults = extractStructuredResults(rawResult);
 
-      let searchResults: string[] = [];
-
-      if (resultText.length > 0) {
-        // Tavily returns structured text; split into logical results
-        // Each result is typically separated by double newlines.
-        searchResults = resultText
-          .split(/\n{2,}/)
-          .map((r) => r.trim())
-          .filter((r) => r.length > 0)
+      // Build text results for the synthesizer (preserving existing behavior)
+      let searchResults: string[];
+      if (structuredResults.length > 0) {
+        searchResults = structuredResults
+          .map((r) => r.content)
           .slice(0, MAX_SEARCH_RESULTS);
+      } else {
+        // Fallback: parse raw result as text
+        const resultText =
+          typeof rawResult === "string"
+            ? rawResult
+            : JSON.stringify(rawResult, null, 2);
+
+        searchResults =
+          resultText.length > 0
+            ? resultText
+                .split(/\n{2,}/)
+                .map((r) => r.trim())
+                .filter((r) => r.length > 0)
+                .slice(0, MAX_SEARCH_RESULTS)
+            : [];
       }
 
       log.info("Web search complete", {
         resultCount: searchResults.length,
+        structuredUrlCount: structuredResults.length,
       });
 
       return {
         webSearchResults: searchResults,
+        webSearchResultUrls: structuredResults.slice(0, MAX_SEARCH_RESULTS),
       };
     } catch (error) {
       const isCircuitOpen = error instanceof CircuitBreakerError;
@@ -127,7 +168,7 @@ export function createResearcherNode(tavilySearch: TavilySearchLike) {
 
       // Graceful degradation: the synthesizer can still work with
       // whatever documents were retrieved earlier.
-      return { webSearchResults: [] };
+      return { webSearchResults: [], webSearchResultUrls: [] };
     }
   };
 }

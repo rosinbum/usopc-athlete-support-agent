@@ -88,6 +88,7 @@ export async function POST(req: Request) {
       loadSummary,
       saveSummary,
       generateSummary,
+      persistDiscoveredUrls,
     } = await import("@usopc/core");
 
     // Load existing conversation summary if feature is enabled
@@ -109,6 +110,9 @@ export async function POST(req: Request) {
 
     return createDataStreamResponse({
       async execute(writer) {
+        let discoveredUrls: { url: string; title: string; content: string }[] =
+          [];
+
         for await (const event of events) {
           if (event.type === "answer-reset") {
             writer.write(
@@ -125,6 +129,8 @@ export async function POST(req: Request) {
                 { type: "citations", citations: event.citations },
               ] as unknown as JSONValue[]),
             );
+          } else if (event.type === "discovered-urls" && event.discoveredUrls) {
+            discoveredUrls = event.discoveredUrls;
           }
         }
 
@@ -134,6 +140,22 @@ export async function POST(req: Request) {
             .then((summary: string) => saveSummary(conversationId, summary))
             .catch((err: unknown) =>
               log.error("Failed to save conversation summary", {
+                error: String(err),
+              }),
+            );
+        }
+
+        // Fire-and-forget: persist discovered URLs to source pipeline
+        if (discoveredUrls.length > 0) {
+          import("sst")
+            .then(({ Resource }) => {
+              const tableName = (
+                Resource as unknown as { AppTable: { name: string } }
+              ).AppTable.name;
+              return persistDiscoveredUrls(discoveredUrls, tableName);
+            })
+            .catch((err: unknown) =>
+              log.error("Failed to persist discovered URLs", {
                 error: String(err),
               }),
             );

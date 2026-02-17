@@ -9,6 +9,7 @@ import type {
   QualityCheckResult,
   SubQuery,
   EmotionalSupportContext,
+  WebSearchResult,
 } from "../types/index.js";
 
 /**
@@ -63,6 +64,16 @@ export const AgentStateAnnotation = Annotation.Root({
    * Set by the researcher node.
    */
   webSearchResults: Annotation<string[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
+  }),
+
+  /**
+   * Structured URL results from Tavily web search, used to feed
+   * discovered URLs back into the source discovery pipeline.
+   * Set by the researcher node alongside webSearchResults.
+   */
+  webSearchResultUrls: Annotation<WebSearchResult[]>({
     reducer: (_prev, next) => next,
     default: () => [],
   }),

@@ -1,6 +1,10 @@
 import { AppError } from "@usopc/shared";
 import { TimeoutError } from "../utils/withTimeout.js";
-import type { Citation, EscalationInfo } from "../types/index.js";
+import type {
+  Citation,
+  EscalationInfo,
+  WebSearchResult,
+} from "../types/index.js";
 import type { AgentState } from "./state.js";
 import type { StreamChunk } from "./runner.js";
 
@@ -10,11 +14,13 @@ export interface AgentStreamEvent {
     | "citations"
     | "escalation"
     | "answer-reset"
+    | "discovered-urls"
     | "error"
     | "done";
   textDelta?: string;
   citations?: Citation[];
   escalation?: EscalationInfo;
+  discoveredUrls?: WebSearchResult[];
   error?: { message: string; code?: string };
 }
 
@@ -74,6 +80,7 @@ export async function* agentStreamToEvents(
 ): AsyncGenerator<AgentStreamEvent> {
   let citationsEmitted = false;
   let escalationEmitted = false;
+  let lastDiscoveredUrls: WebSearchResult[] = [];
   // Track answer from values mode for nodes that don't use LLM streaming
   // (like clarify, escalate fallbacks, error handlers)
   let previousAnswerFromValues = "";
@@ -146,6 +153,11 @@ export async function* agentStreamToEvents(
           escalationEmitted = true;
           yield { type: "escalation", escalation: state.escalation };
         }
+
+        // Track discovered URLs from the latest state (researcher node)
+        if (state.webSearchResultUrls && state.webSearchResultUrls.length > 0) {
+          lastDiscoveredUrls = state.webSearchResultUrls;
+        }
       }
     }
   } catch (error) {
@@ -154,6 +166,11 @@ export async function* agentStreamToEvents(
     const code = errorToCode(error);
 
     yield { type: "error", error: { message, code } };
+  }
+
+  // Emit discovered URLs once at the end of the stream
+  if (lastDiscoveredUrls.length > 0) {
+    yield { type: "discovered-urls", discoveredUrls: lastDiscoveredUrls };
   }
 
   yield { type: "done" };

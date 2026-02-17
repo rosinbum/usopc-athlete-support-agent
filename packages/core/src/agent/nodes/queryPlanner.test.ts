@@ -49,6 +49,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     queryIntent: "factual",
     retrievedDocuments: [],
     webSearchResults: [],
+    webSearchResultUrls: [],
     retrievalConfidence: 0,
     citations: [],
     answer: undefined,

@@ -48,6 +48,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     queryIntent: "procedural",
     retrievedDocuments: [makeDoc("Section 9 arbitration procedures...")],
     webSearchResults: [],
+    webSearchResultUrls: [],
     retrievalConfidence: 0.8,
     citations: [],
     answer: "Here is a detailed answer about Section 9 arbitration...",

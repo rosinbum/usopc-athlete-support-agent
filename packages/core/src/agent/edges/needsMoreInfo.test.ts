@@ -10,6 +10,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     queryIntent: undefined,
     retrievedDocuments: [],
     webSearchResults: [],
+    webSearchResultUrls: [],
     retrievalConfidence: 0,
     citations: [],
     answer: undefined,
@@ -50,6 +51,7 @@ describe("needsMoreInfo (backward-compatible export)", () => {
     const state = makeState({
       retrievalConfidence: 0.3,
       webSearchResults: [],
+      webSearchResultUrls: [],
     });
     expect(needsMoreInfo(state)).toBe("researcher");
   });
@@ -66,6 +68,7 @@ describe("needsMoreInfo (backward-compatible export)", () => {
     const state = makeState({
       retrievalConfidence: 0,
       webSearchResults: [],
+      webSearchResultUrls: [],
     });
     expect(needsMoreInfo(state)).toBe("researcher");
   });
@@ -78,6 +81,7 @@ describe("createNeedsMoreInfo(true, false) — expansion enabled, parallel resea
     const state = makeState({
       retrievalConfidence: 0.3,
       webSearchResults: [],
+      webSearchResultUrls: [],
       expansionAttempted: false,
     });
     expect(edgeFn(state)).toBe("retrievalExpander");
@@ -87,6 +91,7 @@ describe("createNeedsMoreInfo(true, false) — expansion enabled, parallel resea
     const state = makeState({
       retrievalConfidence: 0.3,
       webSearchResults: [],
+      webSearchResultUrls: [],
       expansionAttempted: true,
     });
     expect(edgeFn(state)).toBe("researcher");
@@ -113,6 +118,7 @@ describe("createNeedsMoreInfo(true, false) — expansion enabled, parallel resea
     const state = makeState({
       retrievalConfidence: 0,
       webSearchResults: [],
+      webSearchResultUrls: [],
       expansionAttempted: false,
     });
     expect(edgeFn(state)).toBe("retrievalExpander");
@@ -126,6 +132,7 @@ describe("createNeedsMoreInfo(false, false) — both disabled", () => {
     const state = makeState({
       retrievalConfidence: 0.3,
       webSearchResults: [],
+      webSearchResultUrls: [],
       expansionAttempted: false,
     });
     expect(edgeFn(state)).toBe("researcher");
@@ -139,6 +146,7 @@ describe("createNeedsMoreInfo(false, true) — parallel research enabled", () =>
     const state = makeState({
       retrievalConfidence: 0.6,
       webSearchResults: [],
+      webSearchResultUrls: [],
     });
     expect(edgeFn(state)).toBe("researcher");
   });
@@ -147,6 +155,7 @@ describe("createNeedsMoreInfo(false, true) — parallel research enabled", () =>
     const state = makeState({
       retrievalConfidence: 0.5,
       webSearchResults: [],
+      webSearchResultUrls: [],
     });
     expect(edgeFn(state)).toBe("researcher");
   });
@@ -155,6 +164,7 @@ describe("createNeedsMoreInfo(false, true) — parallel research enabled", () =>
     const state = makeState({
       retrievalConfidence: 0.75,
       webSearchResults: [],
+      webSearchResultUrls: [],
     });
     expect(edgeFn(state)).toBe("synthesizer");
   });
@@ -163,6 +173,7 @@ describe("createNeedsMoreInfo(false, true) — parallel research enabled", () =>
     const state = makeState({
       retrievalConfidence: 0.9,
       webSearchResults: [],
+      webSearchResultUrls: [],
     });
     expect(edgeFn(state)).toBe("synthesizer");
   });
@@ -171,6 +182,7 @@ describe("createNeedsMoreInfo(false, true) — parallel research enabled", () =>
     const state = makeState({
       retrievalConfidence: 0.3,
       webSearchResults: [],
+      webSearchResultUrls: [],
     });
     expect(edgeFn(state)).toBe("researcher");
   });
@@ -191,6 +203,7 @@ describe("createNeedsMoreInfo(true, true) — expansion + parallel research", ()
     const state = makeState({
       retrievalConfidence: 0.6,
       webSearchResults: [],
+      webSearchResultUrls: [],
       expansionAttempted: false,
     });
     expect(edgeFn(state)).toBe("researcher");
@@ -200,6 +213,7 @@ describe("createNeedsMoreInfo(true, true) — expansion + parallel research", ()
     const state = makeState({
       retrievalConfidence: 0.3,
       webSearchResults: [],
+      webSearchResultUrls: [],
       expansionAttempted: false,
     });
     expect(edgeFn(state)).toBe("retrievalExpander");
@@ -209,6 +223,7 @@ describe("createNeedsMoreInfo(true, true) — expansion + parallel research", ()
     const state = makeState({
       retrievalConfidence: 0.3,
       webSearchResults: [],
+      webSearchResultUrls: [],
       expansionAttempted: true,
     });
     expect(edgeFn(state)).toBe("researcher");
@@ -218,6 +233,7 @@ describe("createNeedsMoreInfo(true, true) — expansion + parallel research", ()
     const state = makeState({
       retrievalConfidence: 0.8,
       webSearchResults: [],
+      webSearchResultUrls: [],
       expansionAttempted: false,
     });
     expect(edgeFn(state)).toBe("synthesizer");
