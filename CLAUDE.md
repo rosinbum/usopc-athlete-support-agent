@@ -96,8 +96,8 @@ Detailed documentation is in the `docs/` folder:
 - [Commands](./docs/commands.md) — Full CLI commands reference
 - [Deployment](./docs/deployment.md) — Production deployment guide
 - [Conventions](./docs/conventions.md) — Formatting, testing, and technical conventions
-- [Quality Review](./docs/quality-review.md) — Round-by-round quality comparison framework
-- [Evaluation Playbook](./docs/evaluation-playbook.md) — Running and interpreting LangSmith evaluations
+- [Evaluation Metrics](./docs/evaluation-metrics.md) — Scoring rubric, failure taxonomy, and evaluation criteria
+- [Evaluation Playbook](./docs/evaluation-playbook.md) — Running quality review rounds and configuring online evaluators
 - [Tech Debt](./docs/tech-debt.md) — Known technical debt and prioritized fixes
 
 ## Quick Reference
@@ -115,9 +115,8 @@ pnpm db:migrate                       # Run database migrations
 pnpm db:down                          # Stop local database
 pnpm --filter @usopc/ingestion discovery:run  # Run source discovery pipeline
 pnpm --filter @usopc/evals eval       # Run LangSmith evaluations
+pnpm --filter @usopc/evals quality:seed      # Seed quality review dataset to LangSmith
 pnpm --filter @usopc/evals quality:run       # Run quality review scenarios
-pnpm --filter @usopc/evals quality:evaluate  # Evaluate quality review results
-pnpm --filter @usopc/evals quality:all       # Run + evaluate + setup (combined)
 ```
 
 ### Key Conventions

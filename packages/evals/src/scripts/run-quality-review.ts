@@ -140,6 +140,10 @@ async function runScenario(
         answer: result.state.answer ?? "",
         trajectory: result.trajectory,
         durationMs: Date.now() - start,
+        expected_path: scenario.expectedOutput?.expectedPath ?? null,
+        required_facts: scenario.expectedOutput?.requiredFacts ?? null,
+        category: scenario.metadata.category,
+        difficulty: scenario.metadata.difficulty,
       };
     },
     {

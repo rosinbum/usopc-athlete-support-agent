@@ -81,10 +81,6 @@ pnpm --filter @usopc/evals seed-langsmith              # Seed LangSmith datasets
 ## Quality Review (@usopc/evals)
 
 ```bash
+pnpm --filter @usopc/evals quality:seed                # Seed quality review dataset to LangSmith
 pnpm --filter @usopc/evals quality:run                 # Run quality review scenarios
-pnpm --filter @usopc/evals quality:evaluate            # Evaluate quality review results
-pnpm --filter @usopc/evals quality:setup               # Set up annotation queue
-pnpm --filter @usopc/evals quality:report              # Generate quality report
-pnpm --filter @usopc/evals quality:seed                # Seed quality review data
-pnpm --filter @usopc/evals quality:all                 # Run + evaluate + setup (combined)
 ```
