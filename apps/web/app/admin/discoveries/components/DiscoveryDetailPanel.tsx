@@ -333,16 +333,7 @@ export function DiscoveryDetailPanel({
       rejectionReason: discovery.rejectionReason ?? "N/A",
     },
     "Linked Source": {
-      sourceConfigId: discovery.sourceConfigId ? (
-        <a
-          href={`/admin/sources/${discovery.sourceConfigId}`}
-          className="text-blue-600 hover:text-blue-800"
-        >
-          {discovery.sourceConfigId}
-        </a>
-      ) : (
-        "Not linked"
-      ),
+      sourceConfigId: discovery.sourceConfigId ?? "Not linked",
     },
     Timestamps: {
       createdAt: formatDate(discovery.createdAt),
