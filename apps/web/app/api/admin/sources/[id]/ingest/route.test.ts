@@ -7,6 +7,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../../../../../../auth.js", () => ({
   auth: vi.fn(),
 }));
+vi.mock("../../../../../../lib/auth-env.js", () => ({
+  getAdminEmails: vi.fn(() => ["admin@test.com"]),
+}));
 
 vi.mock("../../../../../../lib/source-config.js", () => ({
   createSourceConfigEntity: vi.fn(),

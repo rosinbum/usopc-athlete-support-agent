@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Resource } from "sst";
+import { auth } from "../../../../../auth.js";
 
 /**
  * GET /api/documents/:key/url
@@ -13,6 +14,11 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ key: string }> },
 ) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { key } = await params;
     const s3Key = decodeURIComponent(key);
@@ -31,7 +37,7 @@ export async function GET(
       Key: s3Key,
     });
 
-    const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    const url = await getSignedUrl(s3, command, { expiresIn: 300 });
 
     return NextResponse.json({ url });
   } catch (error) {
