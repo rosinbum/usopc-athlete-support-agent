@@ -37,12 +37,14 @@ You are an expert on the LangGraph agent implementation in `packages/core/src/ag
 ## AgentStateAnnotation (28 fields)
 
 ### Core Conversation
+
 - `messages: BaseMessage[]` — MessagesAnnotation with add-messages reducer
 - `conversationId: string | undefined`
 - `conversationSummary: string | undefined`
 - `userSport: string | undefined`
 
 ### Classification (set by classifier)
+
 - `topicDomain: TopicDomain | undefined` — team_selection, dispute_resolution, safesport, anti_doping, eligibility, governance, athlete_rights
 - `queryIntent: QueryIntent | undefined` — factual, procedural, deadline, escalation, general
 - `detectedNgbIds: string[]`
@@ -53,6 +55,7 @@ You are an expert on the LangGraph agent implementation in `packages/core/src/ag
 - `escalationReason: string | undefined`
 
 ### Retrieval
+
 - `retrievedDocuments: RetrievedDocument[]`
 - `retrievalConfidence: number` (0–1, default 0)
 - `webSearchResults: string[]`
@@ -62,42 +65,47 @@ You are an expert on the LangGraph agent implementation in `packages/core/src/ag
 - `reformulatedQueries: string[]`
 
 ### Complex Query Planning
+
 - `isComplexQuery: boolean` (default false)
 - `subQueries: SubQuery[]`
 
 ### Emotional Support
+
 - `emotionalSupportContext: EmotionalSupportContext | undefined`
 
 ### Synthesis & Quality
+
 - `answer: string | undefined`
 - `qualityCheckResult: QualityCheckResult | undefined` — { passed, score, issues[], critique }
 - `qualityRetryCount: number` (default 0)
 
 ### Citations & Output
+
 - `citations: Citation[]` — { title, URL, section, effectiveDate, authorityLevel, s3Key }
 - `disclaimerRequired: boolean` (default true)
 
 ### Escalation
+
 - `escalation: EscalationInfo | undefined` — { organization, phone, email, message, urgency }
 
 ---
 
 ## Node Implementation Patterns
 
-| Node | Pattern | Model |
-|------|---------|-------|
-| classifier | JSON-structured LLM output with guard validation | Haiku |
-| clarify | Template-based, optionally empathetic | None |
-| retriever | Vector store search with metadata filtering, confidence scoring | Embeddings |
-| researcher | Tavily web search with domain-aware query building | None |
-| synthesizer | LLM generation from context + docs/web, retryable with quality feedback | Sonnet |
-| escalate | LLM escalation with urgency determination, domain targets | Sonnet |
-| citationBuilder | Deterministic extraction, deduplication by URL+section+title | None |
-| disclaimerGuard | Domain-specific disclaimer footer (legal, SafeSport, anti-doping) | None |
-| qualityChecker | LLM quality scoring (0–1), issue detection, fail-open | Sonnet |
-| retrievalExpander | LLM query reformulation (JSON array), re-search + merge | Sonnet |
-| queryPlanner | LLM multi-domain decomposition into sub-queries | Sonnet |
-| emotionalSupport | Pure template — domain + emotional state → support guidance | None |
+| Node              | Pattern                                                                 | Model      |
+| ----------------- | ----------------------------------------------------------------------- | ---------- |
+| classifier        | JSON-structured LLM output with guard validation                        | Haiku      |
+| clarify           | Template-based, optionally empathetic                                   | None       |
+| retriever         | Vector store search with metadata filtering, confidence scoring         | Embeddings |
+| researcher        | Tavily web search with domain-aware query building                      | None       |
+| synthesizer       | LLM generation from context + docs/web, retryable with quality feedback | Sonnet     |
+| escalate          | LLM escalation with urgency determination, domain targets               | Sonnet     |
+| citationBuilder   | Deterministic extraction, deduplication by URL+section+title            | None       |
+| disclaimerGuard   | Domain-specific disclaimer footer (legal, SafeSport, anti-doping)       | None       |
+| qualityChecker    | LLM quality scoring (0–1), issue detection, fail-open                   | Sonnet     |
+| retrievalExpander | LLM query reformulation (JSON array), re-search + merge                 | Sonnet     |
+| queryPlanner      | LLM multi-domain decomposition into sub-queries                         | Sonnet     |
+| emotionalSupport  | Pure template — domain + emotional state → support guidance             | None       |
 
 ---
 
@@ -105,17 +113,17 @@ You are an expert on the LangGraph agent implementation in `packages/core/src/ag
 
 All default `true`, set via `FEATURE_*` env vars. Only the string `"false"` disables a flag.
 
-| Flag | Effect |
-|------|--------|
-| qualityChecker | Enables synthesizer → qualityChecker → routeByQuality loop |
-| conversationMemory | Multi-turn conversation context |
-| sourceDiscovery | Ingest discovered URLs |
-| multiStepPlanner | Complex query decomposition |
-| feedbackLoop | User feedback integration |
-| retrievalExpansion | Query reformulation on low confidence |
-| queryPlanner | Multi-domain query decomposition via queryPlanner node |
-| emotionalSupport | Trauma-informed support for distressed users |
-| parallelResearch | Gray-zone (0.5–0.75) web search supplement |
+| Flag               | Effect                                                     |
+| ------------------ | ---------------------------------------------------------- |
+| qualityChecker     | Enables synthesizer → qualityChecker → routeByQuality loop |
+| conversationMemory | Multi-turn conversation context                            |
+| sourceDiscovery    | Ingest discovered URLs                                     |
+| multiStepPlanner   | Complex query decomposition                                |
+| feedbackLoop       | User feedback integration                                  |
+| retrievalExpansion | Query reformulation on low confidence                      |
+| queryPlanner       | Multi-domain query decomposition via queryPlanner node     |
+| emotionalSupport   | Trauma-informed support for distressed users               |
+| parallelResearch   | Gray-zone (0.5–0.75) web search supplement                 |
 
 ---
 

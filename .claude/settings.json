@@ -27,9 +27,7 @@
       "Bash(cd * && npx *)",
       "Bash(cd ~/src/usopc-issue-* *)"
     ],
-    "additionalDirectories": [
-      "/Users/joelrosinbum/src/usopc-issue-*"
-    ]
+    "additionalDirectories": ["/Users/joelrosinbum/src/usopc-issue-*"]
   },
   "enableAllProjectMcpServers": true,
   "hooks": {

@@ -152,18 +152,18 @@ Custom Claude Code skills that automate the development workflow. Use these inst
 | `/pr-ready`                | Pre-PR quality gate — tests, typecheck, prettier for changed packages                            |
 | `/eval-check`              | Run agent evals after core code changes (fast + optional LLM evals)                              |
 | `/implement <issue>`       | Full issue-to-code workflow — worktree setup, code exploration, test scaffolding, implementation |
-| `/address-pr-comments`     | Address review comments on the current PR — fetches comments, applies fixes, updates PR           |
+| `/address-pr-comments`     | Address review comments on the current PR — fetches comments, applies fixes, updates PR          |
 
 ### Sub-Agents
 
 Specialized sub-agents in `.claude/agents/` provide deep domain expertise. Claude Code auto-discovers them — they activate when working in their respective areas.
 
-| Agent | Scope | When to Use |
-| ----- | ----- | ----------- |
-| `langgraph-expert` | `packages/core/src/agent/` | Modifying graph topology, nodes, edges, state fields, feature flags, or runner config |
-| `eval-specialist` | `packages/evals/` | Writing evaluators, updating datasets, running quality reviews, configuring online evaluators |
-| `sst-architect` | `sst.config.ts`, AWS resources | Adding/modifying infrastructure, secrets, Lambda config, DynamoDB entities, CI/CD workflows |
-| `frontend-architect` | `apps/web/` | Building UI components, admin pages, API routes, auth flows, or data fetching hooks |
+| Agent                | Scope                          | When to Use                                                                                   |
+| -------------------- | ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `langgraph-expert`   | `packages/core/src/agent/`     | Modifying graph topology, nodes, edges, state fields, feature flags, or runner config         |
+| `eval-specialist`    | `packages/evals/`              | Writing evaluators, updating datasets, running quality reviews, configuring online evaluators |
+| `sst-architect`      | `sst.config.ts`, AWS resources | Adding/modifying infrastructure, secrets, Lambda config, DynamoDB entities, CI/CD workflows   |
+| `frontend-architect` | `apps/web/`                    | Building UI components, admin pages, API routes, auth flows, or data fetching hooks           |
 
 ### Hooks
 

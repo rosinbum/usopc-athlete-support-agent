@@ -48,6 +48,7 @@ app/admin/
 ```
 
 **Naming patterns:**
+
 - `*Client.tsx` — Client-rendered route sections (state management, data fetching)
 - `*Panel.tsx` — Slide-over modal panels (detail views)
 - `*Step.tsx` — Wizard step components
@@ -67,6 +68,7 @@ app/admin/
 ## Data Fetching
 
 ### SWR Hooks
+
 ```typescript
 useSources()           → { sources, isLoading, error, mutate }
 useSource(id)          → { source, chunkCount, isLoading, error }
@@ -75,6 +77,7 @@ useDiscovery(id)       → { discovery, isLoading, error }
 ```
 
 ### Mutation Hooks (useSWRMutation)
+
 ```typescript
 useSourceAction(id)        → PATCH source
 useSourceDelete(id)        → DELETE source
@@ -85,6 +88,7 @@ useBulkDiscoveryAction()   → POST bulk approve/reject
 ```
 
 ### Chat
+
 - `useChat({ api: "/api/chat" })` from Vercel AI SDK for streaming responses
 
 ---
@@ -123,15 +127,15 @@ useBulkDiscoveryAction()   → POST bulk approve/reject
 
 No component library — all hand-rolled Tailwind CSS.
 
-| Element | Classes |
-|---------|---------|
-| Primary button | `bg-blue-600 text-white hover:bg-blue-700 rounded-lg px-4 py-2 text-sm font-medium` |
-| Secondary button | `border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg px-4 py-2 text-sm font-medium` |
-| Card | `border border-gray-200 rounded-lg` |
-| Status badge | `inline-block px-2 py-0.5 rounded-full text-xs font-medium` + semantic color |
-| Loading spinner | `Loader2` icon with `animate-spin` |
-| Max content width | `max-w-5xl` (chat) or `max-w-6xl` (admin) |
-| Slide panel | Portal-based, right-side, `translate-x-full` → `translate-x-0` animation, Escape to close |
+| Element           | Classes                                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------------------ |
+| Primary button    | `bg-blue-600 text-white hover:bg-blue-700 rounded-lg px-4 py-2 text-sm font-medium`              |
+| Secondary button  | `border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg px-4 py-2 text-sm font-medium` |
+| Card              | `border border-gray-200 rounded-lg`                                                              |
+| Status badge      | `inline-block px-2 py-0.5 rounded-full text-xs font-medium` + semantic color                     |
+| Loading spinner   | `Loader2` icon with `animate-spin`                                                               |
+| Max content width | `max-w-5xl` (chat) or `max-w-6xl` (admin)                                                        |
+| Slide panel       | Portal-based, right-side, `translate-x-full` → `translate-x-0` animation, Escape to close        |
 
 ---
 
@@ -148,6 +152,7 @@ No component library — all hand-rolled Tailwind CSS.
 ## Domain Constants
 
 `lib/source-constants.ts` — Client-safe copy of shared Zod enums:
+
 - TOPIC_DOMAINS, AUTHORITY_LEVELS, DOCUMENT_TYPES, FORMATS, PRIORITIES, etc.
 - Duplicated from `@usopc/shared` to avoid pulling pg/node-only modules into client bundles
 

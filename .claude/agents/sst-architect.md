@@ -7,10 +7,12 @@ You are an expert on the AWS SST v3 infrastructure in this project. You have dee
 ## Resource Inventory
 
 ### Database
+
 - **Production:** Aurora Serverless v2 with pgvector (0.5–4 ACU), database `usopc_athlete_support`
 - **Dev/Staging:** Local Docker PostgreSQL (`pgvector/pgvector:pg16`) via `DATABASE_URL` env var
 
 ### DynamoDB (Single Table — OneTable Pattern)
+
 - **Table:** `AppTable` with `pk` (hash) × `sk` (range)
 - **GSIs:**
   - `ngbId-index`: `ngbId` (hash) × `pk` (range)
@@ -19,28 +21,34 @@ You are an expert on the AWS SST v3 infrastructure in this project. You have dee
 - **Entities:** SourceConfig, DiscoveredSource, SportOrganization, AgentModel, IngestionLog, Prompt, UsageMetric
 
 ### S3
+
 - `DocumentsBucket` — versioning enabled, document storage/cache/archive
 
 ### SQS Queues
-| Queue | Type | Visibility | DLQ Retries | Stage |
-|-------|------|-----------|-------------|-------|
-| Discovery Feed | Standard | 10 min | 2 | All stages |
-| Ingestion | FIFO (content-dedup) | 15 min | 2 | Production only |
+
+| Queue          | Type                 | Visibility | DLQ Retries | Stage           |
+| -------------- | -------------------- | ---------- | ----------- | --------------- |
+| Discovery Feed | Standard             | 10 min     | 2           | All stages      |
+| Ingestion      | FIFO (content-dedup) | 15 min     | 2           | Production only |
 
 ### APIs
+
 - **tRPC API Gateway** (`Api`): `apps/api/src/lambda.handler` — 120s timeout, 512MB
 - **Slack Bot API** (`SlackApi`): `apps/slack/src/index.handler` — 120s timeout, 512MB, route `POST /slack/events`
 
 ### Web
+
 - **Next.js** via CloudFront + Lambda@Edge: `apps/web`
 
 ### Crons (Production Only)
-| Cron | Schedule | Handler | Timeout | Memory |
-|------|----------|---------|---------|--------|
-| DiscoveryCron | Monday 2 AM UTC | `packages/ingestion/src/functions/discovery.handler` | 15 min | 1024MB |
-| IngestionCron | Every 7 days | `packages/ingestion/src/cron.handler` | 5 min | 512MB |
+
+| Cron          | Schedule        | Handler                                              | Timeout | Memory |
+| ------------- | --------------- | ---------------------------------------------------- | ------- | ------ |
+| DiscoveryCron | Monday 2 AM UTC | `packages/ingestion/src/functions/discovery.handler` | 15 min  | 1024MB |
+| IngestionCron | Every 7 days    | `packages/ingestion/src/cron.handler`                | 5 min   | 512MB  |
 
 ### SES
+
 - Discovery cron sends notification emails via SES (SendEmail/SendRawEmail permissions)
 
 ---
@@ -49,30 +57,32 @@ You are an expert on the AWS SST v3 infrastructure in this project. You have dee
 
 PascalCase for SST binding, SCREAMING_SNAKE_CASE for env vars.
 
-| SST Name | Env Var | Purpose |
-|----------|---------|---------|
-| AnthropicApiKey | ANTHROPIC_API_KEY | Claude LLM calls |
-| OpenaiApiKey | OPENAI_API_KEY | Embeddings (text-embedding-3-small) |
-| TavilyApiKey | TAVILY_API_KEY | Web search |
-| LangchainApiKey | LANGCHAIN_API_KEY | LangSmith tracing |
-| SlackBotToken | SLACK_BOT_TOKEN | Slack bot |
-| SlackSigningSecret | SLACK_SIGNING_SECRET | Slack webhook verification |
-| AuthSecret | — | NextAuth JWT signing |
-| GitHubClientId | — | GitHub OAuth |
-| GitHubClientSecret | — | GitHub OAuth |
-| AdminEmails | — | Email allowlist for admin access |
-| ConversationMaxTurns | — | Max conversation turns (default "5") |
+| SST Name             | Env Var              | Purpose                              |
+| -------------------- | -------------------- | ------------------------------------ |
+| AnthropicApiKey      | ANTHROPIC_API_KEY    | Claude LLM calls                     |
+| OpenaiApiKey         | OPENAI_API_KEY       | Embeddings (text-embedding-3-small)  |
+| TavilyApiKey         | TAVILY_API_KEY       | Web search                           |
+| LangchainApiKey      | LANGCHAIN_API_KEY    | LangSmith tracing                    |
+| SlackBotToken        | SLACK_BOT_TOKEN      | Slack bot                            |
+| SlackSigningSecret   | SLACK_SIGNING_SECRET | Slack webhook verification           |
+| AuthSecret           | —                    | NextAuth JWT signing                 |
+| GitHubClientId       | —                    | GitHub OAuth                         |
+| GitHubClientSecret   | —                    | GitHub OAuth                         |
+| AdminEmails          | —                    | Email allowlist for admin access     |
+| ConversationMaxTurns | —                    | Max conversation turns (default "5") |
 
 ---
 
 ## Secret Resolution Pattern
 
 **`getSecretValue(envKey, sstResourceName)`** — three-tier cascade:
+
 1. Direct environment variable (highest priority)
 2. SST `Resource` binding (production Lambdas)
 3. Throws error
 
 **`getDatabaseUrl()`** — cascade:
+
 1. `DATABASE_URL` env var
 2. SST `Resource.Database` fields → construct URL
 3. Local Docker fallback: `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`
@@ -97,39 +107,39 @@ FEATURE_QUERY_PLANNER
 
 ## DynamoDB Entity Design
 
-| Entity | PK | SK | Key Fields |
-|--------|----|----|------------|
-| SourceConfig | `Source#{id}` | `SourceConfig` | url, documentType, topicDomains[], ngbId, priority, enabled, format |
-| DiscoveredSource | `Discovery#{id}` | `DiscoveredSource` | url, status (pending_metadata/pending_content/approved/rejected), confidences |
-| SportOrganization | `SportOrg#{id}` | `Profile` | officialName, abbreviation, sports[], olympicProgram, websiteUrl |
-| AgentModel | `Agent#{id}` | `AgentModel` | Model config by role (dynamic LLM config) |
-| IngestionLog | `Source#{sourceId}` | `Ingest#{startedAt}` | status, contentHash, chunksCount, errorMessage |
-| Prompt | `Prompt#{name}` | `Prompt` | Stored prompt templates |
-| UsageMetric | `Usage#{service}` | `{period}#{date}` | tavilyCalls, anthropicCalls, costs |
+| Entity            | PK                  | SK                   | Key Fields                                                                    |
+| ----------------- | ------------------- | -------------------- | ----------------------------------------------------------------------------- |
+| SourceConfig      | `Source#{id}`       | `SourceConfig`       | url, documentType, topicDomains[], ngbId, priority, enabled, format           |
+| DiscoveredSource  | `Discovery#{id}`    | `DiscoveredSource`   | url, status (pending_metadata/pending_content/approved/rejected), confidences |
+| SportOrganization | `SportOrg#{id}`     | `Profile`            | officialName, abbreviation, sports[], olympicProgram, websiteUrl              |
+| AgentModel        | `Agent#{id}`        | `AgentModel`         | Model config by role (dynamic LLM config)                                     |
+| IngestionLog      | `Source#{sourceId}` | `Ingest#{startedAt}` | status, contentHash, chunksCount, errorMessage                                |
+| Prompt            | `Prompt#{name}`     | `Prompt`             | Stored prompt templates                                                       |
+| UsageMetric       | `Usage#{service}`   | `{period}#{date}`    | tavilyCalls, anthropicCalls, costs                                            |
 
 ---
 
 ## Stage-Aware Behavior
 
-| Component | Production | Dev/Staging |
-|-----------|-----------|-------------|
-| Database | Aurora Serverless v2 | Local Docker PostgreSQL |
-| Ingestion Queue | FIFO, enabled | Not created |
-| Discovery Cron | Monday 2 AM UTC | Not created |
-| Ingestion Cron | Weekly | Not created |
-| Discovery Feed Queue | Enabled | Enabled |
-| Removal Policy | Retain | Remove |
+| Component            | Production           | Dev/Staging             |
+| -------------------- | -------------------- | ----------------------- |
+| Database             | Aurora Serverless v2 | Local Docker PostgreSQL |
+| Ingestion Queue      | FIFO, enabled        | Not created             |
+| Discovery Cron       | Monday 2 AM UTC      | Not created             |
+| Ingestion Cron       | Weekly               | Not created             |
+| Discovery Feed Queue | Enabled              | Enabled                 |
+| Removal Policy       | Retain               | Remove                  |
 
 ---
 
 ## CI/CD Workflows
 
-| Workflow | Trigger | Jobs |
-|----------|---------|------|
-| `ci.yml` | PR to main | test, typecheck (`pnpm typecheck`), format (`prettier --check .`) |
-| `evals.yml` | Changes to `packages/core/src/agent/**` or `packages/evals/**` | Deterministic evals (always) + LLM judge evals (with `run-llm-evals` label) |
-| `claude-code-review.yml` | Manual or `claude-review` label | Anthropic Claude code review |
-| `claude.yml` | `@claude` comments on PRs/issues | Claude Code interactive assistance |
+| Workflow                 | Trigger                                                        | Jobs                                                                        |
+| ------------------------ | -------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `ci.yml`                 | PR to main                                                     | test, typecheck (`pnpm typecheck`), format (`prettier --check .`)           |
+| `evals.yml`              | Changes to `packages/core/src/agent/**` or `packages/evals/**` | Deterministic evals (always) + LLM judge evals (with `run-llm-evals` label) |
+| `claude-code-review.yml` | Manual or `claude-review` label                                | Anthropic Claude code review                                                |
+| `claude.yml`             | `@claude` comments on PRs/issues                               | Claude Code interactive assistance                                          |
 
 ---
 
