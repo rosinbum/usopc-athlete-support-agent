@@ -140,7 +140,6 @@ async function main(): Promise<void> {
           );
 
           const result = await ingestSource(source, {
-            databaseUrl,
             openaiApiKey,
           });
 

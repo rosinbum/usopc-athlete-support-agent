@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { OpenAIEmbeddings } from "@langchain/openai";
+import type { Pool } from "pg";
 
 const { mockInitialize } = vi.hoisted(() => ({
   mockInitialize: vi.fn(),
+}));
+
+const { mockGetPool } = vi.hoisted(() => ({
+  mockGetPool: vi.fn(),
 }));
 
 vi.mock("@langchain/community/vectorstores/pgvector", () => ({
@@ -11,23 +16,27 @@ vi.mock("@langchain/community/vectorstores/pgvector", () => ({
   },
 }));
 
+vi.mock("@usopc/shared", () => ({
+  getPool: mockGetPool,
+}));
+
 import { createVectorStore } from "./vectorStore.js";
 
 describe("createVectorStore", () => {
   let mockEmbeddings: OpenAIEmbeddings;
+  let mockPool: Pool;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.DATABASE_URL;
     mockEmbeddings = {} as OpenAIEmbeddings;
+    mockPool = { query: vi.fn() } as unknown as Pool;
+    mockGetPool.mockReturnValue(mockPool);
     mockInitialize.mockResolvedValue({ similaritySearch: vi.fn() });
   });
 
   describe("initialization", () => {
     it("should call PGVectorStore.initialize with embeddings", async () => {
-      await createVectorStore(mockEmbeddings, {
-        connectionString: "postgresql://test",
-      });
+      await createVectorStore(mockEmbeddings);
 
       expect(mockInitialize).toHaveBeenCalledWith(
         mockEmbeddings,
@@ -39,74 +48,50 @@ describe("createVectorStore", () => {
       const mockStore = { similaritySearch: vi.fn() };
       mockInitialize.mockResolvedValue(mockStore);
 
-      const result = await createVectorStore(mockEmbeddings, {
-        connectionString: "postgresql://test",
-      });
+      const result = await createVectorStore(mockEmbeddings);
 
       expect(result).toBe(mockStore);
     });
   });
 
-  describe("connection string", () => {
-    it("should use provided connection string", async () => {
-      await createVectorStore(mockEmbeddings, {
-        connectionString: "postgresql://custom:5432/db",
-      });
-
-      expect(mockInitialize).toHaveBeenCalledWith(
-        mockEmbeddings,
-        expect.objectContaining({
-          postgresConnectionOptions: expect.objectContaining({
-            connectionString: "postgresql://custom:5432/db",
-          }),
-        }),
-      );
-    });
-
-    it("should fall back to DATABASE_URL environment variable", async () => {
-      process.env.DATABASE_URL = "postgresql://env:5432/envdb";
-
+  describe("pool", () => {
+    it("should use the shared pool from getPool() by default", async () => {
       await createVectorStore(mockEmbeddings);
 
+      expect(mockGetPool).toHaveBeenCalled();
       expect(mockInitialize).toHaveBeenCalledWith(
         mockEmbeddings,
         expect.objectContaining({
-          postgresConnectionOptions: expect.objectContaining({
-            connectionString: "postgresql://env:5432/envdb",
-          }),
+          pool: mockPool,
         }),
       );
     });
 
-    it("should throw error when no connection string available", async () => {
-      await expect(createVectorStore(mockEmbeddings)).rejects.toThrow(
-        "DATABASE_URL is required for vector store",
-      );
-    });
+    it("should use a custom pool when provided", async () => {
+      const customPool = { query: vi.fn() } as unknown as Pool;
 
-    it("should prefer provided connection string over env variable", async () => {
-      process.env.DATABASE_URL = "postgresql://env:5432/envdb";
+      await createVectorStore(mockEmbeddings, { pool: customPool });
 
-      await createVectorStore(mockEmbeddings, {
-        connectionString: "postgresql://explicit:5432/explicitdb",
-      });
-
+      expect(mockGetPool).not.toHaveBeenCalled();
       expect(mockInitialize).toHaveBeenCalledWith(
         mockEmbeddings,
         expect.objectContaining({
-          postgresConnectionOptions: expect.objectContaining({
-            connectionString: "postgresql://explicit:5432/explicitdb",
-          }),
+          pool: customPool,
         }),
       );
+    });
+
+    it("should not pass postgresConnectionOptions", async () => {
+      await createVectorStore(mockEmbeddings);
+
+      const callArgs = mockInitialize.mock.calls[0][1];
+      expect(callArgs).not.toHaveProperty("postgresConnectionOptions");
     });
   });
 
   describe("default configuration", () => {
     it("should use default table name", async () => {
-      await createVectorStore(mockEmbeddings, {
-        connectionString: "postgresql://test",
-      });
+      await createVectorStore(mockEmbeddings);
 
       expect(mockInitialize).toHaveBeenCalledWith(
         mockEmbeddings,
@@ -117,9 +102,7 @@ describe("createVectorStore", () => {
     });
 
     it("should use default column names", async () => {
-      await createVectorStore(mockEmbeddings, {
-        connectionString: "postgresql://test",
-      });
+      await createVectorStore(mockEmbeddings);
 
       expect(mockInitialize).toHaveBeenCalledWith(
         mockEmbeddings,
@@ -138,7 +121,6 @@ describe("createVectorStore", () => {
   describe("custom configuration", () => {
     it("should allow custom table name", async () => {
       await createVectorStore(mockEmbeddings, {
-        connectionString: "postgresql://test",
         tableName: "custom_embeddings",
       });
 
@@ -152,7 +134,6 @@ describe("createVectorStore", () => {
 
     it("should allow custom column names", async () => {
       await createVectorStore(mockEmbeddings, {
-        connectionString: "postgresql://test",
         columns: {
           idColumnName: "custom_id",
           vectorColumnName: "custom_vector",
@@ -176,7 +157,6 @@ describe("createVectorStore", () => {
 
     it("should merge partial column config with defaults", async () => {
       await createVectorStore(mockEmbeddings, {
-        connectionString: "postgresql://test",
         columns: {
           vectorColumnName: "my_embedding",
         },
@@ -193,34 +173,13 @@ describe("createVectorStore", () => {
     });
   });
 
-  describe("pool configuration", () => {
-    it("should limit pool size and set timeouts", async () => {
-      await createVectorStore(mockEmbeddings, {
-        connectionString: "postgresql://test",
-      });
-
-      expect(mockInitialize).toHaveBeenCalledWith(
-        mockEmbeddings,
-        expect.objectContaining({
-          postgresConnectionOptions: expect.objectContaining({
-            max: 5,
-            idleTimeoutMillis: 30_000,
-            connectionTimeoutMillis: 5_000,
-          }),
-        }),
-      );
-    });
-  });
-
   describe("error handling", () => {
     it("should propagate initialization errors", async () => {
       mockInitialize.mockRejectedValue(new Error("Connection failed"));
 
-      await expect(
-        createVectorStore(mockEmbeddings, {
-          connectionString: "postgresql://test",
-        }),
-      ).rejects.toThrow("Connection failed");
+      await expect(createVectorStore(mockEmbeddings)).rejects.toThrow(
+        "Connection failed",
+      );
     });
   });
 });

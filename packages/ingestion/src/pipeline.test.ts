@@ -5,17 +5,7 @@ import type { Document } from "@langchain/core/documents";
 // Mocks — must be before importing the module under test
 // ---------------------------------------------------------------------------
 
-const mockPgQuery = vi.fn().mockResolvedValue({ rowCount: 0 });
-const mockPgConnect = vi.fn().mockResolvedValue(undefined);
-const mockPgEnd = vi.fn().mockResolvedValue(undefined);
-
-vi.mock("pg", () => ({
-  Client: vi.fn(() => ({
-    connect: mockPgConnect,
-    query: mockPgQuery,
-    end: mockPgEnd,
-  })),
-}));
+const mockPoolQuery = vi.fn().mockResolvedValue({ rowCount: 0 });
 
 vi.mock("@usopc/shared", () => ({
   createLogger: () => ({
@@ -24,6 +14,9 @@ vi.mock("@usopc/shared", () => ({
     error: vi.fn(),
     debug: vi.fn(),
     child: vi.fn(),
+  }),
+  getPool: () => ({
+    query: mockPoolQuery,
   }),
 }));
 
@@ -93,7 +86,6 @@ import {
   ingestSource,
   type IngestionSource,
 } from "./pipeline.js";
-import { Client } from "pg";
 import { loadPdf } from "./loaders/pdfLoader.js";
 import { cleanText } from "./transformers/cleaner.js";
 
@@ -117,7 +109,6 @@ const SOURCE: IngestionSource = {
 };
 
 const OPTIONS = {
-  databaseUrl: "postgresql://localhost/test",
   openaiApiKey: "sk-test",
 };
 
@@ -166,19 +157,14 @@ describe("ingestSource", () => {
     });
   });
 
-  it("runs backfill after embedding", async () => {
-    mockPgQuery.mockResolvedValueOnce({ rowCount: 5 });
+  it("runs backfill after embedding using shared pool", async () => {
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 5 });
 
     await ingestSource(SOURCE, OPTIONS);
 
-    expect(Client).toHaveBeenCalledWith({
-      connectionString: OPTIONS.databaseUrl,
-    });
-    expect(mockPgConnect).toHaveBeenCalled();
-    expect(mockPgQuery).toHaveBeenCalledWith(
+    expect(mockPoolQuery).toHaveBeenCalledWith(
       expect.stringContaining("UPDATE document_chunks"),
     );
-    expect(mockPgEnd).toHaveBeenCalled();
   });
 
   it("throws QuotaExhaustedError for 'insufficient_quota' errors", async () => {
@@ -310,44 +296,31 @@ describe("backfillDenormalizedColumns", () => {
     vi.clearAllMocks();
   });
 
-  it("connects, runs UPDATE, and closes the client", async () => {
-    mockPgQuery.mockResolvedValueOnce({ rowCount: 3 });
+  it("runs UPDATE using the shared pool", async () => {
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 3 });
 
-    const updated = await backfillDenormalizedColumns(
-      "postgresql://localhost/test",
-    );
+    const updated = await backfillDenormalizedColumns();
 
-    expect(Client).toHaveBeenCalledWith({
-      connectionString: "postgresql://localhost/test",
-    });
-    expect(mockPgConnect).toHaveBeenCalled();
-    expect(mockPgQuery).toHaveBeenCalledWith(
+    expect(mockPoolQuery).toHaveBeenCalledWith(
       expect.stringContaining("UPDATE document_chunks"),
     );
-    expect(mockPgQuery).toHaveBeenCalledWith(
+    expect(mockPoolQuery).toHaveBeenCalledWith(
       expect.stringContaining("source_url IS NULL"),
     );
-    expect(mockPgEnd).toHaveBeenCalled();
     expect(updated).toBe(3);
   });
 
   it("returns 0 when no rows need backfilling", async () => {
-    mockPgQuery.mockResolvedValueOnce({ rowCount: 0 });
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0 });
 
-    const updated = await backfillDenormalizedColumns(
-      "postgresql://localhost/test",
-    );
+    const updated = await backfillDenormalizedColumns();
 
     expect(updated).toBe(0);
   });
 
-  it("closes client even on query error", async () => {
-    mockPgQuery.mockRejectedValueOnce(new Error("db error"));
+  it("propagates query errors", async () => {
+    mockPoolQuery.mockRejectedValueOnce(new Error("db error"));
 
-    await expect(
-      backfillDenormalizedColumns("postgresql://localhost/test"),
-    ).rejects.toThrow("db error");
-
-    expect(mockPgEnd).toHaveBeenCalled();
+    await expect(backfillDenormalizedColumns()).rejects.toThrow("db error");
   });
 });

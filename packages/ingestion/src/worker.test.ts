@@ -56,7 +56,6 @@ vi.mock("./entities/index.js", () => ({
 }));
 
 vi.mock("@usopc/shared", () => ({
-  getDatabaseUrl: () => "postgresql://localhost/test",
   getSecretValue: () => "sk-test-key",
   createLogger: () => ({
     info: vi.fn(),

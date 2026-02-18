@@ -1,9 +1,10 @@
 import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import type { EmbeddingsInterface } from "@langchain/core/embeddings";
-import type { PoolConfig } from "pg";
+import type { Pool } from "pg";
+import { getPool } from "@usopc/shared";
 
 export interface VectorStoreConfig {
-  connectionString?: string;
+  pool?: Pool;
   tableName?: string;
   columns?: {
     idColumnName?: string;
@@ -28,22 +29,10 @@ export async function createVectorStore(
   config?: VectorStoreConfig,
 ): Promise<PGVectorStore> {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
-  const connectionString =
-    mergedConfig.connectionString ?? process.env.DATABASE_URL;
-
-  if (!connectionString) {
-    throw new Error("DATABASE_URL is required for vector store");
-  }
-
-  const pgConfig: PoolConfig = {
-    connectionString,
-    max: 5,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
-  };
+  const pool = mergedConfig.pool ?? getPool();
 
   return await PGVectorStore.initialize(embeddings, {
-    postgresConnectionOptions: pgConfig,
+    pool,
     tableName: mergedConfig.tableName!,
     columns: mergedConfig.columns,
   });
