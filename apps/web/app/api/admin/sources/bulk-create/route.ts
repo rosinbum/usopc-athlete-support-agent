@@ -1,6 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { TOPIC_DOMAINS, AUTHORITY_LEVELS, DOCUMENT_TYPES } from "@usopc/shared";
+import {
+  TOPIC_DOMAINS,
+  AUTHORITY_LEVELS,
+  DOCUMENT_TYPES,
+  logger,
+} from "@usopc/shared";
+
+const log = logger.child({ service: "admin-sources-bulk-create" });
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 
@@ -92,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ results }, { status: 201 });
   } catch (error) {
-    console.error("Bulk create error:", error);
+    log.error("Bulk create error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to process bulk create request" },
       { status: 500 },

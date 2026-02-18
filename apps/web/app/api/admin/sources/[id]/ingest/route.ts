@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { Resource } from "sst";
+import { getResource, logger } from "@usopc/shared";
 import { requireAdmin } from "../../../../../../lib/admin-api.js";
+
+const log = logger.child({ service: "admin-sources-ingest" });
 import { createSourceConfigEntity } from "../../../../../../lib/source-config.js";
 
 export async function POST(
@@ -23,8 +25,7 @@ export async function POST(
     // Get the queue URL from SST Resource (only available in production)
     let queueUrl: string;
     try {
-      queueUrl = (Resource as unknown as { IngestionQueue: { url: string } })
-        .IngestionQueue.url;
+      queueUrl = getResource("IngestionQueue").url;
     } catch {
       return NextResponse.json(
         { error: "Ingestion queue not available (dev environment)" },
@@ -60,7 +61,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, sourceId: id });
   } catch (error) {
-    console.error("Admin source ingest error:", error);
+    log.error("Admin source ingest error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to trigger ingestion" },
       { status: 500 },

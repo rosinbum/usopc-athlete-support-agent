@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { Resource } from "sst";
 import { z } from "zod";
 import {
   getPool,
   deleteChunksBySourceId,
   updateChunkMetadataBySourceId,
   countChunksBySourceId,
+  getResource,
+  logger,
   type SourceConfig,
 } from "@usopc/shared";
+
+const log = logger.child({ service: "admin-sources" });
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 
@@ -71,7 +74,7 @@ export async function GET(
 
     return NextResponse.json({ source, chunkCount });
   } catch (error) {
-    console.error("Admin source detail error:", error);
+    log.error("Admin source detail error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to fetch source" },
       { status: 500 },
@@ -123,9 +126,7 @@ export async function PATCH(
 
       // Trigger re-ingestion via SQS
       try {
-        const queueUrl = (
-          Resource as unknown as { IngestionQueue: { url: string } }
-        ).IngestionQueue.url;
+        const queueUrl = getResource("IngestionQueue").url;
 
         const message = {
           source: {
@@ -187,7 +188,7 @@ export async function PATCH(
 
     return NextResponse.json({ source, actions });
   } catch (error) {
-    console.error("Admin source update error:", error);
+    log.error("Admin source update error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to update source" },
       { status: 500 },
@@ -228,7 +229,7 @@ export async function DELETE(
       chunksDeleted,
     });
   } catch (error) {
-    console.error("Admin source delete error:", error);
+    log.error("Admin source delete error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to delete source" },
       { status: 500 },

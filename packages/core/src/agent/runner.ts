@@ -8,6 +8,7 @@ import type { TavilySearchLike } from "./nodes/researcher.js";
 import { createAgentGraph } from "./graph.js";
 import { GRAPH_CONFIG } from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
+import { nodeMetrics } from "./nodeMetrics.js";
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
 
@@ -112,6 +113,7 @@ export class AgentRunner {
    * Enforces a timeout to prevent indefinitely hung invocations.
    */
   async invoke(input: AgentInput): Promise<AgentOutput> {
+    nodeMetrics.reset();
     const initialState = this.buildInitialState(input);
     const config = initialState.conversationId
       ? { metadata: { session_id: initialState.conversationId } }
@@ -145,6 +147,7 @@ export class AgentRunner {
    * Enforces a deadline to prevent indefinitely hung streams.
    */
   async *stream(input: AgentInput): AsyncGenerator<StreamChunk> {
+    nodeMetrics.reset();
     const initialState = this.buildInitialState(input);
     const deadline = Date.now() + GRAPH_CONFIG.streamTimeoutMs;
 

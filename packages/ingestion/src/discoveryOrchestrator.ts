@@ -1,5 +1,5 @@
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { createLogger, normalizeUrl } from "@usopc/shared";
+import { createLogger, getResource, normalizeUrl } from "@usopc/shared";
 import type { DiscoveryFeedMessage } from "@usopc/core";
 import { Resource } from "sst";
 import { DiscoveryService } from "./services/discoveryService.js";
@@ -207,9 +207,7 @@ export class DiscoveryOrchestrator {
     };
 
     try {
-      const queueUrl = (
-        Resource as unknown as { DiscoveryFeedQueue: { url: string } }
-      ).DiscoveryFeedQueue.url;
+      const queueUrl = getResource("DiscoveryFeedQueue").url;
 
       await sqs.send(
         new SendMessageCommand({

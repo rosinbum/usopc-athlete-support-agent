@@ -91,3 +91,5 @@ export type {
 } from "./types/sport-org.js";
 
 export { normalizeUrl, urlToId } from "./url.js";
+
+export { getResource } from "./resources.js";

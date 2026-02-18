@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPool } from "@usopc/shared";
+import { getPool, logger } from "@usopc/shared";
+
+const log = logger.child({ service: "sources-api" });
 
 interface DocumentRow {
   source_url: string;
@@ -44,7 +46,7 @@ export async function GET(request: Request) {
 
     return await handleList(url);
   } catch (error) {
-    console.error("Sources API error:", error);
+    log.error("Sources API error", { error: String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
