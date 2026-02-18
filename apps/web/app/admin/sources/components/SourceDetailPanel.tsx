@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Loader2,
   ExternalLink,
@@ -11,8 +11,13 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import type { SourceConfig } from "@usopc/shared";
 import { SourceForm, type SourceFormValues } from "./SourceForm.js";
+import {
+  useSource,
+  useSourceAction,
+  useSourceDelete,
+  useSourceIngest,
+} from "../../hooks/use-sources.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -97,43 +102,38 @@ export function SourceDetailPanel({
   hasPrev,
   hasNext,
 }: SourceDetailPanelProps) {
-  const [source, setSource] = useState<SourceConfig | null>(null);
-  const [chunkCount, setChunkCount] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [toggling, setToggling] = useState(false);
-  const [ingesting, setIngesting] = useState(false);
   const [ingestResult, setIngestResult] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [mode, setMode] = useState<"detail" | "edit">("detail");
   const [apiError, setApiError] = useState<string | null>(null);
   const initialValuesRef = useRef<SourceFormValues | null>(null);
 
-  const fetchSource = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/sources/${id}`);
-      if (!res.ok) {
-        if (res.status === 404) throw new Error("Source not found");
-        throw new Error("Failed to fetch source");
-      }
-      const data = await res.json();
-      setSource(data.source);
-      setChunkCount(data.chunkCount ?? 0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
+  // Reset mode when switching sources
   useEffect(() => {
-    fetchSource();
-    // Reset mode when switching sources
     setMode("detail");
     initialValuesRef.current = null;
-  }, [fetchSource]);
+    setIngestResult(null);
+    setApiError(null);
+  }, [id]);
+
+  // -------------------------------------------------------------------------
+  // Data hooks
+  // -------------------------------------------------------------------------
+
+  const {
+    source,
+    chunkCount,
+    isLoading,
+    error: fetchError,
+    mutate,
+  } = useSource(id);
+
+  const { trigger: triggerAction, isMutating: toggling } = useSourceAction(id);
+
+  const { trigger: triggerDelete, isMutating: deleting } = useSourceDelete(id);
+
+  const { trigger: triggerIngest, isMutating: ingesting } = useSourceIngest(id);
+
+  const error = fetchError ? fetchError.message : null;
 
   // -------------------------------------------------------------------------
   // Actions
@@ -141,43 +141,28 @@ export function SourceDetailPanel({
 
   async function toggleEnabled() {
     if (!source) return;
-    setToggling(true);
     try {
-      const res = await fetch(`/api/admin/sources/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: !source.enabled }),
-      });
-      if (!res.ok) throw new Error("Failed to update");
-      const data = await res.json();
-      setSource(data.source);
+      await triggerAction({ enabled: !source.enabled });
+      await mutate();
       onMutate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
-    } finally {
-      setToggling(false);
+      setApiError(err instanceof Error ? err.message : "Update failed");
     }
   }
 
-  async function triggerIngest() {
-    setIngesting(true);
+  async function triggerIngestAction() {
     setIngestResult(null);
     try {
-      const res = await fetch(`/api/admin/sources/${id}/ingest`, {
-        method: "POST",
-      });
-      if (res.status === 501) {
-        setIngestResult("Ingestion queue not available in dev environment");
-        return;
-      }
-      if (!res.ok) throw new Error("Failed to trigger ingestion");
+      await triggerIngest();
       setIngestResult("Ingestion triggered successfully");
     } catch (err) {
-      setIngestResult(
-        err instanceof Error ? err.message : "Failed to trigger ingestion",
-      );
-    } finally {
-      setIngesting(false);
+      const msg =
+        err instanceof Error ? err.message : "Failed to trigger ingestion";
+      if (msg.includes("501")) {
+        setIngestResult("Ingestion queue not available in dev environment");
+      } else {
+        setIngestResult(msg);
+      }
     }
   }
 
@@ -188,17 +173,12 @@ export function SourceDetailPanel({
     );
     if (!confirmed) return;
 
-    setDeleting(true);
     try {
-      const res = await fetch(`/api/admin/sources/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to delete source");
+      await triggerDelete();
       onMutate();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
-      setDeleting(false);
+      setApiError(err instanceof Error ? err.message : "Delete failed");
     }
   }
 
@@ -233,30 +213,24 @@ export function SourceDetailPanel({
       return;
     }
 
-    const res = await fetch(`/api/admin/sources/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(diff),
-    });
-
-    if (!res.ok) {
-      const data = await res.json();
-      setApiError(data.error || "Failed to update source");
-      return;
+    try {
+      await triggerAction(diff);
+      initialValuesRef.current = null;
+      await mutate();
+      onMutate();
+      setMode("detail");
+    } catch (err) {
+      setApiError(
+        err instanceof Error ? err.message : "Failed to update source",
+      );
     }
-
-    // Refresh data and return to detail view
-    initialValuesRef.current = null;
-    await fetchSource();
-    onMutate();
-    setMode("detail");
   }
 
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
@@ -426,7 +400,7 @@ export function SourceDetailPanel({
         </button>
 
         <button
-          onClick={triggerIngest}
+          onClick={triggerIngestAction}
           disabled={ingesting}
           className="px-4 py-2 text-sm rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
         >

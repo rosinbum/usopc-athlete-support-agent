@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Loader2,
   AlertTriangle,
@@ -11,12 +11,12 @@ import {
   Plus,
   Upload,
 } from "lucide-react";
-import type { SourceConfig } from "@usopc/shared";
 import { SlidePanel } from "../components/SlidePanel.js";
 import { SortIcon } from "../components/SortIcon.js";
 import { Pagination } from "../components/Pagination.js";
 import { formatDate } from "../components/formatDate.js";
 import { SourceDetailPanel } from "./components/SourceDetailPanel.js";
+import { useSources, useBulkSourceAction } from "../hooks/use-sources.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,9 +57,6 @@ function priorityWeight(p: string): number {
 // ---------------------------------------------------------------------------
 
 export function SourcesAdminClient() {
-  const [sources, setSources] = useState<SourceConfig[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({
     search: "",
     enabled: "",
@@ -71,39 +68,22 @@ export function SourcesAdminClient() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [bulkLoading, setBulkLoading] = useState(false);
   const [openSourceId, setOpenSourceId] = useState<string | null>(null);
   const [cardFilter, setCardFilter] = useState<
     "failing" | "neverIngested" | "stale" | null
   >(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // -------------------------------------------------------------------------
-  // Fetch
+  // Data hooks
   // -------------------------------------------------------------------------
 
-  const fetchSources = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!opts?.silent) setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/sources");
-      if (!res.ok) throw new Error("Failed to fetch sources");
-      const data = await res.json();
-      setSources(data.sources);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { sources, isLoading, error: fetchError, mutate } = useSources();
 
-  const refetchSources = useCallback(
-    () => fetchSources({ silent: true }),
-    [fetchSources],
-  );
+  const { trigger: triggerBulk, isMutating: bulkLoading } =
+    useBulkSourceAction();
 
-  useEffect(() => {
-    fetchSources();
-  }, [fetchSources]);
+  const error = actionError || (fetchError ? fetchError.message : null);
 
   // -------------------------------------------------------------------------
   // Health stats
@@ -250,23 +230,13 @@ export function SourcesAdminClient() {
       if (!confirmed) return;
     }
 
-    setBulkLoading(true);
+    setActionError(null);
     try {
-      const res = await fetch("/api/admin/sources/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, ids: Array.from(selected) }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Bulk action failed");
-      }
+      await triggerBulk({ action, ids: Array.from(selected) });
       setSelected(new Set());
-      await refetchSources();
+      await mutate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bulk action failed");
-    } finally {
-      setBulkLoading(false);
+      setActionError(err instanceof Error ? err.message : "Bulk action failed");
     }
   }
 
@@ -294,7 +264,7 @@ export function SourcesAdminClient() {
   // Render
   // -------------------------------------------------------------------------
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
@@ -303,12 +273,12 @@ export function SourcesAdminClient() {
     );
   }
 
-  if (error) {
+  if (error && sources.length === 0) {
     return (
       <div className="text-center py-12">
         <p className="text-red-600">{error}</p>
         <button
-          onClick={() => fetchSources()}
+          onClick={() => mutate()}
           className="mt-4 text-blue-600 hover:text-blue-800"
         >
           Try again
@@ -612,7 +582,6 @@ export function SourcesAdminClient() {
                 key={source.id}
                 className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                 onClick={(e) => {
-                  // Don't open panel if clicking checkbox
                   if ((e.target as HTMLElement).tagName === "INPUT") return;
                   setOpenSourceId(source.id);
                 }}
@@ -699,7 +668,7 @@ export function SourcesAdminClient() {
           <SourceDetailPanel
             id={openSourceId}
             onClose={() => setOpenSourceId(null)}
-            onMutate={refetchSources}
+            onMutate={() => mutate()}
             hasPrev={sorted.findIndex((s) => s.id === openSourceId) > 0}
             hasNext={
               sorted.findIndex((s) => s.id === openSourceId) < sorted.length - 1

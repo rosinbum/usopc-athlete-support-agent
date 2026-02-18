@@ -168,3 +168,13 @@ Defined in `sst.config.ts`. Production uses Aurora Serverless v2 with pgvector; 
 - **Crons**: `DiscoveryCron` (weekly discovery), `IngestionCron` (weekly ingestion)
 
 Use `pnpm dev` (which runs `sst dev`) for local development to inject secrets. For scripts needing SST resources, use `sst shell -- <command>` or the wrapped npm scripts.
+
+## Admin Data Fetching (SWR)
+
+The admin pages in `apps/web/app/admin/` use [SWR](https://swr.vercel.app/) for data fetching and mutations. Custom hooks live in `apps/web/app/admin/hooks/`:
+
+- **`fetcher.ts`** — shared `fetcher` (for `useSWR` reads) and `mutationFetcher` (for `useSWRMutation` writes). Both parse error bodies and throw `FetchError`.
+- **`use-discoveries.ts`** — `useDiscoveries(status?)`, `useDiscovery(id)`, `useDiscoveryAction(id)`, `useBulkDiscoveryAction()`
+- **`use-sources.ts`** — `useSources()`, `useSource(id)`, `useSourceAction(id)`, `useSourceDelete(id)`, `useSourceIngest(id)`, `useBulkSourceAction()`
+
+**Pattern**: Read hooks return `{ data, isLoading, error, mutate }`. Mutation hooks return `{ trigger, isMutating, error }` with `revalidate: false` (callers explicitly `mutate()` after mutations). Detail panels call their own `mutate()` then the parent's `onMutate` prop to refresh both caches.

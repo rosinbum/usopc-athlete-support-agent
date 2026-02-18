@@ -1,12 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { SWRConfig } from "swr";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
 import { DiscoveriesAdminClient } from "./DiscoveriesAdminClient.js";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function renderWithSWR(ui: React.ReactElement) {
+  return render(
+    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+      {ui}
+    </SWRConfig>,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -79,12 +92,12 @@ beforeEach(() => {
 
 describe("DiscoveriesAdminClient", () => {
   it("renders loading state initially", () => {
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
     expect(screen.getByText("Loading discoveries...")).toBeInTheDocument();
   });
 
   it("renders discoveries after loading", async () => {
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -94,7 +107,7 @@ describe("DiscoveriesAdminClient", () => {
   });
 
   it("displays summary cards", async () => {
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("Total Discovered")).toBeInTheDocument();
@@ -107,7 +120,7 @@ describe("DiscoveriesAdminClient", () => {
   });
 
   it("displays confidence badges", async () => {
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("72%")).toBeInTheDocument();
@@ -117,7 +130,7 @@ describe("DiscoveriesAdminClient", () => {
   });
 
   it("displays status badges in table", async () => {
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       // "Pending Content" appears in dropdown and table badge
@@ -132,7 +145,7 @@ describe("DiscoveriesAdminClient", () => {
 
   it("filters by search text", async () => {
     const user = userEvent.setup();
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -149,7 +162,7 @@ describe("DiscoveriesAdminClient", () => {
 
   it("shows empty state when no discoveries match", async () => {
     const user = userEvent.setup();
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -171,19 +184,17 @@ describe("DiscoveriesAdminClient", () => {
       json: () => Promise.resolve({ error: "Server error" }),
     });
 
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Failed to fetch discoveries"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Server error")).toBeInTheDocument();
     });
 
     expect(screen.getByText("Try again")).toBeInTheDocument();
   });
 
   it("shows Sent badge for discoveries linked to a source", async () => {
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("Athlete Rights FAQ")).toBeInTheDocument();
@@ -199,7 +210,7 @@ describe("DiscoveriesAdminClient", () => {
 
   it("filters by source link status", async () => {
     const user = userEvent.setup();
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -221,7 +232,7 @@ describe("DiscoveriesAdminClient", () => {
 
   it("selects and shows bulk action bar", async () => {
     const user = userEvent.setup();
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -238,7 +249,7 @@ describe("DiscoveriesAdminClient", () => {
 
   it("opens slide panel when row is clicked", async () => {
     const user = userEvent.setup();
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -260,7 +271,7 @@ describe("DiscoveriesAdminClient", () => {
 
   it("closes slide panel via close button", async () => {
     const user = userEvent.setup();
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -289,7 +300,7 @@ describe("DiscoveriesAdminClient", () => {
 
   it("filters by Pending Review card click", async () => {
     const user = userEvent.setup();
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -311,7 +322,7 @@ describe("DiscoveriesAdminClient", () => {
 
   it("filters by Sent to Sources card click", async () => {
     const user = userEvent.setup();
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -331,7 +342,7 @@ describe("DiscoveriesAdminClient", () => {
 
   it("clicking Total Discovered card clears card filter", async () => {
     const user = userEvent.setup();
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -350,7 +361,7 @@ describe("DiscoveriesAdminClient", () => {
 
   it("navigates between discoveries with prev/next buttons", async () => {
     const user = userEvent.setup();
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -394,7 +405,7 @@ describe("DiscoveriesAdminClient", () => {
 
   it("auto-advances to next discovery after approve", async () => {
     const user = userEvent.setup();
-    render(<DiscoveriesAdminClient />);
+    renderWithSWR(<DiscoveriesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
@@ -424,7 +435,7 @@ describe("DiscoveriesAdminClient", () => {
     // Verify Next is enabled (there IS a next item)
     expect(screen.getByLabelText("Next discovery")).toBeEnabled();
 
-    // Mock: approve PATCH, silent list refetch, next item detail fetch
+    // Mock: approve PATCH, list refetch, next item detail fetch
     vi.mocked(global.fetch)
       .mockResolvedValueOnce({
         ok: true,

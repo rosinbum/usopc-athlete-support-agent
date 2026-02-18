@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Loader2,
   Search,
@@ -10,12 +10,16 @@ import {
   Eye,
   Upload,
 } from "lucide-react";
-import type { DiscoveredSource, DiscoveryStatus } from "@usopc/shared";
+import type { DiscoveryStatus } from "@usopc/shared";
 import { SlidePanel } from "../components/SlidePanel.js";
 import { SortIcon } from "../components/SortIcon.js";
 import { Pagination } from "../components/Pagination.js";
 import { formatDate } from "../components/formatDate.js";
 import { DiscoveryDetailPanel } from "./components/DiscoveryDetailPanel.js";
+import {
+  useDiscoveries,
+  useBulkDiscoveryAction,
+} from "../hooks/use-discoveries.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -96,9 +100,6 @@ function statusWeight(s: DiscoveryStatus): number {
 // ---------------------------------------------------------------------------
 
 export function DiscoveriesAdminClient() {
-  const [discoveries, setDiscoveries] = useState<DiscoveredSource[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({
     search: "",
     status: "",
@@ -111,46 +112,27 @@ export function DiscoveriesAdminClient() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [bulkLoading, setBulkLoading] = useState(false);
   const [openDiscoveryId, setOpenDiscoveryId] = useState<string | null>(null);
   const [cardFilter, setCardFilter] = useState<
     "pendingReview" | "approved" | "rejected" | "sentToSources" | null
   >(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // -------------------------------------------------------------------------
-  // Fetch
+  // Data hooks
   // -------------------------------------------------------------------------
 
-  const fetchDiscoveries = useCallback(
-    async (opts?: { silent?: boolean }) => {
-      if (!opts?.silent) setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams();
-        if (filters.status) params.set("status", filters.status);
-        const qs = params.toString();
-        const url = `/api/admin/discoveries${qs ? `?${qs}` : ""}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Failed to fetch discoveries");
-        const data = await res.json();
-        setDiscoveries(data.discoveries);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [filters.status],
-  );
+  const {
+    discoveries,
+    isLoading,
+    error: fetchError,
+    mutate,
+  } = useDiscoveries(filters.status);
 
-  const refetchDiscoveries = useCallback(
-    () => fetchDiscoveries({ silent: true }),
-    [fetchDiscoveries],
-  );
+  const { trigger: triggerBulk, isMutating: bulkLoading } =
+    useBulkDiscoveryAction();
 
-  useEffect(() => {
-    fetchDiscoveries();
-  }, [fetchDiscoveries]);
+  const error = actionError || (fetchError ? fetchError.message : null);
 
   // -------------------------------------------------------------------------
   // Summary stats
@@ -191,7 +173,6 @@ export function DiscoveriesAdminClient() {
         )
           return false;
       }
-      // Status filter is server-side, but if showing all, we still respect it
       if (
         filters.discoveryMethod &&
         d.discoveryMethod !== filters.discoveryMethod
@@ -304,65 +285,49 @@ export function DiscoveriesAdminClient() {
       reason = input;
     }
 
-    setBulkLoading(true);
+    setActionError(null);
     try {
-      const res = await fetch("/api/admin/discoveries/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          ids: Array.from(selected),
-          reason,
-        }),
+      await triggerBulk({
+        action,
+        ids: Array.from(selected),
+        reason,
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Bulk action failed");
-      }
       setSelected(new Set());
-      await refetchDiscoveries();
+      await mutate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bulk action failed");
-    } finally {
-      setBulkLoading(false);
+      setActionError(err instanceof Error ? err.message : "Bulk action failed");
     }
   }
 
   async function bulkSendToSources(ids?: string[]) {
-    setBulkLoading(true);
+    setActionError(null);
     try {
-      const res = await fetch("/api/admin/discoveries/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "send_to_sources",
-          ...(ids ? { ids } : {}),
-        }),
+      const data = await triggerBulk({
+        action: "send_to_sources",
+        ...(ids ? { ids } : {}),
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Send to sources failed");
-      }
-      const data = await res.json();
       const parts: string[] = [];
-      if (data.created > 0) parts.push(`${data.created} created`);
-      if (data.alreadyLinked > 0)
+      if (data && data.created && data.created > 0)
+        parts.push(`${data.created} created`);
+      if (data && data.alreadyLinked && data.alreadyLinked > 0)
         parts.push(`${data.alreadyLinked} already linked`);
-      if (data.duplicateUrl > 0)
+      if (data && data.duplicateUrl && data.duplicateUrl > 0)
         parts.push(`${data.duplicateUrl} linked to existing source (same URL)`);
-      if (data.notApproved > 0) parts.push(`${data.notApproved} not approved`);
-      if (data.failed > 0) parts.push(`${data.failed} failed`);
+      if (data && data.notApproved && data.notApproved > 0)
+        parts.push(`${data.notApproved} not approved`);
+      if (data && data.failed && data.failed > 0)
+        parts.push(`${data.failed} failed`);
       window.alert(
         parts.length > 0
           ? `Send to Sources: ${parts.join(", ")}`
           : "No discoveries to process",
       );
       setSelected(new Set());
-      await refetchDiscoveries();
+      await mutate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Send to sources failed");
-    } finally {
-      setBulkLoading(false);
+      setActionError(
+        err instanceof Error ? err.message : "Send to sources failed",
+      );
     }
   }
 
@@ -390,7 +355,7 @@ export function DiscoveriesAdminClient() {
   // Render
   // -------------------------------------------------------------------------
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
@@ -399,12 +364,12 @@ export function DiscoveriesAdminClient() {
     );
   }
 
-  if (error) {
+  if (error && discoveries.length === 0) {
     return (
       <div className="text-center py-12">
         <p className="text-red-600">{error}</p>
         <button
-          onClick={() => fetchDiscoveries()}
+          onClick={() => mutate()}
           className="mt-4 text-blue-600 hover:text-blue-800"
         >
           Try again
@@ -774,7 +739,7 @@ export function DiscoveriesAdminClient() {
           <DiscoveryDetailPanel
             id={openDiscoveryId}
             onClose={() => setOpenDiscoveryId(null)}
-            onMutate={refetchDiscoveries}
+            onMutate={() => mutate()}
             hasPrev={sorted.findIndex((d) => d.id === openDiscoveryId) > 0}
             hasNext={
               sorted.findIndex((d) => d.id === openDiscoveryId) <

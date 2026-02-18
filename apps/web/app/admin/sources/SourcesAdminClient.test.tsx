@@ -1,12 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { SWRConfig } from "swr";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
 import { SourcesAdminClient } from "./SourcesAdminClient.js";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function renderWithSWR(ui: React.ReactElement) {
+  return render(
+    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+      {ui}
+    </SWRConfig>,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Mock fetch
@@ -67,12 +80,12 @@ beforeEach(() => {
 
 describe("SourcesAdminClient", () => {
   it("renders loading state initially", () => {
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
     expect(screen.getByText("Loading sources...")).toBeInTheDocument();
   });
 
   it("renders health summary cards", async () => {
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("Total Sources")).toBeInTheDocument();
@@ -83,7 +96,7 @@ describe("SourcesAdminClient", () => {
   });
 
   it("renders source table rows", async () => {
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
@@ -94,7 +107,7 @@ describe("SourcesAdminClient", () => {
 
   it("filters by search text", async () => {
     const user = userEvent.setup();
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
@@ -113,10 +126,10 @@ describe("SourcesAdminClient", () => {
       json: () => Promise.resolve({ error: "Server error" }),
     });
 
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
 
     await waitFor(() => {
-      expect(screen.getByText("Failed to fetch sources")).toBeInTheDocument();
+      expect(screen.getByText("Server error")).toBeInTheDocument();
     });
 
     expect(screen.getByText("Try again")).toBeInTheDocument();
@@ -124,7 +137,7 @@ describe("SourcesAdminClient", () => {
 
   it("shows bulk action bar when items selected", async () => {
     const user = userEvent.setup();
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
@@ -142,7 +155,7 @@ describe("SourcesAdminClient", () => {
 
   it("opens slide panel when row is clicked", async () => {
     const user = userEvent.setup();
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
@@ -166,7 +179,7 @@ describe("SourcesAdminClient", () => {
 
   it("closes slide panel via close button", async () => {
     const user = userEvent.setup();
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
@@ -197,7 +210,7 @@ describe("SourcesAdminClient", () => {
 
   it("selections persist while panel is open (no sessionStorage needed)", async () => {
     const user = userEvent.setup();
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
@@ -227,7 +240,7 @@ describe("SourcesAdminClient", () => {
 
   it("filters by health card clicks", async () => {
     const user = userEvent.setup();
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
@@ -248,7 +261,7 @@ describe("SourcesAdminClient", () => {
 
   it("clicking Total Sources card clears card filter", async () => {
     const user = userEvent.setup();
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
@@ -266,7 +279,7 @@ describe("SourcesAdminClient", () => {
 
   it("navigates between sources with prev/next buttons", async () => {
     const user = userEvent.setup();
-    render(<SourcesAdminClient />);
+    renderWithSWR(<SourcesAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
