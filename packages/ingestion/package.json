@@ -31,7 +31,7 @@
     "@usopc/core": "workspace:*",
     "@usopc/shared": "workspace:*",
     "cheerio": "^1.0.0",
-    "pdf-parse": "^1.1.1",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.14.1",
     "zod": "^3.24.1"
   },
