@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import {
   Loader2,
   AlertTriangle,
@@ -15,6 +14,8 @@ import {
   Upload,
 } from "lucide-react";
 import type { SourceConfig } from "@usopc/shared";
+import { SlidePanel } from "../components/SlidePanel.js";
+import { SourceDetailPanel } from "./components/SourceDetailPanel.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,11 +68,7 @@ function priorityWeight(p: string): number {
 // Component
 // ---------------------------------------------------------------------------
 
-const STORAGE_KEY = "admin-sources-selected";
-
 export function SourcesAdminClient() {
-  const router = useRouter();
-
   const [sources, setSources] = useState<SourceConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,28 +82,19 @@ export function SourcesAdminClient() {
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    const stored = sessionStorage.getItem(STORAGE_KEY);
-    return stored ? new Set(stored.split(",").filter(Boolean)) : new Set();
-  });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
-
-  // Sync selection to sessionStorage
-  const syncSelection = useCallback((sel: Set<string>) => {
-    if (sel.size > 0) {
-      sessionStorage.setItem(STORAGE_KEY, Array.from(sel).join(","));
-    } else {
-      sessionStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
+  const [openSourceId, setOpenSourceId] = useState<string | null>(null);
+  const [cardFilter, setCardFilter] = useState<
+    "failing" | "neverIngested" | "stale" | null
+  >(null);
 
   // -------------------------------------------------------------------------
   // Fetch
   // -------------------------------------------------------------------------
 
-  const fetchSources = useCallback(async () => {
-    setLoading(true);
+  const fetchSources = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/sources");
@@ -119,6 +107,11 @@ export function SourcesAdminClient() {
       setLoading(false);
     }
   }, []);
+
+  const refetchSources = useCallback(
+    () => fetchSources({ silent: true }),
+    [fetchSources],
+  );
 
   useEffect(() => {
     fetchSources();
@@ -161,6 +154,7 @@ export function SourcesAdminClient() {
   }, [sources]);
 
   const filtered = useMemo(() => {
+    const now = Date.now();
     return sources.filter((s) => {
       if (
         filters.search &&
@@ -172,9 +166,21 @@ export function SourcesAdminClient() {
       if (filters.priority && s.priority !== filters.priority) return false;
       if (filters.format && s.format !== filters.format) return false;
       if (filters.ngbId && s.ngbId !== filters.ngbId) return false;
+      if (cardFilter === "failing") {
+        if (!s.enabled || s.consecutiveFailures < FAILURE_THRESHOLD)
+          return false;
+      }
+      if (cardFilter === "neverIngested") {
+        if (!s.enabled || s.lastIngestedAt) return false;
+      }
+      if (cardFilter === "stale") {
+        if (!s.enabled || !s.lastIngestedAt) return false;
+        const age = now - new Date(s.lastIngestedAt).getTime();
+        if (age <= STALE_DAYS * 24 * 60 * 60 * 1000) return false;
+      }
       return true;
     });
-  }, [sources, filters]);
+  }, [sources, filters, cardFilter]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -231,7 +237,6 @@ export function SourcesAdminClient() {
       paginated.forEach((s) => next.add(s.id));
     }
     setSelected(next);
-    syncSelection(next);
   }
 
   function toggleSelect(id: string) {
@@ -239,7 +244,6 @@ export function SourcesAdminClient() {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelected(next);
-    syncSelection(next);
   }
 
   // -------------------------------------------------------------------------
@@ -269,10 +273,8 @@ export function SourcesAdminClient() {
         const data = await res.json();
         throw new Error(data.error || "Bulk action failed");
       }
-      const empty = new Set<string>();
-      setSelected(empty);
-      syncSelection(empty);
-      await fetchSources();
+      setSelected(new Set());
+      await refetchSources();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bulk action failed");
     } finally {
@@ -322,7 +324,7 @@ export function SourcesAdminClient() {
       <div className="text-center py-12">
         <p className="text-red-600">{error}</p>
         <button
-          onClick={fetchSources}
+          onClick={() => fetchSources()}
           className="mt-4 text-blue-600 hover:text-blue-800"
         >
           Try again
@@ -353,7 +355,14 @@ export function SourcesAdminClient() {
 
       {/* Health Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="border border-gray-200 rounded-lg p-4">
+        <button
+          type="button"
+          onClick={() => {
+            setCardFilter(null);
+            setPage(1);
+          }}
+          className={`border rounded-lg p-4 text-left ${cardFilter === null ? "ring-2 ring-blue-500" : "border-gray-200"}`}
+        >
           <div className="flex items-center gap-2 text-gray-500 mb-1">
             <CheckCircle2 className="w-4 h-4" />
             <span className="text-sm">Total Sources</span>
@@ -362,10 +371,21 @@ export function SourcesAdminClient() {
           <p className="text-xs text-gray-400">
             {healthStats.enabled} enabled / {healthStats.disabled} disabled
           </p>
-        </div>
+        </button>
 
-        <div
-          className={`border rounded-lg p-4 ${healthStats.failing > 0 ? "border-red-200 bg-red-50" : "border-gray-200"}`}
+        <button
+          type="button"
+          onClick={() => {
+            setCardFilter((c) => (c === "failing" ? null : "failing"));
+            setPage(1);
+          }}
+          className={`border rounded-lg p-4 text-left ${
+            cardFilter === "failing"
+              ? "ring-2 ring-red-500 border-red-200 bg-red-50"
+              : healthStats.failing > 0
+                ? "border-red-200 bg-red-50"
+                : "border-gray-200"
+          }`}
         >
           <div className="flex items-center gap-2 text-red-600 mb-1">
             <XCircle className="w-4 h-4" />
@@ -375,10 +395,23 @@ export function SourcesAdminClient() {
           <p className="text-xs text-gray-400">
             {FAILURE_THRESHOLD}+ consecutive failures
           </p>
-        </div>
+        </button>
 
-        <div
-          className={`border rounded-lg p-4 ${healthStats.neverIngested > 0 ? "border-yellow-200 bg-yellow-50" : "border-gray-200"}`}
+        <button
+          type="button"
+          onClick={() => {
+            setCardFilter((c) =>
+              c === "neverIngested" ? null : "neverIngested",
+            );
+            setPage(1);
+          }}
+          className={`border rounded-lg p-4 text-left ${
+            cardFilter === "neverIngested"
+              ? "ring-2 ring-yellow-500 border-yellow-200 bg-yellow-50"
+              : healthStats.neverIngested > 0
+                ? "border-yellow-200 bg-yellow-50"
+                : "border-gray-200"
+          }`}
         >
           <div className="flex items-center gap-2 text-yellow-600 mb-1">
             <AlertTriangle className="w-4 h-4" />
@@ -386,10 +419,21 @@ export function SourcesAdminClient() {
           </div>
           <p className="text-2xl font-bold">{healthStats.neverIngested}</p>
           <p className="text-xs text-gray-400">Enabled but no data</p>
-        </div>
+        </button>
 
-        <div
-          className={`border rounded-lg p-4 ${healthStats.stale > 0 ? "border-orange-200 bg-orange-50" : "border-gray-200"}`}
+        <button
+          type="button"
+          onClick={() => {
+            setCardFilter((c) => (c === "stale" ? null : "stale"));
+            setPage(1);
+          }}
+          className={`border rounded-lg p-4 text-left ${
+            cardFilter === "stale"
+              ? "ring-2 ring-orange-500 border-orange-200 bg-orange-50"
+              : healthStats.stale > 0
+                ? "border-orange-200 bg-orange-50"
+                : "border-gray-200"
+          }`}
         >
           <div className="flex items-center gap-2 text-orange-600 mb-1">
             <Clock className="w-4 h-4" />
@@ -397,7 +441,7 @@ export function SourcesAdminClient() {
           </div>
           <p className="text-2xl font-bold">{healthStats.stale}</p>
           <p className="text-xs text-gray-400">&gt;{STALE_DAYS} days old</p>
-        </div>
+        </button>
       </div>
 
       {/* Filters */}
@@ -584,9 +628,9 @@ export function SourcesAdminClient() {
                 key={source.id}
                 className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                 onClick={(e) => {
-                  // Don't navigate if clicking checkbox
+                  // Don't open panel if clicking checkbox
                   if ((e.target as HTMLElement).tagName === "INPUT") return;
-                  router.push(`/admin/sources/${source.id}`);
+                  setOpenSourceId(source.id);
                 }}
               >
                 <td className="px-3 py-3">
@@ -684,6 +728,29 @@ export function SourcesAdminClient() {
           </div>
         </div>
       )}
+
+      {/* Detail Slide Panel */}
+      <SlidePanel open={!!openSourceId} onClose={() => setOpenSourceId(null)}>
+        {openSourceId && (
+          <SourceDetailPanel
+            id={openSourceId}
+            onClose={() => setOpenSourceId(null)}
+            onMutate={refetchSources}
+            hasPrev={sorted.findIndex((s) => s.id === openSourceId) > 0}
+            hasNext={
+              sorted.findIndex((s) => s.id === openSourceId) < sorted.length - 1
+            }
+            onPrev={() => {
+              const idx = sorted.findIndex((s) => s.id === openSourceId);
+              if (idx > 0) setOpenSourceId(sorted[idx - 1].id);
+            }}
+            onNext={() => {
+              const idx = sorted.findIndex((s) => s.id === openSourceId);
+              if (idx < sorted.length - 1) setOpenSourceId(sorted[idx + 1].id);
+            }}
+          />
+        )}
+      </SlidePanel>
     </div>
   );
 }

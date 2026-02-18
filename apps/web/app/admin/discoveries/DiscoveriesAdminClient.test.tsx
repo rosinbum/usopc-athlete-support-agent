@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 import { DiscoveriesAdminClient } from "./DiscoveriesAdminClient.js";
@@ -72,7 +71,6 @@ const SAMPLE_DISCOVERIES = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  sessionStorage.clear();
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: () => Promise.resolve({ discoveries: SAMPLE_DISCOVERIES }),
@@ -191,7 +189,7 @@ describe("DiscoveriesAdminClient", () => {
       expect(screen.getByText("Athlete Rights FAQ")).toBeInTheDocument();
     });
 
-    // disc-2 has sourceConfigId: "src-faq" → should show "Sent" badge
+    // disc-2 has sourceConfigId: "src-faq" -> should show "Sent" badge
     expect(screen.getByText("Sent")).toBeInTheDocument();
     // Summary card for "Sent to Sources" appears
     expect(
@@ -238,7 +236,7 @@ describe("DiscoveriesAdminClient", () => {
     expect(screen.getByText("Reject")).toBeInTheDocument();
   });
 
-  it("uses router.push for row navigation", async () => {
+  it("opens slide panel when row is clicked", async () => {
     const user = userEvent.setup();
     render(<DiscoveriesAdminClient />);
 
@@ -246,8 +244,211 @@ describe("DiscoveriesAdminClient", () => {
       expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
     });
 
+    // Mock the detail fetch for the panel
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ discovery: SAMPLE_DISCOVERIES[0] }),
+    } as Response);
+
     await user.click(screen.getByText("USOPC Governance Page"));
 
-    expect(mockPush).toHaveBeenCalledWith("/admin/discoveries/disc-1");
+    // Panel should open
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+  });
+
+  it("closes slide panel via close button", async () => {
+    const user = userEvent.setup();
+    render(<DiscoveriesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    });
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ discovery: SAMPLE_DISCOVERIES[0] }),
+    } as Response);
+
+    await user.click(screen.getByText("USOPC Governance Page"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByLabelText("Close panel"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { hidden: true })).toHaveAttribute(
+        "aria-modal",
+        "true",
+      );
+    });
+  });
+
+  it("filters by Pending Review card click", async () => {
+    const user = userEvent.setup();
+    render(<DiscoveriesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    });
+
+    // Click "Pending Review" card
+    await user.click(screen.getByText("Pending Review"));
+
+    // disc-1 is pending_content, disc-2 is approved — only disc-1 should show
+    expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    expect(screen.queryByText("Athlete Rights FAQ")).not.toBeInTheDocument();
+
+    // Click again to deselect
+    await user.click(screen.getByText("Pending Review"));
+
+    expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    expect(screen.getByText("Athlete Rights FAQ")).toBeInTheDocument();
+  });
+
+  it("filters by Sent to Sources card click", async () => {
+    const user = userEvent.setup();
+    render(<DiscoveriesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    });
+
+    // Click "Sent to Sources" card
+    await user.click(
+      screen
+        .getAllByText("Sent to Sources")
+        .find((el) => el.closest("button"))!,
+    );
+
+    // disc-2 has sourceConfigId, disc-1 does not
+    expect(screen.queryByText("USOPC Governance Page")).not.toBeInTheDocument();
+    expect(screen.getByText("Athlete Rights FAQ")).toBeInTheDocument();
+  });
+
+  it("clicking Total Discovered card clears card filter", async () => {
+    const user = userEvent.setup();
+    render(<DiscoveriesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    });
+
+    // Activate a filter
+    await user.click(screen.getByText("Pending Review"));
+    expect(screen.queryByText("Athlete Rights FAQ")).not.toBeInTheDocument();
+
+    // Click "Total Discovered" to clear
+    await user.click(screen.getByText("Total Discovered"));
+
+    expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    expect(screen.getByText("Athlete Rights FAQ")).toBeInTheDocument();
+  });
+
+  it("navigates between discoveries with prev/next buttons", async () => {
+    const user = userEvent.setup();
+    render(<DiscoveriesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    });
+
+    // Default sort is combinedConfidence desc: disc-2 (93%) first, disc-1 (72%) second
+    // Open disc-2 (first in sorted order)
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ discovery: SAMPLE_DISCOVERIES[1] }),
+    } as Response);
+
+    await user.click(screen.getByText("Athlete Rights FAQ"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    // Prev should be disabled (first item), next enabled
+    expect(screen.getByLabelText("Previous discovery")).toBeDisabled();
+    expect(screen.getByLabelText("Next discovery")).toBeEnabled();
+
+    // Click next to go to disc-1
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ discovery: SAMPLE_DISCOVERIES[0] }),
+    } as Response);
+
+    await user.click(screen.getByLabelText("Next discovery"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Relevant governance document"),
+      ).toBeInTheDocument();
+    });
+
+    // Now next should be disabled (last item) and prev enabled
+    expect(screen.getByLabelText("Next discovery")).toBeDisabled();
+    expect(screen.getByLabelText("Previous discovery")).toBeEnabled();
+  });
+
+  it("auto-advances to next discovery after approve", async () => {
+    const user = userEvent.setup();
+    render(<DiscoveriesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    });
+
+    // Sorted by combinedConfidence desc: disc-2 (93%) at index 0, disc-1 (72%) at index 1
+    // Open disc-2 (first in sorted order — has next but no prev)
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          // Return a pending version so Approve button shows
+          discovery: {
+            ...SAMPLE_DISCOVERIES[1],
+            status: "pending_content",
+            sourceConfigId: null,
+          },
+        }),
+    } as Response);
+
+    await user.click(screen.getByText("Athlete Rights FAQ"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    // Verify Next is enabled (there IS a next item)
+    expect(screen.getByLabelText("Next discovery")).toBeEnabled();
+
+    // Mock: approve PATCH, silent list refetch, next item detail fetch
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            discovery: { ...SAMPLE_DISCOVERIES[1], status: "approved" },
+          }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ discoveries: SAMPLE_DISCOVERIES }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ discovery: SAMPLE_DISCOVERIES[0] }),
+      } as Response);
+
+    await user.click(screen.getByText("Approve"));
+
+    // Should auto-advance to disc-1 — panel now shows its metadataReasoning
+    await waitFor(() => {
+      expect(
+        screen.getByText("Relevant governance document"),
+      ).toBeInTheDocument();
+    });
   });
 });

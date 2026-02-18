@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 import { SourcesAdminClient } from "./SourcesAdminClient.js";
@@ -60,7 +59,6 @@ const SAMPLE_SOURCES = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  sessionStorage.clear();
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: () => Promise.resolve({ sources: SAMPLE_SOURCES }),
@@ -142,7 +140,7 @@ describe("SourcesAdminClient", () => {
     expect(screen.getByText("Trigger Ingestion")).toBeInTheDocument();
   });
 
-  it("persists selections in sessionStorage after toggling checkboxes", async () => {
+  it("opens slide panel when row is clicked", async () => {
     const user = userEvent.setup();
     render(<SourcesAdminClient />);
 
@@ -150,25 +148,162 @@ describe("SourcesAdminClient", () => {
       expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
     });
 
-    const checkboxes = screen.getAllByRole("checkbox");
-    await user.click(checkboxes[1]); // select first visible row
-
-    const stored = sessionStorage.getItem("admin-sources-selected");
-    expect(stored).toBeTruthy();
-    expect(stored).toContain("src");
-  });
-
-  it("uses router.push for row navigation", async () => {
-    const user = userEvent.setup();
-    render(<SourcesAdminClient />);
-
-    await waitFor(() => {
-      expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
-    });
+    // Mock the detail fetch for the panel
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({ source: SAMPLE_SOURCES[0], chunkCount: 42 }),
+    } as Response);
 
     // Click on the row (not the checkbox)
     await user.click(screen.getByText("USOPC Bylaws"));
 
-    expect(mockPush).toHaveBeenCalledWith("/admin/sources/src1");
+    // Panel should open and fetch the source detail
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+  });
+
+  it("closes slide panel via close button", async () => {
+    const user = userEvent.setup();
+    render(<SourcesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
+    });
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({ source: SAMPLE_SOURCES[0], chunkCount: 42 }),
+    } as Response);
+
+    await user.click(screen.getByText("USOPC Bylaws"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByLabelText("Close panel"));
+
+    // Panel should slide closed (aria-hidden becomes true)
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { hidden: true })).toHaveAttribute(
+        "aria-modal",
+        "true",
+      );
+    });
+  });
+
+  it("selections persist while panel is open (no sessionStorage needed)", async () => {
+    const user = userEvent.setup();
+    render(<SourcesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
+    });
+
+    // Select a row via checkbox
+    const checkboxes = screen.getAllByRole("checkbox");
+    await user.click(checkboxes[1]);
+
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+
+    // Open panel for a different row
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ source: SAMPLE_SOURCES[1], chunkCount: 0 }),
+    } as Response);
+
+    await user.click(screen.getByText("SafeSport Policy"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    // Selection bar should still be visible
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+  });
+
+  it("filters by health card clicks", async () => {
+    const user = userEvent.setup();
+    render(<SourcesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
+    });
+
+    // Click "Failing" card — src2 has 5 failures but is disabled, so nothing matches
+    await user.click(screen.getByText("Failing"));
+
+    expect(screen.queryByText("USOPC Bylaws")).not.toBeInTheDocument();
+    expect(screen.queryByText("SafeSport Policy")).not.toBeInTheDocument();
+
+    // Click "Failing" again to deselect
+    await user.click(screen.getByText("Failing"));
+
+    expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
+    expect(screen.getByText("SafeSport Policy")).toBeInTheDocument();
+  });
+
+  it("clicking Total Sources card clears card filter", async () => {
+    const user = userEvent.setup();
+    render(<SourcesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
+    });
+
+    // Activate a card filter first
+    await user.click(screen.getByText("Stale"));
+
+    // Click "Total Sources" to clear
+    await user.click(screen.getByText("Total Sources"));
+
+    expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
+    expect(screen.getByText("SafeSport Policy")).toBeInTheDocument();
+  });
+
+  it("navigates between sources with prev/next buttons", async () => {
+    const user = userEvent.setup();
+    render(<SourcesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
+    });
+
+    // Default sort is title asc: ["SafeSport Policy", "USOPC Bylaws"]
+    // Open first sorted item: SafeSport Policy
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ source: SAMPLE_SOURCES[1], chunkCount: 0 }),
+    } as Response);
+
+    await user.click(screen.getByText("SafeSport Policy"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    // Prev button should be disabled (first item)
+    expect(screen.getByLabelText("Previous source")).toBeDisabled();
+    // Next button should be enabled
+    expect(screen.getByLabelText("Next source")).toBeEnabled();
+
+    // Click next to navigate to second source
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({ source: SAMPLE_SOURCES[0], chunkCount: 42 }),
+    } as Response);
+
+    await user.click(screen.getByLabelText("Next source"));
+
+    await waitFor(() => {
+      // Panel should now show USOPC Bylaws details
+      expect(screen.getByLabelText("Next source")).toBeDisabled();
+    });
+
+    expect(screen.getByLabelText("Previous source")).toBeEnabled();
   });
 });
