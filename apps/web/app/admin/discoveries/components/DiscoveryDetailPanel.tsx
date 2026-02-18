@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import {
   Loader2,
   ExternalLink,
@@ -10,7 +10,11 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import type { DiscoveredSource, DiscoveryStatus } from "@usopc/shared";
+import type { DiscoveryStatus } from "@usopc/shared";
+import {
+  useDiscovery,
+  useDiscoveryAction,
+} from "../../hooks/use-discoveries.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -100,107 +104,71 @@ export function DiscoveryDetailPanel({
   hasPrev,
   hasNext,
 }: DiscoveryDetailPanelProps) {
-  const [discovery, setDiscovery] = useState<DiscoveredSource | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const fetchDiscovery = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/discoveries/${id}`);
-      if (!res.ok) {
-        if (res.status === 404) throw new Error("Discovery not found");
-        throw new Error("Failed to fetch discovery");
-      }
-      const data = await res.json();
-      setDiscovery(data.discovery);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  // -------------------------------------------------------------------------
+  // Data hooks
+  // -------------------------------------------------------------------------
 
-  useEffect(() => {
-    fetchDiscovery();
-  }, [fetchDiscovery]);
+  const { discovery, isLoading, error: fetchError, mutate } = useDiscovery(id);
+
+  const { trigger: triggerAction, isMutating: actionLoading } =
+    useDiscoveryAction(id);
+
+  const error = actionError || (fetchError ? fetchError.message : null);
 
   // -------------------------------------------------------------------------
   // Actions
   // -------------------------------------------------------------------------
 
   async function handleApprove() {
-    setActionLoading(true);
+    setActionError(null);
     try {
-      const res = await fetch(`/api/admin/discoveries/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "approve" }),
-      });
-      if (!res.ok) throw new Error("Failed to approve");
+      await triggerAction({ action: "approve" });
       onMutate();
       if (hasNext) {
         onNext?.();
       } else {
-        const data = await res.json();
-        setDiscovery(data.discovery);
+        await mutate();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Approve failed");
-    } finally {
-      setActionLoading(false);
+      setActionError(err instanceof Error ? err.message : "Approve failed");
     }
   }
 
   async function handleReject() {
     if (!rejectReason.trim()) return;
-    setActionLoading(true);
+    setActionError(null);
     try {
-      const res = await fetch(`/api/admin/discoveries/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reject", reason: rejectReason.trim() }),
+      await triggerAction({
+        action: "reject",
+        reason: rejectReason.trim(),
       });
-      if (!res.ok) throw new Error("Failed to reject");
       setShowRejectInput(false);
       setRejectReason("");
       onMutate();
       if (hasNext) {
         onNext?.();
       } else {
-        const data = await res.json();
-        setDiscovery(data.discovery);
+        await mutate();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Reject failed");
-    } finally {
-      setActionLoading(false);
+      setActionError(err instanceof Error ? err.message : "Reject failed");
     }
   }
 
   async function handleSendToSources() {
-    setActionLoading(true);
+    setActionError(null);
     try {
-      const res = await fetch(`/api/admin/discoveries/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send_to_sources" }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to send to sources");
-      }
-      const data = await res.json();
-      setDiscovery(data.discovery);
+      await triggerAction({ action: "send_to_sources" });
+      await mutate();
       onMutate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Send to sources failed");
-    } finally {
-      setActionLoading(false);
+      setActionError(
+        err instanceof Error ? err.message : "Send to sources failed",
+      );
     }
   }
 
@@ -208,7 +176,7 @@ export function DiscoveryDetailPanel({
   // Render
   // -------------------------------------------------------------------------
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
