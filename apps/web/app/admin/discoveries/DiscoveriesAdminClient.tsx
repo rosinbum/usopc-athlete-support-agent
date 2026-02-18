@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Loader2,
   Search,
-  ChevronUp,
-  ChevronDown,
   CheckCircle2,
   XCircle,
   Clock,
@@ -14,6 +12,9 @@ import {
 } from "lucide-react";
 import type { DiscoveredSource, DiscoveryStatus } from "@usopc/shared";
 import { SlidePanel } from "../components/SlidePanel.js";
+import { SortIcon } from "../components/SortIcon.js";
+import { Pagination } from "../components/Pagination.js";
+import { formatDate } from "../components/formatDate.js";
 import { DiscoveryDetailPanel } from "./components/DiscoveryDetailPanel.js";
 
 // ---------------------------------------------------------------------------
@@ -50,19 +51,6 @@ const STATUS_OPTIONS: { value: DiscoveryStatus | ""; label: string }[] = [
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "Never";
-  try {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return dateString;
-  }
-}
 
 function confidenceBg(c: number | null): string {
   if (c === null) return "bg-gray-100 text-gray-500";
@@ -392,13 +380,9 @@ export function DiscoveriesAdminClient() {
     setPage(1);
   }
 
-  function SortIcon({ field }: { field: SortField }) {
-    if (sortField !== field)
-      return <ChevronUp className="w-3 h-3 text-gray-300" />;
-    return sortDir === "asc" ? (
-      <ChevronUp className="w-3 h-3" />
-    ) : (
-      <ChevronDown className="w-3 h-3" />
+  function SortBtn({ field }: { field: SortField }) {
+    return (
+      <SortIcon field={field} activeField={sortField} direction={sortDir} />
     );
   }
 
@@ -664,7 +648,7 @@ export function DiscoveriesAdminClient() {
                 onClick={() => handleSort("title")}
               >
                 <span className="flex items-center gap-1">
-                  Title <SortIcon field="title" />
+                  Title <SortBtn field="title" />
                 </span>
               </th>
               <th className="px-3 py-3 text-left">URL</th>
@@ -673,7 +657,7 @@ export function DiscoveriesAdminClient() {
                 onClick={() => handleSort("discoveryMethod")}
               >
                 <span className="flex items-center gap-1">
-                  Method <SortIcon field="discoveryMethod" />
+                  Method <SortBtn field="discoveryMethod" />
                 </span>
               </th>
               <th
@@ -681,7 +665,7 @@ export function DiscoveriesAdminClient() {
                 onClick={() => handleSort("combinedConfidence")}
               >
                 <span className="flex items-center gap-1">
-                  Confidence <SortIcon field="combinedConfidence" />
+                  Confidence <SortBtn field="combinedConfidence" />
                 </span>
               </th>
               <th
@@ -689,7 +673,7 @@ export function DiscoveriesAdminClient() {
                 onClick={() => handleSort("status")}
               >
                 <span className="flex items-center gap-1">
-                  Status <SortIcon field="status" />
+                  Status <SortBtn field="status" />
                 </span>
               </th>
               <th
@@ -697,7 +681,7 @@ export function DiscoveriesAdminClient() {
                 onClick={() => handleSort("discoveredAt")}
               >
                 <span className="flex items-center gap-1">
-                  Discovered <SortIcon field="discoveredAt" />
+                  Discovered <SortBtn field="discoveredAt" />
                 </span>
               </th>
             </tr>
@@ -773,33 +757,13 @@ export function DiscoveriesAdminClient() {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-gray-500">
-            Showing {(page - 1) * ITEMS_PER_PAGE + 1}–
-            {Math.min(page * ITEMS_PER_PAGE, sorted.length)} of {sorted.length}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-500">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={sorted.length}
+        itemsPerPage={ITEMS_PER_PAGE}
+        onPageChange={setPage}
+      />
 
       {/* Detail Slide Panel */}
       <SlidePanel

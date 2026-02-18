@@ -13,33 +13,12 @@ interface SlidePanelProps {
 export function SlidePanel({ open, onClose, children }: SlidePanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Escape key to close
+  // Focus panel on open and lock body scroll
   useEffect(() => {
     if (!open) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
-
-  // Prevent body scroll when open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
-  // Focus trap: focus panel on open
-  useEffect(() => {
-    if (open && panelRef.current) {
-      panelRef.current.focus();
-    }
+    panelRef.current?.focus();
+    document.body.classList.add("overflow-hidden");
+    return () => document.body.classList.remove("overflow-hidden");
   }, [open]);
 
   if (typeof document === "undefined") return null;
@@ -66,7 +45,10 @@ export function SlidePanel({ open, onClose, children }: SlidePanelProps) {
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        className={`absolute top-0 right-0 h-full w-full max-w-2xl bg-white shadow-xl transition-transform duration-300 ease-in-out ${
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose();
+        }}
+        className={`absolute top-0 right-0 h-full w-full max-w-2xl bg-white shadow-xl outline-none transition-transform duration-300 ease-in-out ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >

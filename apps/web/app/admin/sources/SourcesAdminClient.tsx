@@ -8,13 +8,14 @@ import {
   CheckCircle2,
   XCircle,
   Search,
-  ChevronUp,
-  ChevronDown,
   Plus,
   Upload,
 } from "lucide-react";
 import type { SourceConfig } from "@usopc/shared";
 import { SlidePanel } from "../components/SlidePanel.js";
+import { SortIcon } from "../components/SortIcon.js";
+import { Pagination } from "../components/Pagination.js";
+import { formatDate } from "../components/formatDate.js";
 import { SourceDetailPanel } from "./components/SourceDetailPanel.js";
 
 // ---------------------------------------------------------------------------
@@ -46,19 +47,6 @@ const FAILURE_THRESHOLD = 3;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "Never";
-  try {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return dateString;
-  }
-}
 
 function priorityWeight(p: string): number {
   return p === "high" ? 3 : p === "medium" ? 2 : 1;
@@ -296,13 +284,9 @@ export function SourcesAdminClient() {
     setPage(1);
   }
 
-  function SortIcon({ field }: { field: SortField }) {
-    if (sortField !== field)
-      return <ChevronUp className="w-3 h-3 text-gray-300" />;
-    return sortDir === "asc" ? (
-      <ChevronUp className="w-3 h-3" />
-    ) : (
-      <ChevronDown className="w-3 h-3" />
+  function SortBtn({ field }: { field: SortField }) {
+    return (
+      <SortIcon field={field} activeField={sortField} direction={sortDir} />
     );
   }
 
@@ -576,7 +560,7 @@ export function SourcesAdminClient() {
                 onClick={() => handleSort("enabled")}
               >
                 <span className="flex items-center gap-1">
-                  Status <SortIcon field="enabled" />
+                  Status <SortBtn field="enabled" />
                 </span>
               </th>
               <th
@@ -584,7 +568,7 @@ export function SourcesAdminClient() {
                 onClick={() => handleSort("title")}
               >
                 <span className="flex items-center gap-1">
-                  Title <SortIcon field="title" />
+                  Title <SortBtn field="title" />
                 </span>
               </th>
               <th
@@ -592,7 +576,7 @@ export function SourcesAdminClient() {
                 onClick={() => handleSort("format")}
               >
                 <span className="flex items-center gap-1">
-                  Format <SortIcon field="format" />
+                  Format <SortBtn field="format" />
                 </span>
               </th>
               <th
@@ -600,7 +584,7 @@ export function SourcesAdminClient() {
                 onClick={() => handleSort("priority")}
               >
                 <span className="flex items-center gap-1">
-                  Priority <SortIcon field="priority" />
+                  Priority <SortBtn field="priority" />
                 </span>
               </th>
               <th
@@ -608,7 +592,7 @@ export function SourcesAdminClient() {
                 onClick={() => handleSort("consecutiveFailures")}
               >
                 <span className="flex items-center gap-1">
-                  Failures <SortIcon field="consecutiveFailures" />
+                  Failures <SortBtn field="consecutiveFailures" />
                 </span>
               </th>
               <th
@@ -616,7 +600,7 @@ export function SourcesAdminClient() {
                 onClick={() => handleSort("lastIngestedAt")}
               >
                 <span className="flex items-center gap-1">
-                  Last Ingested <SortIcon field="lastIngestedAt" />
+                  Last Ingested <SortBtn field="lastIngestedAt" />
                 </span>
               </th>
               <th className="px-3 py-3 text-left">NGB</th>
@@ -701,33 +685,13 @@ export function SourcesAdminClient() {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-gray-500">
-            Showing {(page - 1) * ITEMS_PER_PAGE + 1}–
-            {Math.min(page * ITEMS_PER_PAGE, sorted.length)} of {sorted.length}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-500">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={sorted.length}
+        itemsPerPage={ITEMS_PER_PAGE}
+        onPageChange={setPage}
+      />
 
       {/* Detail Slide Panel */}
       <SlidePanel open={!!openSourceId} onClose={() => setOpenSourceId(null)}>
