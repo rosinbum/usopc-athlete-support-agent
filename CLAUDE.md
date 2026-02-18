@@ -152,12 +152,27 @@ Custom Claude Code skills that automate the development workflow. Use these inst
 | `/pr-ready`                | Pre-PR quality gate — tests, typecheck, prettier for changed packages                            |
 | `/eval-check`              | Run agent evals after core code changes (fast + optional LLM evals)                              |
 | `/implement <issue>`       | Full issue-to-code workflow — worktree setup, code exploration, test scaffolding, implementation |
+| `/address-pr-comments`     | Address review comments on the current PR — fetches comments, applies fixes, updates PR           |
+
+### Sub-Agents
+
+Specialized sub-agents in `.claude/agents/` provide deep domain expertise. Claude Code auto-discovers them — they activate when working in their respective areas.
+
+| Agent | Scope | When to Use |
+| ----- | ----- | ----------- |
+| `langgraph-expert` | `packages/core/src/agent/` | Modifying graph topology, nodes, edges, state fields, feature flags, or runner config |
+| `eval-specialist` | `packages/evals/` | Writing evaluators, updating datasets, running quality reviews, configuring online evaluators |
+| `sst-architect` | `sst.config.ts`, AWS resources | Adding/modifying infrastructure, secrets, Lambda config, DynamoDB entities, CI/CD workflows |
+| `frontend-architect` | `apps/web/` | Building UI components, admin pages, API routes, auth flows, or data fetching hooks |
 
 ### Hooks
 
-Two PostToolUse hooks fire automatically:
+Five PostToolUse hooks fire automatically:
 
 - **Agent-change guard** — When `Edit` or `Write` modifies a file in `packages/core/src/agent/`, prints a reminder to run `/eval-check`.
 - **Test-coverage reminder** — When `Write` creates a new `.ts` file in `src/` without a corresponding `.test.ts`, prints a reminder to add tests.
+- **State-field guard** — When `Edit` modifies `packages/core/src/agent/state.ts`, warns to update `makeState`/state factories across `core`, `evals`, `web`, and `ingestion`.
+- **Shared-package typecheck reminder** — When `Edit` or `Write` modifies any file in `packages/shared/src/`, reminds to run `pnpm typecheck` (full monorepo).
+- **Migration review reminder** — When `Write` creates a file in any `migrations/` directory, reminds to review for reversibility and index impact.
 
 Hook scripts live in `.claude/hooks/` and are registered in `.claude/settings.json`.
