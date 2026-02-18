@@ -296,6 +296,7 @@ export function SourceDetailPanel({
           idEditable={false}
           submitLabel="Save Changes"
           onSubmit={handleEditSubmit}
+          onCancel={() => setMode("detail")}
           apiError={apiError}
           warning="Changing URL or format will delete existing indexed data and trigger re-ingestion."
         />
