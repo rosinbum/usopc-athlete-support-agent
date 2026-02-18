@@ -17,7 +17,7 @@
     "@langchain/anthropic": "^0.3.12",
     "@langchain/community": "^0.3.22",
     "@langchain/core": "^0.3.28",
-    "@langchain/langgraph": "^0.2.38",
+    "@langchain/langgraph": "^1.1.5",
     "@langchain/openai": "^0.3.17",
     "@langchain/tavily": "^0.1.0",
     "@usopc/shared": "workspace:*",
