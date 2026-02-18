@@ -92,6 +92,7 @@
     "code-review@claude-plugins-official": true,
     "javascript-typescript@claude-code-workflows": true,
     "comprehensive-review@claude-code-workflows": true,
-    "agent-teams@claude-code-workflows": true
+    "agent-teams@claude-code-workflows": true,
+    "llm-application-dev@claude-code-workflows": true
   }
 }
