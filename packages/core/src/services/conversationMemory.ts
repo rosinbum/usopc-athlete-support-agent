@@ -1,9 +1,9 @@
-import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { logger } from "@usopc/shared";
 import { getModelConfig } from "../config/index.js";
 import {
+  createChatAnthropic,
   invokeAnthropic,
   extractTextFromResponse,
 } from "./anthropicService.js";
@@ -107,7 +107,7 @@ export async function generateSummary(
   existingSummary?: string,
 ): Promise<string> {
   const config = await getModelConfig();
-  const model = new ChatAnthropic({
+  const model = createChatAnthropic({
     model: config.classifier.model, // Haiku
     temperature: 0,
     maxTokens: 1024,

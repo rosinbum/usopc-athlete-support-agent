@@ -1,4 +1,5 @@
 export {
+  createChatAnthropic,
   invokeAnthropic,
   invokeAnthropicWithFallback,
   extractTextFromResponse,

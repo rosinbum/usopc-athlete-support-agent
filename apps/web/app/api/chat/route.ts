@@ -21,8 +21,9 @@ async function initRunner() {
   const { getDatabaseUrl, getSecretValue, getOptionalEnv } =
     await import("@usopc/shared");
 
-  // Set env vars BEFORE importing @usopc/core (which loads LangChain)
-  process.env.ANTHROPIC_API_KEY = getSecretValue(
+  // Read the Anthropic key into a local variable — it will be passed
+  // explicitly to AgentRunner.create() instead of lingering in process.env.
+  const anthropicApiKey = getSecretValue(
     "ANTHROPIC_API_KEY",
     "AnthropicApiKey",
   );
@@ -57,11 +58,19 @@ async function initRunner() {
   // Now import the agent (which loads LangChain with env vars set)
   const { AgentRunner } = await import("@usopc/core");
 
-  return await AgentRunner.create({
+  const runner = await AgentRunner.create({
     databaseUrl: getDatabaseUrl(),
     openaiApiKey: getSecretValue("OPENAI_API_KEY", "OpenaiApiKey"),
     tavilyApiKey: getSecretValue("TAVILY_API_KEY", "TavilyApiKey"),
+    anthropicApiKey,
   });
+
+  // Remove the Anthropic key from the environment now that it's stored
+  // in module-scoped state. LANGCHAIN_API_KEY must stay — the LangSmith
+  // SDK reads it from process.env on every trace flush.
+  delete process.env.ANTHROPIC_API_KEY;
+
+  return runner;
 }
 
 async function getRunner() {

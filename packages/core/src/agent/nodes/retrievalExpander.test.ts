@@ -24,6 +24,7 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 import { ChatAnthropic } from "@langchain/anthropic";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { createRetrievalExpanderNode } from "./retrievalExpander.js";
+import { setAnthropicApiKey } from "../../config/index.js";
 import type { VectorStoreLike } from "./retriever.js";
 import type { AgentState } from "../state.js";
 
@@ -133,6 +134,7 @@ function setupFailingModel(error: Error): void {
 describe("createRetrievalExpanderNode", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setAnthropicApiKey("test-key");
   });
 
   it("generates reformulated queries and merges results", async () => {

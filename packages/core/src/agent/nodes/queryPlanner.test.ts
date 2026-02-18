@@ -31,6 +31,7 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 import { queryPlannerNode, parseQueryPlannerResponse } from "./queryPlanner.js";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
+import { setAnthropicApiKey } from "../../config/index.js";
 import type { AgentState } from "../state.js";
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,7 @@ function plannerResponse(data: Record<string, unknown>): {
 describe("queryPlannerNode", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setAnthropicApiKey("test-key");
   });
 
   it("decomposes a complex multi-domain query", async () => {
