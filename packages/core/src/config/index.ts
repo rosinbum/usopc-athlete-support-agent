@@ -2,8 +2,6 @@ export {
   MODEL_CONFIG,
   getModelConfig,
   initModelConfig,
-  setAnthropicApiKey,
-  getAnthropicApiKey,
   type ModelConfig,
 } from "./models.js";
 export {

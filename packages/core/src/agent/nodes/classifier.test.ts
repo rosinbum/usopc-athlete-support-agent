@@ -31,7 +31,6 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 import { classifierNode, parseClassifierResponse } from "./classifier.js";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
-import { setAnthropicApiKey } from "../../config/index.js";
 import type { AgentState } from "../state.js";
 
 // ---------------------------------------------------------------------------
@@ -85,7 +84,6 @@ function classifierResponse(data: Record<string, unknown>): {
 describe("classifierNode", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setAnthropicApiKey("test-key");
   });
 
   it("returns general intent for empty messages", async () => {

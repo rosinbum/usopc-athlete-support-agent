@@ -1,9 +1,9 @@
+import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import { getModelConfig } from "../../config/index.js";
 import { buildQueryPlannerPrompt } from "../../prompts/index.js";
 import {
-  createChatAnthropic,
   invokeAnthropic,
   extractTextFromResponse,
 } from "../../services/anthropicService.js";
@@ -133,7 +133,7 @@ export async function queryPlannerNode(
   }
 
   const config = await getModelConfig();
-  const model = createChatAnthropic({
+  const model = new ChatAnthropic({
     model: config.classifier.model,
     temperature: config.classifier.temperature,
     maxTokens: config.classifier.maxTokens,

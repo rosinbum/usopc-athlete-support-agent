@@ -28,9 +28,12 @@ vi.mock("../config/index.js", () => ({
 }));
 
 vi.mock("./anthropicService.js", () => ({
-  createChatAnthropic: vi.fn(),
   invokeAnthropic: vi.fn(),
   extractTextFromResponse: vi.fn(),
+}));
+
+vi.mock("@langchain/anthropic", () => ({
+  ChatAnthropic: vi.fn(),
 }));
 
 import {
