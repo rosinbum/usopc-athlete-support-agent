@@ -14,14 +14,14 @@
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "@slack/bolt": "^4.1.1",
-    "@slack/web-api": "^7.8.0",
+    "@slack/web-api": "^7.14.1",
     "@usopc/core": "workspace:*",
     "@usopc/shared": "workspace:*",
-    "hono": "^4.6.16",
+    "hono": "^4.11.10",
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "sst": "3.18.1",
+    "sst": "3.18.10",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
