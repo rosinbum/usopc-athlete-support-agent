@@ -111,18 +111,6 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
   }, [fetchDiscovery]);
 
   // -------------------------------------------------------------------------
-  // Build back link preserving selection params
-  // -------------------------------------------------------------------------
-
-  function backHref(): string {
-    if (typeof window === "undefined") return "/admin/discoveries";
-    const params = new URLSearchParams(window.location.search);
-    const selected = params.get("selected");
-    if (selected) return `/admin/discoveries?selected=${selected}`;
-    return "/admin/discoveries";
-  }
-
-  // -------------------------------------------------------------------------
   // Actions
   // -------------------------------------------------------------------------
 
@@ -204,7 +192,7 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
       <div className="text-center py-12">
         <p className="text-red-600">{error ?? "Discovery not found"}</p>
         <a
-          href={backHref()}
+          href="/admin/discoveries"
           className="mt-4 inline-block text-blue-600 hover:text-blue-800"
         >
           Back to Discoveries
@@ -217,6 +205,9 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
   const isPending = PENDING_STATUSES.has(discovery.status);
   const canSendToSources =
     discovery.status === "approved" && !discovery.sourceConfigId;
+  const showApprove = isPending || discovery.status === "rejected";
+  const showReject =
+    isPending || (discovery.status === "approved" && !discovery.sourceConfigId);
 
   const sections: Record<string, Record<string, React.ReactNode>> = {
     Identity: {
@@ -334,7 +325,7 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
       {/* Back link + Title */}
       <div className="mb-6">
         <a
-          href={backHref()}
+          href="/admin/discoveries"
           className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Discoveries
@@ -350,23 +341,25 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
       </div>
 
       {/* Action Buttons */}
-      {(isPending || canSendToSources) && (
+      {(isPending || canSendToSources || showApprove || showReject) && (
         <div className="flex items-center gap-3 mb-6">
-          {isPending && (
-            <>
-              <button
-                onClick={handleApprove}
-                disabled={actionLoading}
-                className="px-4 py-2 text-sm rounded-lg font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
-              >
-                {actionLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-4 h-4" />
-                )}
-                Approve
-              </button>
+          {showApprove && (
+            <button
+              onClick={handleApprove}
+              disabled={actionLoading}
+              className="px-4 py-2 text-sm rounded-lg font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+            >
+              {actionLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              Approve
+            </button>
+          )}
 
+          {showReject && (
+            <>
               {showRejectInput ? (
                 <div className="flex items-center gap-2 flex-1">
                   <input

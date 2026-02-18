@@ -82,7 +82,7 @@ describe("DiscoveryDetailClient", () => {
     expect(screen.getByText("Reject")).toBeInTheDocument();
   });
 
-  it("hides action buttons for approved status", async () => {
+  it("shows Reject and Send to Sources for approved discovery without source link", async () => {
     const approved = { ...SAMPLE_DISCOVERY, status: "approved" };
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -98,7 +98,60 @@ describe("DiscoveryDetailClient", () => {
     });
 
     expect(screen.queryByText("Approve")).not.toBeInTheDocument();
+    expect(screen.getByText("Reject")).toBeInTheDocument();
+    expect(screen.getByText("Send to Sources")).toBeInTheDocument();
+  });
+
+  it("shows Approve button for rejected discovery", async () => {
+    const rejected = {
+      ...SAMPLE_DISCOVERY,
+      status: "rejected",
+      rejectionReason: "Not relevant",
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ discovery: rejected }),
+    });
+
+    render(<DiscoveryDetailClient id="disc-1" />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "USOPC Governance Page" }),
+      ).toBeInTheDocument();
+    });
+
+    // The rejected badge should be visible
+    expect(screen.getAllByText("Rejected").length).toBeGreaterThan(0);
+    expect(screen.getByText("Approve")).toBeInTheDocument();
+    // Reject button should not appear (already rejected)
+    expect(
+      screen.queryByRole("button", { name: /reject/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides all action buttons for approved discovery already sent to sources", async () => {
+    const linked = {
+      ...SAMPLE_DISCOVERY,
+      status: "approved",
+      sourceConfigId: "src-123",
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ discovery: linked }),
+    });
+
+    render(<DiscoveryDetailClient id="disc-1" />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "USOPC Governance Page" }),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Approve")).not.toBeInTheDocument();
     expect(screen.queryByText("Reject")).not.toBeInTheDocument();
+    expect(screen.queryByText("Send to Sources")).not.toBeInTheDocument();
   });
 
   it("handles approve action", async () => {
@@ -125,9 +178,11 @@ describe("DiscoveryDetailClient", () => {
     await user.click(screen.getByText("Approve"));
 
     await waitFor(() => {
-      // After approval, the action buttons should disappear
+      // After approval, Approve disappears but Reject appears (status reversal)
       expect(screen.queryByText("Approve")).not.toBeInTheDocument();
     });
+
+    expect(screen.getByText("Reject")).toBeInTheDocument();
   });
 
   it("shows reject reason input when reject is clicked", async () => {

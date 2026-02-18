@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   Loader2,
   Search,
@@ -106,8 +106,10 @@ function statusWeight(s: DiscoveryStatus): number {
 // Component
 // ---------------------------------------------------------------------------
 
+const STORAGE_KEY = "admin-discoveries-selected";
+
 export function DiscoveriesAdminClient() {
-  const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [discoveries, setDiscoveries] = useState<DiscoveredSource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,20 +126,19 @@ export function DiscoveriesAdminClient() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(() => {
-    const param = searchParams.get("selected");
-    return param ? new Set(param.split(",").filter(Boolean)) : new Set();
+    if (typeof window === "undefined") return new Set();
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    return stored ? new Set(stored.split(",").filter(Boolean)) : new Set();
   });
   const [bulkLoading, setBulkLoading] = useState(false);
 
-  // Sync selection to URL params (without triggering re-renders)
-  const syncSelectionToUrl = useCallback((sel: Set<string>) => {
-    const url = new URL(window.location.href);
+  // Sync selection to sessionStorage
+  const syncSelection = useCallback((sel: Set<string>) => {
     if (sel.size > 0) {
-      url.searchParams.set("selected", Array.from(sel).join(","));
+      sessionStorage.setItem(STORAGE_KEY, Array.from(sel).join(","));
     } else {
-      url.searchParams.delete("selected");
+      sessionStorage.removeItem(STORAGE_KEY);
     }
-    window.history.replaceState({}, "", url.toString());
   }, []);
 
   // -------------------------------------------------------------------------
@@ -283,7 +284,7 @@ export function DiscoveriesAdminClient() {
       paginated.forEach((d) => next.add(d.id));
     }
     setSelected(next);
-    syncSelectionToUrl(next);
+    syncSelection(next);
   }
 
   function toggleSelect(id: string) {
@@ -291,7 +292,7 @@ export function DiscoveriesAdminClient() {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelected(next);
-    syncSelectionToUrl(next);
+    syncSelection(next);
   }
 
   // -------------------------------------------------------------------------
@@ -324,7 +325,7 @@ export function DiscoveriesAdminClient() {
         throw new Error(data.error || "Bulk action failed");
       }
       setSelected(new Set());
-      syncSelectionToUrl(new Set());
+      syncSelection(new Set());
       await fetchDiscoveries();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bulk action failed");
@@ -363,7 +364,7 @@ export function DiscoveriesAdminClient() {
           : "No discoveries to process",
       );
       setSelected(new Set());
-      syncSelectionToUrl(new Set());
+      syncSelection(new Set());
       await fetchDiscoveries();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Send to sources failed");
@@ -394,16 +395,6 @@ export function DiscoveriesAdminClient() {
     ) : (
       <ChevronDown className="w-3 h-3" />
     );
-  }
-
-  // -------------------------------------------------------------------------
-  // Build selection query string for detail page links
-  // -------------------------------------------------------------------------
-
-  function detailHref(id: string): string {
-    const base = `/admin/discoveries/${id}`;
-    if (selected.size === 0) return base;
-    return `${base}?selected=${Array.from(selected).join(",")}`;
   }
 
   // -------------------------------------------------------------------------
@@ -660,7 +651,7 @@ export function DiscoveriesAdminClient() {
                   className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                   onClick={(e) => {
                     if ((e.target as HTMLElement).tagName === "INPUT") return;
-                    window.location.href = detailHref(d.id);
+                    router.push(`/admin/discoveries/${d.id}`);
                   }}
                 >
                   <td className="px-3 py-3">

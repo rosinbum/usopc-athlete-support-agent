@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
 import { SourcesAdminClient } from "./SourcesAdminClient.js";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +60,7 @@ const SAMPLE_SOURCES = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: () => Promise.resolve({ sources: SAMPLE_SOURCES }),
@@ -133,5 +140,35 @@ describe("SourcesAdminClient", () => {
     expect(screen.getByText("Enable")).toBeInTheDocument();
     expect(screen.getByText("Disable")).toBeInTheDocument();
     expect(screen.getByText("Trigger Ingestion")).toBeInTheDocument();
+  });
+
+  it("persists selections in sessionStorage after toggling checkboxes", async () => {
+    const user = userEvent.setup();
+    render(<SourcesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
+    });
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    await user.click(checkboxes[1]); // select first visible row
+
+    const stored = sessionStorage.getItem("admin-sources-selected");
+    expect(stored).toBeTruthy();
+    expect(stored).toContain("src");
+  });
+
+  it("uses router.push for row navigation", async () => {
+    const user = userEvent.setup();
+    render(<SourcesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
+    });
+
+    // Click on the row (not the checkbox)
+    await user.click(screen.getByText("USOPC Bylaws"));
+
+    expect(mockPush).toHaveBeenCalledWith("/admin/sources/src1");
   });
 });

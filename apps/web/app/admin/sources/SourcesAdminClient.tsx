@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   Loader2,
   AlertTriangle,
@@ -66,7 +67,11 @@ function priorityWeight(p: string): number {
 // Component
 // ---------------------------------------------------------------------------
 
+const STORAGE_KEY = "admin-sources-selected";
+
 export function SourcesAdminClient() {
+  const router = useRouter();
+
   const [sources, setSources] = useState<SourceConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,8 +85,21 @@ export function SourcesAdminClient() {
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    return stored ? new Set(stored.split(",").filter(Boolean)) : new Set();
+  });
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  // Sync selection to sessionStorage
+  const syncSelection = useCallback((sel: Set<string>) => {
+    if (sel.size > 0) {
+      sessionStorage.setItem(STORAGE_KEY, Array.from(sel).join(","));
+    } else {
+      sessionStorage.removeItem(STORAGE_KEY);
+    }
+  }, []);
 
   // -------------------------------------------------------------------------
   // Fetch
@@ -206,15 +224,14 @@ export function SourcesAdminClient() {
     paginated.length > 0 && paginated.every((s) => selected.has(s.id));
 
   function toggleSelectAll() {
+    const next = new Set(selected);
     if (allOnPageSelected) {
-      const next = new Set(selected);
       paginated.forEach((s) => next.delete(s.id));
-      setSelected(next);
     } else {
-      const next = new Set(selected);
       paginated.forEach((s) => next.add(s.id));
-      setSelected(next);
     }
+    setSelected(next);
+    syncSelection(next);
   }
 
   function toggleSelect(id: string) {
@@ -222,6 +239,7 @@ export function SourcesAdminClient() {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelected(next);
+    syncSelection(next);
   }
 
   // -------------------------------------------------------------------------
@@ -251,7 +269,9 @@ export function SourcesAdminClient() {
         const data = await res.json();
         throw new Error(data.error || "Bulk action failed");
       }
-      setSelected(new Set());
+      const empty = new Set<string>();
+      setSelected(empty);
+      syncSelection(empty);
       await fetchSources();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bulk action failed");
@@ -566,7 +586,7 @@ export function SourcesAdminClient() {
                 onClick={(e) => {
                   // Don't navigate if clicking checkbox
                   if ((e.target as HTMLElement).tagName === "INPUT") return;
-                  window.location.href = `/admin/sources/${source.id}`;
+                  router.push(`/admin/sources/${source.id}`);
                 }}
               >
                 <td className="px-3 py-3">
