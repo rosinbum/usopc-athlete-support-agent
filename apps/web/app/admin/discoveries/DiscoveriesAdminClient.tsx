@@ -1,12 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import {
   Loader2,
   Search,
-  ChevronUp,
-  ChevronDown,
   CheckCircle2,
   XCircle,
   Clock,
@@ -14,6 +11,11 @@ import {
   Upload,
 } from "lucide-react";
 import type { DiscoveredSource, DiscoveryStatus } from "@usopc/shared";
+import { SlidePanel } from "../components/SlidePanel.js";
+import { SortIcon } from "../components/SortIcon.js";
+import { Pagination } from "../components/Pagination.js";
+import { formatDate } from "../components/formatDate.js";
+import { DiscoveryDetailPanel } from "./components/DiscoveryDetailPanel.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,19 +51,6 @@ const STATUS_OPTIONS: { value: DiscoveryStatus | ""; label: string }[] = [
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "Never";
-  try {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return dateString;
-  }
-}
 
 function confidenceBg(c: number | null): string {
   if (c === null) return "bg-gray-100 text-gray-500";
@@ -106,11 +95,7 @@ function statusWeight(s: DiscoveryStatus): number {
 // Component
 // ---------------------------------------------------------------------------
 
-const STORAGE_KEY = "admin-discoveries-selected";
-
 export function DiscoveriesAdminClient() {
-  const router = useRouter();
-
   const [discoveries, setDiscoveries] = useState<DiscoveredSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,44 +110,43 @@ export function DiscoveriesAdminClient() {
   const [sortField, setSortField] = useState<SortField>("combinedConfidence");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    const stored = sessionStorage.getItem(STORAGE_KEY);
-    return stored ? new Set(stored.split(",").filter(Boolean)) : new Set();
-  });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
-
-  // Sync selection to sessionStorage
-  const syncSelection = useCallback((sel: Set<string>) => {
-    if (sel.size > 0) {
-      sessionStorage.setItem(STORAGE_KEY, Array.from(sel).join(","));
-    } else {
-      sessionStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
+  const [openDiscoveryId, setOpenDiscoveryId] = useState<string | null>(null);
+  const [cardFilter, setCardFilter] = useState<
+    "pendingReview" | "approved" | "rejected" | "sentToSources" | null
+  >(null);
 
   // -------------------------------------------------------------------------
   // Fetch
   // -------------------------------------------------------------------------
 
-  const fetchDiscoveries = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (filters.status) params.set("status", filters.status);
-      const qs = params.toString();
-      const url = `/api/admin/discoveries${qs ? `?${qs}` : ""}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch discoveries");
-      const data = await res.json();
-      setDiscoveries(data.discoveries);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
-    }
-  }, [filters.status]);
+  const fetchDiscoveries = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        if (filters.status) params.set("status", filters.status);
+        const qs = params.toString();
+        const url = `/api/admin/discoveries${qs ? `?${qs}` : ""}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Failed to fetch discoveries");
+        const data = await res.json();
+        setDiscoveries(data.discoveries);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filters.status],
+  );
+
+  const refetchDiscoveries = useCallback(
+    () => fetchDiscoveries({ silent: true }),
+    [fetchDiscoveries],
+  );
 
   useEffect(() => {
     fetchDiscoveries();
@@ -231,9 +215,22 @@ export function DiscoveriesAdminClient() {
         )
           return false;
       }
+      if (cardFilter === "pendingReview") {
+        if (d.status !== "pending_metadata" && d.status !== "pending_content")
+          return false;
+      }
+      if (cardFilter === "approved") {
+        if (d.status !== "approved") return false;
+      }
+      if (cardFilter === "rejected") {
+        if (d.status !== "rejected") return false;
+      }
+      if (cardFilter === "sentToSources") {
+        if (!d.sourceConfigId) return false;
+      }
       return true;
     });
-  }, [discoveries, filters]);
+  }, [discoveries, filters, cardFilter]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -284,7 +281,6 @@ export function DiscoveriesAdminClient() {
       paginated.forEach((d) => next.add(d.id));
     }
     setSelected(next);
-    syncSelection(next);
   }
 
   function toggleSelect(id: string) {
@@ -292,7 +288,6 @@ export function DiscoveriesAdminClient() {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelected(next);
-    syncSelection(next);
   }
 
   // -------------------------------------------------------------------------
@@ -325,8 +320,7 @@ export function DiscoveriesAdminClient() {
         throw new Error(data.error || "Bulk action failed");
       }
       setSelected(new Set());
-      syncSelection(new Set());
-      await fetchDiscoveries();
+      await refetchDiscoveries();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bulk action failed");
     } finally {
@@ -364,8 +358,7 @@ export function DiscoveriesAdminClient() {
           : "No discoveries to process",
       );
       setSelected(new Set());
-      syncSelection(new Set());
-      await fetchDiscoveries();
+      await refetchDiscoveries();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Send to sources failed");
     } finally {
@@ -387,13 +380,9 @@ export function DiscoveriesAdminClient() {
     setPage(1);
   }
 
-  function SortIcon({ field }: { field: SortField }) {
-    if (sortField !== field)
-      return <ChevronUp className="w-3 h-3 text-gray-300" />;
-    return sortDir === "asc" ? (
-      <ChevronUp className="w-3 h-3" />
-    ) : (
-      <ChevronDown className="w-3 h-3" />
+  function SortBtn({ field }: { field: SortField }) {
+    return (
+      <SortIcon field={field} activeField={sortField} direction={sortDir} />
     );
   }
 
@@ -415,7 +404,7 @@ export function DiscoveriesAdminClient() {
       <div className="text-center py-12">
         <p className="text-red-600">{error}</p>
         <button
-          onClick={fetchDiscoveries}
+          onClick={() => fetchDiscoveries()}
           className="mt-4 text-blue-600 hover:text-blue-800"
         >
           Try again
@@ -428,47 +417,102 @@ export function DiscoveriesAdminClient() {
     <div>
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <div className="border border-gray-200 rounded-lg p-4">
+        <button
+          type="button"
+          onClick={() => {
+            setCardFilter(null);
+            setPage(1);
+          }}
+          className={`border rounded-lg p-4 text-left ${cardFilter === null ? "ring-2 ring-blue-500" : "border-gray-200"}`}
+        >
           <div className="flex items-center gap-2 text-gray-500 mb-1">
             <Eye className="w-4 h-4" />
             <span className="text-sm">Total Discovered</span>
           </div>
           <p className="text-2xl font-bold">{stats.total}</p>
-        </div>
+        </button>
 
-        <div
-          className={`border rounded-lg p-4 ${stats.pendingReview > 0 ? "border-yellow-200 bg-yellow-50" : "border-gray-200"}`}
+        <button
+          type="button"
+          onClick={() => {
+            setCardFilter((c) =>
+              c === "pendingReview" ? null : "pendingReview",
+            );
+            setPage(1);
+          }}
+          className={`border rounded-lg p-4 text-left ${
+            cardFilter === "pendingReview"
+              ? "ring-2 ring-yellow-500 border-yellow-200 bg-yellow-50"
+              : stats.pendingReview > 0
+                ? "border-yellow-200 bg-yellow-50"
+                : "border-gray-200"
+          }`}
         >
           <div className="flex items-center gap-2 text-yellow-600 mb-1">
             <Clock className="w-4 h-4" />
             <span className="text-sm">Pending Review</span>
           </div>
           <p className="text-2xl font-bold">{stats.pendingReview}</p>
-        </div>
+        </button>
 
-        <div className="border border-gray-200 rounded-lg p-4">
+        <button
+          type="button"
+          onClick={() => {
+            setCardFilter((c) => (c === "approved" ? null : "approved"));
+            setPage(1);
+          }}
+          className={`border rounded-lg p-4 text-left ${
+            cardFilter === "approved"
+              ? "ring-2 ring-green-500 border-green-200 bg-green-50"
+              : "border-gray-200"
+          }`}
+        >
           <div className="flex items-center gap-2 text-green-600 mb-1">
             <CheckCircle2 className="w-4 h-4" />
             <span className="text-sm">Approved</span>
           </div>
           <p className="text-2xl font-bold">{stats.approved}</p>
-        </div>
+        </button>
 
-        <div className="border border-gray-200 rounded-lg p-4">
+        <button
+          type="button"
+          onClick={() => {
+            setCardFilter((c) => (c === "rejected" ? null : "rejected"));
+            setPage(1);
+          }}
+          className={`border rounded-lg p-4 text-left ${
+            cardFilter === "rejected"
+              ? "ring-2 ring-red-500 border-red-200 bg-red-50"
+              : "border-gray-200"
+          }`}
+        >
           <div className="flex items-center gap-2 text-red-600 mb-1">
             <XCircle className="w-4 h-4" />
             <span className="text-sm">Rejected</span>
           </div>
           <p className="text-2xl font-bold">{stats.rejected}</p>
-        </div>
+        </button>
 
-        <div className="border border-gray-200 rounded-lg p-4">
+        <button
+          type="button"
+          onClick={() => {
+            setCardFilter((c) =>
+              c === "sentToSources" ? null : "sentToSources",
+            );
+            setPage(1);
+          }}
+          className={`border rounded-lg p-4 text-left ${
+            cardFilter === "sentToSources"
+              ? "ring-2 ring-indigo-500 border-indigo-200 bg-indigo-50"
+              : "border-gray-200"
+          }`}
+        >
           <div className="flex items-center gap-2 text-indigo-600 mb-1">
             <Upload className="w-4 h-4" />
             <span className="text-sm">Sent to Sources</span>
           </div>
           <p className="text-2xl font-bold">{stats.sentToSources}</p>
-        </div>
+        </button>
       </div>
 
       {/* Send All Approved to Sources */}
@@ -604,7 +648,7 @@ export function DiscoveriesAdminClient() {
                 onClick={() => handleSort("title")}
               >
                 <span className="flex items-center gap-1">
-                  Title <SortIcon field="title" />
+                  Title <SortBtn field="title" />
                 </span>
               </th>
               <th className="px-3 py-3 text-left">URL</th>
@@ -613,7 +657,7 @@ export function DiscoveriesAdminClient() {
                 onClick={() => handleSort("discoveryMethod")}
               >
                 <span className="flex items-center gap-1">
-                  Method <SortIcon field="discoveryMethod" />
+                  Method <SortBtn field="discoveryMethod" />
                 </span>
               </th>
               <th
@@ -621,7 +665,7 @@ export function DiscoveriesAdminClient() {
                 onClick={() => handleSort("combinedConfidence")}
               >
                 <span className="flex items-center gap-1">
-                  Confidence <SortIcon field="combinedConfidence" />
+                  Confidence <SortBtn field="combinedConfidence" />
                 </span>
               </th>
               <th
@@ -629,7 +673,7 @@ export function DiscoveriesAdminClient() {
                 onClick={() => handleSort("status")}
               >
                 <span className="flex items-center gap-1">
-                  Status <SortIcon field="status" />
+                  Status <SortBtn field="status" />
                 </span>
               </th>
               <th
@@ -637,7 +681,7 @@ export function DiscoveriesAdminClient() {
                 onClick={() => handleSort("discoveredAt")}
               >
                 <span className="flex items-center gap-1">
-                  Discovered <SortIcon field="discoveredAt" />
+                  Discovered <SortBtn field="discoveredAt" />
                 </span>
               </th>
             </tr>
@@ -651,7 +695,7 @@ export function DiscoveriesAdminClient() {
                   className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                   onClick={(e) => {
                     if ((e.target as HTMLElement).tagName === "INPUT") return;
-                    router.push(`/admin/discoveries/${d.id}`);
+                    setOpenDiscoveryId(d.id);
                   }}
                 >
                   <td className="px-3 py-3">
@@ -713,33 +757,41 @@ export function DiscoveriesAdminClient() {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-gray-500">
-            Showing {(page - 1) * ITEMS_PER_PAGE + 1}–
-            {Math.min(page * ITEMS_PER_PAGE, sorted.length)} of {sorted.length}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-500">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={sorted.length}
+        itemsPerPage={ITEMS_PER_PAGE}
+        onPageChange={setPage}
+      />
+
+      {/* Detail Slide Panel */}
+      <SlidePanel
+        open={!!openDiscoveryId}
+        onClose={() => setOpenDiscoveryId(null)}
+      >
+        {openDiscoveryId && (
+          <DiscoveryDetailPanel
+            id={openDiscoveryId}
+            onClose={() => setOpenDiscoveryId(null)}
+            onMutate={refetchDiscoveries}
+            hasPrev={sorted.findIndex((d) => d.id === openDiscoveryId) > 0}
+            hasNext={
+              sorted.findIndex((d) => d.id === openDiscoveryId) <
+              sorted.length - 1
+            }
+            onPrev={() => {
+              const idx = sorted.findIndex((d) => d.id === openDiscoveryId);
+              if (idx > 0) setOpenDiscoveryId(sorted[idx - 1].id);
+            }}
+            onNext={() => {
+              const idx = sorted.findIndex((d) => d.id === openDiscoveryId);
+              if (idx < sorted.length - 1)
+                setOpenDiscoveryId(sorted[idx + 1].id);
+            }}
+          />
+        )}
+      </SlidePanel>
     </div>
   );
 }

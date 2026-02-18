@@ -22,8 +22,7 @@ export function CreateSourceForm() {
     });
 
     if (res.status === 201) {
-      const data = await res.json();
-      window.location.href = `/admin/sources/${data.source.id}`;
+      window.location.href = "/admin/sources";
       return;
     }
 

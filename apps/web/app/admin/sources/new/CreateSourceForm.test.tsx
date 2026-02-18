@@ -118,7 +118,7 @@ describe("CreateSourceForm", () => {
       });
     });
 
-    expect(mockLocation.href).toBe("/admin/sources/test-source");
+    expect(mockLocation.href).toBe("/admin/sources");
   });
 
   it("shows error message on 409 conflict", async () => {

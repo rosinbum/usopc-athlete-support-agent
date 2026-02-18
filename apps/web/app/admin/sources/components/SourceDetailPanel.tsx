@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Loader2,
-  ArrowLeft,
-  RefreshCw,
   ExternalLink,
   Pencil,
   Trash2,
+  RefreshCw,
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type { SourceConfig } from "@usopc/shared";
+import { SourceForm, type SourceFormValues } from "./SourceForm.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -37,11 +40,63 @@ function formatLabel(key: string): string {
     .trim();
 }
 
+const SCALAR_FIELDS = [
+  "title",
+  "description",
+  "url",
+  "format",
+  "documentType",
+  "authorityLevel",
+  "priority",
+] as const satisfies readonly (keyof SourceFormValues)[];
+
+function computeDiff(
+  initial: SourceFormValues,
+  values: SourceFormValues,
+): Record<string, unknown> {
+  const diff: Record<string, unknown> = {};
+
+  for (const key of SCALAR_FIELDS) {
+    if (values[key] !== initial[key]) diff[key] = values[key];
+  }
+
+  if (
+    JSON.stringify([...values.topicDomains].sort()) !==
+    JSON.stringify([...initial.topicDomains].sort())
+  ) {
+    diff.topicDomains = values.topicDomains;
+  }
+
+  const newNgb = values.ngbId || null;
+  const oldNgb = initial.ngbId || null;
+  if (newNgb !== oldNgb) diff.ngbId = newNgb;
+
+  return diff;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function SourceDetailClient({ id }: { id: string }) {
+interface SourceDetailPanelProps {
+  id: string;
+  onClose: () => void;
+  onMutate: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev: boolean;
+  hasNext: boolean;
+}
+
+export function SourceDetailPanel({
+  id,
+  onClose,
+  onMutate,
+  onPrev,
+  onNext,
+  hasPrev,
+  hasNext,
+}: SourceDetailPanelProps) {
   const [source, setSource] = useState<SourceConfig | null>(null);
   const [chunkCount, setChunkCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -50,6 +105,9 @@ export function SourceDetailClient({ id }: { id: string }) {
   const [ingesting, setIngesting] = useState(false);
   const [ingestResult, setIngestResult] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [mode, setMode] = useState<"detail" | "edit">("detail");
+  const [apiError, setApiError] = useState<string | null>(null);
+  const initialValuesRef = useRef<SourceFormValues | null>(null);
 
   const fetchSource = useCallback(async () => {
     setLoading(true);
@@ -72,6 +130,9 @@ export function SourceDetailClient({ id }: { id: string }) {
 
   useEffect(() => {
     fetchSource();
+    // Reset mode when switching sources
+    setMode("detail");
+    initialValuesRef.current = null;
   }, [fetchSource]);
 
   // -------------------------------------------------------------------------
@@ -90,6 +151,7 @@ export function SourceDetailClient({ id }: { id: string }) {
       if (!res.ok) throw new Error("Failed to update");
       const data = await res.json();
       setSource(data.source);
+      onMutate();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Update failed");
     } finally {
@@ -132,11 +194,62 @@ export function SourceDetailClient({ id }: { id: string }) {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete source");
-      window.location.href = "/admin/sources";
+      onMutate();
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
       setDeleting(false);
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Edit mode
+  // -------------------------------------------------------------------------
+
+  if (source && !initialValuesRef.current) {
+    initialValuesRef.current = {
+      id: source.id,
+      title: source.title,
+      description: source.description,
+      url: source.url,
+      format: source.format,
+      documentType: source.documentType as SourceFormValues["documentType"],
+      topicDomains: source.topicDomains,
+      authorityLevel:
+        source.authorityLevel as SourceFormValues["authorityLevel"],
+      priority: source.priority,
+      ngbId: source.ngbId ?? "",
+    };
+  }
+
+  async function handleEditSubmit(values: SourceFormValues) {
+    if (!initialValuesRef.current) return;
+    setApiError(null);
+
+    const diff = computeDiff(initialValuesRef.current, values);
+
+    if (Object.keys(diff).length === 0) {
+      setMode("detail");
+      return;
+    }
+
+    const res = await fetch(`/api/admin/sources/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(diff),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      setApiError(data.error || "Failed to update source");
+      return;
+    }
+
+    // Refresh data and return to detail view
+    initialValuesRef.current = null;
+    await fetchSource();
+    onMutate();
+    setMode("detail");
   }
 
   // -------------------------------------------------------------------------
@@ -156,16 +269,42 @@ export function SourceDetailClient({ id }: { id: string }) {
     return (
       <div className="text-center py-12">
         <p className="text-red-600">{error ?? "Source not found"}</p>
-        <a
-          href="/admin/sources"
-          className="mt-4 inline-block text-blue-600 hover:text-blue-800"
+        <button
+          onClick={onClose}
+          className="mt-4 text-blue-600 hover:text-blue-800"
         >
-          Back to Sources
-        </a>
+          Close
+        </button>
       </div>
     );
   }
 
+  // -- Edit mode --
+  if (mode === "edit") {
+    return (
+      <div>
+        <button
+          onClick={() => setMode("detail")}
+          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Detail
+        </button>
+        <h2 className="text-xl font-bold mb-6">Edit: {source.title}</h2>
+
+        <SourceForm
+          initialValues={initialValuesRef.current ?? undefined}
+          idEditable={false}
+          submitLabel="Save Changes"
+          onSubmit={handleEditSubmit}
+          onCancel={() => setMode("detail")}
+          apiError={apiError}
+          warning="Changing URL or format will delete existing indexed data and trigger re-ingestion."
+        />
+      </div>
+    );
+  }
+
+  // -- Detail mode --
   const fields: Record<string, Record<string, React.ReactNode>> = {
     Identity: {
       id: source.id,
@@ -225,16 +364,30 @@ export function SourceDetailClient({ id }: { id: string }) {
 
   return (
     <div>
-      {/* Back link + Title */}
+      {/* Navigation + Title */}
       <div className="mb-6">
-        <a
-          href="/admin/sources"
-          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Sources
-        </a>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onPrev}
+              disabled={!hasPrev}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Previous source"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <button
+              onClick={onNext}
+              disabled={!hasNext}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Next source"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">{source.title}</h1>
+          <h2 className="text-xl font-bold">{source.title}</h2>
           <span
             className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${
               source.enabled
@@ -248,14 +401,14 @@ export function SourceDetailClient({ id }: { id: string }) {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex items-center gap-3 mb-6">
-        <a
-          href={`/admin/sources/${id}/edit`}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <button
+          onClick={() => setMode("edit")}
           className="px-4 py-2 text-sm rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 inline-flex items-center gap-1"
         >
           <Pencil className="w-4 h-4" />
           Edit Source
-        </a>
+        </button>
 
         <button
           onClick={toggleEnabled}
@@ -312,12 +465,12 @@ export function SourceDetailClient({ id }: { id: string }) {
       )}
 
       {/* Detail Fields */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {Object.entries(fields).map(([section, sectionFields]) => (
           <div key={section} className="border border-gray-200 rounded-lg p-4">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
               {section}
-            </h2>
+            </h3>
             <dl className="space-y-2">
               {Object.entries(sectionFields).map(([key, value]) => (
                 <div key={key}>

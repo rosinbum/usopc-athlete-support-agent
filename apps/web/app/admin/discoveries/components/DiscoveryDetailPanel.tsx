@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Loader2,
-  ArrowLeft,
   ExternalLink,
   CheckCircle2,
   XCircle,
   Upload,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type { DiscoveredSource, DiscoveryStatus } from "@usopc/shared";
 
@@ -80,7 +81,25 @@ const PENDING_STATUSES = new Set<DiscoveryStatus>([
 // Component
 // ---------------------------------------------------------------------------
 
-export function DiscoveryDetailClient({ id }: { id: string }) {
+interface DiscoveryDetailPanelProps {
+  id: string;
+  onClose: () => void;
+  onMutate: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev: boolean;
+  hasNext: boolean;
+}
+
+export function DiscoveryDetailPanel({
+  id,
+  onClose,
+  onMutate,
+  onPrev,
+  onNext,
+  hasPrev,
+  hasNext,
+}: DiscoveryDetailPanelProps) {
   const [discovery, setDiscovery] = useState<DiscoveredSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,8 +142,13 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
         body: JSON.stringify({ action: "approve" }),
       });
       if (!res.ok) throw new Error("Failed to approve");
-      const data = await res.json();
-      setDiscovery(data.discovery);
+      onMutate();
+      if (hasNext) {
+        onNext?.();
+      } else {
+        const data = await res.json();
+        setDiscovery(data.discovery);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Approve failed");
     } finally {
@@ -142,10 +166,15 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
         body: JSON.stringify({ action: "reject", reason: rejectReason.trim() }),
       });
       if (!res.ok) throw new Error("Failed to reject");
-      const data = await res.json();
-      setDiscovery(data.discovery);
       setShowRejectInput(false);
       setRejectReason("");
+      onMutate();
+      if (hasNext) {
+        onNext?.();
+      } else {
+        const data = await res.json();
+        setDiscovery(data.discovery);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reject failed");
     } finally {
@@ -167,6 +196,7 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
       }
       const data = await res.json();
       setDiscovery(data.discovery);
+      onMutate();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Send to sources failed");
     } finally {
@@ -191,12 +221,12 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
     return (
       <div className="text-center py-12">
         <p className="text-red-600">{error ?? "Discovery not found"}</p>
-        <a
-          href="/admin/discoveries"
-          className="mt-4 inline-block text-blue-600 hover:text-blue-800"
+        <button
+          onClick={onClose}
+          className="mt-4 text-blue-600 hover:text-blue-800"
         >
-          Back to Discoveries
-        </a>
+          Close
+        </button>
       </div>
     );
   }
@@ -303,16 +333,7 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
       rejectionReason: discovery.rejectionReason ?? "N/A",
     },
     "Linked Source": {
-      sourceConfigId: discovery.sourceConfigId ? (
-        <a
-          href={`/admin/sources/${discovery.sourceConfigId}`}
-          className="text-blue-600 hover:text-blue-800"
-        >
-          {discovery.sourceConfigId}
-        </a>
-      ) : (
-        "Not linked"
-      ),
+      sourceConfigId: discovery.sourceConfigId ?? "Not linked",
     },
     Timestamps: {
       createdAt: formatDate(discovery.createdAt),
@@ -322,16 +343,30 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
 
   return (
     <div>
-      {/* Back link + Title */}
+      {/* Navigation + Title */}
       <div className="mb-6">
-        <a
-          href="/admin/discoveries"
-          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Discoveries
-        </a>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onPrev}
+              disabled={!hasPrev}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Previous discovery"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <button
+              onClick={onNext}
+              disabled={!hasNext}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Next discovery"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">{discovery.title}</h1>
+          <h2 className="text-xl font-bold">{discovery.title}</h2>
           <span
             className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.className}`}
           >
@@ -342,7 +377,7 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
 
       {/* Action Buttons */}
       {(isPending || canSendToSources || showApprove || showReject) && (
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex flex-wrap items-center gap-3 mb-6">
           {showApprove && (
             <button
               onClick={handleApprove}
@@ -417,12 +452,12 @@ export function DiscoveryDetailClient({ id }: { id: string }) {
       )}
 
       {/* Detail Fields */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {Object.entries(sections).map(([section, sectionFields]) => (
           <div key={section} className="border border-gray-200 rounded-lg p-4">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
               {section}
-            </h2>
+            </h3>
             <dl className="space-y-2">
               {Object.entries(sectionFields).map(([key, value]) => (
                 <div key={key}>
