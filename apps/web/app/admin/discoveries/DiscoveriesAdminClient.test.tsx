@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: mockPush }),
 }));
 
 import { DiscoveriesAdminClient } from "./DiscoveriesAdminClient.js";
@@ -71,6 +72,7 @@ const SAMPLE_DISCOVERIES = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: () => Promise.resolve({ discoveries: SAMPLE_DISCOVERIES }),
@@ -234,5 +236,18 @@ describe("DiscoveriesAdminClient", () => {
     expect(screen.getByText("1 selected")).toBeInTheDocument();
     expect(screen.getByText("Approve")).toBeInTheDocument();
     expect(screen.getByText("Reject")).toBeInTheDocument();
+  });
+
+  it("uses router.push for row navigation", async () => {
+    const user = userEvent.setup();
+    render(<DiscoveriesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Governance Page")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("USOPC Governance Page"));
+
+    expect(mockPush).toHaveBeenCalledWith("/admin/discoveries/disc-1");
   });
 });

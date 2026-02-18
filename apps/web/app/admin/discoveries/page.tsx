@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { DiscoveriesAdminClient } from "./DiscoveriesAdminClient.js";
 
 export default function AdminDiscoveriesPage() {
@@ -8,9 +7,7 @@ export default function AdminDiscoveriesPage() {
       <p className="text-gray-600 mb-8">
         Review, approve, or reject automatically discovered sources.
       </p>
-      <Suspense>
-        <DiscoveriesAdminClient />
-      </Suspense>
+      <DiscoveriesAdminClient />
     </>
   );
 }

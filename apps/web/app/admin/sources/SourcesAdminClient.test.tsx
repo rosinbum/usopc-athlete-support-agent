@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: mockPush }),
 }));
 
 import { SourcesAdminClient } from "./SourcesAdminClient.js";
@@ -59,6 +60,7 @@ const SAMPLE_SOURCES = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: () => Promise.resolve({ sources: SAMPLE_SOURCES }),
@@ -140,11 +142,7 @@ describe("SourcesAdminClient", () => {
     expect(screen.getByText("Trigger Ingestion")).toBeInTheDocument();
   });
 
-  it("persists selections in URL after toggling checkboxes", async () => {
-    // Mock replaceState to avoid jsdom SecurityError
-    const replaceStateSpy = vi
-      .spyOn(window.history, "replaceState")
-      .mockImplementation(() => {});
+  it("persists selections in sessionStorage after toggling checkboxes", async () => {
     const user = userEvent.setup();
     render(<SourcesAdminClient />);
 
@@ -155,12 +153,22 @@ describe("SourcesAdminClient", () => {
     const checkboxes = screen.getAllByRole("checkbox");
     await user.click(checkboxes[1]); // select first visible row
 
-    expect(replaceStateSpy).toHaveBeenCalledWith(
-      {},
-      "",
-      expect.stringContaining("selected="),
-    );
+    const stored = sessionStorage.getItem("admin-sources-selected");
+    expect(stored).toBeTruthy();
+    expect(stored).toContain("src");
+  });
 
-    replaceStateSpy.mockRestore();
+  it("uses router.push for row navigation", async () => {
+    const user = userEvent.setup();
+    render(<SourcesAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
+    });
+
+    // Click on the row (not the checkbox)
+    await user.click(screen.getByText("USOPC Bylaws"));
+
+    expect(mockPush).toHaveBeenCalledWith("/admin/sources/src1");
   });
 });
