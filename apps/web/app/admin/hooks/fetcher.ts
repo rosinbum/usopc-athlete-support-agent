@@ -7,18 +7,20 @@ export class FetchError extends Error {
   }
 }
 
+async function parseError(res: Response): Promise<FetchError> {
+  let message = `Request failed (${res.status})`;
+  try {
+    const body = await res.json();
+    if (body.error) message = body.error;
+  } catch {
+    // ignore parse errors
+  }
+  return new FetchError(message, res.status);
+}
+
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
-  if (!res.ok) {
-    let message = `Request failed (${res.status})`;
-    try {
-      const body = await res.json();
-      if (body.error) message = body.error;
-    } catch {
-      // ignore parse errors
-    }
-    throw new FetchError(message, res.status);
-  }
+  if (!res.ok) throw await parseError(res);
   return res.json() as Promise<T>;
 }
 
@@ -31,15 +33,6 @@ export async function mutationFetcher<T>(
     headers: arg.body ? { "Content-Type": "application/json" } : undefined,
     body: arg.body ? JSON.stringify(arg.body) : undefined,
   });
-  if (!res.ok) {
-    let message = `Request failed (${res.status})`;
-    try {
-      const body = await res.json();
-      if (body.error) message = body.error;
-    } catch {
-      // ignore parse errors
-    }
-    throw new FetchError(message, res.status);
-  }
+  if (!res.ok) throw await parseError(res);
   return res.json() as Promise<T>;
 }

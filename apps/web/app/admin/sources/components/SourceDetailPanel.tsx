@@ -17,6 +17,7 @@ import {
   useSourceAction,
   useSourceDelete,
   useSourceIngest,
+  type SourceActionArg,
 } from "../../hooks/use-sources.js";
 
 // ---------------------------------------------------------------------------
@@ -214,7 +215,7 @@ export function SourceDetailPanel({
     }
 
     try {
-      await triggerAction(diff);
+      await triggerAction(diff as SourceActionArg);
       initialValuesRef.current = null;
       await mutate();
       onMutate();

@@ -51,10 +51,23 @@ export function useSource(id: string | null) {
 // Mutation hooks
 // ---------------------------------------------------------------------------
 
+export interface SourceActionArg {
+  title?: string;
+  description?: string;
+  url?: string;
+  format?: "pdf" | "html" | "text";
+  documentType?: string;
+  topicDomains?: string[];
+  ngbId?: string | null;
+  priority?: "high" | "medium" | "low";
+  authorityLevel?: string;
+  enabled?: boolean;
+}
+
 export function useSourceAction(id: string) {
   const { trigger, isMutating, error } = useSWRMutation(
     `/api/admin/sources/${id}`,
-    (url: string, { arg }: { arg: Record<string, unknown> }) =>
+    (url: string, { arg }: { arg: SourceActionArg }) =>
       mutationFetcher<SourceResponse>(url, {
         arg: { method: "PATCH", body: arg },
       }),
