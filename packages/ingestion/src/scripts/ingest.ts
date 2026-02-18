@@ -15,12 +15,7 @@
  */
 
 import { createHash } from "node:crypto";
-import {
-  getDatabaseUrl,
-  getSecretValue,
-  createLogger,
-  type SourceConfig,
-} from "@usopc/shared";
+import { getSecretValue, createLogger, type SourceConfig } from "@usopc/shared";
 import { ingestSource } from "../pipeline.js";
 import type { IngestionSource } from "../pipeline.js";
 import { createSourceConfigEntity } from "../entities/index.js";
@@ -106,7 +101,6 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  const databaseUrl = getDatabaseUrl();
   const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
   const { sourceId, all, resume, force } = parseArgs();
 
@@ -181,7 +175,6 @@ async function main(): Promise<void> {
     }
 
     const result = await ingestSource(source, {
-      databaseUrl,
       openaiApiKey,
       s3Key,
     });
@@ -347,7 +340,6 @@ async function main(): Promise<void> {
       }
 
       const result = await ingestSource(source, {
-        databaseUrl,
         openaiApiKey,
         s3Key: batchS3Key,
       });

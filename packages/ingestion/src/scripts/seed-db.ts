@@ -124,7 +124,7 @@ async function main(): Promise<void> {
     const sources = await loadAllSources();
     logger.info(`Loaded ${sources.length} source configuration(s)`);
 
-    const results = await ingestAll(sources, { databaseUrl, openaiApiKey });
+    const results = await ingestAll(sources, { openaiApiKey });
 
     const succeeded = results.filter((r) => r.status === "completed");
     const failed = results.filter((r) => r.status === "failed");

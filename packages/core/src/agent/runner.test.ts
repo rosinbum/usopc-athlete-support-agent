@@ -85,13 +85,12 @@ describe("AgentRunner", () => {
       expect(mockCreateEmbeddings).toHaveBeenCalledWith("test-openai-key");
     });
 
-    it("creates vector store with embeddings and database URL", async () => {
+    it("creates vector store with embeddings (uses shared pool)", async () => {
       await AgentRunner.create(defaultConfig);
 
-      expect(mockCreateVectorStore).toHaveBeenCalledWith(
-        { fake: "embeddings" },
-        { connectionString: "postgresql://localhost:5432/test" },
-      );
+      expect(mockCreateVectorStore).toHaveBeenCalledWith({
+        fake: "embeddings",
+      });
     });
 
     it("creates Tavily search tool when tavilyApiKey is provided", async () => {
