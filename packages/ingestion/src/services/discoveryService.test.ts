@@ -14,27 +14,31 @@ vi.mock("@tavily/core", () => ({
 }));
 
 // Mock @usopc/shared
-vi.mock("@usopc/shared", () => ({
-  CircuitBreaker: vi.fn(() => ({
-    execute: vi.fn((fn) => fn()),
-    getMetrics: vi.fn(() => ({
-      state: "closed",
-      failures: 0,
-      consecutiveFailures: 0,
-      totalRequests: 0,
-      totalFailures: 0,
-      totalTimeouts: 0,
-      totalRejections: 0,
-      lastFailureTime: null,
+vi.mock("@usopc/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usopc/shared")>();
+  return {
+    ...actual,
+    CircuitBreaker: vi.fn(() => ({
+      execute: vi.fn((fn: () => unknown) => fn()),
+      getMetrics: vi.fn(() => ({
+        state: "closed",
+        failures: 0,
+        consecutiveFailures: 0,
+        totalRequests: 0,
+        totalFailures: 0,
+        totalTimeouts: 0,
+        totalRejections: 0,
+        lastFailureTime: null,
+      })),
     })),
-  })),
-  createLogger: vi.fn(() => ({
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-  })),
-}));
+    createLogger: vi.fn(() => ({
+      info: vi.fn(),
+      error: vi.fn(),
+      warn: vi.fn(),
+      debug: vi.fn(),
+    })),
+  };
+});
 
 describe("DiscoveryService", () => {
   let service: DiscoveryService;

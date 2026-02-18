@@ -25,6 +25,9 @@ Relevant URLs typically include:
 - Paralympic classification rules and procedures
 - IPC eligibility and classification appeal processes
 - Disability accommodation policies for athletes
+- Organizational leadership directories and board/committee rosters
+- Staff and department contact information, especially for grievances or compliance
+- Organizational charts and governance structure pages
 
 Irrelevant URLs typically include:
 - News articles, press releases, blog posts
@@ -102,6 +105,8 @@ High-quality documents:
 - Are current and appear to be actively maintained
 - Describe athlete financial support programs, stipend amounts, or funding eligibility
 - Detail Paralympic classification procedures or disability accommodation policies
+- List organizational leadership, board members, or committee rosters with roles
+- Provide contact information for grievance, compliance, or athlete-services departments
 
 Low-quality documents:
 - Are outdated or superseded by newer versions
@@ -133,6 +138,9 @@ A specific label for the document type. Examples:
 - "Grant Program"
 - "Classification Rules"
 - "Paralympic Eligibility"
+- "Leadership Directory"
+- "Organizational Structure"
+- "Contact Directory"
 
 ### topicDomains (required)
 An array of topic domains covered in this document. Use these values:
@@ -149,8 +157,13 @@ An array of topic domains covered in this document. Use these values:
 ### authorityLevel (required)
 The authoritative level of this document. One of:
 - "law" -- Federal or state legislation (e.g., Ted Stevens Act, Title IX)
+- "international_rule" -- IOC, IPC, IF rules
 - "usopc_governance" -- USOPC bylaws, policies, and governance frameworks
+- "usopc_policy_procedure" -- USOPC policies and procedures
+- "independent_office" -- SafeSport, Athlete Ombuds
+- "anti_doping_national" -- USADA rules
 - "ngb_policy_procedure" -- NGB-specific policies, procedures, and governance
+- "games_event_specific" -- Olympic/Paralympic specific rules
 - "educational_guidance" -- Educational materials, FAQs, and guidance documents
 
 ### priority (required)
