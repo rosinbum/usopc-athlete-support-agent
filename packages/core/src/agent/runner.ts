@@ -93,9 +93,7 @@ export class AgentRunner {
 
     const embeddings = createEmbeddings(config.openaiApiKey);
 
-    const vectorStore = await createVectorStore(embeddings, {
-      connectionString: config.databaseUrl,
-    });
+    const vectorStore = await createVectorStore(embeddings);
 
     const tavilySearch: TavilySearchLike = config.tavilyApiKey
       ? (createTavilySearchTool(config.tavilyApiKey) as TavilySearchLike)

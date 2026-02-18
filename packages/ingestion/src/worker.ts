@@ -1,7 +1,7 @@
 import type { SQSBatchResponse, SQSEvent, SQSRecord } from "aws-lambda";
 import { SQSClient, PurgeQueueCommand } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
-import { createLogger, getDatabaseUrl, getSecretValue } from "@usopc/shared";
+import { createLogger, getSecretValue } from "@usopc/shared";
 import { ingestSource, QuotaExhaustedError } from "./pipeline.js";
 import { upsertIngestionStatus } from "./db.js";
 import type { IngestionMessage } from "./cron.js";
@@ -23,7 +23,6 @@ const logger = createLogger({ service: "ingestion-worker" });
  * as batch item failures so SQS can redeliver them later.
  */
 export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
-  const databaseUrl = getDatabaseUrl();
   const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
   const ingestionLogEntity = createIngestionLogEntity();
 
@@ -51,7 +50,6 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
         });
 
         const result = await ingestSource(message.source, {
-          databaseUrl,
           openaiApiKey,
           s3Key: message.s3Key,
         });

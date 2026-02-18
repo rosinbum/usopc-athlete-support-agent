@@ -1,6 +1,5 @@
 import type { Document } from "@langchain/core/documents";
-import { Client } from "pg";
-import { createLogger, type AuthorityLevel } from "@usopc/shared";
+import { createLogger, getPool, type AuthorityLevel } from "@usopc/shared";
 import { MODEL_CONFIG } from "@usopc/core/src/config/index";
 import {
   createRawEmbeddings,
@@ -205,29 +204,21 @@ async function embedBatchWithRetry(
  * LangChain's PGVectorStore only writes id, content, embedding, and metadata —
  * the dedicated columns (source_url, document_title, etc.) are left NULL.
  */
-export async function backfillDenormalizedColumns(
-  databaseUrl: string,
-): Promise<number> {
-  const client = new Client({ connectionString: databaseUrl });
-  try {
-    await client.connect();
-    const result = await client.query(`
-      UPDATE document_chunks
-      SET
-        source_url      = metadata->>'sourceUrl',
-        document_title  = metadata->>'documentTitle',
-        document_type   = metadata->>'documentType',
-        ngb_id          = metadata->>'ngbId',
-        topic_domain    = metadata->>'topicDomain',
-        authority_level  = metadata->>'authorityLevel',
-        section_title   = metadata->>'sectionTitle'
-      WHERE source_url IS NULL
-        AND metadata->>'sourceUrl' IS NOT NULL
-    `);
-    return result.rowCount ?? 0;
-  } finally {
-    await client.end();
-  }
+export async function backfillDenormalizedColumns(): Promise<number> {
+  const result = await getPool().query(`
+    UPDATE document_chunks
+    SET
+      source_url      = metadata->>'sourceUrl',
+      document_title  = metadata->>'documentTitle',
+      document_type   = metadata->>'documentType',
+      ngb_id          = metadata->>'ngbId',
+      topic_domain    = metadata->>'topicDomain',
+      authority_level  = metadata->>'authorityLevel',
+      section_title   = metadata->>'sectionTitle'
+    WHERE source_url IS NULL
+      AND metadata->>'sourceUrl' IS NOT NULL
+  `);
+  return result.rowCount ?? 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -240,9 +231,9 @@ export async function backfillDenormalizedColumns(
 export async function ingestSource(
   source: IngestionSource,
   options: {
-    databaseUrl: string;
     openaiApiKey: string;
     s3Key?: string;
+    vectorStore?: Awaited<ReturnType<typeof createVectorStore>>;
   },
 ): Promise<IngestionResult> {
   logger.info(`Starting ingestion for source: ${source.id}`, {
@@ -289,9 +280,8 @@ export async function ingestSource(
 
     // 6. Generate embeddings & store in pgvector (batched to respect TPM limits)
     const embeddings = createRawEmbeddings(options.openaiApiKey);
-    const vectorStore = await createVectorStore(embeddings, {
-      connectionString: options.databaseUrl,
-    });
+    const vectorStore =
+      options.vectorStore ?? (await createVectorStore(embeddings));
 
     // Use small batches (~8K tokens) to avoid OpenAI 500 errors on large
     // payloads, with a 15s inter-batch delay to stay under the 40K TPM limit
@@ -325,7 +315,7 @@ export async function ingestSource(
     }
 
     // 7. Backfill denormalized columns from JSONB metadata
-    const backfilled = await backfillDenormalizedColumns(options.databaseUrl);
+    const backfilled = await backfillDenormalizedColumns();
     logger.info(
       `Backfilled ${backfilled} row(s) with denormalized column values`,
       { sourceId: source.id },
@@ -367,11 +357,15 @@ export async function ingestSource(
 export async function ingestAll(
   sources: IngestionSource[],
   options: {
-    databaseUrl: string;
     openaiApiKey: string;
   },
 ): Promise<IngestionResult[]> {
   logger.info(`Starting batch ingestion for ${sources.length} source(s)`);
+
+  // Create a single vectorStore + embeddings up front so all sources share
+  // the same pool instead of each creating its own.
+  const embeddings = createRawEmbeddings(options.openaiApiKey);
+  const vectorStore = await createVectorStore(embeddings);
 
   const results: IngestionResult[] = [];
   for (let i = 0; i < sources.length; i++) {
@@ -381,7 +375,10 @@ export async function ingestAll(
       logger.info("Waiting 15s between sources for TPM window reset...");
       await sleep(15_000);
     }
-    const result = await ingestSource(sources[i], options);
+    const result = await ingestSource(sources[i], {
+      openaiApiKey: options.openaiApiKey,
+      vectorStore,
+    });
     results.push(result);
   }
 

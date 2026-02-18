@@ -4,6 +4,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 let shouldFailInit = false;
 let initCallCount = 0;
 
+vi.mock("../../../auth.js", () => ({
+  auth: vi.fn(),
+}));
+
 vi.mock("@usopc/shared", () => ({
   logger: {
     child: vi.fn(() => ({
@@ -58,6 +62,14 @@ vi.mock("ai", () => ({
   ),
 }));
 
+async function importWithAuth(session: unknown) {
+  const { auth } = await import("../../../auth.js");
+  vi.mocked(auth).mockResolvedValue(
+    session as Awaited<ReturnType<typeof auth>>,
+  );
+  return import("./route.js");
+}
+
 describe("POST /api/chat", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -67,10 +79,27 @@ describe("POST /api/chat", () => {
     vi.resetModules();
   });
 
+  it("returns 401 when not authenticated", async () => {
+    const { POST } = await importWithAuth(null);
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({ messages: [] }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe("Unauthorized");
+  });
+
   it("returns 500 with generic message when runner init fails", async () => {
     shouldFailInit = true;
 
-    const { POST } = await import("./route.js");
+    const { POST } = await importWithAuth({
+      user: { email: "test@example.com" },
+    });
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({ messages: [], userSport: "swimming" }),
@@ -89,7 +118,9 @@ describe("POST /api/chat", () => {
   it("clears cached runner after failure so next call retries", async () => {
     shouldFailInit = true;
 
-    const { POST } = await import("./route.js");
+    const { POST } = await importWithAuth({
+      user: { email: "test@example.com" },
+    });
 
     // First request fails
     const req1 = new Request("http://localhost/api/chat", {
@@ -112,7 +143,9 @@ describe("POST /api/chat", () => {
   });
 
   it("returns 500 on malformed request body", async () => {
-    const { POST } = await import("./route.js");
+    const { POST } = await importWithAuth({
+      user: { email: "test@example.com" },
+    });
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: "not json",
