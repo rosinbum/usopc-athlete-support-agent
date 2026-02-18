@@ -28,11 +28,11 @@
     "@usopc/core": "workspace:*",
     "@usopc/shared": "workspace:*",
     "agentevals": "^0.0.6",
-    "langsmith": "^0.5.3",
+    "langsmith": "^0.5.4",
     "openevals": "^0.1.4"
   },
   "devDependencies": {
-    "sst": "3.18.1",
+    "sst": "3.18.10",
     "tsx": "^4.19.0",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
