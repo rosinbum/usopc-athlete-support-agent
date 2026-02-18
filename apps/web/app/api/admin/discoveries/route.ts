@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { logger } from "@usopc/shared";
 import type { DiscoveryStatus } from "@usopc/shared";
+
+const log = logger.child({ service: "admin-discoveries" });
 import { requireAdmin } from "../../../../lib/admin-api.js";
 import { createDiscoveredSourceEntity } from "../../../../lib/discovered-source.js";
 
@@ -35,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ discoveries });
   } catch (error) {
-    console.error("Admin discoveries list error:", error);
+    log.error("Admin discoveries list error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to fetch discoveries" },
       { status: 500 },

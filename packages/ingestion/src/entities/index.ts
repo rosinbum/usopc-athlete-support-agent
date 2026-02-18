@@ -1,6 +1,6 @@
-import { Resource } from "sst";
 import {
   createAppTable,
+  getResource,
   SourceConfigEntity,
   type SourceConfig,
   type CreateSourceInput,
@@ -26,14 +26,7 @@ export { DiscoveredSourceEntity, type DiscoveredSource };
  * Get the AppTable name from SST Resource.
  */
 export function getAppTableName(): string {
-  try {
-    return (Resource as unknown as { AppTable: { name: string } }).AppTable
-      .name;
-  } catch {
-    throw new Error(
-      "SST Resource AppTable not available. Run with 'sst shell' or deploy with SST.",
-    );
-  }
+  return getResource("AppTable").name;
 }
 
 /**

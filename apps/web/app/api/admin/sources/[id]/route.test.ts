@@ -25,6 +25,14 @@ vi.mock("@usopc/shared", () => ({
   updateChunkMetadataBySourceId: (...args: unknown[]) =>
     mockUpdateChunkMetadata(...args),
   countChunksBySourceId: (...args: unknown[]) => mockCountChunks(...args),
+  getResource: vi.fn((key: string) => {
+    if (key === "IngestionQueue")
+      return { url: "https://sqs.us-east-1.amazonaws.com/test-queue" };
+    throw new Error(`SST Resource '${key}' not available`);
+  }),
+  logger: {
+    child: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() })),
+  },
 }));
 
 const mockSqsSend = vi.fn();

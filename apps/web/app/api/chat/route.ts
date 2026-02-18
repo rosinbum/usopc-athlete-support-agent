@@ -3,15 +3,12 @@ import {
   formatDataStreamPart,
   type JSONValue,
 } from "ai";
-import { Resource } from "sst";
-import { logger } from "@usopc/shared";
+import { getResource, logger } from "@usopc/shared";
 import { auth } from "../../../auth.js";
 
 const log = logger.child({ service: "chat-route" });
 
-const discoveryFeedQueueUrl = (
-  Resource as unknown as { DiscoveryFeedQueue: { url: string } }
-).DiscoveryFeedQueue.url;
+const discoveryFeedQueueUrl = getResource("DiscoveryFeedQueue").url;
 
 // Cache a single runner instance per Lambda cold start
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

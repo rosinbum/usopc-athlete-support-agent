@@ -15,6 +15,11 @@ vi.mock("@usopc/shared", () => ({
       error: vi.fn(),
     })),
   },
+  getResource: vi.fn((key: string) => {
+    if (key === "DiscoveryFeedQueue")
+      return { url: "https://sqs.us-east-1.amazonaws.com/test-queue" };
+    throw new Error(`SST Resource '${key}' not available`);
+  }),
   getDatabaseUrl: vi.fn(() => {
     initCallCount++;
     if (shouldFailInit) throw new Error("Missing DATABASE_URL");

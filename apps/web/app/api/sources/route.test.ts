@@ -4,6 +4,9 @@ const mockQuery = vi.fn();
 
 vi.mock("@usopc/shared", () => ({
   getPool: vi.fn(() => ({ query: mockQuery })),
+  logger: {
+    child: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() })),
+  },
 }));
 
 describe("GET /api/sources", () => {
