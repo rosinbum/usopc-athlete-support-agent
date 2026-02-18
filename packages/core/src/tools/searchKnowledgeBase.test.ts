@@ -100,7 +100,7 @@ describe("createSearchKnowledgeBaseTool", () => {
       expect(mockVectorStore.similaritySearchWithScore).toHaveBeenCalledWith(
         "eligibility requirements",
         expect.any(Number),
-        { ngbId: { $in: ["usa-swimming", "us-rowing"] } },
+        { ngbId: { in: ["usa-swimming", "us-rowing"] } },
       );
     });
 
@@ -149,7 +149,7 @@ describe("createSearchKnowledgeBaseTool", () => {
         "anti-doping rules",
         expect.any(Number),
         {
-          ngbId: { $in: ["usa-track-field"] },
+          ngbId: { in: ["usa-track-field"] },
           topicDomain: "anti_doping",
         },
       );

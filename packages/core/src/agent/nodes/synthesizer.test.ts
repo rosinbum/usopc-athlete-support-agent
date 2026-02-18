@@ -31,7 +31,6 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 import { synthesizerNode } from "./synthesizer.js";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
-import { setAnthropicApiKey } from "../../config/index.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 
@@ -94,7 +93,6 @@ function makeDoc(content: string): RetrievedDocument {
 describe("synthesizerNode", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setAnthropicApiKey("test-key");
   });
 
   it("returns a rephrasing prompt when user question is empty", async () => {

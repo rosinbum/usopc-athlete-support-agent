@@ -31,7 +31,6 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 import { escalateNode } from "./escalate.js";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
-import { setAnthropicApiKey } from "../../config/index.js";
 import type { AgentState } from "../state.js";
 
 // ---------------------------------------------------------------------------
@@ -79,7 +78,6 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
 describe("escalateNode", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setAnthropicApiKey("test-key");
   });
 
   it("returns escalation info for dispute_resolution", async () => {

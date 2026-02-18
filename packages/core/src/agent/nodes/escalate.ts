@@ -1,3 +1,4 @@
+import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import { getModelConfig } from "../../config/index.js";
@@ -10,7 +11,6 @@ import {
   type EscalationTarget,
 } from "../../prompts/index.js";
 import {
-  createChatAnthropic,
   invokeAnthropic,
   extractTextFromResponse,
 } from "../../services/anthropicService.js";
@@ -102,7 +102,7 @@ async function generateEscalationResponse(
   );
 
   const config = await getModelConfig();
-  const model = createChatAnthropic({
+  const model = new ChatAnthropic({
     model: config.agent.model,
     temperature: config.agent.temperature,
     maxTokens: config.agent.maxTokens,

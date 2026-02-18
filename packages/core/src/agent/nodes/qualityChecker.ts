@@ -1,10 +1,10 @@
+import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import { getModelConfig } from "../../config/index.js";
 import { QUALITY_CHECKER_CONFIG } from "../../config/index.js";
 import { buildQualityCheckerPrompt } from "../../prompts/index.js";
 import {
-  createChatAnthropic,
   invokeAnthropic,
   extractTextFromResponse,
 } from "../../services/anthropicService.js";
@@ -86,7 +86,7 @@ export async function qualityCheckerNode(
 
   try {
     const config = await getModelConfig();
-    const model = createChatAnthropic({
+    const model = new ChatAnthropic({
       model: config.classifier.model,
       temperature: config.classifier.temperature,
       maxTokens: config.classifier.maxTokens,
