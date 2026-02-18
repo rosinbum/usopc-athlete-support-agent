@@ -31,6 +31,7 @@ import { qualityCheckerNode } from "./qualityChecker.js";
 import { HumanMessage } from "@langchain/core/messages";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { CircuitBreakerError } from "@usopc/shared";
+import { setAnthropicApiKey } from "../../config/index.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 
@@ -96,6 +97,7 @@ function mockQualityResponse(data: Record<string, unknown>) {
 describe("qualityCheckerNode", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setAnthropicApiKey("test-key");
   });
 
   it("skips check when answer is falsy", async () => {
@@ -255,6 +257,7 @@ describe("qualityCheckerNode", () => {
       expect.objectContaining({
         model: "claude-haiku-4-5-20251001",
         temperature: 0,
+        apiKey: "test-key",
       }),
     );
   });

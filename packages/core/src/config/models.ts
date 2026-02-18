@@ -19,6 +19,21 @@ export const MODEL_CONFIG = {
 
 export type ModelConfig = typeof MODEL_CONFIG;
 
+let anthropicApiKey: string | undefined;
+
+export function setAnthropicApiKey(key: string): void {
+  anthropicApiKey = key;
+}
+
+export function getAnthropicApiKey(): string {
+  if (!anthropicApiKey) {
+    throw new Error(
+      "Anthropic API key not set. Call setAnthropicApiKey() before using Anthropic models.",
+    );
+  }
+  return anthropicApiKey;
+}
+
 let cachedConfig: ModelConfig | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes

@@ -1,8 +1,8 @@
-import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger } from "@usopc/shared";
 import { getModelConfig } from "../../config/index.js";
 import {
+  createChatAnthropic,
   invokeAnthropic,
   extractTextFromResponse,
 } from "../../services/anthropicService.js";
@@ -79,7 +79,7 @@ export function createRetrievalExpanderNode(vectorStore: VectorStoreLike) {
 
     try {
       const config = await getModelConfig();
-      const model = new ChatAnthropic({
+      const model = createChatAnthropic({
         model: config.classifier.model,
         temperature: config.classifier.temperature,
         maxTokens: config.classifier.maxTokens,

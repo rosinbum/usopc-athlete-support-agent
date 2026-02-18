@@ -1,4 +1,5 @@
-import type { ChatAnthropic } from "@langchain/anthropic";
+import { ChatAnthropic } from "@langchain/anthropic";
+import type { AnthropicInput } from "@langchain/anthropic";
 import type { AIMessage, BaseMessage } from "@langchain/core/messages";
 import {
   CircuitBreaker,
@@ -6,6 +7,7 @@ import {
   logger,
   type CircuitBreakerMetrics,
 } from "@usopc/shared";
+import { getAnthropicApiKey } from "../config/index.js";
 
 const log = logger.child({ service: "anthropic-circuit" });
 
@@ -110,6 +112,16 @@ export function extractTextFromResponse(response: AIMessage): string {
   }
 
   return "";
+}
+
+/**
+ * Creates a ChatAnthropic instance with the stored API key.
+ * Centralizes model creation so no call site needs process.env access.
+ */
+export function createChatAnthropic(
+  options: Omit<Partial<AnthropicInput>, "apiKey" | "anthropicApiKey">,
+): ChatAnthropic {
+  return new ChatAnthropic({ ...options, apiKey: getAnthropicApiKey() });
 }
 
 /**

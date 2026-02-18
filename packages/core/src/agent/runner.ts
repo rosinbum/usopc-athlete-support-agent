@@ -6,7 +6,7 @@ import { createVectorStore } from "../rag/vectorStore.js";
 import { createTavilySearchTool } from "./nodes/researcher.js";
 import type { TavilySearchLike } from "./nodes/researcher.js";
 import { createAgentGraph } from "./graph.js";
-import { GRAPH_CONFIG } from "../config/index.js";
+import { GRAPH_CONFIG, setAnthropicApiKey } from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
@@ -30,6 +30,7 @@ export interface AgentRunnerConfig {
   databaseUrl: string;
   openaiApiKey?: string;
   tavilyApiKey?: string;
+  anthropicApiKey?: string;
 }
 
 export interface AgentInput {
@@ -84,6 +85,10 @@ export class AgentRunner {
   static async create(config: AgentRunnerConfig): Promise<AgentRunner> {
     if (!config.databaseUrl) {
       throw new Error("databaseUrl is required");
+    }
+
+    if (config.anthropicApiKey) {
+      setAnthropicApiKey(config.anthropicApiKey);
     }
 
     const embeddings = createEmbeddings(config.openaiApiKey);
