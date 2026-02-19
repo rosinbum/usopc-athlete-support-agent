@@ -28,11 +28,14 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-import { synthesizerNode } from "./synthesizer.js";
+import { createSynthesizerNode } from "./synthesizer.js";
+import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
+
+const synthesizerNode = createSynthesizerNode(new ChatAnthropic());
 
 // ---------------------------------------------------------------------------
 // Helpers

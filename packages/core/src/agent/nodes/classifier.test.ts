@@ -28,10 +28,13 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-import { classifierNode, parseClassifierResponse } from "./classifier.js";
+import { createClassifierNode, parseClassifierResponse } from "./classifier.js";
+import { ChatAnthropic } from "@langchain/anthropic";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
 import type { AgentState } from "../state.js";
+
+const classifierNode = createClassifierNode(new ChatAnthropic());
 
 // ---------------------------------------------------------------------------
 // Helpers

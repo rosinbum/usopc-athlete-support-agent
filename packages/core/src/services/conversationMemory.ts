@@ -65,6 +65,18 @@ export class InMemorySummaryStore implements SummaryStore {
 
 let store: SummaryStore = new InMemorySummaryStore();
 
+/** Shared classifier model instance, injected by AgentRunner. */
+let classifierModel: ChatAnthropic | null = null;
+
+/**
+ * Injects a shared ChatAnthropic instance for summary generation.
+ * Called once from AgentRunner.create() so that generateSummary
+ * reuses the same model instance instead of creating a new one per call.
+ */
+export function initConversationMemoryModel(model: ChatAnthropic): void {
+  classifierModel = model;
+}
+
 /**
  * Returns the current summary store singleton.
  */
@@ -106,12 +118,18 @@ export async function generateSummary(
   messages: BaseMessage[],
   existingSummary?: string,
 ): Promise<string> {
-  const config = await getModelConfig();
-  const model = new ChatAnthropic({
-    model: config.classifier.model, // Haiku
-    temperature: 0,
-    maxTokens: 1024,
-  });
+  // Use injected model if available, otherwise create one (backward compat for tests/dev tools)
+  let model: ChatAnthropic;
+  if (classifierModel) {
+    model = classifierModel;
+  } else {
+    const config = await getModelConfig();
+    model = new ChatAnthropic({
+      model: config.classifier.model,
+      temperature: 0,
+      maxTokens: 1024,
+    });
+  }
 
   const prompt = buildSummaryPrompt(messages, existingSummary);
 

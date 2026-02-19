@@ -27,12 +27,14 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-import { qualityCheckerNode } from "./qualityChecker.js";
+import { createQualityCheckerNode } from "./qualityChecker.js";
 import { HumanMessage } from "@langchain/core/messages";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { CircuitBreakerError } from "@usopc/shared";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
+
+const qualityCheckerNode = createQualityCheckerNode(new ChatAnthropic());
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -235,27 +237,5 @@ describe("qualityCheckerNode", () => {
 
     expect(result.qualityCheckResult?.passed).toBe(true);
     expect(result.qualityCheckResult?.score).toBe(0.9);
-  });
-
-  it("uses classifier model (Haiku)", async () => {
-    mockInvoke.mockResolvedValue(
-      mockQualityResponse({
-        passed: true,
-        score: 0.9,
-        issues: [],
-        critique: "",
-      }),
-    );
-
-    const state = makeState();
-    await qualityCheckerNode(state);
-
-    const MockChatAnthropic = vi.mocked(ChatAnthropic);
-    expect(MockChatAnthropic).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: "claude-haiku-4-5-20251001",
-        temperature: 0,
-      }),
-    );
   });
 });

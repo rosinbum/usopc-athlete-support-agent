@@ -1,7 +1,6 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import type { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger } from "@usopc/shared";
-import { getModelConfig } from "../../config/index.js";
 import {
   invokeAnthropic,
   extractTextFromResponse,
@@ -68,7 +67,10 @@ function buildFilter(state: AgentState): Record<string, unknown> | undefined {
  * `{ expansionAttempted: true }` so the graph falls through to the
  * researcher node on the next routing decision.
  */
-export function createRetrievalExpanderNode(vectorStore: VectorStoreLike) {
+export function createRetrievalExpanderNode(
+  vectorStore: VectorStoreLike,
+  model: ChatAnthropic,
+) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const { currentMessage } = buildContextualQuery(state.messages);
 
@@ -78,13 +80,6 @@ export function createRetrievalExpanderNode(vectorStore: VectorStoreLike) {
     }
 
     try {
-      const config = await getModelConfig();
-      const model = new ChatAnthropic({
-        model: config.classifier.model,
-        temperature: config.classifier.temperature,
-        maxTokens: config.classifier.maxTokens,
-      });
-
       const existingDocTitles = state.retrievedDocuments
         .map((d) => d.metadata.documentTitle)
         .filter((t): t is string => !!t);

@@ -266,6 +266,9 @@ importers:
 
   packages/evals:
     dependencies:
+      '@langchain/anthropic':
+        specifier: ^0.3.12
+        version: 0.3.34(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@6.21.0(ws@8.19.0)(zod@3.25.76)))(zod@3.25.76)
       '@langchain/core':
         specifier: ^0.3.28
         version: 0.3.80(@opentelemetry/api@1.9.0)(openai@6.21.0(ws@8.19.0)(zod@3.25.76))

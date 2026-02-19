@@ -1,7 +1,6 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import type { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
-import { getModelConfig } from "../../config/index.js";
 import { QUALITY_CHECKER_CONFIG } from "../../config/index.js";
 import { buildQualityCheckerPrompt } from "../../prompts/index.js";
 import {
@@ -60,83 +59,76 @@ function evaluateResult(result: QualityCheckResult): boolean {
  * completeness using Haiku (fast, cheap). Fail-open on all errors —
  * if anything goes wrong, the answer passes through unchanged.
  */
-export async function qualityCheckerNode(
-  state: AgentState,
-): Promise<Partial<AgentState>> {
-  // Fail-open: skip if no answer or answer is a known error message
-  if (!state.answer) {
-    return makePassResult();
-  }
-  if (isKnownErrorMessage(state.answer)) {
-    return makePassResult();
-  }
-
-  const { currentMessage } = buildContextualQuery(state.messages);
-  if (!currentMessage) {
-    return makePassResult();
-  }
-
-  const context = buildContext(state);
-  const prompt = buildQualityCheckerPrompt(
-    state.answer,
-    currentMessage,
-    context,
-    state.queryIntent,
-  );
-
-  try {
-    const config = await getModelConfig();
-    const model = new ChatAnthropic({
-      model: config.classifier.model,
-      temperature: config.classifier.temperature,
-      maxTokens: config.classifier.maxTokens,
-    });
-
-    log.info("Running quality check", {
-      answerLength: state.answer.length,
-      retryCount: state.qualityRetryCount,
-      ...stateContext(state),
-    });
-
-    const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
-    let text = extractTextFromResponse(response).trim();
-
-    // Strip markdown fences if present
-    if (text.startsWith("```")) {
-      text = text.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+export function createQualityCheckerNode(model: ChatAnthropic) {
+  return async (state: AgentState): Promise<Partial<AgentState>> => {
+    // Fail-open: skip if no answer or answer is a known error message
+    if (!state.answer) {
+      return makePassResult();
+    }
+    if (isKnownErrorMessage(state.answer)) {
+      return makePassResult();
     }
 
-    const parsed = JSON.parse(text) as QualityCheckResult;
-
-    // Determine pass/fail based on score + severity
-    const passed = evaluateResult(parsed);
-
-    const qualityCheckResult: QualityCheckResult = {
-      passed,
-      score: parsed.score,
-      issues: parsed.issues ?? [],
-      critique: parsed.critique ?? "",
-    };
-
-    log.info("Quality check complete", {
-      passed,
-      score: parsed.score,
-      issueCount: qualityCheckResult.issues.length,
-    });
-
-    return { qualityCheckResult };
-  } catch (error) {
-    // Fail-open: any error means the answer passes through
-    if (error instanceof CircuitBreakerError) {
-      log.warn("Quality checker circuit open; passing through", {
-        ...stateContext(state),
-      });
-    } else {
-      log.warn("Quality check failed; passing through", {
-        error: error instanceof Error ? error.message : String(error),
-        ...stateContext(state),
-      });
+    const { currentMessage } = buildContextualQuery(state.messages);
+    if (!currentMessage) {
+      return makePassResult();
     }
-    return makePassResult();
-  }
+
+    const context = buildContext(state);
+    const prompt = buildQualityCheckerPrompt(
+      state.answer,
+      currentMessage,
+      context,
+      state.queryIntent,
+    );
+
+    try {
+      log.info("Running quality check", {
+        answerLength: state.answer.length,
+        retryCount: state.qualityRetryCount,
+        ...stateContext(state),
+      });
+
+      const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
+      let text = extractTextFromResponse(response).trim();
+
+      // Strip markdown fences if present
+      if (text.startsWith("```")) {
+        text = text.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+      }
+
+      const parsed = JSON.parse(text) as QualityCheckResult;
+
+      // Determine pass/fail based on score + severity
+      const passed = evaluateResult(parsed);
+
+      const qualityCheckResult: QualityCheckResult = {
+        passed,
+        score: parsed.score,
+        issues: parsed.issues ?? [],
+        critique: parsed.critique ?? "",
+      };
+
+      log.info("Quality check complete", {
+        passed,
+        score: parsed.score,
+        issueCount: qualityCheckResult.issues.length,
+      });
+
+      return { qualityCheckResult };
+    } catch (error) {
+      // Fail-open: any error means the answer passes through
+      if (error instanceof CircuitBreakerError) {
+        log.warn("Quality checker circuit open; passing through", {
+          ...stateContext(state),
+        });
+      } else {
+        log.warn("Quality check failed; passing through", {
+          error: error instanceof Error ? error.message : String(error),
+          ...stateContext(state),
+        });
+      }
+      return makePassResult();
+    }
+  };
 }

@@ -28,10 +28,16 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-import { queryPlannerNode, parseQueryPlannerResponse } from "./queryPlanner.js";
+import {
+  createQueryPlannerNode,
+  parseQueryPlannerResponse,
+} from "./queryPlanner.js";
+import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
 import type { AgentState } from "../state.js";
+
+const queryPlannerNode = createQueryPlannerNode(new ChatAnthropic());
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -1,3 +1,4 @@
+import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { createEmbeddings } from "../rag/embeddings.js";
@@ -6,8 +7,9 @@ import { createVectorStore } from "../rag/vectorStore.js";
 import { createTavilySearchTool } from "./nodes/researcher.js";
 import type { TavilySearchLike } from "./nodes/researcher.js";
 import { createAgentGraph } from "./graph.js";
-import { GRAPH_CONFIG } from "../config/index.js";
+import { GRAPH_CONFIG, getModelConfig } from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
+import { initConversationMemoryModel } from "../services/conversationMemory.js";
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
 
@@ -94,7 +96,28 @@ export class AgentRunner {
       ? (createTavilySearchTool(config.tavilyApiKey) as TavilySearchLike)
       : { invoke: async () => "" };
 
-    const graph = createAgentGraph({ vectorStore, tavilySearch });
+    // Construct shared model instances once for all graph nodes
+    const modelConfig = await getModelConfig();
+    const agentModel = new ChatAnthropic({
+      model: modelConfig.agent.model,
+      temperature: modelConfig.agent.temperature,
+      maxTokens: modelConfig.agent.maxTokens,
+    });
+    const classifierModel = new ChatAnthropic({
+      model: modelConfig.classifier.model,
+      temperature: modelConfig.classifier.temperature,
+      maxTokens: modelConfig.classifier.maxTokens,
+    });
+
+    // Inject the classifier model into conversationMemory service
+    initConversationMemoryModel(classifierModel);
+
+    const graph = createAgentGraph({
+      vectorStore,
+      tavilySearch,
+      agentModel,
+      classifierModel,
+    });
 
     return new AgentRunner(graph, vectorStore);
   }

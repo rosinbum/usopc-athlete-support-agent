@@ -24,6 +24,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@langchain/anthropic": "^0.3.12",
     "@langchain/core": "^0.3.28",
     "@usopc/core": "workspace:*",
     "@usopc/shared": "workspace:*",

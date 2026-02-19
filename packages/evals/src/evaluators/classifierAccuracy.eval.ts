@@ -1,9 +1,22 @@
 import * as ls from "langsmith/vitest";
+import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
-import { classifierNode, routeByDomain } from "@usopc/core";
+import {
+  createClassifierNode,
+  getModelConfig,
+  routeByDomain,
+} from "@usopc/core";
 import { DATASET_NAMES } from "../config.js";
 import { makeTestState } from "../helpers/stateFactory.js";
 import { fetchExamples } from "../helpers/fetchExamples.js";
+
+const modelConfig = await getModelConfig();
+const classifierModel = new ChatAnthropic({
+  model: modelConfig.classifier.model,
+  temperature: modelConfig.classifier.temperature,
+  maxTokens: modelConfig.classifier.maxTokens,
+});
+const classifierNode = createClassifierNode(classifierModel);
 
 /**
  * Computes Jaccard similarity between two string sets.

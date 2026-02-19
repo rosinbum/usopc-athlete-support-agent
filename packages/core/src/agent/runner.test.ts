@@ -33,6 +33,31 @@ vi.mock("./graph.js", () => ({
   createAgentGraph: mockCreateAgentGraph,
 }));
 
+vi.mock("@langchain/anthropic", () => ({
+  ChatAnthropic: vi.fn().mockImplementation(() => ({ invoke: vi.fn() })),
+}));
+
+vi.mock("../config/index.js", () => ({
+  getModelConfig: () =>
+    Promise.resolve({
+      agent: {
+        model: "claude-sonnet-4-20250514",
+        temperature: 0.1,
+        maxTokens: 4096,
+      },
+      classifier: {
+        model: "claude-haiku-4-5-20251001",
+        temperature: 0,
+        maxTokens: 1024,
+      },
+    }),
+  GRAPH_CONFIG: { invokeTimeoutMs: 90_000, streamTimeoutMs: 120_000 },
+}));
+
+vi.mock("../services/conversationMemory.js", () => ({
+  initConversationMemoryModel: vi.fn(),
+}));
+
 import { AgentRunner, convertMessages } from "./runner.js";
 import type { AgentRunnerConfig, AgentInput } from "./runner.js";
 
@@ -117,6 +142,8 @@ describe("AgentRunner", () => {
       expect(mockCreateAgentGraph).toHaveBeenCalledWith({
         vectorStore: expect.objectContaining({ fake: "vectorStore" }),
         tavilySearch: { fake: "tavily" },
+        agentModel: expect.any(Object),
+        classifierModel: expect.any(Object),
       });
     });
 

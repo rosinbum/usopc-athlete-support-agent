@@ -28,10 +28,13 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-import { escalateNode } from "./escalate.js";
+import { createEscalateNode } from "./escalate.js";
+import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
 import type { AgentState } from "../state.js";
+
+const escalateNode = createEscalateNode(new ChatAnthropic());
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -43,6 +43,7 @@ export {
   loadSummary,
   saveSummary,
   generateSummary,
+  initConversationMemoryModel,
 } from "./conversationMemory.js";
 
 export {
