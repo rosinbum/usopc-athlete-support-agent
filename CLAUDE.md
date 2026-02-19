@@ -155,6 +155,7 @@ Custom Claude Code skills that automate the development workflow. Use these inst
 | `/implement <issue>`       | Full issue-to-code workflow — worktree setup, code exploration, test scaffolding, implementation |
 | `/address-pr-comments`     | Address review comments on the current PR — fetches comments, applies fixes, updates PR          |
 | `/resolve-readme`          | Resolve the recurring README.md merge conflict caused by the hours timestamp pre-commit hook     |
+| `/fix-bugs [--limit N] [--dry-run]` | Autonomous bug-fixing — fetches open bug issues and spawns parallel bug-fixer agents  |
 
 ### Sub-Agents
 
@@ -166,6 +167,7 @@ Specialized sub-agents in `.claude/agents/` provide deep domain expertise. Claud
 | `eval-specialist`    | `packages/evals/`              | Writing evaluators, updating datasets, running quality reviews, configuring online evaluators |
 | `sst-architect`      | `sst.config.ts`, AWS resources | Adding/modifying infrastructure, secrets, Lambda config, DynamoDB entities, CI/CD workflows   |
 | `frontend-architect` | `apps/web/`                    | Building UI components, admin pages, API routes, auth flows, or data fetching hooks           |
+| `bug-fixer`          | Any package                    | Spawned by `/fix-bugs` — verifies issue, scopes bug, assesses confidence, implements fix, opens PR |
 
 ### Hooks
 
