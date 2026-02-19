@@ -9,6 +9,14 @@ vi.mock("@usopc/shared", () => ({
     debug: vi.fn(),
   })),
   normalizeUrl: vi.fn((url: string) => url),
+  getResource: vi.fn((key: string) => {
+    const resources: Record<string, unknown> = {
+      DiscoveryFeedQueue: {
+        url: "https://sqs.us-east-1.amazonaws.com/queue",
+      },
+    };
+    return resources[key];
+  }),
 }));
 
 // Mock SST Resource

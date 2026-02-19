@@ -20,6 +20,7 @@ Extract from `$ARGUMENTS`:
 ## Step 2: Fetch open bug issues
 
 Call `mcp__github__list_issues` with:
+
 - `owner`: `rosinbum`
 - `repo`: `usopc-athlete-support-agent`
 - `state`: `OPEN`
