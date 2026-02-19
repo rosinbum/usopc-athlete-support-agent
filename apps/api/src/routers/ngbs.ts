@@ -1,15 +1,14 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../trpc.js";
-import { Resource } from "sst";
 import {
   createAppTable,
+  getResource,
   SportOrgEntity,
   type SportOrganization,
 } from "@usopc/shared";
 
 function getEntity(): SportOrgEntity {
-  const tableName = (Resource as unknown as { AppTable: { name: string } })
-    .AppTable.name;
+  const tableName = getResource("AppTable").name;
   const table = createAppTable(tableName);
   return new SportOrgEntity(table);
 }

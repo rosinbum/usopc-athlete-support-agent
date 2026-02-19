@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { Resource } from "sst";
+import { getResource, logger } from "@usopc/shared";
 import { auth } from "../../../../../auth.js";
+
+const log = logger.child({ service: "documents-url" });
 
 /**
  * GET /api/documents/:key/url
@@ -33,7 +35,7 @@ export async function GET(
 
     const s3 = new S3Client({});
     const command = new GetObjectCommand({
-      Bucket: Resource.DocumentsBucket.name,
+      Bucket: getResource("DocumentsBucket").name,
       Key: s3Key,
     });
 
@@ -41,7 +43,7 @@ export async function GET(
 
     return NextResponse.json({ url });
   } catch (error) {
-    console.error("Presigned URL error:", error);
+    log.error("Presigned URL error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to generate document URL" },
       { status: 500 },

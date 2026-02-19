@@ -154,6 +154,7 @@ Custom Claude Code skills that automate the development workflow. Use these inst
 | `/eval-check`              | Run agent evals after core code changes (fast + optional LLM evals)                              |
 | `/implement <issue>`       | Full issue-to-code workflow — worktree setup, code exploration, test scaffolding, implementation |
 | `/address-pr-comments`     | Address review comments on the current PR — fetches comments, applies fixes, updates PR          |
+| `/resolve-readme`          | Resolve the recurring README.md merge conflict caused by the hours timestamp pre-commit hook     |
 
 ### Sub-Agents
 

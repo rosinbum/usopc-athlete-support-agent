@@ -1,6 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { TOPIC_DOMAINS, AUTHORITY_LEVELS, DOCUMENT_TYPES } from "@usopc/shared";
+import {
+  TOPIC_DOMAINS,
+  AUTHORITY_LEVELS,
+  DOCUMENT_TYPES,
+  logger,
+} from "@usopc/shared";
+
+const log = logger.child({ service: "admin-sources" });
 import { requireAdmin } from "../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../lib/source-config.js";
 
@@ -39,7 +46,7 @@ export async function GET() {
     const sources = await entity.getAll();
     return NextResponse.json({ sources });
   } catch (error) {
-    console.error("Admin sources list error:", error);
+    log.error("Admin sources list error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to fetch sources" },
       { status: 500 },
@@ -85,7 +92,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error("Admin source create error:", error);
+    log.error("Admin source create error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to create source" },
       { status: 500 },

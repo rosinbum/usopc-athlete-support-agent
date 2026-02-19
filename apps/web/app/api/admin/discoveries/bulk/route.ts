@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { logger } from "@usopc/shared";
 import { auth } from "../../../../../auth.js";
+
+const log = logger.child({ service: "admin-discoveries-bulk" });
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createDiscoveredSourceEntity } from "../../../../../lib/discovered-source.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
@@ -125,7 +128,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ succeeded, failed });
   } catch (error) {
-    console.error("Admin bulk discovery action error:", error);
+    log.error("Admin bulk discovery action error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to perform bulk action" },
       { status: 500 },

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { logger } from "@usopc/shared";
 import { auth } from "../../../../../auth.js";
+
+const log = logger.child({ service: "admin-discoveries" });
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createDiscoveredSourceEntity } from "../../../../../lib/discovered-source.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
@@ -49,7 +52,7 @@ export async function GET(
 
     return NextResponse.json({ discovery });
   } catch (error) {
-    console.error("Admin discovery detail error:", error);
+    log.error("Admin discovery detail error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to fetch discovery" },
       { status: 500 },
@@ -133,7 +136,7 @@ export async function PATCH(
     const discovery = await entity.getById(id);
     return NextResponse.json({ discovery });
   } catch (error) {
-    console.error("Admin discovery update error:", error);
+    log.error("Admin discovery update error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to update discovery" },
       { status: 500 },

@@ -52,48 +52,53 @@ export async function updateChunkMetadataBySourceId(
   sourceId: string,
   updates: ChunkMetadataUpdates,
 ): Promise<number> {
-  // Build the JSONB patch from the updates
+  // Build the JSONB patch and extra column updates linearly.
+  // Final params: $1 = sourceId, $2 = jsonb patch, $3+ = column values
   const jsonbPatch: Record<string, unknown> = {};
-  const setClauses: string[] = [`metadata = metadata || $2::jsonb`];
-  const params: unknown[] = [sourceId]; // $1 = sourceId, $2 = jsonb patch
+  const extraClauses: string[] = [];
+  const extraParams: unknown[] = [];
 
   if (updates.title !== undefined) {
     jsonbPatch.documentTitle = updates.title;
-    setClauses.push(`document_title = $${params.length + 2}`);
-    params.push(updates.title); // will be $3, $4, etc.
+    extraClauses.push(`document_title = $${extraParams.length + 3}`);
+    extraParams.push(updates.title);
   }
 
   if (updates.documentType !== undefined) {
     jsonbPatch.documentType = updates.documentType;
-    setClauses.push(`document_type = $${params.length + 2}`);
-    params.push(updates.documentType);
+    extraClauses.push(`document_type = $${extraParams.length + 3}`);
+    extraParams.push(updates.documentType);
   }
 
   if (updates.topicDomains !== undefined) {
     jsonbPatch.topicDomain = updates.topicDomains[0] ?? null;
     jsonbPatch.topicDomains = updates.topicDomains;
-    setClauses.push(`topic_domain = $${params.length + 2}`);
-    params.push(updates.topicDomains[0] ?? null);
+    extraClauses.push(`topic_domain = $${extraParams.length + 3}`);
+    extraParams.push(updates.topicDomains[0] ?? null);
   }
 
   if (updates.ngbId !== undefined) {
     jsonbPatch.ngbId = updates.ngbId;
-    setClauses.push(`ngb_id = $${params.length + 2}`);
-    params.push(updates.ngbId);
+    extraClauses.push(`ngb_id = $${extraParams.length + 3}`);
+    extraParams.push(updates.ngbId);
   }
 
   if (updates.authorityLevel !== undefined) {
     jsonbPatch.authorityLevel = updates.authorityLevel;
-    setClauses.push(`authority_level = $${params.length + 2}`);
-    params.push(updates.authorityLevel);
+    extraClauses.push(`authority_level = $${extraParams.length + 3}`);
+    extraParams.push(updates.authorityLevel);
   }
 
   if (Object.keys(jsonbPatch).length === 0) {
     return 0;
   }
 
-  // Insert the jsonb patch as $2
-  params.splice(1, 0, JSON.stringify(jsonbPatch));
+  const setClauses = [`metadata = metadata || $2::jsonb`, ...extraClauses];
+  const params: unknown[] = [
+    sourceId,
+    JSON.stringify(jsonbPatch),
+    ...extraParams,
+  ];
 
   const sql = `UPDATE document_chunks SET ${setClauses.join(", ")} WHERE metadata->>'sourceId' = $1`;
   const result = await pool.query(sql, params);

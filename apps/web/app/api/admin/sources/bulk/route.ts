@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { Resource } from "sst";
-import { getPool, deleteChunksBySourceId } from "@usopc/shared";
+import {
+  getPool,
+  deleteChunksBySourceId,
+  getResource,
+  logger,
+} from "@usopc/shared";
+
+const log = logger.child({ service: "admin-sources-bulk" });
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 
@@ -38,8 +44,7 @@ export async function POST(request: Request) {
     let queueUrl: string | undefined;
     if (action === "ingest") {
       try {
-        queueUrl = (Resource as unknown as { IngestionQueue: { url: string } })
-          .IngestionQueue.url;
+        queueUrl = getResource("IngestionQueue").url;
         sqs = new SQSClient({});
       } catch {
         return NextResponse.json(
@@ -99,7 +104,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ succeeded, failed });
   } catch (error) {
-    console.error("Admin bulk action error:", error);
+    log.error("Admin bulk action error", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to perform bulk action" },
       { status: 500 },
