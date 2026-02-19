@@ -145,28 +145,28 @@ See [docs/conventions.md](./docs/conventions.md) for the full list.
 
 Custom Claude Code skills that automate the development workflow. Use these instead of running the manual steps above.
 
-| Skill                      | Description                                                                                      |
-| -------------------------- | ------------------------------------------------------------------------------------------------ |
-| `/worktree create <issue>` | Create a worktree for an issue — handles deps, hook script copy, branch naming                   |
-| `/worktree list`           | List active worktrees with ahead/behind status                                                   |
-| `/worktree cleanup`        | Remove worktrees for merged branches, prune refs                                                 |
-| `/pr-ready`                | Pre-PR quality gate — tests, typecheck, prettier for changed packages                            |
-| `/eval-check`              | Run agent evals after core code changes (fast + optional LLM evals)                              |
-| `/implement <issue>`       | Full issue-to-code workflow — worktree setup, code exploration, test scaffolding, implementation |
-| `/address-pr-comments`     | Address review comments on the current PR — fetches comments, applies fixes, updates PR          |
-| `/resolve-readme`          | Resolve the recurring README.md merge conflict caused by the hours timestamp pre-commit hook     |
-| `/fix-bugs [--limit N] [--dry-run]` | Autonomous bug-fixing — fetches open bug issues and spawns parallel bug-fixer agents  |
+| Skill                               | Description                                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `/worktree create <issue>`          | Create a worktree for an issue — handles deps, hook script copy, branch naming                   |
+| `/worktree list`                    | List active worktrees with ahead/behind status                                                   |
+| `/worktree cleanup`                 | Remove worktrees for merged branches, prune refs                                                 |
+| `/pr-ready`                         | Pre-PR quality gate — tests, typecheck, prettier for changed packages                            |
+| `/eval-check`                       | Run agent evals after core code changes (fast + optional LLM evals)                              |
+| `/implement <issue>`                | Full issue-to-code workflow — worktree setup, code exploration, test scaffolding, implementation |
+| `/address-pr-comments`              | Address review comments on the current PR — fetches comments, applies fixes, updates PR          |
+| `/resolve-readme`                   | Resolve the recurring README.md merge conflict caused by the hours timestamp pre-commit hook     |
+| `/fix-bugs [--limit N] [--dry-run]` | Autonomous bug-fixing — fetches open bug issues and spawns parallel bug-fixer agents             |
 
 ### Sub-Agents
 
 Specialized sub-agents in `.claude/agents/` provide deep domain expertise. Claude Code auto-discovers them — they activate when working in their respective areas.
 
-| Agent                | Scope                          | When to Use                                                                                   |
-| -------------------- | ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `langgraph-expert`   | `packages/core/src/agent/`     | Modifying graph topology, nodes, edges, state fields, feature flags, or runner config         |
-| `eval-specialist`    | `packages/evals/`              | Writing evaluators, updating datasets, running quality reviews, configuring online evaluators |
-| `sst-architect`      | `sst.config.ts`, AWS resources | Adding/modifying infrastructure, secrets, Lambda config, DynamoDB entities, CI/CD workflows   |
-| `frontend-architect` | `apps/web/`                    | Building UI components, admin pages, API routes, auth flows, or data fetching hooks           |
+| Agent                | Scope                          | When to Use                                                                                        |
+| -------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `langgraph-expert`   | `packages/core/src/agent/`     | Modifying graph topology, nodes, edges, state fields, feature flags, or runner config              |
+| `eval-specialist`    | `packages/evals/`              | Writing evaluators, updating datasets, running quality reviews, configuring online evaluators      |
+| `sst-architect`      | `sst.config.ts`, AWS resources | Adding/modifying infrastructure, secrets, Lambda config, DynamoDB entities, CI/CD workflows        |
+| `frontend-architect` | `apps/web/`                    | Building UI components, admin pages, API routes, auth flows, or data fetching hooks                |
 | `bug-fixer`          | Any package                    | Spawned by `/fix-bugs` — verifies issue, scopes bug, assesses confidence, implements fix, opens PR |
 
 ### Hooks

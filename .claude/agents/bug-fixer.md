@@ -16,6 +16,7 @@ You fix one GitHub bug issue end-to-end. Your input is an issue number (and opti
 ## Step 1: Verify the issue
 
 Fetch the issue using `mcp__github__issue_read`:
+
 - `owner`: `rosinbum`
 - `repo`: `usopc-athlete-support-agent`
 - `issue_number`: `<number>`
@@ -55,13 +56,13 @@ Then explore:
 
 Score yourself on these factors:
 
-| Factor | Points |
-| --- | --- |
-| Can I reproduce the bug logically by reading the code? | +30% |
-| Do I know exactly which file(s) to change? | +25% |
-| Do I understand the correct fix without guessing? | +25% |
-| Are there existing tests that show the expected behavior? | +10% |
-| Is the change isolated (no cross-package impact)? | +10% |
+| Factor                                                    | Points |
+| --------------------------------------------------------- | ------ |
+| Can I reproduce the bug logically by reading the code?    | +30%   |
+| Do I know exactly which file(s) to change?                | +25%   |
+| Do I understand the correct fix without guessing?         | +25%   |
+| Are there existing tests that show the expected behavior? | +10%   |
+| Is the change isolated (no cross-package impact)?         | +10%   |
 
 **If total < 55%:** Post a comment via `mcp__github__add_issue_comment` with:
 
@@ -218,6 +219,7 @@ Closes #<number>
 ## Step 8: Monitor CI and merge (if confidence ≥ 80%)
 
 After the PR is created, poll CI status using `mcp__github__pull_request_read`:
+
 - `method`: `"get_status"`
 - `owner`: `rosinbum`, `repo`: `usopc-athlete-support-agent`, `pullNumber`: `<pr_number>`
 
@@ -227,12 +229,12 @@ After the PR is created, poll CI status using `mcp__github__pull_request_read`:
 
 The response contains a list of check runs. Each check has a state/conclusion. Treat them as follows:
 
-| State / conclusion | Meaning |
-| --- | --- |
-| `success` / `neutral` | ✓ Passed |
-| `failure` / `error` / `action_required` / `timed_out` | ✗ Failed — do NOT merge |
-| `pending` / `in_progress` / `queued` / `waiting` | ⏳ Still running — keep polling |
-| No checks present yet | ⏳ CI hasn't started — keep polling |
+| State / conclusion                                    | Meaning                             |
+| ----------------------------------------------------- | ----------------------------------- |
+| `success` / `neutral`                                 | ✓ Passed                            |
+| `failure` / `error` / `action_required` / `timed_out` | ✗ Failed — do NOT merge             |
+| `pending` / `in_progress` / `queued` / `waiting`      | ⏳ Still running — keep polling     |
+| No checks present yet                                 | ⏳ CI hasn't started — keep polling |
 
 **NEVER merge unless every single check is in a terminal passing state (`success` or `neutral`). Any check that is still pending, any check that has failed, or any check whose state is unknown means the PR must NOT be merged.**
 
