@@ -31,4 +31,36 @@ describe("GET /api/sources", () => {
     expect(response.status).toBe(500);
     expect(body.error).toBe("Internal server error");
   });
+
+  it("escapes ILIKE wildcard characters in search parameter", async () => {
+    // count query returns 0 total
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ total: "0" }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const { GET } = await import("./route.js");
+    const request = new Request(
+      "http://localhost/api/sources?search=100%25_match",
+    );
+    await GET(request);
+
+    // The count query (first call) receives the escaped search param
+    const countParams = mockQuery.mock.calls[0][1] as string[];
+    const searchParam = countParams[0];
+    expect(searchParam).toContain("\\%");
+    expect(searchParam).toContain("\\_");
+  });
+
+  it("uses ESCAPE clause in ILIKE predicate", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ total: "0" }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const { GET } = await import("./route.js");
+    const request = new Request("http://localhost/api/sources?search=bylaws");
+    await GET(request);
+
+    const countSql = mockQuery.mock.calls[0][0] as string;
+    expect(countSql).toContain("ESCAPE");
+  });
 });

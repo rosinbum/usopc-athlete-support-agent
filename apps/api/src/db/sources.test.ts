@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Pool } from "pg";
-import { listUniqueDocuments, getSourcesStats } from "./sources.js";
+import {
+  listUniqueDocuments,
+  getSourcesStats,
+  escapeIlike,
+} from "./sources.js";
 
 function createMockPool() {
   return { query: vi.fn() } as unknown as Pool & {
@@ -67,6 +71,31 @@ describe("listUniqueDocuments", () => {
       expect.stringContaining("ILIKE"),
       expect.arrayContaining(["%bylaws%"]),
     );
+  });
+
+  it("uses ESCAPE clause in ILIKE predicate to prevent wildcard injection", async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ total: "0" }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await listUniqueDocuments(pool, { search: "bylaws" });
+
+    const countCall = pool.query.mock.calls[0];
+    expect(countCall[0]).toContain("ESCAPE");
+  });
+
+  it("escapes ILIKE wildcard characters in search input", async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ total: "0" }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await listUniqueDocuments(pool, { search: "100%_match" });
+
+    // Both count and data queries receive the escaped value
+    const countParams = pool.query.mock.calls[0][1] as string[];
+    const searchParam = countParams[0];
+    expect(searchParam).toContain("\\%");
+    expect(searchParam).toContain("\\_");
   });
 
   it("queries denormalized columns directly", async () => {
@@ -173,6 +202,34 @@ describe("listUniqueDocuments", () => {
     expect(result.documents).toEqual([]);
     expect(result.total).toBe(0);
     expect(result.totalPages).toBe(0);
+  });
+});
+
+describe("escapeIlike", () => {
+  it("passes through strings with no wildcards unchanged", () => {
+    expect(escapeIlike("bylaws")).toBe("bylaws");
+    expect(escapeIlike("hello world")).toBe("hello world");
+    expect(escapeIlike("")).toBe("");
+  });
+
+  it("escapes percent signs", () => {
+    expect(escapeIlike("100%")).toBe("100\\%");
+    expect(escapeIlike("%start")).toBe("\\%start");
+    expect(escapeIlike("mid%dle")).toBe("mid\\%dle");
+  });
+
+  it("escapes underscores", () => {
+    expect(escapeIlike("_leading")).toBe("\\_leading");
+    expect(escapeIlike("trail_")).toBe("trail\\_");
+    expect(escapeIlike("mid_dle")).toBe("mid\\_dle");
+  });
+
+  it("escapes backslashes", () => {
+    expect(escapeIlike("path\\to")).toBe("path\\\\to");
+  });
+
+  it("escapes multiple wildcard characters in one string", () => {
+    expect(escapeIlike("100%_match\\path")).toBe("100\\%\\_match\\\\path");
   });
 });
 
