@@ -59,6 +59,28 @@ describe("contextHints", () => {
       expect(hints?.domain).toBe("usahockey.com");
     });
 
+    it("should return hints for USA Archery", () => {
+      const hints = getHintsByNgb("usa-archery");
+
+      expect(hints).toBeDefined();
+      expect(hints?.ngbId).toBe("usa-archery");
+      expect(hints?.displayName).toBe("USA Archery");
+      expect(hints?.domain).toBe("usarchery.org");
+      expect(hints?.topicDomains).toContain("team_selection");
+    });
+
+    it("should return hints for US Paralympics", () => {
+      const hints = getHintsByNgb("us-paralympics");
+
+      expect(hints).toBeDefined();
+      expect(hints?.ngbId).toBe("us-paralympics");
+      expect(hints?.displayName).toBe("US Paralympics");
+      expect(hints?.domain).toBe("usparalympics.org");
+      expect(hints?.topicDomains).toContain("athlete_safety");
+      expect(hints?.topicDomains).toContain("financial_assistance");
+      expect(hints?.documentTypes).toContain("safesport");
+    });
+
     it("should return undefined for unknown NGB", () => {
       const hints = getHintsByNgb("unknown-ngb");
 
@@ -103,6 +125,20 @@ describe("contextHints", () => {
       expect(hints?.ngbId).toBe("usa-hockey");
     });
 
+    it("should return hints for usarchery.org", () => {
+      const hints = getHintsByDomain("usarchery.org");
+
+      expect(hints).toBeDefined();
+      expect(hints?.ngbId).toBe("usa-archery");
+    });
+
+    it("should return hints for usparalympics.org", () => {
+      const hints = getHintsByDomain("usparalympics.org");
+
+      expect(hints).toBeDefined();
+      expect(hints?.ngbId).toBe("us-paralympics");
+    });
+
     it("should return undefined for unknown domain", () => {
       const hints = getHintsByDomain("example.com");
 
@@ -111,10 +147,10 @@ describe("contextHints", () => {
   });
 
   describe("getAllNgbHints", () => {
-    it("should return all 20 NGB hints", () => {
+    it("should return all 53 NGB hints", () => {
       const hints = getAllNgbHints();
 
-      expect(hints).toHaveLength(20);
+      expect(hints).toHaveLength(53);
       expect(hints.map((h) => h.ngbId)).toEqual(
         expect.arrayContaining([
           "usa-track-field",
@@ -137,6 +173,39 @@ describe("contextHints", () => {
           "usa-boxing",
           "usa-taekwondo",
           "us-figure-skating",
+          "usa-archery",
+          "usa-badminton",
+          "usa-canoe-kayak",
+          "usa-equestrian",
+          "usa-field-hockey",
+          "usa-golf",
+          "usa-handball",
+          "usa-modern-pentathlon",
+          "usa-racquetball",
+          "usa-rugby",
+          "usa-sailing",
+          "usa-shooting",
+          "usa-skateboarding",
+          "usa-climbing",
+          "usa-squash",
+          "usa-surfing",
+          "usa-table-tennis",
+          "usa-water-polo",
+          "us-biathlon",
+          "us-bobsled-skeleton",
+          "us-curling",
+          "us-luge",
+          "us-speedskating",
+          "adaptive-sports-usa",
+          "blaze-sports",
+          "disabled-sports-usa",
+          "daaa",
+          "lakeshore-foundation",
+          "move-united",
+          "nwba",
+          "usaba",
+          "us-paralympics",
+          "wasusa",
         ]),
       );
     });
