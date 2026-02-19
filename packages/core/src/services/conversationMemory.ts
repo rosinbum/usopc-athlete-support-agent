@@ -78,6 +78,13 @@ export function initConversationMemoryModel(model: ChatAnthropic): void {
 }
 
 /**
+ * Resets the injected model (for testing only).
+ */
+export function resetConversationMemoryModel(): void {
+  classifierModel = null;
+}
+
+/**
  * Returns the current summary store singleton.
  */
 export function getSummaryStore(): SummaryStore {
@@ -123,11 +130,15 @@ export async function generateSummary(
   if (classifierModel) {
     model = classifierModel;
   } else {
+    log.warn(
+      "classifierModel not initialized — creating transient ChatAnthropic instance. " +
+        "Call initConversationMemoryModel() from the entry point to eliminate this allocation.",
+    );
     const config = await getModelConfig();
     model = new ChatAnthropic({
       model: config.classifier.model,
-      temperature: 0,
-      maxTokens: 1024,
+      temperature: config.classifier.temperature,
+      maxTokens: config.classifier.maxTokens,
     });
   }
 

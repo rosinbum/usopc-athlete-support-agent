@@ -5,6 +5,7 @@ import { createTavilySearchTool } from "./agent/nodes/researcher.js";
 import type { TavilySearchLike } from "./agent/nodes/researcher.js";
 import { createAgentGraph } from "./agent/graph.js";
 import { getModelConfig } from "./config/index.js";
+import { initConversationMemoryModel } from "./services/conversationMemory.js";
 
 export async function createGraph() {
   const embeddings = createEmbeddings(process.env.OPENAI_API_KEY);
@@ -24,6 +25,8 @@ export async function createGraph() {
     temperature: modelConfig.classifier.temperature,
     maxTokens: modelConfig.classifier.maxTokens,
   });
+
+  initConversationMemoryModel(classifierModel);
 
   return createAgentGraph({
     vectorStore,

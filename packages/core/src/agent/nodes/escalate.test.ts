@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks — must be declared before importing the module under test
 // ---------------------------------------------------------------------------
 
-const mockInvoke = vi.fn();
+const { mockInvoke } = vi.hoisted(() => ({ mockInvoke: vi.fn() }));
 
 vi.mock("@langchain/anthropic", () => ({
   ChatAnthropic: vi.fn().mockImplementation(() => ({

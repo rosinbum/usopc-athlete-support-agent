@@ -44,6 +44,7 @@ export {
   saveSummary,
   generateSummary,
   initConversationMemoryModel,
+  resetConversationMemoryModel,
 } from "./conversationMemory.js";
 
 export {
