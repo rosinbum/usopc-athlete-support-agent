@@ -29,6 +29,9 @@ export default $config({
     const adminEmails = new sst.Secret("AdminEmails");
     // Optional config with default value
     const conversationMaxTurns = new sst.Secret("ConversationMaxTurns", "5");
+    // API key for tRPC protectedProcedure auth — empty default allows unauthenticated
+    // local dev; set a strong value in production via `sst secret set TrpcApiKey`
+    const trpcApiKey = new sst.Secret("TrpcApiKey", "");
 
     // Database
     // Production: Aurora Serverless v2 with pgvector
@@ -80,8 +83,15 @@ export default $config({
       versioning: true,
     });
 
-    // tRPC API
-    const api = new sst.aws.ApiGatewayV2("Api");
+    // tRPC API — throttle at the API Gateway layer so rate limits are enforced
+    // across all Lambda instances and survive cold starts.
+    // 100 req/s burst, 60 req/s steady state (per stage/account, not per-client).
+    const api = new sst.aws.ApiGatewayV2("Api", {
+      throttle: {
+        burst: 100,
+        rate: 60,
+      },
+    });
     // Feature flags — passed through to Lambda environment
     const featureFlags = {
       FEATURE_QUALITY_CHECKER: process.env.FEATURE_QUALITY_CHECKER ?? "true",
@@ -96,7 +106,7 @@ export default $config({
 
     api.route("$default", {
       handler: "apps/api/src/lambda.handler",
-      link: [...linkables, conversationMaxTurns, appTable],
+      link: [...linkables, conversationMaxTurns, appTable, trpcApiKey],
       timeout: "120 seconds",
       memory: "512 MB",
       environment: {

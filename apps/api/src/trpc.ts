@@ -1,5 +1,6 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
+import { getOptionalSecretValue } from "@usopc/shared";
 
 // Context type
 export interface Context {
@@ -22,30 +23,42 @@ export const router = t.router;
 export const publicProcedure = t.procedure;
 export const middleware = t.middleware;
 
-// Rate limiting middleware (simple in-memory for now)
-// Track requests per API key per minute window
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+/**
+ * Authentication middleware — validates the x-api-key header against the
+ * TrpcApiKey SST secret. When no key is configured (empty default), auth is
+ * skipped so local dev works without extra setup.
+ *
+ * Infrastructure-level rate limiting is handled by API Gateway V2 throttling
+ * (see sst.config.ts). This replaces the prior in-memory Map which was
+ * ineffective across Lambda instances and reset on cold starts.
+ */
+export const authenticated = middleware(async ({ ctx, next }) => {
+  const configuredKey = getOptionalSecretValue(
+    "TRPC_API_KEY",
+    "TrpcApiKey",
+    "",
+  );
 
-export const rateLimited = middleware(async ({ ctx, next }) => {
-  const key = ctx.apiKey ?? "anonymous";
-  const now = Date.now();
-  const windowMs = 60_000;
-  const maxRequests = 60;
+  // If no API key is configured (e.g. local dev), skip auth
+  if (configuredKey === "") {
+    return next();
+  }
 
-  const entry = rateLimitMap.get(key);
-  if (entry && entry.resetAt > now) {
-    if (entry.count >= maxRequests) {
-      throw new TRPCError({
-        code: "TOO_MANY_REQUESTS",
-        message: "Rate limit exceeded. Maximum 60 requests per minute.",
-      });
-    }
-    entry.count++;
-  } else {
-    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
+  if (!ctx.apiKey) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Missing x-api-key header.",
+    });
+  }
+
+  if (ctx.apiKey !== configuredKey) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Invalid API key.",
+    });
   }
 
   return next();
 });
 
-export const protectedProcedure = publicProcedure.use(rateLimited);
+export const protectedProcedure = publicProcedure.use(authenticated);

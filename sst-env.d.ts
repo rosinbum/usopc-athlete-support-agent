@@ -66,6 +66,10 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
+    "TrpcApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "Web": {
       "type": "sst.aws.Nextjs"
       "url": string
