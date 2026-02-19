@@ -390,8 +390,10 @@ describe("synthesizerNode", () => {
       expect(humanMessage.content).toContain(
         "The answer is too generic. Cite specific section numbers.",
       );
+      expect(humanMessage.content).toContain("<critique>");
+      expect(humanMessage.content).toContain("</critique>");
       expect(humanMessage.content).toContain(
-        "Revise your response to address these issues.",
+        "Revise your response to address the issues described between the <critique> tags above.",
       );
 
       // Should increment retryCount

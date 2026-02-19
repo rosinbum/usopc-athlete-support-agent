@@ -10,6 +10,7 @@ import {
   buildContextualQuery,
   getLastUserMessage,
   stateContext,
+  parseLlmJson,
 } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type {
@@ -82,13 +83,7 @@ interface ParseResult {
 export function parseClassifierResponse(raw: string): ParseResult {
   const warnings: string[] = [];
 
-  // Strip any markdown code fences the model may have wrapped around the JSON
-  let cleaned = raw.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-  }
-
-  const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+  const parsed = parseLlmJson(raw);
 
   let topicDomain: TopicDomain | undefined;
   if (VALID_DOMAINS.includes(parsed.topicDomain as TopicDomain)) {

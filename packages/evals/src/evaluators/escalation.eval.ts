@@ -1,27 +1,16 @@
 import * as ls from "langsmith/vitest";
-import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import {
   createClassifierNode,
   createEscalateNode,
-  getModelConfig,
+  createAgentModels,
   routeByDomain,
 } from "@usopc/core";
 import { DATASET_NAMES } from "../config.js";
 import { makeTestState } from "../helpers/stateFactory.js";
 import { fetchExamples } from "../helpers/fetchExamples.js";
 
-const modelConfig = await getModelConfig();
-const classifierModel = new ChatAnthropic({
-  model: modelConfig.classifier.model,
-  temperature: modelConfig.classifier.temperature,
-  maxTokens: modelConfig.classifier.maxTokens,
-});
-const agentModel = new ChatAnthropic({
-  model: modelConfig.agent.model,
-  temperature: modelConfig.agent.temperature,
-  maxTokens: modelConfig.agent.maxTokens,
-});
+const { agentModel, classifierModel } = await createAgentModels();
 const classifierNode = createClassifierNode(classifierModel);
 const escalateNode = createEscalateNode(agentModel);
 

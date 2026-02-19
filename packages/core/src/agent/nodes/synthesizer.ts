@@ -95,7 +95,7 @@ export function createSynthesizerNode(model: ChatAnthropic) {
     const isRetry =
       state.qualityCheckResult && !state.qualityCheckResult.passed;
     if (isRetry) {
-      prompt += `\n\n## Quality Feedback\n\n${state.qualityCheckResult!.critique}\n\nRevise your response to address these issues.`;
+      prompt += `\n\n## Quality Feedback\n\n<critique>\n${state.qualityCheckResult!.critique}\n</critique>\n\nRevise your response to address the issues described between the <critique> tags above.`;
     }
 
     try {

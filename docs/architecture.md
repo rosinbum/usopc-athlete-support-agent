@@ -59,6 +59,30 @@ START → classifier → (routeByDomain) → clarify | retriever | escalate
 
 Agent tools are in `packages/core/src/tools/`.
 
+### Model Instance Management
+
+`ChatAnthropic` instances are created once at startup and injected into graph nodes via factory closures — the same pattern as `createRetrieverNode(vectorStore)`.
+
+**Two model roles:**
+
+- `agentModel` (Sonnet) — synthesizer, escalate
+- `classifierModel` (Haiku) — classifier, qualityChecker, queryPlanner, retrievalExpander, conversationMemory
+
+**Shared factory:** `createAgentModels()` in `config/modelFactory.ts` constructs both instances from `getModelConfig()`. All entry points (`AgentRunner.create()`, `studio.ts`, evals) call this factory instead of constructing models directly.
+
+**Node factory pattern:**
+
+```typescript
+// Each LLM-calling node is a factory: receives model, returns node function
+export function createSynthesizerNode(model: ChatAnthropic) {
+  return async (state: AgentState): Promise<Partial<AgentState>> => {
+    // model captured in closure — reused across all invocations
+  };
+}
+```
+
+**Lifecycle:** In Lambda, model instances live for the container's lifetime (cold start → warm reuse). Config changes (model name, temperature, maxTokens) take effect only on cold start. The `conversationMemory` service receives its model via `initConversationMemoryModel()` called from the entry point.
+
 ## Ingestion Pipeline
 
 Fan-out architecture via SQS FIFO queue (production only):

@@ -11,6 +11,7 @@ import {
   buildContextualQuery,
   stateContext,
   buildContext,
+  parseLlmJson,
 } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { QualityCheckResult, QualityIssue } from "../../types/index.js";
@@ -90,14 +91,8 @@ export function createQualityCheckerNode(model: ChatAnthropic) {
       });
 
       const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
-      let text = extractTextFromResponse(response).trim();
-
-      // Strip markdown fences if present
-      if (text.startsWith("```")) {
-        text = text.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-      }
-
-      const parsed = JSON.parse(text) as QualityCheckResult;
+      const text = extractTextFromResponse(response);
+      const parsed = parseLlmJson<QualityCheckResult>(text);
 
       // Determine pass/fail based on score + severity
       const passed = evaluateResult(parsed);

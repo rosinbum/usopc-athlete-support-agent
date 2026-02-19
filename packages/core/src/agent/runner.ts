@@ -1,4 +1,3 @@
-import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { createEmbeddings } from "../rag/embeddings.js";
@@ -8,7 +7,7 @@ import { createTavilySearchTool } from "./nodes/researcher.js";
 import type { TavilySearchLike } from "./nodes/researcher.js";
 import { logger } from "@usopc/shared";
 import { createAgentGraph } from "./graph.js";
-import { GRAPH_CONFIG, getModelConfig } from "../config/index.js";
+import { GRAPH_CONFIG, createAgentModels } from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
 import { initConversationMemoryModel } from "../services/conversationMemory.js";
 import type { Citation, EscalationInfo } from "../types/index.js";
@@ -108,22 +107,9 @@ export class AgentRunner {
       : { invoke: async () => "" };
 
     // Construct shared model instances once for all graph nodes
-    const modelConfig = await getModelConfig();
-    const agentModel = new ChatAnthropic({
-      model: modelConfig.agent.model,
-      temperature: modelConfig.agent.temperature,
-      maxTokens: modelConfig.agent.maxTokens,
-    });
-    const classifierModel = new ChatAnthropic({
-      model: modelConfig.classifier.model,
-      temperature: modelConfig.classifier.temperature,
-      maxTokens: modelConfig.classifier.maxTokens,
-    });
+    const { agentModel, classifierModel } = await createAgentModels();
 
-    log.info("Agent models constructed", {
-      agentModel: modelConfig.agent.model,
-      classifierModel: modelConfig.classifier.model,
-    });
+    log.info("Agent models constructed");
 
     // Inject the classifier model into conversationMemory service
     initConversationMemoryModel(classifierModel);
@@ -209,11 +195,26 @@ export class AgentRunner {
    */
   static convertMessages = convertMessages;
 
+  /**
+   * Validates a conversationId for safe use in LangSmith metadata.
+   * Accepts UUIDs and alphanumeric strings with hyphens/underscores (max 128 chars).
+   */
+  private static isValidConversationId(id: string): boolean {
+    return /^[a-zA-Z0-9_-]{1,128}$/.test(id);
+  }
+
   private buildInitialState(input: AgentInput): Record<string, unknown> {
+    let conversationId = input.conversationId;
+    if (conversationId && !AgentRunner.isValidConversationId(conversationId)) {
+      log.warn("Invalid conversationId format; ignoring", {
+        conversationId: conversationId.slice(0, 50),
+      });
+      conversationId = undefined;
+    }
     return {
       messages: input.messages,
       userSport: input.userSport,
-      conversationId: input.conversationId,
+      conversationId,
       conversationSummary: input.conversationSummary,
     };
   }

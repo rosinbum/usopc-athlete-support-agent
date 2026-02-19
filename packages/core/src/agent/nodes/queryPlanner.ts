@@ -6,7 +6,11 @@ import {
   invokeAnthropic,
   extractTextFromResponse,
 } from "../../services/anthropicService.js";
-import { getLastUserMessage, stateContext } from "../../utils/index.js";
+import {
+  getLastUserMessage,
+  stateContext,
+  parseLlmJson,
+} from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { TopicDomain, QueryIntent, SubQuery } from "../../types/index.js";
 
@@ -49,12 +53,7 @@ interface ParseResult {
 export function parseQueryPlannerResponse(raw: string): ParseResult {
   const warnings: string[] = [];
 
-  let cleaned = raw.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-  }
-
-  const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+  const parsed = parseLlmJson(raw);
 
   const isComplex =
     typeof parsed.isComplex === "boolean" ? parsed.isComplex : false;

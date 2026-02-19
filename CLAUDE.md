@@ -126,6 +126,7 @@ pnpm --filter @usopc/evals quality:run       # Run quality review scenarios
 - **Testing**: Vitest, tests co-located as `*.test.ts` in `src/`.
 - **SST secret naming**: PascalCase for SST (`OpenaiApiKey`), SCREAMING_SNAKE_CASE for env vars (`OPENAI_API_KEY`).
 - **Scripts needing AWS**: Wrap with `sst shell --` in package.json.
+- **Node factory pattern**: LLM-calling graph nodes use factory functions (`createXxxNode(model)`) that capture a shared `ChatAnthropic` instance via closure. Use `createAgentModels()` from `config/modelFactory.ts` to construct models; never call `new ChatAnthropic()` directly in nodes. See [Architecture — Model Instance Management](./docs/architecture.md#model-instance-management).
 
 ### Testing Gotchas
 
