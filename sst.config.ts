@@ -104,17 +104,6 @@ export default $config({
       FEATURE_QUERY_PLANNER: process.env.FEATURE_QUERY_PLANNER ?? "true",
     };
 
-    api.route("$default", {
-      handler: "apps/api/src/lambda.handler",
-      link: [...linkables, conversationMaxTurns, appTable, trpcApiKey],
-      timeout: "120 seconds",
-      memory: "512 MB",
-      environment: {
-        ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
-        ...featureFlags,
-      },
-    });
-
     // Slack bot webhook
     const slackApi = new sst.aws.ApiGatewayV2("SlackApi");
     slackApi.route("POST /slack/events", {
@@ -251,6 +240,21 @@ export default $config({
       environment: {
         NEXT_PUBLIC_API_URL: api.url,
         ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+      },
+    });
+
+    // Register the tRPC API route after Web is created so we can pass web.url
+    // as ALLOWED_ORIGIN for CORS. Hono's cors middleware reads this env var to
+    // restrict cross-origin requests to the web app's CloudFront origin only.
+    api.route("$default", {
+      handler: "apps/api/src/lambda.handler",
+      link: [...linkables, conversationMaxTurns, appTable, trpcApiKey],
+      timeout: "120 seconds",
+      memory: "512 MB",
+      environment: {
+        ALLOWED_ORIGIN: web.url,
+        ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+        ...featureFlags,
       },
     });
 
