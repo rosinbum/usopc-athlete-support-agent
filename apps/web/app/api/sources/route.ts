@@ -35,6 +35,15 @@ const COL = {
   authority_level: "COALESCE(authority_level, metadata->>'authorityLevel')",
 } as const;
 
+/**
+ * Escapes PostgreSQL ILIKE wildcard characters (%, _, \) in user-supplied input
+ * so they are treated as literals rather than pattern metacharacters.
+ * Use in conjunction with the ESCAPE '\' clause on the ILIKE predicate.
+ */
+function escapeIlike(input: string): string {
+  return input.replace(/[%_\\]/g, (ch) => `\\${ch}`);
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -93,8 +102,8 @@ async function handleList(url: URL) {
   let paramIndex = 1;
 
   if (search) {
-    conditions.push(`${COL.document_title} ILIKE $${paramIndex}`);
-    values.push(`%${search}%`);
+    conditions.push(`${COL.document_title} ILIKE $${paramIndex} ESCAPE '\\'`);
+    values.push(`%${escapeIlike(search)}%`);
     paramIndex++;
   }
 

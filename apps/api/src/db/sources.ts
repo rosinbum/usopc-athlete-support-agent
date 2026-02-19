@@ -69,6 +69,15 @@ const COL = {
 } as const;
 
 /**
+ * Escapes PostgreSQL ILIKE wildcard characters (%, _, \) in user-supplied input
+ * so they are treated as literals rather than pattern metacharacters.
+ * Use in conjunction with the ESCAPE '\' clause on the ILIKE predicate.
+ */
+export function escapeIlike(input: string): string {
+  return input.replace(/[%_\\]/g, (ch) => `\\${ch}`);
+}
+
+/**
  * Lists unique documents from document_chunks, grouped by source_url.
  * Supports filtering by search, documentType, topicDomain, ngbId, and authorityLevel.
  * Returns paginated results.
@@ -92,8 +101,8 @@ export async function listUniqueDocuments(
   let paramIndex = 1;
 
   if (search) {
-    conditions.push(`${COL.document_title} ILIKE $${paramIndex}`);
-    values.push(`%${search}%`);
+    conditions.push(`${COL.document_title} ILIKE $${paramIndex} ESCAPE '\\'`);
+    values.push(`%${escapeIlike(search)}%`);
     paramIndex++;
   }
 
