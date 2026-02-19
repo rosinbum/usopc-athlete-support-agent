@@ -6,12 +6,15 @@ import type { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import { createVectorStore } from "../rag/vectorStore.js";
 import { createTavilySearchTool } from "./nodes/researcher.js";
 import type { TavilySearchLike } from "./nodes/researcher.js";
+import { logger } from "@usopc/shared";
 import { createAgentGraph } from "./graph.js";
 import { GRAPH_CONFIG, getModelConfig } from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
 import { initConversationMemoryModel } from "../services/conversationMemory.js";
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
+
+const log = logger.child({ service: "agent-runner" });
 
 /**
  * Stream chunk types from dual-mode streaming.
@@ -82,6 +85,14 @@ export class AgentRunner {
   /**
    * Factory — creates embeddings, vector store, optional Tavily search,
    * and compiles the LangGraph agent.
+   *
+   * Model instances (`agentModel` for Sonnet, `classifierModel` for Haiku) are
+   * constructed once here and injected into every graph node via factory closures.
+   * In a Lambda warm container these instances persist across sequential requests,
+   * avoiding 3-5 redundant `ChatAnthropic` allocations per invocation.
+   *
+   * Config changes (model name, temperature, maxTokens) take effect only on
+   * cold start, when a new `AgentRunner` is created.
    */
   static async create(config: AgentRunnerConfig): Promise<AgentRunner> {
     if (!config.databaseUrl) {
@@ -107,6 +118,11 @@ export class AgentRunner {
       model: modelConfig.classifier.model,
       temperature: modelConfig.classifier.temperature,
       maxTokens: modelConfig.classifier.maxTokens,
+    });
+
+    log.info("Agent models constructed", {
+      agentModel: modelConfig.agent.model,
+      classifierModel: modelConfig.classifier.model,
     });
 
     // Inject the classifier model into conversationMemory service

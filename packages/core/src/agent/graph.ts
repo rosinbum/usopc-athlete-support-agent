@@ -23,10 +23,23 @@ import { routeByQuality } from "./edges/routeByQuality.js";
 import { withMetrics } from "./nodeMetrics.js";
 import { getFeatureFlags } from "../config/featureFlags.js";
 
+/**
+ * External dependencies injected into the LangGraph agent at construction time.
+ *
+ * Model instances are created once by {@link AgentRunner.create} and shared
+ * across all graph nodes via closure injection (factory functions). This
+ * eliminates redundant `ChatAnthropic` allocations per request — in a Lambda
+ * warm container the same instances are reused for the lifetime of the process.
+ *
+ * Changing model configuration (model name, temperature, maxTokens) requires
+ * a cold start — the runner must be recreated with fresh instances.
+ */
 export interface GraphDependencies {
   vectorStore: VectorStoreLike;
   tavilySearch: TavilySearchLike;
+  /** Sonnet instance used by synthesizer, escalate, and other heavy-reasoning nodes. */
   agentModel: ChatAnthropic;
+  /** Haiku instance used by classifier, qualityChecker, queryPlanner, retrievalExpander, and conversationMemory. */
   classifierModel: ChatAnthropic;
 }
 

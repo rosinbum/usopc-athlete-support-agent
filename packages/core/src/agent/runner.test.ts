@@ -17,6 +17,21 @@ const {
   mockCreateAgentGraph: vi.fn(),
 }));
 
+vi.mock("@usopc/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usopc/shared")>();
+  return {
+    ...actual,
+    logger: {
+      child: () => ({
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+      }),
+    },
+  };
+});
+
 vi.mock("../rag/embeddings.js", () => ({
   createEmbeddings: mockCreateEmbeddings,
 }));
@@ -33,8 +48,15 @@ vi.mock("./graph.js", () => ({
   createAgentGraph: mockCreateAgentGraph,
 }));
 
+const { MockChatAnthropic } = vi.hoisted(() => {
+  const MockChatAnthropic = vi
+    .fn()
+    .mockImplementation(() => ({ invoke: vi.fn() }));
+  return { MockChatAnthropic };
+});
+
 vi.mock("@langchain/anthropic", () => ({
-  ChatAnthropic: vi.fn().mockImplementation(() => ({ invoke: vi.fn() })),
+  ChatAnthropic: MockChatAnthropic,
 }));
 
 vi.mock("../config/index.js", () => ({
@@ -54,8 +76,12 @@ vi.mock("../config/index.js", () => ({
   GRAPH_CONFIG: { invokeTimeoutMs: 90_000, streamTimeoutMs: 120_000 },
 }));
 
+const { mockInitConversationMemoryModel } = vi.hoisted(() => ({
+  mockInitConversationMemoryModel: vi.fn(),
+}));
+
 vi.mock("../services/conversationMemory.js", () => ({
-  initConversationMemoryModel: vi.fn(),
+  initConversationMemoryModel: mockInitConversationMemoryModel,
 }));
 
 import { AgentRunner, convertMessages } from "./runner.js";
@@ -161,6 +187,37 @@ describe("AgentRunner", () => {
     it("throws when databaseUrl is empty", async () => {
       await expect(AgentRunner.create({ databaseUrl: "" })).rejects.toThrow(
         "databaseUrl is required",
+      );
+    });
+
+    it("constructs exactly two ChatAnthropic instances (agent + classifier)", async () => {
+      await AgentRunner.create(defaultConfig);
+
+      expect(MockChatAnthropic).toHaveBeenCalledTimes(2);
+      expect(MockChatAnthropic).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "claude-sonnet-4-20250514" }),
+      );
+      expect(MockChatAnthropic).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "claude-haiku-4-5-20251001" }),
+      );
+    });
+
+    it("passes the same model instances to graph and conversationMemory", async () => {
+      await AgentRunner.create(defaultConfig);
+
+      // The classifierModel passed to initConversationMemoryModel should be
+      // the same object instance passed to createAgentGraph
+      const graphDeps = mockCreateAgentGraph.mock.calls[0][0];
+      const memoryModel = mockInitConversationMemoryModel.mock.calls[0][0];
+      expect(memoryModel).toBe(graphDeps.classifierModel);
+    });
+
+    it("calls initConversationMemoryModel with the classifier model", async () => {
+      await AgentRunner.create(defaultConfig);
+
+      expect(mockInitConversationMemoryModel).toHaveBeenCalledOnce();
+      expect(mockInitConversationMemoryModel).toHaveBeenCalledWith(
+        expect.any(Object),
       );
     });
   });
