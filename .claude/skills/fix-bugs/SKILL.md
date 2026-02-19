@@ -3,7 +3,7 @@ name: fix-bugs
 description: Autonomous bug-fixing orchestrator — fetches open bug issues and spawns parallel bug-fixer sub-agents.
 argument-hint: [--limit N] [--dry-run]
 disable-model-invocation: true
-allowed-tools: Bash(gh *), Bash(jq *), Task, mcp__github__list_issues, mcp__github__search_issues, mcp__github__issue_read
+allowed-tools: Task, mcp__github__list_issues, mcp__github__issue_read
 ---
 
 # Autonomous Bug-Fixing Orchestrator
@@ -19,14 +19,13 @@ Extract from `$ARGUMENTS`:
 
 ## Step 2: Fetch open bug issues
 
-Run:
+Call `mcp__github__list_issues` with:
+- `owner`: `rosinbum`
+- `repo`: `usopc-athlete-support-agent`
+- `state`: `OPEN`
+- `labels`: `["bug"]`
 
-```bash
-gh issue list --label bug --state open --json number,title,labels \
-  | jq '[.[] | select(.labels | map(.name) | contains(["deferred"]) | not)]'
-```
-
-This returns all open bugs that do NOT have the `deferred` label.
+From the results, filter out any issue whose labels array includes `"deferred"`. This gives the list of actionable open bugs.
 
 ## Step 3: Apply limit and print list
 
