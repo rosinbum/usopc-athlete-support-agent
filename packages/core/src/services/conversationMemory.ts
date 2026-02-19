@@ -38,12 +38,22 @@ interface CacheEntry {
   expiresAt: number;
 }
 
+/** Maximum number of cached summaries before LRU eviction kicks in. */
+const DEFAULT_MAX_ENTRIES = 1000;
+
 /**
- * In-memory summary store with TTL-based expiration.
+ * In-memory summary store with TTL-based expiration and LRU eviction.
  * Summaries are lost on Lambda cold start — intentional for privacy.
+ * Capped at {@link DEFAULT_MAX_ENTRIES} entries to prevent unbounded memory
+ * growth in long-lived Lambda warm containers.
  */
 export class InMemorySummaryStore implements SummaryStore {
   private cache = new Map<string, CacheEntry>();
+  private maxEntries: number;
+
+  constructor(maxEntries = DEFAULT_MAX_ENTRIES) {
+    this.maxEntries = maxEntries;
+  }
 
   async get(conversationId: string): Promise<string | undefined> {
     const entry = this.cache.get(conversationId);
@@ -52,14 +62,29 @@ export class InMemorySummaryStore implements SummaryStore {
       this.cache.delete(conversationId);
       return undefined;
     }
+    // Move to end for LRU ordering (Map preserves insertion order)
+    this.cache.delete(conversationId);
+    this.cache.set(conversationId, entry);
     return entry.summary;
   }
 
   async set(conversationId: string, summary: string): Promise<void> {
+    // Delete first so re-insertion moves to end (most recently used)
+    this.cache.delete(conversationId);
     this.cache.set(conversationId, {
       summary,
       expiresAt: Date.now() + getSummaryTtlMs(),
     });
+    // Evict oldest entries if over capacity
+    while (this.cache.size > this.maxEntries) {
+      const oldest = this.cache.keys().next().value!;
+      this.cache.delete(oldest);
+    }
+  }
+
+  /** Returns the current number of cached entries (for testing/observability). */
+  get size(): number {
+    return this.cache.size;
   }
 }
 
@@ -101,22 +126,41 @@ export async function saveSummary(
 /**
  * Generates a rolling summary of conversation messages using Haiku.
  * If an existing summary is provided, it's incorporated into the new one.
+ *
+ * @param messages - The conversation messages to summarize.
+ * @param existingSummary - An existing summary to incorporate (rolling summary).
+ * @param model - A shared ChatAnthropic instance. When omitted, a transient
+ *   instance is created from config (backward compat for tests/dev tools).
+ *   Callers with a long-lived model (e.g., AgentRunner) should pass it
+ *   explicitly to avoid redundant allocations.
  */
 export async function generateSummary(
   messages: BaseMessage[],
   existingSummary?: string,
+  model?: ChatAnthropic,
 ): Promise<string> {
-  const config = await getModelConfig();
-  const model = new ChatAnthropic({
-    model: config.classifier.model, // Haiku
-    temperature: 0,
-    maxTokens: 1024,
-  });
+  let resolvedModel: ChatAnthropic;
+  if (model) {
+    resolvedModel = model;
+  } else {
+    log.warn(
+      "No model passed to generateSummary — creating transient ChatAnthropic instance. " +
+        "Pass the classifierModel explicitly to eliminate this allocation.",
+    );
+    const config = await getModelConfig();
+    resolvedModel = new ChatAnthropic({
+      model: config.classifier.model,
+      temperature: config.classifier.temperature,
+      maxTokens: config.classifier.maxTokens,
+    });
+  }
 
   const prompt = buildSummaryPrompt(messages, existingSummary);
 
   try {
-    const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
+    const response = await invokeAnthropic(resolvedModel, [
+      new HumanMessage(prompt),
+    ]);
     return extractTextFromResponse(response);
   } catch (error) {
     log.error("Failed to generate conversation summary", {

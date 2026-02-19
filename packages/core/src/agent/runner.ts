@@ -1,3 +1,4 @@
+import type { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { createEmbeddings } from "../rag/embeddings.js";
@@ -5,12 +6,15 @@ import type { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import { createVectorStore } from "../rag/vectorStore.js";
 import { createTavilySearchTool } from "./nodes/researcher.js";
 import type { TavilySearchLike } from "./nodes/researcher.js";
+import { logger } from "@usopc/shared";
 import { createAgentGraph } from "./graph.js";
-import { GRAPH_CONFIG } from "../config/index.js";
+import { GRAPH_CONFIG, createAgentModels } from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
 import { nodeMetrics } from "./nodeMetrics.js";
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
+
+const log = logger.child({ service: "agent-runner" });
 
 /**
  * Stream chunk types from dual-mode streaming.
@@ -69,18 +73,37 @@ export function convertMessages(
 export class AgentRunner {
   private graph: ReturnType<typeof createAgentGraph>;
   private vectorStore: PGVectorStore;
+  private _classifierModel: ChatAnthropic;
 
   private constructor(
     graph: ReturnType<typeof createAgentGraph>,
     vectorStore: PGVectorStore,
+    classifierModel: ChatAnthropic,
   ) {
     this.graph = graph;
     this.vectorStore = vectorStore;
+    this._classifierModel = classifierModel;
+  }
+
+  /**
+   * The shared Haiku model instance. Exposed so callers (e.g., route handlers)
+   * can pass it to `generateSummary()` without a module-level singleton.
+   */
+  get classifierModel(): ChatAnthropic {
+    return this._classifierModel;
   }
 
   /**
    * Factory — creates embeddings, vector store, optional Tavily search,
    * and compiles the LangGraph agent.
+   *
+   * Model instances (`agentModel` for Sonnet, `classifierModel` for Haiku) are
+   * constructed once here and injected into every graph node via factory closures.
+   * In a Lambda warm container these instances persist across sequential requests,
+   * avoiding 3-5 redundant `ChatAnthropic` allocations per invocation.
+   *
+   * Config changes (model name, temperature, maxTokens) take effect only on
+   * cold start, when a new `AgentRunner` is created.
    */
   static async create(config: AgentRunnerConfig): Promise<AgentRunner> {
     if (!config.databaseUrl) {
@@ -95,9 +118,19 @@ export class AgentRunner {
       ? (createTavilySearchTool(config.tavilyApiKey) as TavilySearchLike)
       : { invoke: async () => "" };
 
-    const graph = createAgentGraph({ vectorStore, tavilySearch });
+    // Construct shared model instances once for all graph nodes
+    const { agentModel, classifierModel } = await createAgentModels();
 
-    return new AgentRunner(graph, vectorStore);
+    log.info("Agent models constructed");
+
+    const graph = createAgentGraph({
+      vectorStore,
+      tavilySearch,
+      agentModel,
+      classifierModel,
+    });
+
+    return new AgentRunner(graph, vectorStore, classifierModel);
   }
 
   /**
@@ -173,11 +206,26 @@ export class AgentRunner {
    */
   static convertMessages = convertMessages;
 
+  /**
+   * Validates a conversationId for safe use in LangSmith metadata.
+   * Accepts UUIDs and alphanumeric strings with hyphens/underscores (max 128 chars).
+   */
+  private static isValidConversationId(id: string): boolean {
+    return /^[a-zA-Z0-9_-]{1,128}$/.test(id);
+  }
+
   private buildInitialState(input: AgentInput): Record<string, unknown> {
+    let conversationId = input.conversationId;
+    if (conversationId && !AgentRunner.isValidConversationId(conversationId)) {
+      log.warn("Invalid conversationId format; ignoring", {
+        conversationId: conversationId.slice(0, 50),
+      });
+      conversationId = undefined;
+    }
     return {
       messages: input.messages,
       userSport: input.userSport,
-      conversationId: input.conversationId,
+      conversationId,
       conversationSummary: input.conversationSummary,
     };
   }

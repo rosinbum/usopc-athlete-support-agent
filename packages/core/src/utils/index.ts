@@ -14,3 +14,4 @@ export {
   formatDocument,
   formatWebResults,
 } from "./buildContext.js";
+export { parseLlmJson } from "./safeParseLlmJson.js";

@@ -1,9 +1,18 @@
 import * as ls from "langsmith/vitest";
 import { HumanMessage } from "@langchain/core/messages";
-import { classifierNode, escalateNode, routeByDomain } from "@usopc/core";
+import {
+  createClassifierNode,
+  createEscalateNode,
+  createAgentModels,
+  routeByDomain,
+} from "@usopc/core";
 import { DATASET_NAMES } from "../config.js";
 import { makeTestState } from "../helpers/stateFactory.js";
 import { fetchExamples } from "../helpers/fetchExamples.js";
+
+const { agentModel, classifierModel } = await createAgentModels();
+const classifierNode = createClassifierNode(classifierModel);
+const escalateNode = createEscalateNode(agentModel);
 
 const examples = await fetchExamples(DATASET_NAMES.escalation);
 

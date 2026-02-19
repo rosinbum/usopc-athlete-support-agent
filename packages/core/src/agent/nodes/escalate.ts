@@ -1,7 +1,6 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import type { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
-import { getModelConfig } from "../../config/index.js";
 import {
   getEscalationTargets,
   buildEscalation,
@@ -87,6 +86,7 @@ function buildFallbackMessage(targets: EscalationTarget[]): string {
  * Falls back to a deterministic message if the LLM is unavailable.
  */
 async function generateEscalationResponse(
+  model: ChatAnthropic,
   userMessage: string,
   domain: TopicDomain,
   urgency: "immediate" | "standard",
@@ -100,13 +100,6 @@ async function generateEscalationResponse(
     escalationReason,
     targets,
   );
-
-  const config = await getModelConfig();
-  const model = new ChatAnthropic({
-    model: config.agent.model,
-    temperature: config.agent.temperature,
-    maxTokens: config.agent.maxTokens,
-  });
 
   try {
     const response = await invokeAnthropic(model, [
@@ -147,100 +140,101 @@ async function generateEscalationResponse(
  * unavailable, a deterministic fallback provides contact info without
  * the blanket 911 preamble.
  */
-export async function escalateNode(
-  state: AgentState,
-): Promise<Partial<AgentState>> {
-  const userMessage = getLastUserMessage(state.messages);
-  const domain = state.topicDomain ?? "dispute_resolution";
-  const escalationReason = state.escalationReason;
+export function createEscalateNode(model: ChatAnthropic) {
+  return async (state: AgentState): Promise<Partial<AgentState>> => {
+    const userMessage = getLastUserMessage(state.messages);
+    const domain = state.topicDomain ?? "dispute_resolution";
+    const escalationReason = state.escalationReason;
 
-  try {
-    const targets = getEscalationTargets(domain);
-    const urgency = determineUrgency(state, domain);
+    try {
+      const targets = getEscalationTargets(domain);
+      const urgency = determineUrgency(state, domain);
 
-    if (targets.length === 0) {
-      log.warn("No escalation targets found for domain", { domain });
-      // Fall back to the Athlete Ombuds as a universal contact
-      const fallbackEscalation: EscalationInfo = {
-        target: "athlete_ombuds",
-        organization: "Athlete Ombuds",
-        contactEmail: "ombudsman@usathlete.org",
-        contactPhone: "719-866-5000",
-        contactUrl: "https://www.usathlete.org",
-        reason:
-          escalationReason ??
-          "Query requires human assistance and no specific escalation target was identified",
-        urgency: "standard",
-      };
+      if (targets.length === 0) {
+        log.warn("No escalation targets found for domain", { domain });
+        // Fall back to the Athlete Ombuds as a universal contact
+        const fallbackEscalation: EscalationInfo = {
+          target: "athlete_ombuds",
+          organization: "Athlete Ombuds",
+          contactEmail: "ombudsman@usathlete.org",
+          contactPhone: "719-866-5000",
+          contactUrl: "https://www.usathlete.org",
+          reason:
+            escalationReason ??
+            "Query requires human assistance and no specific escalation target was identified",
+          urgency: "standard",
+        };
+
+        return {
+          answer: withEmpathy(
+            "Your question is best addressed by speaking with the Athlete Ombuds, " +
+              "who provides free, confidential, and independent advice to athletes.\n\n" +
+              "**Athlete Ombuds**\n" +
+              "- Phone: 719-866-5000\n" +
+              "- Email: ombudsman@usathlete.org\n" +
+              "- Website: https://www.usathlete.org",
+            state.emotionalState,
+          ),
+          escalation: fallbackEscalation,
+        };
+      }
+
+      // Build the escalation info deterministically for analytics/tracking
+      const reason =
+        escalationReason ??
+        `User query requires ${urgency} escalation to ${targets[0].organization} ` +
+          `for ${domain.replace(/_/g, " ")} matter`;
+
+      const escalation = buildEscalation(domain, reason, urgency);
+
+      // Generate context-aware response via LLM (with fallback)
+      const answer = await generateEscalationResponse(
+        model,
+        userMessage,
+        domain,
+        urgency,
+        escalationReason,
+        targets,
+      );
+
+      log.info("Escalation complete", {
+        domain,
+        urgency,
+        targetCount: targets.length,
+        primaryTarget: targets[0].id,
+        llmGenerated: true,
+      });
 
       return {
+        answer: withEmpathy(answer, state.emotionalState),
+        escalation: escalation ?? undefined,
+      };
+    } catch (error) {
+      log.error("Escalation failed", {
+        error: error instanceof Error ? error.message : String(error),
+        ...stateContext(state),
+      });
+
+      // Even on error, provide a basic referral
+      return {
         answer: withEmpathy(
-          "Your question is best addressed by speaking with the Athlete Ombuds, " +
-            "who provides free, confidential, and independent advice to athletes.\n\n" +
-            "**Athlete Ombuds**\n" +
-            "- Phone: 719-866-5000\n" +
-            "- Email: ombudsman@usathlete.org\n" +
-            "- Website: https://www.usathlete.org",
+          "I encountered an issue processing your request. For immediate assistance, " +
+            "please contact the Athlete Ombuds at ombudsman@usathlete.org or 719-866-5000. " +
+            "They provide free, confidential advice to athletes.",
           state.emotionalState,
         ),
-        escalation: fallbackEscalation,
+        escalation: {
+          target: "athlete_ombuds",
+          organization: "Athlete Ombuds",
+          contactEmail: "ombudsman@usathlete.org",
+          contactPhone: "719-866-5000",
+          contactUrl: "https://www.usathlete.org",
+          reason:
+            escalationReason ??
+            "Escalation processing error; providing default referral",
+          urgency: "standard",
+        },
       };
     }
-
-    // Build the escalation info deterministically for analytics/tracking
-    const reason =
-      escalationReason ??
-      `User query requires ${urgency} escalation to ${targets[0].organization} ` +
-        `for ${domain.replace(/_/g, " ")} matter`;
-
-    const escalation = buildEscalation(domain, reason, urgency);
-
-    // Generate context-aware response via LLM (with fallback)
-    const answer = await generateEscalationResponse(
-      userMessage,
-      domain,
-      urgency,
-      escalationReason,
-      targets,
-    );
-
-    log.info("Escalation complete", {
-      domain,
-      urgency,
-      targetCount: targets.length,
-      primaryTarget: targets[0].id,
-      llmGenerated: true,
-    });
-
-    return {
-      answer: withEmpathy(answer, state.emotionalState),
-      escalation: escalation ?? undefined,
-    };
-  } catch (error) {
-    log.error("Escalation failed", {
-      error: error instanceof Error ? error.message : String(error),
-      ...stateContext(state),
-    });
-
-    // Even on error, provide a basic referral
-    return {
-      answer: withEmpathy(
-        "I encountered an issue processing your request. For immediate assistance, " +
-          "please contact the Athlete Ombuds at ombudsman@usathlete.org or 719-866-5000. " +
-          "They provide free, confidential advice to athletes.",
-        state.emotionalState,
-      ),
-      escalation: {
-        target: "athlete_ombuds",
-        organization: "Athlete Ombuds",
-        contactEmail: "ombudsman@usathlete.org",
-        contactPhone: "719-866-5000",
-        contactUrl: "https://www.usathlete.org",
-        reason:
-          escalationReason ??
-          "Escalation processing error; providing default referral",
-        urgency: "standard",
-      },
-    };
-  }
+  };
 }

@@ -43,6 +43,7 @@ import {
   generateSummary,
   setSummaryStore,
 } from "./conversationMemory.js";
+import { ChatAnthropic } from "@langchain/anthropic";
 import {
   invokeAnthropic,
   extractTextFromResponse,
@@ -88,6 +89,65 @@ describe("conversationMemory", () => {
 
       vi.spyOn(Date, "now").mockRestore();
     });
+
+    it("evicts oldest entries when exceeding maxEntries", async () => {
+      const store = new InMemorySummaryStore(3);
+
+      await store.set("conv-1", "first");
+      await store.set("conv-2", "second");
+      await store.set("conv-3", "third");
+      await store.set("conv-4", "fourth");
+
+      // conv-1 (oldest) should have been evicted
+      expect(await store.get("conv-1")).toBeUndefined();
+      expect(await store.get("conv-2")).toBe("second");
+      expect(await store.get("conv-3")).toBe("third");
+      expect(await store.get("conv-4")).toBe("fourth");
+      expect(store.size).toBe(3);
+    });
+
+    it("refreshes LRU order on get", async () => {
+      const store = new InMemorySummaryStore(3);
+
+      await store.set("conv-1", "first");
+      await store.set("conv-2", "second");
+      await store.set("conv-3", "third");
+
+      // Access conv-1 to make it most recently used
+      await store.get("conv-1");
+
+      // Add a new entry — conv-2 (now oldest) should be evicted
+      await store.set("conv-4", "fourth");
+
+      expect(await store.get("conv-1")).toBe("first");
+      expect(await store.get("conv-2")).toBeUndefined();
+      expect(await store.get("conv-3")).toBe("third");
+      expect(await store.get("conv-4")).toBe("fourth");
+    });
+
+    it("refreshes LRU order on set (update)", async () => {
+      const store = new InMemorySummaryStore(3);
+
+      await store.set("conv-1", "first");
+      await store.set("conv-2", "second");
+      await store.set("conv-3", "third");
+
+      // Update conv-1 to make it most recently used
+      await store.set("conv-1", "updated-first");
+
+      // Add a new entry — conv-2 (now oldest) should be evicted
+      await store.set("conv-4", "fourth");
+
+      expect(await store.get("conv-1")).toBe("updated-first");
+      expect(await store.get("conv-2")).toBeUndefined();
+    });
+
+    it("reports size via size getter", async () => {
+      const store = new InMemorySummaryStore();
+      expect(store.size).toBe(0);
+      await store.set("conv-1", "summary");
+      expect(store.size).toBe(1);
+    });
   });
 
   describe("loadSummary / saveSummary", () => {
@@ -98,6 +158,41 @@ describe("conversationMemory", () => {
     it("saves and loads a summary", async () => {
       await saveSummary("conv-1", "Test summary");
       expect(await loadSummary("conv-1")).toBe("Test summary");
+    });
+  });
+
+  describe("generateSummary model injection", () => {
+    it("uses explicitly passed model", async () => {
+      const fakeModel = new ChatAnthropic();
+
+      mockInvokeAnthropic.mockResolvedValue({} as never);
+      mockExtractText.mockReturnValue("summary");
+
+      await generateSummary([new HumanMessage("hello")], undefined, fakeModel);
+
+      // invokeAnthropic should receive the explicitly passed model instance
+      expect(mockInvokeAnthropic).toHaveBeenCalledWith(
+        fakeModel,
+        expect.any(Array),
+      );
+    });
+
+    it("falls back to transient instance when no model passed", async () => {
+      const { ChatAnthropic: MockChatAnthropic } =
+        await import("@langchain/anthropic");
+      const mockCtor = vi.mocked(MockChatAnthropic);
+      mockCtor.mockClear();
+
+      mockInvokeAnthropic.mockResolvedValue({} as never);
+      mockExtractText.mockReturnValue("summary");
+
+      await generateSummary([new HumanMessage("hello")]);
+
+      expect(mockCtor).toHaveBeenCalledWith({
+        model: "claude-haiku-4-5-20251001",
+        temperature: 0,
+        maxTokens: 1024,
+      });
     });
   });
 

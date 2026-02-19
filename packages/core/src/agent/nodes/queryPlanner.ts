@@ -1,13 +1,16 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import type { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
-import { getModelConfig } from "../../config/index.js";
 import { buildQueryPlannerPrompt } from "../../prompts/index.js";
 import {
   invokeAnthropic,
   extractTextFromResponse,
 } from "../../services/anthropicService.js";
-import { getLastUserMessage, stateContext } from "../../utils/index.js";
+import {
+  getLastUserMessage,
+  stateContext,
+  parseLlmJson,
+} from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { TopicDomain, QueryIntent, SubQuery } from "../../types/index.js";
 
@@ -50,12 +53,7 @@ interface ParseResult {
 export function parseQueryPlannerResponse(raw: string): ParseResult {
   const warnings: string[] = [];
 
-  let cleaned = raw.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-  }
-
-  const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+  const parsed = parseLlmJson(raw);
 
   const isComplex =
     typeof parsed.isComplex === "boolean" ? parsed.isComplex : false;
@@ -122,65 +120,58 @@ export function parseQueryPlannerResponse(raw: string): ParseResult {
  * Simple queries pass through unchanged (isComplexQuery: false).
  * Errors fail open — the pipeline continues with normal single-domain retrieval.
  */
-export async function queryPlannerNode(
-  state: AgentState,
-): Promise<Partial<AgentState>> {
-  const userMessage = getLastUserMessage(state.messages);
+export function createQueryPlannerNode(model: ChatAnthropic) {
+  return async (state: AgentState): Promise<Partial<AgentState>> => {
+    const userMessage = getLastUserMessage(state.messages);
 
-  if (!userMessage) {
-    log.warn("Query planner received empty user message; passing through");
-    return { isComplexQuery: false, subQueries: [] };
-  }
-
-  const config = await getModelConfig();
-  const model = new ChatAnthropic({
-    model: config.classifier.model,
-    temperature: config.classifier.temperature,
-    maxTokens: config.classifier.maxTokens,
-  });
-
-  const prompt = buildQueryPlannerPrompt(
-    userMessage,
-    state.topicDomain,
-    state.queryIntent,
-  );
-
-  try {
-    const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
-    const responseText = extractTextFromResponse(response);
-    const { output: result, warnings } =
-      parseQueryPlannerResponse(responseText);
-
-    if (warnings.length > 0) {
-      log.warn("Query planner response had issues", {
-        warnings,
-        ...stateContext(state),
-      });
+    if (!userMessage) {
+      log.warn("Query planner received empty user message; passing through");
+      return { isComplexQuery: false, subQueries: [] };
     }
 
-    log.info("Query planning complete", {
-      isComplex: result.isComplex,
-      subQueryCount: result.subQueries.length,
-      domains: result.subQueries.map((sq) => sq.domain),
-      ...stateContext(state),
-    });
+    const prompt = buildQueryPlannerPrompt(
+      userMessage,
+      state.topicDomain,
+      state.queryIntent,
+    );
 
-    return {
-      isComplexQuery: result.isComplex,
-      subQueries: result.subQueries,
-    };
-  } catch (error) {
-    if (error instanceof CircuitBreakerError) {
-      log.warn("Query planner circuit open; passing through", {
+    try {
+      const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
+      const responseText = extractTextFromResponse(response);
+      const { output: result, warnings } =
+        parseQueryPlannerResponse(responseText);
+
+      if (warnings.length > 0) {
+        log.warn("Query planner response had issues", {
+          warnings,
+          ...stateContext(state),
+        });
+      }
+
+      log.info("Query planning complete", {
+        isComplex: result.isComplex,
+        subQueryCount: result.subQueries.length,
+        domains: result.subQueries.map((sq) => sq.domain),
         ...stateContext(state),
       });
-    } else {
-      log.error("Query planner failed; passing through", {
-        error: error instanceof Error ? error.message : String(error),
-        ...stateContext(state),
-      });
+
+      return {
+        isComplexQuery: result.isComplex,
+        subQueries: result.subQueries,
+      };
+    } catch (error) {
+      if (error instanceof CircuitBreakerError) {
+        log.warn("Query planner circuit open; passing through", {
+          ...stateContext(state),
+        });
+      } else {
+        log.error("Query planner failed; passing through", {
+          error: error instanceof Error ? error.message : String(error),
+          ...stateContext(state),
+        });
+      }
+
+      return { isComplexQuery: false, subQueries: [] };
     }
-
-    return { isComplexQuery: false, subQueries: [] };
-  }
+  };
 }

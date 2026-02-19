@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-const mockInvoke = vi.fn();
+const { mockInvoke } = vi.hoisted(() => ({ mockInvoke: vi.fn() }));
 
 vi.mock("@langchain/anthropic", () => ({
   ChatAnthropic: vi.fn().mockImplementation(() => ({
@@ -28,11 +28,14 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-import { synthesizerNode } from "./synthesizer.js";
+import { createSynthesizerNode } from "./synthesizer.js";
+import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
+
+const synthesizerNode = createSynthesizerNode(new ChatAnthropic());
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -387,8 +390,10 @@ describe("synthesizerNode", () => {
       expect(humanMessage.content).toContain(
         "The answer is too generic. Cite specific section numbers.",
       );
+      expect(humanMessage.content).toContain("<critique>");
+      expect(humanMessage.content).toContain("</critique>");
       expect(humanMessage.content).toContain(
-        "Revise your response to address these issues.",
+        "Revise your response to address the issues described between the <critique> tags above.",
       );
 
       // Should increment retryCount

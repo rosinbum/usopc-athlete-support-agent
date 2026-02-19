@@ -1,7 +1,6 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import type { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
-import { getModelConfig } from "../../config/index.js";
 import { buildClassifierPromptWithHistory } from "../../prompts/index.js";
 import {
   invokeAnthropic,
@@ -11,6 +10,7 @@ import {
   buildContextualQuery,
   getLastUserMessage,
   stateContext,
+  parseLlmJson,
 } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type {
@@ -83,13 +83,7 @@ interface ParseResult {
 export function parseClassifierResponse(raw: string): ParseResult {
   const warnings: string[] = [];
 
-  // Strip any markdown code fences the model may have wrapped around the JSON
-  let cleaned = raw.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-  }
-
-  const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+  const parsed = parseLlmJson(raw);
 
   let topicDomain: TopicDomain | undefined;
   if (VALID_DOMAINS.includes(parsed.topicDomain as TopicDomain)) {
@@ -177,90 +171,84 @@ export function parseClassifierResponse(raw: string): ParseResult {
  * the state as `queryIntent === "escalation"` so downstream conditional
  * edges can route accordingly.
  */
-export async function classifierNode(
-  state: AgentState,
-): Promise<Partial<AgentState>> {
-  // Build contextual query from conversation history
-  const { currentMessage, conversationContext } = buildContextualQuery(
-    state.messages,
-    { conversationSummary: state.conversationSummary },
-  );
+export function createClassifierNode(model: ChatAnthropic) {
+  return async (state: AgentState): Promise<Partial<AgentState>> => {
+    // Build contextual query from conversation history
+    const { currentMessage, conversationContext } = buildContextualQuery(
+      state.messages,
+      { conversationSummary: state.conversationSummary },
+    );
 
-  if (!currentMessage) {
-    log.warn("Classifier received empty user message; defaulting state");
-    return {
-      queryIntent: "general",
-      needsClarification: false,
-      emotionalState: "neutral",
-    };
-  }
-
-  const config = await getModelConfig();
-  const model = new ChatAnthropic({
-    model: config.classifier.model,
-    temperature: config.classifier.temperature,
-    maxTokens: config.classifier.maxTokens,
-  });
-
-  const prompt = buildClassifierPromptWithHistory(
-    currentMessage,
-    conversationContext,
-  );
-
-  try {
-    const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
-    const responseText = extractTextFromResponse(response);
-    const { output: result, warnings } = parseClassifierResponse(responseText);
-
-    if (warnings.length > 0) {
-      log.warn("Classifier response had coerced fields", {
-        warnings,
-        ...stateContext(state),
-      });
+    if (!currentMessage) {
+      log.warn("Classifier received empty user message; defaulting state");
+      return {
+        queryIntent: "general",
+        needsClarification: false,
+        emotionalState: "neutral",
+      };
     }
 
-    log.info("Classification complete", {
-      topicDomain: result.topicDomain,
-      queryIntent: result.queryIntent,
-      detectedNgbIds: result.detectedNgbIds,
-      hasTimeConstraint: result.hasTimeConstraint,
-      shouldEscalate: result.shouldEscalate,
-      needsClarification: result.needsClarification,
-      emotionalState: result.emotionalState,
-      ...stateContext(state),
-    });
+    const prompt = buildClassifierPromptWithHistory(
+      currentMessage,
+      conversationContext,
+    );
 
-    return {
-      topicDomain: result.topicDomain,
-      detectedNgbIds: result.detectedNgbIds,
-      queryIntent: result.shouldEscalate ? "escalation" : result.queryIntent,
-      hasTimeConstraint: result.hasTimeConstraint,
-      needsClarification: result.needsClarification,
-      clarificationQuestion: result.clarificationQuestion,
-      emotionalState: result.emotionalState,
-      escalationReason: result.escalationReason,
-    };
-  } catch (error) {
-    if (error instanceof CircuitBreakerError) {
-      log.warn("Classifier circuit open; falling back to defaults", {
+    try {
+      const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
+      const responseText = extractTextFromResponse(response);
+      const { output: result, warnings } =
+        parseClassifierResponse(responseText);
+
+      if (warnings.length > 0) {
+        log.warn("Classifier response had coerced fields", {
+          warnings,
+          ...stateContext(state),
+        });
+      }
+
+      log.info("Classification complete", {
+        topicDomain: result.topicDomain,
+        queryIntent: result.queryIntent,
+        detectedNgbIds: result.detectedNgbIds,
+        hasTimeConstraint: result.hasTimeConstraint,
+        shouldEscalate: result.shouldEscalate,
+        needsClarification: result.needsClarification,
+        emotionalState: result.emotionalState,
         ...stateContext(state),
       });
-    } else {
-      log.error("Classifier failed; falling back to defaults", {
-        error: error instanceof Error ? error.message : String(error),
-        ...stateContext(state),
-      });
+
+      return {
+        topicDomain: result.topicDomain,
+        detectedNgbIds: result.detectedNgbIds,
+        queryIntent: result.shouldEscalate ? "escalation" : result.queryIntent,
+        hasTimeConstraint: result.hasTimeConstraint,
+        needsClarification: result.needsClarification,
+        clarificationQuestion: result.clarificationQuestion,
+        emotionalState: result.emotionalState,
+        escalationReason: result.escalationReason,
+      };
+    } catch (error) {
+      if (error instanceof CircuitBreakerError) {
+        log.warn("Classifier circuit open; falling back to defaults", {
+          ...stateContext(state),
+        });
+      } else {
+        log.error("Classifier failed; falling back to defaults", {
+          error: error instanceof Error ? error.message : String(error),
+          ...stateContext(state),
+        });
+      }
+
+      // Graceful degradation: allow the pipeline to continue with
+      // safe defaults so the user still gets a response.
+      return {
+        topicDomain: undefined,
+        detectedNgbIds: [],
+        queryIntent: "general",
+        hasTimeConstraint: false,
+        needsClarification: false,
+        emotionalState: "neutral",
+      };
     }
-
-    // Graceful degradation: allow the pipeline to continue with
-    // safe defaults so the user still gets a response.
-    return {
-      topicDomain: undefined,
-      detectedNgbIds: [],
-      queryIntent: "general",
-      hasTimeConstraint: false,
-      needsClarification: false,
-      emotionalState: "neutral",
-    };
-  }
+  };
 }

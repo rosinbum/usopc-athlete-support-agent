@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks — must be declared before importing the module under test
 // ---------------------------------------------------------------------------
 
-const mockInvoke = vi.fn();
+const { mockInvoke } = vi.hoisted(() => ({ mockInvoke: vi.fn() }));
 
 vi.mock("@langchain/anthropic", () => ({
   ChatAnthropic: vi.fn().mockImplementation(() => ({
@@ -28,10 +28,13 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-import { escalateNode } from "./escalate.js";
+import { createEscalateNode } from "./escalate.js";
+import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
 import type { AgentState } from "../state.js";
+
+const escalateNode = createEscalateNode(new ChatAnthropic());
 
 // ---------------------------------------------------------------------------
 // Helpers

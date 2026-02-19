@@ -1,17 +1,18 @@
+import type { ChatAnthropic } from "@langchain/anthropic";
 import { StateGraph } from "@langchain/langgraph";
 import { AgentStateAnnotation } from "./state.js";
 import {
-  classifierNode,
+  createClassifierNode,
   clarifyNode,
   createRetrieverNode,
   createResearcherNode,
-  synthesizerNode,
-  escalateNode,
+  createSynthesizerNode,
+  createEscalateNode,
   citationBuilderNode,
   disclaimerGuardNode,
-  qualityCheckerNode,
+  createQualityCheckerNode,
   createRetrievalExpanderNode,
-  queryPlannerNode,
+  createQueryPlannerNode,
   emotionalSupportNode,
 } from "./nodes/index.js";
 import type { VectorStoreLike } from "./nodes/index.js";
@@ -22,9 +23,24 @@ import { routeByQuality } from "./edges/routeByQuality.js";
 import { withMetrics } from "./nodeMetrics.js";
 import { getFeatureFlags } from "../config/featureFlags.js";
 
+/**
+ * External dependencies injected into the LangGraph agent at construction time.
+ *
+ * Model instances are created once by {@link AgentRunner.create} and shared
+ * across all graph nodes via closure injection (factory functions). This
+ * eliminates redundant `ChatAnthropic` allocations per request — in a Lambda
+ * warm container the same instances are reused for the lifetime of the process.
+ *
+ * Changing model configuration (model name, temperature, maxTokens) requires
+ * a cold start — the runner must be recreated with fresh instances.
+ */
 export interface GraphDependencies {
   vectorStore: VectorStoreLike;
   tavilySearch: TavilySearchLike;
+  /** Sonnet instance used by synthesizer, escalate, and other heavy-reasoning nodes. */
+  agentModel: ChatAnthropic;
+  /** Haiku instance used by classifier, qualityChecker, queryPlanner, and retrievalExpander. */
+  classifierModel: ChatAnthropic;
 }
 
 /**
@@ -59,7 +75,10 @@ export function createAgentGraph(deps: GraphDependencies) {
 
   // All nodes registered unconditionally for TypeScript generic tracking.
   const builder = new StateGraph(AgentStateAnnotation)
-    .addNode("classifier", withMetrics("classifier", classifierNode))
+    .addNode(
+      "classifier",
+      withMetrics("classifier", createClassifierNode(deps.classifierModel)),
+    )
     .addNode("clarify", withMetrics("clarify", clarifyNode))
     .addNode(
       "retriever",
@@ -69,8 +88,14 @@ export function createAgentGraph(deps: GraphDependencies) {
       "researcher",
       withMetrics("researcher", createResearcherNode(deps.tavilySearch)),
     )
-    .addNode("synthesizer", withMetrics("synthesizer", synthesizerNode))
-    .addNode("escalate", withMetrics("escalate", escalateNode))
+    .addNode(
+      "synthesizer",
+      withMetrics("synthesizer", createSynthesizerNode(deps.agentModel)),
+    )
+    .addNode(
+      "escalate",
+      withMetrics("escalate", createEscalateNode(deps.agentModel)),
+    )
     .addNode(
       "citationBuilder",
       withMetrics("citationBuilder", citationBuilderNode),
@@ -81,16 +106,22 @@ export function createAgentGraph(deps: GraphDependencies) {
     )
     .addNode(
       "qualityChecker",
-      withMetrics("qualityChecker", qualityCheckerNode),
+      withMetrics(
+        "qualityChecker",
+        createQualityCheckerNode(deps.classifierModel),
+      ),
     )
     .addNode(
       "retrievalExpander",
       withMetrics(
         "retrievalExpander",
-        createRetrievalExpanderNode(deps.vectorStore),
+        createRetrievalExpanderNode(deps.vectorStore, deps.classifierModel),
       ),
     )
-    .addNode("queryPlanner", withMetrics("queryPlanner", queryPlannerNode))
+    .addNode(
+      "queryPlanner",
+      withMetrics("queryPlanner", createQueryPlannerNode(deps.classifierModel)),
+    )
     .addNode(
       "emotionalSupport",
       withMetrics("emotionalSupport", emotionalSupportNode),

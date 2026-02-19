@@ -169,6 +169,18 @@ aws lambda invoke \
 
 **Total estimated monthly cost:** ~$5-10 (well within default budgets)
 
+## Updating Model Configuration
+
+Model instances (`agentModel` for Sonnet, `classifierModel` for Haiku) are constructed once at Lambda cold start and reused for the container's lifetime. Config changes stored in DynamoDB are cached for 5 minutes by `getModelConfig()`, but the `ChatAnthropic` instances themselves are never recreated.
+
+**To apply model config changes (model name, temperature, maxTokens):**
+
+1. Update the config in DynamoDB (via admin UI or direct update)
+2. Force a cold start by redeploying: `sst deploy --stage production`
+3. Or wait for Lambda to naturally recycle containers (up to ~2 hours)
+
+**Note:** Changing just the DynamoDB config without a redeploy will **not** update the running model instances. The 5-minute config cache TTL only affects `getModelConfig()` calls, not already-constructed `ChatAnthropic` instances.
+
 ## Troubleshooting
 
 ### Discovery Not Running

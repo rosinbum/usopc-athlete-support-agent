@@ -1,9 +1,16 @@
 import * as ls from "langsmith/vitest";
 import { HumanMessage } from "@langchain/core/messages";
-import { classifierNode, routeByDomain } from "@usopc/core";
+import {
+  createClassifierNode,
+  createAgentModels,
+  routeByDomain,
+} from "@usopc/core";
 import { DATASET_NAMES } from "../config.js";
 import { makeTestState } from "../helpers/stateFactory.js";
 import { fetchExamples } from "../helpers/fetchExamples.js";
+
+const { classifierModel } = await createAgentModels();
+const classifierNode = createClassifierNode(classifierModel);
 
 /**
  * Computes Jaccard similarity between two string sets.

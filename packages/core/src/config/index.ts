@@ -12,3 +12,4 @@ export {
   QUALITY_CHECKER_CONFIG,
 } from "./settings.js";
 export { getFeatureFlags, type FeatureFlags } from "./featureFlags.js";
+export { createAgentModels, type AgentModels } from "./modelFactory.js";

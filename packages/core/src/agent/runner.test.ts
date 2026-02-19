@@ -17,6 +17,21 @@ const {
   mockCreateAgentGraph: vi.fn(),
 }));
 
+vi.mock("@usopc/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usopc/shared")>();
+  return {
+    ...actual,
+    logger: {
+      child: () => ({
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+      }),
+    },
+  };
+});
+
 vi.mock("../rag/embeddings.js", () => ({
   createEmbeddings: mockCreateEmbeddings,
 }));
@@ -31,6 +46,15 @@ vi.mock("./nodes/researcher.js", () => ({
 
 vi.mock("./graph.js", () => ({
   createAgentGraph: mockCreateAgentGraph,
+}));
+
+const { mockCreateAgentModels } = vi.hoisted(() => ({
+  mockCreateAgentModels: vi.fn(),
+}));
+
+vi.mock("../config/index.js", () => ({
+  createAgentModels: mockCreateAgentModels,
+  GRAPH_CONFIG: { invokeTimeoutMs: 90_000, streamTimeoutMs: 120_000 },
 }));
 
 import { AgentRunner, convertMessages } from "./runner.js";
@@ -66,6 +90,9 @@ const defaultConfig: AgentRunnerConfig = {
 // Tests
 // ---------------------------------------------------------------------------
 
+const fakeAgentModel = { invoke: vi.fn(), role: "agent" };
+const fakeClassifierModel = { invoke: vi.fn(), role: "classifier" };
+
 describe("AgentRunner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -76,6 +103,10 @@ describe("AgentRunner", () => {
     });
     mockCreateTavilySearchTool.mockReturnValue({ fake: "tavily" });
     mockCreateAgentGraph.mockReturnValue(makeFakeGraph());
+    mockCreateAgentModels.mockResolvedValue({
+      agentModel: fakeAgentModel,
+      classifierModel: fakeClassifierModel,
+    });
   });
 
   describe("create()", () => {
@@ -117,6 +148,8 @@ describe("AgentRunner", () => {
       expect(mockCreateAgentGraph).toHaveBeenCalledWith({
         vectorStore: expect.objectContaining({ fake: "vectorStore" }),
         tavilySearch: { fake: "tavily" },
+        agentModel: expect.any(Object),
+        classifierModel: expect.any(Object),
       });
     });
 
@@ -135,6 +168,24 @@ describe("AgentRunner", () => {
       await expect(AgentRunner.create({ databaseUrl: "" })).rejects.toThrow(
         "databaseUrl is required",
       );
+    });
+
+    it("calls createAgentModels once to construct shared instances", async () => {
+      await AgentRunner.create(defaultConfig);
+
+      expect(mockCreateAgentModels).toHaveBeenCalledOnce();
+    });
+
+    it("passes model instances from factory to graph and exposes classifierModel", async () => {
+      const runner = await AgentRunner.create(defaultConfig);
+
+      // Graph should receive the exact instances from the factory
+      const graphDeps = mockCreateAgentGraph.mock.calls[0][0];
+      expect(graphDeps.agentModel).toBe(fakeAgentModel);
+      expect(graphDeps.classifierModel).toBe(fakeClassifierModel);
+
+      // Runner should expose the classifier model for callers like generateSummary
+      expect(runner.classifierModel).toBe(fakeClassifierModel);
     });
   });
 
@@ -228,6 +279,23 @@ describe("AgentRunner", () => {
         messages: [new HumanMessage("hello")],
       });
 
+      expect(graph.invoke).toHaveBeenCalledWith(
+        expect.objectContaining({ conversationId: undefined }),
+        undefined,
+      );
+    });
+
+    it("ignores conversationId with invalid format", async () => {
+      const graph = makeFakeGraph();
+      mockCreateAgentGraph.mockReturnValue(graph);
+
+      const runner = await AgentRunner.create(defaultConfig);
+      await runner.invoke({
+        messages: [new HumanMessage("hello")],
+        conversationId: "'; DROP TABLE users; --",
+      });
+
+      // Invalid conversationId should be stripped (no metadata passed)
       expect(graph.invoke).toHaveBeenCalledWith(
         expect.objectContaining({ conversationId: undefined }),
         undefined,
@@ -430,21 +498,26 @@ describe("AgentRunner", () => {
       const graph = {
         invoke: vi.fn().mockReturnValue(
           new Promise(() => {
-            // Never resolves
+            // Never resolves — withTimeout will reject after the deadline
           }),
         ),
         stream: vi.fn(),
       };
       mockCreateAgentGraph.mockReturnValue(graph);
 
-      // Mock the timeout module to use a short timeout for testing
-      const runner = await AgentRunner.create(defaultConfig);
+      // Use a short timeout so the test completes quickly
+      const config = await import("../config/index.js");
+      const saved = config.GRAPH_CONFIG.invokeTimeoutMs;
+      Object.assign(config.GRAPH_CONFIG, { invokeTimeoutMs: 50 });
 
-      // Since withTimeout races the promise against a timer,
-      // and GRAPH_CONFIG.invokeTimeoutMs is 90000ms, we can't easily
-      // test this without mocking the config or time. Instead, verify
-      // that graph.invoke is called with the right state.
-      expect(graph.invoke).not.toHaveBeenCalled();
+      try {
+        const runner = await AgentRunner.create(defaultConfig);
+        await expect(
+          runner.invoke({ messages: [new HumanMessage("test")] }),
+        ).rejects.toThrow("timed out");
+      } finally {
+        Object.assign(config.GRAPH_CONFIG, { invokeTimeoutMs: saved });
+      }
     });
   });
 });
