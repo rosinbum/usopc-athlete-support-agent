@@ -229,14 +229,18 @@ After the PR is created, poll CI status using `mcp__github__pull_request_read`:
 
 The response contains a list of check runs. Each check has a state/conclusion. Treat them as follows:
 
-| State / conclusion                                    | Meaning                             |
-| ----------------------------------------------------- | ----------------------------------- |
-| `success` / `neutral`                                 | ✓ Passed                            |
-| `failure` / `error` / `action_required` / `timed_out` | ✗ Failed — do NOT merge             |
-| `pending` / `in_progress` / `queued` / `waiting`      | ⏳ Still running — keep polling     |
-| No checks present yet                                 | ⏳ CI hasn't started — keep polling |
+| State / conclusion                                    | Meaning                                |
+| ----------------------------------------------------- | -------------------------------------- |
+| `success` / `neutral`                                 | ✓ Passed                               |
+| `failure` / `error` / `action_required` / `timed_out` | ✗ Failed — investigate before deciding |
+| `pending` / `in_progress` / `queued` / `waiting`      | ⏳ Still running — keep polling        |
+| No checks present yet                                 | ⏳ CI hasn't started — keep polling    |
 
-**NEVER merge unless every single check is in a terminal passing state (`success` or `neutral`). Any check that is still pending, any check that has failed, or any check whose state is unknown means the PR must NOT be merged.**
+**Known `continue-on-error` checks (allowed to fail without blocking merge):**
+
+The **Security audit** check (`pnpm audit --prod --audit-level=high`) is configured with `continue-on-error: true` in `.github/workflows/ci.yml`. It may show `failure` in the API even when CI overall passes (e.g. transient npm registry 500 errors). Do NOT block merge solely because this check failed.
+
+**Merge rule:** All checks must reach a terminal state. Every check must be `success`/`neutral` **or** be a known `continue-on-error` check whose failure is expected. Any unexpected failure, or any check still pending/in-progress, blocks merge.
 
 ### If any checks fail
 
