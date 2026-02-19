@@ -90,25 +90,6 @@ export class InMemorySummaryStore implements SummaryStore {
 
 let store: SummaryStore = new InMemorySummaryStore();
 
-/** Shared classifier model instance, injected by AgentRunner. */
-let classifierModel: ChatAnthropic | null = null;
-
-/**
- * Injects a shared ChatAnthropic instance for summary generation.
- * Called once from AgentRunner.create() so that generateSummary
- * reuses the same model instance instead of creating a new one per call.
- */
-export function initConversationMemoryModel(model: ChatAnthropic): void {
-  classifierModel = model;
-}
-
-/**
- * Resets the injected model (for testing only).
- */
-export function resetConversationMemoryModel(): void {
-  classifierModel = null;
-}
-
 /**
  * Returns the current summary store singleton.
  */
@@ -145,22 +126,29 @@ export async function saveSummary(
 /**
  * Generates a rolling summary of conversation messages using Haiku.
  * If an existing summary is provided, it's incorporated into the new one.
+ *
+ * @param messages - The conversation messages to summarize.
+ * @param existingSummary - An existing summary to incorporate (rolling summary).
+ * @param model - A shared ChatAnthropic instance. When omitted, a transient
+ *   instance is created from config (backward compat for tests/dev tools).
+ *   Callers with a long-lived model (e.g., AgentRunner) should pass it
+ *   explicitly to avoid redundant allocations.
  */
 export async function generateSummary(
   messages: BaseMessage[],
   existingSummary?: string,
+  model?: ChatAnthropic,
 ): Promise<string> {
-  // Use injected model if available, otherwise create one (backward compat for tests/dev tools)
-  let model: ChatAnthropic;
-  if (classifierModel) {
-    model = classifierModel;
+  let resolvedModel: ChatAnthropic;
+  if (model) {
+    resolvedModel = model;
   } else {
     log.warn(
-      "classifierModel not initialized — creating transient ChatAnthropic instance. " +
-        "Call initConversationMemoryModel() from the entry point to eliminate this allocation.",
+      "No model passed to generateSummary — creating transient ChatAnthropic instance. " +
+        "Pass the classifierModel explicitly to eliminate this allocation.",
     );
     const config = await getModelConfig();
-    model = new ChatAnthropic({
+    resolvedModel = new ChatAnthropic({
       model: config.classifier.model,
       temperature: config.classifier.temperature,
       maxTokens: config.classifier.maxTokens,
@@ -170,7 +158,9 @@ export async function generateSummary(
   const prompt = buildSummaryPrompt(messages, existingSummary);
 
   try {
-    const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
+    const response = await invokeAnthropic(resolvedModel, [
+      new HumanMessage(prompt),
+    ]);
     return extractTextFromResponse(response);
   } catch (error) {
     log.error("Failed to generate conversation summary", {

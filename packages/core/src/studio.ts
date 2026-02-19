@@ -4,7 +4,6 @@ import { createTavilySearchTool } from "./agent/nodes/researcher.js";
 import type { TavilySearchLike } from "./agent/nodes/researcher.js";
 import { createAgentGraph } from "./agent/graph.js";
 import { createAgentModels } from "./config/index.js";
-import { initConversationMemoryModel } from "./services/conversationMemory.js";
 
 export async function createGraph() {
   const embeddings = createEmbeddings(process.env.OPENAI_API_KEY);
@@ -14,8 +13,6 @@ export async function createGraph() {
     : { invoke: async () => "" };
 
   const { agentModel, classifierModel } = await createAgentModels();
-
-  initConversationMemoryModel(classifierModel);
 
   return createAgentGraph({
     vectorStore,

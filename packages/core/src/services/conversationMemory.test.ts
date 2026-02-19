@@ -42,8 +42,6 @@ import {
   saveSummary,
   generateSummary,
   setSummaryStore,
-  initConversationMemoryModel,
-  resetConversationMemoryModel,
 } from "./conversationMemory.js";
 import { ChatAnthropic } from "@langchain/anthropic";
 import {
@@ -163,44 +161,23 @@ describe("conversationMemory", () => {
     });
   });
 
-  describe("initConversationMemoryModel / resetConversationMemoryModel", () => {
-    afterEach(() => {
-      resetConversationMemoryModel();
-    });
-
-    it("uses injected model when initialized", async () => {
+  describe("generateSummary model injection", () => {
+    it("uses explicitly passed model", async () => {
       const fakeModel = new ChatAnthropic();
-      initConversationMemoryModel(fakeModel);
 
       mockInvokeAnthropic.mockResolvedValue({} as never);
       mockExtractText.mockReturnValue("summary");
 
-      await generateSummary([new HumanMessage("hello")]);
+      await generateSummary([new HumanMessage("hello")], undefined, fakeModel);
 
-      // invokeAnthropic should receive the injected model instance
+      // invokeAnthropic should receive the explicitly passed model instance
       expect(mockInvokeAnthropic).toHaveBeenCalledWith(
         fakeModel,
         expect.any(Array),
       );
     });
 
-    it("falls back to transient instance after reset", async () => {
-      const fakeModel = new ChatAnthropic();
-      initConversationMemoryModel(fakeModel);
-      resetConversationMemoryModel();
-
-      mockInvokeAnthropic.mockResolvedValue({} as never);
-      mockExtractText.mockReturnValue("summary");
-
-      await generateSummary([new HumanMessage("hello")]);
-
-      // Should NOT receive the previously injected model (it was reset)
-      const modelArg = mockInvokeAnthropic.mock.calls[0][0];
-      expect(modelArg).not.toBe(fakeModel);
-    });
-
-    it("creates a new ChatAnthropic with config values on fallback", async () => {
-      // No model initialized — fallback path
+    it("falls back to transient instance when no model passed", async () => {
       const { ChatAnthropic: MockChatAnthropic } =
         await import("@langchain/anthropic");
       const mockCtor = vi.mocked(MockChatAnthropic);

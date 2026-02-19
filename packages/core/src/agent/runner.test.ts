@@ -57,14 +57,6 @@ vi.mock("../config/index.js", () => ({
   GRAPH_CONFIG: { invokeTimeoutMs: 90_000, streamTimeoutMs: 120_000 },
 }));
 
-const { mockInitConversationMemoryModel } = vi.hoisted(() => ({
-  mockInitConversationMemoryModel: vi.fn(),
-}));
-
-vi.mock("../services/conversationMemory.js", () => ({
-  initConversationMemoryModel: mockInitConversationMemoryModel,
-}));
-
 import { AgentRunner, convertMessages } from "./runner.js";
 import type { AgentRunnerConfig, AgentInput } from "./runner.js";
 
@@ -184,19 +176,16 @@ describe("AgentRunner", () => {
       expect(mockCreateAgentModels).toHaveBeenCalledOnce();
     });
 
-    it("passes model instances from factory to graph and conversationMemory", async () => {
-      await AgentRunner.create(defaultConfig);
+    it("passes model instances from factory to graph and exposes classifierModel", async () => {
+      const runner = await AgentRunner.create(defaultConfig);
 
       // Graph should receive the exact instances from the factory
       const graphDeps = mockCreateAgentGraph.mock.calls[0][0];
       expect(graphDeps.agentModel).toBe(fakeAgentModel);
       expect(graphDeps.classifierModel).toBe(fakeClassifierModel);
 
-      // conversationMemory should receive the classifier model
-      expect(mockInitConversationMemoryModel).toHaveBeenCalledOnce();
-      expect(mockInitConversationMemoryModel).toHaveBeenCalledWith(
-        fakeClassifierModel,
-      );
+      // Runner should expose the classifier model for callers like generateSummary
+      expect(runner.classifierModel).toBe(fakeClassifierModel);
     });
   });
 

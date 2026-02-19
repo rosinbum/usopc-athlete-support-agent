@@ -39,7 +39,7 @@ export interface GraphDependencies {
   tavilySearch: TavilySearchLike;
   /** Sonnet instance used by synthesizer, escalate, and other heavy-reasoning nodes. */
   agentModel: ChatAnthropic;
-  /** Haiku instance used by classifier, qualityChecker, queryPlanner, retrievalExpander, and conversationMemory. */
+  /** Haiku instance used by classifier, qualityChecker, queryPlanner, and retrievalExpander. */
   classifierModel: ChatAnthropic;
 }
 

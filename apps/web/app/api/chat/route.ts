@@ -150,7 +150,11 @@ export async function POST(req: Request) {
 
         // Fire-and-forget: generate and save updated summary after stream completes
         if (flags.conversationMemory && conversationId) {
-          generateSummary(langchainMessages, conversationSummary)
+          generateSummary(
+            langchainMessages,
+            conversationSummary,
+            runner.classifierModel,
+          )
             .then((summary: string) => saveSummary(conversationId, summary))
             .catch((err: unknown) =>
               log.error("Failed to save conversation summary", {
