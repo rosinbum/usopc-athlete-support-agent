@@ -23,6 +23,8 @@ const log = logger.child({ service: "classifier-node" });
 
 /**
  * Valid topic domains for guard-checking the classifier output.
+ * Must be kept in sync with the TopicDomain type in packages/core/src/types/agent.ts
+ * and the TOPIC_DOMAINS constant in packages/shared/src/validation.ts.
  */
 const VALID_DOMAINS: TopicDomain[] = [
   "team_selection",
@@ -32,6 +34,8 @@ const VALID_DOMAINS: TopicDomain[] = [
   "eligibility",
   "governance",
   "athlete_rights",
+  "athlete_safety",
+  "financial_assistance",
 ];
 
 /**
@@ -59,7 +63,7 @@ const VALID_EMOTIONAL_STATES: EmotionalState[] = [
  * Parsed output from the classifier model.
  */
 interface ClassifierOutput {
-  topicDomain: TopicDomain;
+  topicDomain: TopicDomain | undefined;
   detectedNgbIds: string[];
   queryIntent: QueryIntent;
   hasTimeConstraint: boolean;
@@ -142,7 +146,7 @@ export function parseClassifierResponse(raw: string): ParseResult {
 
   return {
     output: {
-      topicDomain: topicDomain ?? "team_selection", // fallback handled below
+      topicDomain,
       detectedNgbIds,
       queryIntent,
       hasTimeConstraint,
