@@ -1,3 +1,5 @@
+export type ApiError = { error: string; code?: string };
+
 export class AppError extends Error {
   public readonly code: string;
   public readonly statusCode: number;

@@ -10,6 +10,7 @@ import {
 const log = logger.child({ service: "admin-sources" });
 import { requireAdmin } from "../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../lib/source-config.js";
+import { apiError } from "../../../../lib/apiResponse.js";
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -47,10 +48,7 @@ export async function GET() {
     return NextResponse.json({ sources });
   } catch (error) {
     log.error("Admin sources list error", { error: String(error) });
-    return NextResponse.json(
-      { error: "Failed to fetch sources" },
-      { status: 500 },
-    );
+    return apiError("Failed to fetch sources", 500);
   }
 }
 
@@ -86,16 +84,10 @@ export async function POST(request: NextRequest) {
       error instanceof Error &&
       error.name === "ConditionalCheckFailedException"
     ) {
-      return NextResponse.json(
-        { error: "A source with this ID already exists" },
-        { status: 409 },
-      );
+      return apiError("A source with this ID already exists", 409);
     }
 
     log.error("Admin source create error", { error: String(error) });
-    return NextResponse.json(
-      { error: "Failed to create source" },
-      { status: 500 },
-    );
+    return apiError("Failed to create source", 500);
   }
 }

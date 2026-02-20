@@ -14,6 +14,7 @@ import {
 const log = logger.child({ service: "admin-sources" });
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
+import { apiError } from "../../../../../lib/apiResponse.js";
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -66,7 +67,7 @@ export async function GET(
     const source = await entity.getById(id);
 
     if (!source) {
-      return NextResponse.json({ error: "Source not found" }, { status: 404 });
+      return apiError("Source not found", 404);
     }
 
     const pool = getPool();
@@ -75,10 +76,7 @@ export async function GET(
     return NextResponse.json({ source, chunkCount });
   } catch (error) {
     log.error("Admin source detail error", { error: String(error) });
-    return NextResponse.json(
-      { error: "Failed to fetch source" },
-      { status: 500 },
-    );
+    return apiError("Failed to fetch source", 500);
   }
 }
 
@@ -100,7 +98,7 @@ export async function PATCH(
 
     if (!result.success) {
       const firstError = result.error.errors[0]?.message ?? "Invalid input";
-      return NextResponse.json({ error: firstError }, { status: 400 });
+      return apiError(firstError, 400);
     }
 
     // Cast is safe — Zod has validated the values above
@@ -189,10 +187,7 @@ export async function PATCH(
     return NextResponse.json({ source, actions });
   } catch (error) {
     log.error("Admin source update error", { error: String(error) });
-    return NextResponse.json(
-      { error: "Failed to update source" },
-      { status: 500 },
-    );
+    return apiError("Failed to update source", 500);
   }
 }
 
@@ -213,7 +208,7 @@ export async function DELETE(
     const source = await entity.getById(id);
 
     if (!source) {
-      return NextResponse.json({ error: "Source not found" }, { status: 404 });
+      return apiError("Source not found", 404);
     }
 
     // Delete chunks from PG first (safer ordering)
@@ -230,9 +225,6 @@ export async function DELETE(
     });
   } catch (error) {
     log.error("Admin source delete error", { error: String(error) });
-    return NextResponse.json(
-      { error: "Failed to delete source" },
-      { status: 500 },
-    );
+    return apiError("Failed to delete source", 500);
   }
 }

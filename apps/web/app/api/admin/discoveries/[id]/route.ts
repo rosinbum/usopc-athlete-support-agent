@@ -6,6 +6,7 @@ import { auth } from "../../../../../auth.js";
 const log = logger.child({ service: "admin-discoveries" });
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createDiscoveredSourceEntity } from "../../../../../lib/discovered-source.js";
+import { apiError } from "../../../../../lib/apiResponse.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 import { sendDiscoveryToSources } from "../../../../../lib/send-to-sources.js";
 
@@ -44,19 +45,13 @@ export async function GET(
     const discovery = await entity.getById(id);
 
     if (!discovery) {
-      return NextResponse.json(
-        { error: "Discovery not found" },
-        { status: 404 },
-      );
+      return apiError("Discovery not found", 404);
     }
 
     return NextResponse.json({ discovery });
   } catch (error) {
     log.error("Admin discovery detail error", { error: String(error) });
-    return NextResponse.json(
-      { error: "Failed to fetch discovery" },
-      { status: 500 },
-    );
+    return apiError("Failed to fetch discovery", 500);
   }
 }
 
@@ -78,16 +73,13 @@ export async function PATCH(
 
     if (!result.success) {
       const firstError = result.error.errors[0]?.message ?? "Invalid input";
-      return NextResponse.json({ error: firstError }, { status: 400 });
+      return apiError(firstError, 400);
     }
 
     const entity = createDiscoveredSourceEntity();
     const existing = await entity.getById(id);
     if (!existing) {
-      return NextResponse.json(
-        { error: "Discovery not found" },
-        { status: 404 },
-      );
+      return apiError("Discovery not found", 404);
     }
 
     const { action } = result.data;
@@ -111,9 +103,9 @@ export async function PATCH(
       );
 
       if (sendResult.status === "failed") {
-        return NextResponse.json(
-          { error: sendResult.error ?? "Failed to create source config" },
-          { status: 500 },
+        return apiError(
+          sendResult.error ?? "Failed to create source config",
+          500,
         );
       }
 
@@ -137,9 +129,6 @@ export async function PATCH(
     return NextResponse.json({ discovery });
   } catch (error) {
     log.error("Admin discovery update error", { error: String(error) });
-    return NextResponse.json(
-      { error: "Failed to update discovery" },
-      { status: 500 },
-    );
+    return apiError("Failed to update discovery", 500);
   }
 }
