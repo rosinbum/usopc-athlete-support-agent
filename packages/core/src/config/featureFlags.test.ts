@@ -7,10 +7,7 @@ const FLAG_ENV_VARS = [
   "FEATURE_SOURCE_DISCOVERY",
   "FEATURE_MULTI_STEP_PLANNER",
   "FEATURE_FEEDBACK_LOOP",
-  "FEATURE_RETRIEVAL_EXPANSION",
   "FEATURE_QUERY_PLANNER",
-  "FEATURE_EMOTIONAL_SUPPORT",
-  "FEATURE_PARALLEL_RESEARCH",
 ] as const;
 
 describe("getFeatureFlags", () => {
@@ -28,10 +25,7 @@ describe("getFeatureFlags", () => {
     expect(flags.sourceDiscovery).toBe(true);
     expect(flags.multiStepPlanner).toBe(true);
     expect(flags.feedbackLoop).toBe(true);
-    expect(flags.retrievalExpansion).toBe(true);
     expect(flags.queryPlanner).toBe(true);
-    expect(flags.emotionalSupport).toBe(true);
-    expect(flags.parallelResearch).toBe(true);
   });
 
   it.each([
@@ -40,10 +34,7 @@ describe("getFeatureFlags", () => {
     ["FEATURE_SOURCE_DISCOVERY", "sourceDiscovery"],
     ["FEATURE_MULTI_STEP_PLANNER", "multiStepPlanner"],
     ["FEATURE_FEEDBACK_LOOP", "feedbackLoop"],
-    ["FEATURE_RETRIEVAL_EXPANSION", "retrievalExpansion"],
     ["FEATURE_QUERY_PLANNER", "queryPlanner"],
-    ["FEATURE_EMOTIONAL_SUPPORT", "emotionalSupport"],
-    ["FEATURE_PARALLEL_RESEARCH", "parallelResearch"],
   ] as const)("%s disables %s when set to 'false'", (envVar, flagKey) => {
     process.env[envVar] = "false";
     const flags = getFeatureFlags();
@@ -59,10 +50,7 @@ describe("getFeatureFlags", () => {
     expect(flags.sourceDiscovery).toBe(true);
     expect(flags.multiStepPlanner).toBe(true);
     expect(flags.feedbackLoop).toBe(true);
-    expect(flags.retrievalExpansion).toBe(true);
     expect(flags.queryPlanner).toBe(true);
-    expect(flags.emotionalSupport).toBe(true);
-    expect(flags.parallelResearch).toBe(true);
   });
 
   it.each(["true", "", "1", "FALSE", "yes", "on"])(

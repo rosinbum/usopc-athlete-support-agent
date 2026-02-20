@@ -4,10 +4,7 @@ export interface FeatureFlags {
   sourceDiscovery: boolean;
   multiStepPlanner: boolean;
   feedbackLoop: boolean;
-  retrievalExpansion: boolean;
   queryPlanner: boolean;
-  emotionalSupport: boolean;
-  parallelResearch: boolean;
 }
 
 /**
@@ -25,9 +22,6 @@ export function getFeatureFlags(): FeatureFlags {
     sourceDiscovery: process.env.FEATURE_SOURCE_DISCOVERY !== "false",
     multiStepPlanner: process.env.FEATURE_MULTI_STEP_PLANNER !== "false",
     feedbackLoop: process.env.FEATURE_FEEDBACK_LOOP !== "false",
-    retrievalExpansion: process.env.FEATURE_RETRIEVAL_EXPANSION !== "false",
     queryPlanner: process.env.FEATURE_QUERY_PLANNER !== "false",
-    emotionalSupport: process.env.FEATURE_EMOTIONAL_SUPPORT !== "false",
-    parallelResearch: process.env.FEATURE_PARALLEL_RESEARCH !== "false",
   };
 }

@@ -18,7 +18,7 @@ import {
 import type { VectorStoreLike } from "./nodes/index.js";
 import type { TavilySearchLike } from "./nodes/index.js";
 import { routeByDomain } from "./edges/routeByDomain.js";
-import { createNeedsMoreInfo } from "./edges/needsMoreInfo.js";
+import { needsMoreInfo } from "./edges/needsMoreInfo.js";
 import { routeByQuality } from "./edges/routeByQuality.js";
 import { withMetrics } from "./nodeMetrics.js";
 import { getFeatureFlags } from "../config/featureFlags.js";
@@ -46,29 +46,22 @@ export interface GraphDependencies {
 /**
  * Creates and compiles the full LangGraph agent.
  *
- * Graph flow (quality checker OFF, expansion OFF — default):
+ * Graph flow (quality checker OFF):
  *   START -> classifier -> (routeByDomain) -> clarify | retriever | escalate
  *     clarify -> END
- *     retriever -> (needsMoreInfo) -> synthesizer | researcher
- *     researcher -> synthesizer
+ *     retriever -> (needsMoreInfo) -> emotionalSupport | retrievalExpander | researcher
+ *     retrievalExpander -> (needsMoreInfo) -> emotionalSupport | researcher
+ *     researcher -> emotionalSupport -> synthesizer
  *     synthesizer -> citationBuilder -> disclaimerGuard -> END
  *     escalate -> citationBuilder -> disclaimerGuard -> END
  *
- * Graph flow (parallelResearch ON):
- *   ...same as above, but gray-zone confidence (0.5 ≤ c < 0.75) routes to
- *   researcher before synthesizer so web results supplement borderline retrieval.
- *
- * Graph flow (expansion ON):
- *   ...same as above, but:
- *     retriever -> (needsMoreInfo) -> synthesizer | retrievalExpander | researcher
- *     retrievalExpander -> (needsMoreInfoAfterExpansion) -> synthesizer | researcher
  * Graph flow (query planner ON):
  *   ...same as above, but classifier routes through queryPlanner before retriever:
  *     classifier -> queryPlanner -> retriever
  *
  * Graph flow (quality checker ON):
  *   ...same as above, but:
- *     synthesizer -> qualityChecker -> (routeByQuality) -> citationBuilder | synthesizer(retry)
+ *     synthesizer -> qualityChecker -> (routeByQuality) -> citationBuilder | emotionalSupport(retry)
  */
 export function createAgentGraph(deps: GraphDependencies) {
   const flags = getFeatureFlags();
@@ -127,14 +120,9 @@ export function createAgentGraph(deps: GraphDependencies) {
       withMetrics("emotionalSupport", emotionalSupportNode),
     );
 
-  // Determine pre-synthesizer target: emotional support node when flag is on
-  const preSynth = (
-    flags.emotionalSupport ? "emotionalSupport" : "synthesizer"
-  ) as "emotionalSupport" | "synthesizer";
+  const preSynth = "emotionalSupport" as const;
 
-  if (flags.emotionalSupport) {
-    builder.addEdge("emotionalSupport", "synthesizer");
-  }
+  builder.addEdge("emotionalSupport", "synthesizer");
 
   // Edges
   builder.addEdge("__start__", "classifier");
@@ -149,26 +137,15 @@ export function createAgentGraph(deps: GraphDependencies) {
     retrievalExpander: "retrievalExpander" as const,
   };
 
-  if (flags.retrievalExpansion) {
-    // Retriever routes to expander when confidence is low and expansion not attempted
-    builder.addConditionalEdges(
-      "retriever",
-      createNeedsMoreInfo(true, flags.parallelResearch),
-      needsMoreInfoPathMap,
-    );
-    // After expansion, route to synthesizer or researcher (never back to expander)
-    builder.addConditionalEdges(
-      "retrievalExpander",
-      createNeedsMoreInfo(false, flags.parallelResearch),
-      needsMoreInfoPathMap,
-    );
-  } else {
-    builder.addConditionalEdges(
-      "retriever",
-      createNeedsMoreInfo(false, flags.parallelResearch),
-      needsMoreInfoPathMap,
-    );
-  }
+  // Retriever routes to expander when confidence is low and expansion not attempted
+  builder.addConditionalEdges("retriever", needsMoreInfo, needsMoreInfoPathMap);
+  // After expansion, route to synthesizer or researcher (never back to expander
+  // since expansionAttempted will be true)
+  builder.addConditionalEdges(
+    "retrievalExpander",
+    needsMoreInfo,
+    needsMoreInfoPathMap,
+  );
   builder.addEdge("researcher", preSynth);
 
   if (flags.qualityChecker) {

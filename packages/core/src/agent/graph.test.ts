@@ -29,7 +29,7 @@ vi.mock("./edges/routeByDomain.js", () => ({
 }));
 
 vi.mock("./edges/needsMoreInfo.js", () => ({
-  createNeedsMoreInfo: () => vi.fn(),
+  needsMoreInfo: vi.fn(),
 }));
 
 vi.mock("./edges/routeByQuality.js", () => ({
@@ -77,10 +77,7 @@ const allFlagsOff = {
   sourceDiscovery: false,
   multiStepPlanner: false,
   feedbackLoop: false,
-  retrievalExpansion: false,
   queryPlanner: false,
-  emotionalSupport: false,
-  parallelResearch: false,
 };
 
 /**
@@ -146,24 +143,6 @@ describe("createAgentGraph", () => {
     expect(graph).toBeDefined();
   });
 
-  it("compiles with retrievalExpansion flag on", () => {
-    mockGetFeatureFlags.mockReturnValue({
-      ...allFlagsOff,
-      retrievalExpansion: true,
-    });
-    const graph = createAgentGraph(makeDeps());
-    expect(graph).toBeDefined();
-  });
-
-  it("compiles with emotionalSupport flag on", () => {
-    mockGetFeatureFlags.mockReturnValue({
-      ...allFlagsOff,
-      emotionalSupport: true,
-    });
-    const graph = createAgentGraph(makeDeps());
-    expect(graph).toBeDefined();
-  });
-
   it("compiles with all flags on", () => {
     mockGetFeatureFlags.mockReturnValue({
       qualityChecker: true,
@@ -171,10 +150,7 @@ describe("createAgentGraph", () => {
       sourceDiscovery: true,
       multiStepPlanner: true,
       feedbackLoop: true,
-      retrievalExpansion: true,
       queryPlanner: true,
-      emotionalSupport: true,
-      parallelResearch: true,
     });
     const graph = createAgentGraph(makeDeps());
     expect(graph).toBeDefined();
