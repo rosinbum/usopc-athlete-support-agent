@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import type { TopicDomain, AuthorityLevel } from "@usopc/shared";
+import { ParamBuilder } from "@usopc/shared";
 
 export interface SourceDocument {
   sourceUrl: string;
@@ -96,42 +97,39 @@ export async function listUniqueDocuments(
     limit = 20,
   } = params;
 
+  // ParamBuilder tracks $N indices automatically so adding or reordering
+  // filter conditions never breaks the LIMIT/OFFSET placeholders.
+  const p = new ParamBuilder();
   const conditions: string[] = [];
-  const values: (string | number)[] = [];
-  let paramIndex = 1;
 
   if (search) {
-    conditions.push(`${COL.document_title} ILIKE $${paramIndex} ESCAPE '\\'`);
-    values.push(`%${escapeIlike(search)}%`);
-    paramIndex++;
+    conditions.push(
+      `${COL.document_title} ILIKE ${p.add(`%${escapeIlike(search)}%`)} ESCAPE '\\'`,
+    );
   }
 
   if (documentType) {
-    conditions.push(`${COL.document_type} = $${paramIndex}`);
-    values.push(documentType);
-    paramIndex++;
+    conditions.push(`${COL.document_type} = ${p.add(documentType)}`);
   }
 
   if (topicDomain) {
-    conditions.push(`${COL.topic_domain} = $${paramIndex}`);
-    values.push(topicDomain);
-    paramIndex++;
+    conditions.push(`${COL.topic_domain} = ${p.add(topicDomain)}`);
   }
 
   if (ngbId) {
-    conditions.push(`${COL.ngb_id} = $${paramIndex}`);
-    values.push(ngbId);
-    paramIndex++;
+    conditions.push(`${COL.ngb_id} = ${p.add(ngbId)}`);
   }
 
   if (authorityLevel) {
-    conditions.push(`${COL.authority_level} = $${paramIndex}`);
-    values.push(authorityLevel);
-    paramIndex++;
+    conditions.push(`${COL.authority_level} = ${p.add(authorityLevel)}`);
   }
 
   const whereClause =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  // Snapshot filter params before adding pagination params so the count query
+  // receives only the filter values (no LIMIT/OFFSET).
+  const filterValues = p.values();
 
   // Count total grouped rows (must match GROUP BY in data query)
   const countQuery = `
@@ -143,12 +141,16 @@ export async function listUniqueDocuments(
     ) sub
   `;
 
-  const countResult = await pool.query<CountRow>(countQuery, values);
+  const countResult = await pool.query<CountRow>(countQuery, filterValues);
   const total = parseInt(countResult.rows[0]?.total ?? "0", 10);
 
   // Calculate pagination
   const offset = (page - 1) * limit;
   const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
+
+  // Add pagination params — $N indices continue from where filter params left off.
+  const limitRef = p.add(limit);
+  const offsetRef = p.add(offset);
 
   // Fetch documents with pagination
   const dataQuery = `
@@ -168,14 +170,10 @@ export async function listUniqueDocuments(
              ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level},
              metadata->>'effectiveDate'
     ORDER BY ingested_at DESC
-    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    LIMIT ${limitRef} OFFSET ${offsetRef}
   `;
 
-  const dataResult = await pool.query<DocumentRow>(dataQuery, [
-    ...values,
-    limit,
-    offset,
-  ]);
+  const dataResult = await pool.query<DocumentRow>(dataQuery, p.values());
 
   const documents: SourceDocument[] = dataResult.rows.map((row) => ({
     sourceUrl: row.source_url,

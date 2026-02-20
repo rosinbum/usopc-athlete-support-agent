@@ -72,6 +72,41 @@ describe("updateChunkMetadataBySourceId", () => {
     expect(jsonbPatch.documentTitle).toBe("New Title");
   });
 
+  it("uses $1 for sourceId and $2 for jsonbPatch in WHERE and SET respectively", async () => {
+    const pool = createMockPool({ rowCount: 1 });
+
+    await updateChunkMetadataBySourceId(pool, "src-1", { title: "T" });
+
+    const [sql, params] = vi.mocked(pool.query).mock.calls[0]!;
+    // $1 is sourceId in WHERE
+    expect(sql).toContain("WHERE metadata->>'sourceId' = $1");
+    expect(params![0]).toBe("src-1");
+    // $2 is jsonbPatch in SET
+    expect(sql).toContain("metadata = metadata || $2::jsonb");
+    expect(JSON.parse(params![1] as string)).toMatchObject({
+      documentTitle: "T",
+    });
+    // $3 is the first extra column value
+    expect(sql).toContain("document_title = $3");
+    expect(params![2]).toBe("T");
+  });
+
+  it("assigns consecutive $N placeholders to each extra column", async () => {
+    const pool = createMockPool({ rowCount: 2 });
+
+    await updateChunkMetadataBySourceId(pool, "src-1", {
+      title: "T",
+      documentType: "policy",
+    });
+
+    const [sql, params] = vi.mocked(pool.query).mock.calls[0]!;
+    // Extra columns start at $3 and go up sequentially
+    expect(sql).toContain("document_title = $3");
+    expect(sql).toContain("document_type = $4");
+    expect(params![2]).toBe("T");
+    expect(params![3]).toBe("policy");
+  });
+
   it("updates topicDomains with primary domain", async () => {
     const pool = createMockPool({ rowCount: 2 });
 
@@ -124,6 +159,41 @@ describe("updateChunkMetadataBySourceId", () => {
     const call = vi.mocked(pool.query).mock.calls[0];
     const jsonbPatch = JSON.parse(call[1]![1] as string);
     expect(jsonbPatch.ngbId).toBeNull();
+  });
+
+  it("all 5 fields produce correct param indices ($1=sourceId $2=patch $3-$7=columns)", async () => {
+    const pool = createMockPool({ rowCount: 5 });
+
+    await updateChunkMetadataBySourceId(pool, "src-all", {
+      title: "Title",
+      documentType: "policy",
+      topicDomains: ["safesport"],
+      ngbId: "usa-track",
+      authorityLevel: "law",
+    });
+
+    const [sql, params] = vi.mocked(pool.query).mock.calls[0]!;
+
+    // WHERE uses $1
+    expect(sql).toContain("WHERE metadata->>'sourceId' = $1");
+    expect(params![0]).toBe("src-all");
+
+    // SET uses $2 for jsonbPatch
+    expect(sql).toContain("metadata = metadata || $2::jsonb");
+
+    // Extra columns assigned $3–$7 in field order
+    expect(sql).toContain("document_title = $3");
+    expect(sql).toContain("document_type = $4");
+    expect(sql).toContain("topic_domain = $5");
+    expect(sql).toContain("ngb_id = $6");
+    expect(sql).toContain("authority_level = $7");
+
+    expect(params).toHaveLength(7);
+    expect(params![2]).toBe("Title");
+    expect(params![3]).toBe("policy");
+    expect(params![4]).toBe("safesport");
+    expect(params![5]).toBe("usa-track");
+    expect(params![6]).toBe("law");
   });
 });
 
