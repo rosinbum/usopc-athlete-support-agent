@@ -15,8 +15,17 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-import { isTransientError, withSingleRetry } from "./anthropicService.js";
+import {
+  isTransientError,
+  withSingleRetry,
+  invokeAnthropic,
+  invokeAnthropicWithFallback,
+  getAnthropicCircuitMetrics,
+  resetAnthropicCircuit,
+} from "./anthropicService.js";
 import { CircuitBreakerError } from "@usopc/shared";
+import type { ChatAnthropic } from "@langchain/anthropic";
+import type { AIMessage, BaseMessage } from "@langchain/core/messages";
 
 // ---------------------------------------------------------------------------
 // isTransientError
@@ -132,5 +141,122 @@ describe("withSingleRetry", () => {
       "ECONNRESET again",
     );
     expect(fn).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// invokeAnthropic / invokeAnthropicWithFallback — circuit wrapper
+// ---------------------------------------------------------------------------
+
+function makeMockModel(result: AIMessage): ChatAnthropic {
+  return {
+    invoke: vi.fn().mockResolvedValue(result),
+  } as unknown as ChatAnthropic;
+}
+
+function makeFailingModel(error = new Error("LLM error")): ChatAnthropic {
+  return {
+    invoke: vi.fn().mockRejectedValue(error),
+  } as unknown as ChatAnthropic;
+}
+
+const fakeResponse = { content: "Hello" } as AIMessage;
+
+describe("invokeAnthropic", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetAnthropicCircuit();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns the model response when the call succeeds", async () => {
+    const model = makeMockModel(fakeResponse);
+    const result = await invokeAnthropic(model, []);
+    expect(result).toBe(fakeResponse);
+  });
+
+  it("passes the messages array to the model", async () => {
+    const model = makeMockModel(fakeResponse);
+    const messages = [] as BaseMessage[];
+    await invokeAnthropic(model, messages);
+    expect(vi.mocked(model.invoke)).toHaveBeenCalledWith(messages);
+  });
+
+  it("opens the circuit after 3 consecutive failures", async () => {
+    const model = makeFailingModel();
+    for (let i = 0; i < 3; i++) {
+      await expect(invokeAnthropic(model, [])).rejects.toThrow();
+    }
+    expect(getAnthropicCircuitMetrics().state).toBe("open");
+  });
+
+  it("throws CircuitBreakerError when circuit is open", async () => {
+    const failingModel = makeFailingModel();
+    for (let i = 0; i < 3; i++) {
+      await expect(invokeAnthropic(failingModel, [])).rejects.toThrow();
+    }
+
+    const goodModel = makeMockModel(fakeResponse);
+    await expect(invokeAnthropic(goodModel, [])).rejects.toThrow(
+      CircuitBreakerError,
+    );
+  });
+
+  it("resets consecutive failure count on success", async () => {
+    const failingModel = makeFailingModel();
+    await expect(invokeAnthropic(failingModel, [])).rejects.toThrow();
+    await expect(invokeAnthropic(failingModel, [])).rejects.toThrow();
+
+    const goodModel = makeMockModel(fakeResponse);
+    await invokeAnthropic(goodModel, []);
+
+    expect(getAnthropicCircuitMetrics().consecutiveFailures).toBe(0);
+  });
+});
+
+describe("invokeAnthropicWithFallback", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetAnthropicCircuit();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns model response on success", async () => {
+    const model = makeMockModel(fakeResponse);
+    const fallback = { content: "fallback" } as AIMessage;
+    const result = await invokeAnthropicWithFallback(model, [], fallback);
+    expect(result).toBe(fakeResponse);
+  });
+
+  it("returns static fallback when circuit is open", async () => {
+    const failingModel = makeFailingModel();
+    for (let i = 0; i < 3; i++) {
+      await expect(invokeAnthropic(failingModel, [])).rejects.toThrow();
+    }
+
+    const fallback = { content: "fallback" } as AIMessage;
+    const goodModel = makeMockModel(fakeResponse);
+    const result = await invokeAnthropicWithFallback(goodModel, [], fallback);
+    expect(result).toBe(fallback);
+  });
+
+  it("calls fallback function when circuit is open", async () => {
+    const failingModel = makeFailingModel();
+    for (let i = 0; i < 3; i++) {
+      await expect(invokeAnthropic(failingModel, [])).rejects.toThrow();
+    }
+
+    const fallbackFn = vi.fn().mockReturnValue(fakeResponse);
+    const goodModel = makeMockModel({ content: "other" } as AIMessage);
+    const result = await invokeAnthropicWithFallback(goodModel, [], fallbackFn);
+
+    expect(fallbackFn).toHaveBeenCalled();
+    expect(result).toBe(fakeResponse);
   });
 });

@@ -199,7 +199,7 @@ describe("listUniqueDocuments", () => {
 
     await listUniqueDocuments(pool, { page: 2, limit: 5 });
 
-    const [dataSql, dataParams] = pool.query.mock.calls[1];
+    const [dataSql, dataParams] = pool.query.mock.calls[1]!;
     expect(dataSql).toContain("LIMIT $1 OFFSET $2");
     expect(dataParams).toEqual([5, 5]); // limit=5, offset=(2-1)*5=5
   });
@@ -216,7 +216,7 @@ describe("listUniqueDocuments", () => {
       limit: 10,
     });
 
-    const [dataSql, dataParams] = pool.query.mock.calls[1];
+    const [dataSql, dataParams] = pool.query.mock.calls[1]!;
     // search=$1, documentType=$2, limit=$3, offset=$4
     expect(dataSql).toContain("LIMIT $3 OFFSET $4");
     expect(dataParams).toEqual(["%bylaws%", "policy", 10, 10]);
@@ -233,7 +233,7 @@ describe("listUniqueDocuments", () => {
       limit: 10,
     });
 
-    const [, countParams] = pool.query.mock.calls[0];
+    const [, countParams] = pool.query.mock.calls[0]!;
     // Count query only gets the filter param, not limit/offset
     expect(countParams).toEqual(["%bylaws%"]);
   });
