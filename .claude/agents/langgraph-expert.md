@@ -1,6 +1,6 @@
 # LangGraph Agent Graph Specialist
 
-You are an expert on the LangGraph agent implementation in `packages/core/src/agent/`. You have deep knowledge of the graph topology, state management, node implementations, and feature flag system.
+You are an expert on the LangGraph agent implementation in `packages/core/src/agent/`. You have deep knowledge of the graph topology, state management, node implementations, and dynamic model configuration.
 
 ---
 
@@ -10,19 +10,17 @@ You are an expert on the LangGraph agent implementation in `packages/core/src/ag
 
 **3 conditional routers:**
 
-1. **`routeByDomain`** (after classifier) → `clarify | retriever | escalate | queryPlanner`
+1. **`routeByDomain`** (after classifier) → `clarify | escalate | queryPlanner`
    - `needsClarification === true` → clarify
    - `queryIntent === "escalation"` → escalate
-   - Feature flag `queryPlanner` enabled → queryPlanner
-   - Default → retriever
+   - Default → queryPlanner
 
-2. **`createNeedsMoreInfo`** (after retriever/retrievalExpander) → `synthesizer | researcher | retrievalExpander`
-   - `retrievalConfidence >= 0.75` → synthesizer
-   - `webSearchResults.length > 0` → synthesizer
-   - Gray-zone (≥0.5) + parallelResearch enabled → researcher
-   - `confidence >= 0.5` with flag off → synthesizer
-   - Low confidence + `!expansionAttempted` + expansion enabled → retrievalExpander
-   - Default → researcher
+2. **`needsMoreInfo`** (after retriever/retrievalExpander) → `synthesizer | researcher | retrievalExpander`
+   - `retrievalConfidence >= 0.75` → synthesizer (via emotionalSupport)
+   - `webSearchResults.length > 0` → synthesizer (via emotionalSupport)
+   - Gray-zone (≥0.5) → researcher
+   - Low confidence + `!expansionAttempted` → retrievalExpander
+   - Low confidence + already expanded → researcher
 
 3. **`routeByQuality`** (after qualityChecker) → `citationBuilder | synthesizer`
    - No result OR `result.passed === true` → citationBuilder
@@ -34,7 +32,7 @@ You are an expert on the LangGraph agent implementation in `packages/core/src/ag
 
 ---
 
-## AgentStateAnnotation (28 fields)
+## AgentStateAnnotation (27 fields)
 
 ### Core Conversation
 
@@ -102,28 +100,10 @@ You are an expert on the LangGraph agent implementation in `packages/core/src/ag
 | escalate          | LLM escalation with urgency determination, domain targets               | Sonnet     |
 | citationBuilder   | Deterministic extraction, deduplication by URL+section+title            | None       |
 | disclaimerGuard   | Domain-specific disclaimer footer (legal, SafeSport, anti-doping)       | None       |
-| qualityChecker    | LLM quality scoring (0–1), issue detection, fail-open                   | Sonnet     |
-| retrievalExpander | LLM query reformulation (JSON array), re-search + merge                 | Sonnet     |
-| queryPlanner      | LLM multi-domain decomposition into sub-queries                         | Sonnet     |
+| qualityChecker    | LLM quality scoring (0–1), issue detection, fail-open                   | Haiku      |
+| retrievalExpander | LLM query reformulation (JSON array), re-search + merge                 | Haiku      |
+| queryPlanner      | LLM multi-domain decomposition into sub-queries                         | Haiku      |
 | emotionalSupport  | Pure template — domain + emotional state → support guidance             | None       |
-
----
-
-## Feature Flags (9)
-
-All default `true`, set via `FEATURE_*` env vars. Only the string `"false"` disables a flag.
-
-| Flag               | Effect                                                     |
-| ------------------ | ---------------------------------------------------------- |
-| qualityChecker     | Enables synthesizer → qualityChecker → routeByQuality loop |
-| conversationMemory | Multi-turn conversation context                            |
-| sourceDiscovery    | Ingest discovered URLs                                     |
-| multiStepPlanner   | Complex query decomposition                                |
-| feedbackLoop       | User feedback integration                                  |
-| retrievalExpansion | Query reformulation on low confidence                      |
-| queryPlanner       | Multi-domain query decomposition via queryPlanner node     |
-| emotionalSupport   | Trauma-informed support for distressed users               |
-| parallelResearch   | Gray-zone (0.5–0.75) web search supplement                 |
 
 ---
 
@@ -160,8 +140,7 @@ All default `true`, set via `FEATURE_*` env vars. Only the string `"false"` disa
 1. **Never fail-closed** — all nodes must catch errors and produce a usable (if degraded) state. Catch `CircuitBreakerError` separately from general errors.
 2. **State field changes are cross-package** — adding/modifying a field in `AgentStateAnnotation` requires updating `makeState`/state factories in `core`, `evals`, `web`, and `ingestion`.
 3. **Don't mix model tiers** — use Haiku for classification/checking, Sonnet for generation. Check `config/models.ts`.
-4. **Feature flags gate edges, not nodes** — flag checks belong in edge functions and `graph.ts` wiring, not inside node implementations.
-5. **Always preserve the add-messages reducer** — `messages` uses a special reducer. Other fields use replace-on-update.
+4. **Always preserve the add-messages reducer** — `messages` uses a special reducer. Other fields use replace-on-update.
 
 ---
 
@@ -173,6 +152,5 @@ All default `true`, set via `FEATURE_*` env vars. Only the string `"false"` disa
 - `nodeMetrics.ts` — Node execution metrics
 - `nodes/*.ts` — 12 node implementations
 - `edges/*.ts` — 3 conditional routers
-- `config/featureFlags.ts` — Feature flag system
 - `config/settings.ts` — Retrieval, quality, rate limit settings
-- `config/models.ts` — Model configuration with dynamic updates
+- `config/models.ts` — Dynamic model configuration (DynamoDB + defaults)
