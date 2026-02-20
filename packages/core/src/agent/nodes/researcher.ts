@@ -1,15 +1,27 @@
+import type { ChatAnthropic } from "@langchain/anthropic";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { TavilySearch } from "@langchain/tavily";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import { TRUSTED_DOMAINS } from "../../config/index.js";
+import {
+  invokeAnthropic,
+  extractTextFromResponse,
+} from "../../services/anthropicService.js";
 import { searchWithTavily } from "../../services/tavilyService.js";
-import { getLastUserMessage, stateContext } from "../../utils/index.js";
+import {
+  buildContextualQuery,
+  getLastUserMessage,
+  parseLlmJson,
+  stateContext,
+} from "../../utils/index.js";
+import { buildResearcherPrompt } from "../../prompts/index.js";
 import type { AgentState } from "../state.js";
 import type { WebSearchResult } from "../../types/index.js";
 
 const log = logger.child({ service: "researcher-node" });
 
 /**
- * Maximum number of search results to request from Tavily.
+ * Maximum number of search results to return to the synthesizer.
  */
 const MAX_SEARCH_RESULTS = 5;
 
@@ -25,6 +37,8 @@ export interface TavilySearchLike {
 /**
  * Builds a search query from the user message and classification context.
  * Prepends relevant domain keywords to improve search quality.
+ *
+ * Used as fallback when there is no conversation context or the LLM call fails.
  */
 function buildSearchQuery(state: AgentState, userMessage: string): string {
   const parts: string[] = [];
@@ -50,6 +64,97 @@ function buildSearchQuery(state: AgentState, userMessage: string): string {
   parts.push(userMessage);
 
   return parts.join(" ");
+}
+
+/**
+ * Parses a JSON array of search query strings from the model response.
+ * Uses {@link parseLlmJson} for length-guarded parsing with markdown
+ * fence stripping. Returns an empty array if parsing fails.
+ */
+function parseSearchQueries(text: string): string[] {
+  try {
+    const parsed = parseLlmJson<unknown>(text);
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((item) => typeof item === "string")
+    ) {
+      return parsed;
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Generates 1-3 targeted web search queries using an LLM.
+ *
+ * When conversation context is available, the model analyzes prior messages
+ * for current event references (named orgs, concrete actions, timeframes)
+ * and generates event-specific queries alongside policy queries.
+ *
+ * Falls back to `buildSearchQuery()` when:
+ * - There is no conversation context (first message in conversation)
+ * - The LLM call fails
+ * - The response cannot be parsed as a JSON array
+ */
+async function generateSearchQueries(
+  model: ChatAnthropic,
+  state: AgentState,
+): Promise<string[]> {
+  const { currentMessage, conversationContext } = buildContextualQuery(
+    state.messages,
+    { maxTurns: 3 },
+  );
+
+  if (!currentMessage) {
+    return [];
+  }
+
+  // No conversation context — skip LLM, use simple query builder
+  if (!conversationContext) {
+    return [buildSearchQuery(state, currentMessage)];
+  }
+
+  try {
+    const prompt = buildResearcherPrompt(
+      currentMessage,
+      conversationContext,
+      state.topicDomain,
+    );
+
+    const response = await invokeAnthropic(model, [
+      new SystemMessage(
+        "You are a web search query generator. Respond with only a JSON array of strings.",
+      ),
+      new HumanMessage(prompt),
+    ]);
+
+    const responseText = extractTextFromResponse(response);
+    const queries = parseSearchQueries(responseText);
+
+    if (queries.length === 0) {
+      log.warn("Failed to parse search queries from LLM", {
+        responseText: responseText.slice(0, 200),
+        ...stateContext(state),
+      });
+      return [buildSearchQuery(state, currentMessage)];
+    }
+
+    log.info("Generated context-aware search queries", {
+      count: queries.length,
+      queries,
+      ...stateContext(state),
+    });
+
+    return queries;
+  } catch (error) {
+    log.warn("LLM query generation failed, falling back to simple query", {
+      error: error instanceof Error ? error.message : String(error),
+      ...stateContext(state),
+    });
+    return [buildSearchQuery(state, currentMessage)];
+  }
 }
 
 /**
@@ -85,18 +190,21 @@ function extractStructuredResults(rawResult: unknown): WebSearchResult[] {
 
 /**
  * Factory function that creates a RESEARCHER node bound to a specific
- * Tavily search instance.
+ * Tavily search instance and LLM model.
  *
  * The node:
- * 1. Builds a search query from the user message + domain context
- * 2. Runs the Tavily web search scoped to trusted domains
- * 3. Parses and returns the results as webSearchResults on state
- * 4. Extracts structured URL results for the source discovery pipeline
+ * 1. Generates 1-3 search queries (LLM-based when conversation context exists)
+ * 2. Runs parallel Tavily web searches scoped to trusted domains
+ * 3. Deduplicates results by URL, sorted by score descending
+ * 4. Returns structured results as webSearchResults + webSearchResultUrls
  *
  * This node is only invoked when retrieval confidence is below the
  * threshold, providing a fallback information source.
  */
-export function createResearcherNode(tavilySearch: TavilySearchLike) {
+export function createResearcherNode(
+  tavilySearch: TavilySearchLike,
+  model: ChatAnthropic,
+) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const userMessage = getLastUserMessage(state.messages);
 
@@ -105,30 +213,65 @@ export function createResearcherNode(tavilySearch: TavilySearchLike) {
       return { webSearchResults: [], webSearchResultUrls: [] };
     }
 
-    const query = buildSearchQuery(state, userMessage);
-
     try {
-      log.info("Running web search", {
-        query: query.slice(0, 200),
+      // Generate targeted search queries (1-3)
+      const queries = await generateSearchQueries(model, state);
+
+      if (queries.length === 0) {
+        log.warn("No search queries generated");
+        return { webSearchResults: [], webSearchResultUrls: [] };
+      }
+
+      log.info("Running web searches", {
+        queryCount: queries.length,
+        queries: queries.map((q) => q.slice(0, 200)),
         trustedDomains: TRUSTED_DOMAINS,
       });
 
-      // Tavily's invoke returns search results (string or object).
-      // We scope the search to trusted USOPC-related domains.
-      // The call is protected by a circuit breaker for resilience.
-      const rawResult = await searchWithTavily(tavilySearch, query);
+      // Execute searches in parallel, preserving partial results on failure
+      const settled = await Promise.allSettled(
+        queries.map((q) => searchWithTavily(tavilySearch, q)),
+      );
 
-      // Extract structured results (url, title, content) when available
-      const structuredResults = extractStructuredResults(rawResult);
+      const rawResults: unknown[] = [];
+      for (const outcome of settled) {
+        if (outcome.status === "fulfilled") {
+          rawResults.push(outcome.value);
+        } else {
+          log.warn("One search query failed", {
+            error:
+              outcome.reason instanceof Error
+                ? outcome.reason.message
+                : String(outcome.reason),
+          });
+        }
+      }
 
-      // Build text results for the synthesizer (preserving existing behavior)
+      // Collect all structured results and deduplicate by URL
+      const seenUrls = new Set<string>();
+      const allStructured: WebSearchResult[] = [];
+
+      for (const rawResult of rawResults) {
+        for (const result of extractStructuredResults(rawResult)) {
+          if (!seenUrls.has(result.url)) {
+            seenUrls.add(result.url);
+            allStructured.push(result);
+          }
+        }
+      }
+
+      // Sort by score descending
+      allStructured.sort((a, b) => b.score - a.score);
+
+      // Build text results for the synthesizer
       let searchResults: string[];
-      if (structuredResults.length > 0) {
-        searchResults = structuredResults
+      if (allStructured.length > 0) {
+        searchResults = allStructured
           .map((r) => r.content)
           .slice(0, MAX_SEARCH_RESULTS);
       } else {
-        // Fallback: parse raw result as text
+        // Fallback: parse first raw result as text (legacy format)
+        const rawResult = rawResults[0];
         const resultText =
           typeof rawResult === "string"
             ? rawResult
@@ -146,12 +289,13 @@ export function createResearcherNode(tavilySearch: TavilySearchLike) {
 
       log.info("Web search complete", {
         resultCount: searchResults.length,
-        structuredUrlCount: structuredResults.length,
+        structuredUrlCount: allStructured.length,
+        queryCount: queries.length,
       });
 
       return {
         webSearchResults: searchResults,
-        webSearchResultUrls: structuredResults.slice(0, MAX_SEARCH_RESULTS),
+        webSearchResultUrls: allStructured.slice(0, MAX_SEARCH_RESULTS),
       };
     } catch (error) {
       const isCircuitOpen = error instanceof CircuitBreakerError;

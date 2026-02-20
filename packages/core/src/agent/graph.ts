@@ -70,7 +70,10 @@ export function createAgentGraph(deps: GraphDependencies) {
     )
     .addNode(
       "researcher",
-      withMetrics("researcher", createResearcherNode(deps.tavilySearch)),
+      withMetrics(
+        "researcher",
+        createResearcherNode(deps.tavilySearch, deps.classifierModel),
+      ),
     )
     .addNode(
       "synthesizer",
