@@ -11,10 +11,7 @@ export type {
   AgentOutput,
   StreamChunk,
 } from "./runner.js";
-export {
-  agentStreamToEvents,
-  legacyStateStreamToEvents,
-} from "./streamAdapter.js";
+export { agentStreamToEvents } from "./streamAdapter.js";
 export type { AgentStreamEvent } from "./streamAdapter.js";
 export {
   nodeMetrics,

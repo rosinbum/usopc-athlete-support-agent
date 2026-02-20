@@ -267,6 +267,63 @@ describe("CircuitBreaker", () => {
       // Restore fake timers for other tests
       vi.useFakeTimers();
     });
+
+    it("counts ETIMEDOUT network errors as timeouts", async () => {
+      const circuit = createCircuitBreaker({ failureThreshold: 5 });
+
+      const networkError = Object.assign(new Error("connect ETIMEDOUT"), {
+        code: "ETIMEDOUT",
+      });
+      await expect(
+        circuit.execute(async () => {
+          throw networkError;
+        }),
+      ).rejects.toThrow();
+
+      expect(circuit.getMetrics().totalTimeouts).toBe(1);
+    });
+
+    it("counts AbortError as a timeout", async () => {
+      const circuit = createCircuitBreaker({ failureThreshold: 5 });
+
+      const abortError = Object.assign(new Error("The operation was aborted"), {
+        name: "AbortError",
+      });
+      await expect(
+        circuit.execute(async () => {
+          throw abortError;
+        }),
+      ).rejects.toThrow();
+
+      expect(circuit.getMetrics().totalTimeouts).toBe(1);
+    });
+
+    it("counts TimeoutError as a timeout", async () => {
+      const circuit = createCircuitBreaker({ failureThreshold: 5 });
+
+      const timeoutError = Object.assign(new Error("Request timed out"), {
+        name: "TimeoutError",
+      });
+      await expect(
+        circuit.execute(async () => {
+          throw timeoutError;
+        }),
+      ).rejects.toThrow();
+
+      expect(circuit.getMetrics().totalTimeouts).toBe(1);
+    });
+
+    it("does not count generic errors as timeouts", async () => {
+      const circuit = createCircuitBreaker({ failureThreshold: 5 });
+
+      await expect(
+        circuit.execute(async () => {
+          throw new Error("Something went wrong involving a timeout message");
+        }),
+      ).rejects.toThrow();
+
+      expect(circuit.getMetrics().totalTimeouts).toBe(0);
+    });
   });
 
   describe("executeWithFallback", () => {
