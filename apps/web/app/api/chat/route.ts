@@ -5,7 +5,6 @@ import {
 } from "ai";
 import { getResource, logger } from "@usopc/shared";
 import { z } from "zod";
-import { auth } from "../../../auth.js";
 
 const log = logger.child({ service: "chat-route" });
 
@@ -99,11 +98,6 @@ async function getRunner() {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     log.info("POST /api/chat called");
     const body = await req.json();
