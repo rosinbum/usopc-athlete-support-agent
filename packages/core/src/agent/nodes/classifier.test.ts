@@ -733,6 +733,105 @@ describe("classifierNode", () => {
       const result = await classifierNode(state);
       expect(result.emotionalState).toBe("neutral");
     });
+
+    it("classifies governance complaint as neutral, not distressed", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "governance",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          emotionalState: "neutral",
+        }),
+      );
+
+      const state = makeState({
+        messages: [new HumanMessage("athletes don't have a voice in my NGB")],
+      });
+      const result = await classifierNode(state);
+      expect(result.emotionalState).toBe("neutral");
+    });
+
+    it("classifies frustration with process as neutral", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "team_selection",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          emotionalState: "neutral",
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage("I'm frustrated with the selection criteria"),
+        ],
+      });
+      const result = await classifierNode(state);
+      expect(result.emotionalState).toBe("neutral");
+    });
+
+    it("classifies institutional criticism as neutral", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "governance",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          emotionalState: "neutral",
+        }),
+      );
+
+      const state = makeState({
+        messages: [new HumanMessage("the system is broken and nobody cares")],
+      });
+      const result = await classifierNode(state);
+      expect(result.emotionalState).toBe("neutral");
+    });
+
+    it("classifies advocacy language as neutral", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "governance",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          emotionalState: "neutral",
+        }),
+      );
+
+      const state = makeState({
+        messages: [new HumanMessage("my NGB isn't following its own bylaws")],
+      });
+      const result = await classifierNode(state);
+      expect(result.emotionalState).toBe("neutral");
+    });
+
+    it("classifies genuine personal distress as distressed", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "safesport",
+          detectedNgbIds: [],
+          queryIntent: "general",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          emotionalState: "distressed",
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage("I feel completely alone and I can't go on"),
+        ],
+      });
+      const result = await classifierNode(state);
+      expect(result.emotionalState).toBe("distressed");
+    });
   });
 
   describe("CircuitBreakerError handling", () => {

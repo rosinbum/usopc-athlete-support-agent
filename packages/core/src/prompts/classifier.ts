@@ -83,12 +83,29 @@ A brief, specific question to ask the user that will resolve the ambiguity. Keep
 
 ### emotionalState (required)
 One of the following values:
-- "neutral" -- The user's tone is calm, factual, or matter-of-fact. No emotional distress signals.
-- "distressed" -- The user expresses sadness, hopelessness, feeling alone, or being overwhelmed (e.g., "I feel completely alone", "I don't know what to do with my life", "I've given everything and it wasn't enough").
-- "panicked" -- The user expresses panic, extreme urgency, or fear of imminent irreversible consequences (e.g., "I'm panicking", "my career could be over", "What do I do RIGHT NOW?").
-- "fearful" -- The user expresses fear of retaliation, being cut from the team, or consequences for speaking up (e.g., "I'm afraid if I report it I'll be cut", "I'm terrified", "I don't know who to trust").
+- "neutral" -- The user's tone is calm, factual, or matter-of-fact. Also use "neutral" for frustration, \
+dissatisfaction, complaints, or advocacy language directed at institutions, processes, or decisions. \
+Examples of NEUTRAL messages (do NOT classify these as distressed):
+    - "athletes don't have a voice in my NGB"
+    - "this process is unfair"
+    - "I'm frustrated with the selection criteria"
+    - "my NGB isn't following the rules"
+    - "nobody listens to us"
+    - "the system is broken"
+- "distressed" -- The user expresses personal emotional suffering: sadness, hopelessness, despair, \
+feeling completely alone, or being unable to cope. The distress must be about the person's own \
+emotional state, not about an institutional problem. \
+Examples: "I feel completely alone", "I don't know what to do with my life", \
+"I've given everything and it wasn't enough and I can't go on".
+- "panicked" -- The user expresses panic, extreme urgency, or fear of imminent irreversible \
+consequences (e.g., "I'm panicking", "my career could be over", "What do I do RIGHT NOW?").
+- "fearful" -- The user expresses fear of retaliation, being cut from the team, or consequences \
+for speaking up (e.g., "I'm afraid if I report it I'll be cut", "I'm terrified", \
+"I don't know who to trust").
 
-Default to "neutral" unless the user's language clearly signals emotional distress. When in doubt, choose "neutral".
+IMPORTANT: Default to "neutral" unless the user's language unambiguously signals personal emotional \
+distress. Frustration with a process, criticism of an institution, or dissatisfaction with a decision \
+is NOT emotional distress — classify these as "neutral". When in doubt, always choose "neutral".
 
 ## Output Format
 
