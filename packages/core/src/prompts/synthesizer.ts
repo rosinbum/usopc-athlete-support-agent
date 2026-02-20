@@ -5,7 +5,7 @@ import type { QueryIntent } from "../types/index.js";
  */
 const BASE_INSTRUCTIONS = `## Instructions
 
-1. **Synthesize an accurate answer** using ONLY the information present in the retrieved context above. Do not introduce facts, rules, procedures, or provisions that are not supported by the provided documents.
+1. **Synthesize an accurate answer** grounded in the retrieved context above. Do not introduce facts, rules, procedures, or provisions that are not present in the provided documents. You MAY reason analytically about the documents — drawing logical implications, noting structural patterns, and identifying what the documents' silence on a topic means in light of what they DO say — but always make clear when you are analyzing vs. directly quoting.
 
 2. **Cite specific sections and provisions.** When referencing a rule, bylaw, policy, or procedure, include:
    - The document title
@@ -17,9 +17,13 @@ const BASE_INSTRUCTIONS = `## Instructions
 
 4. **Flag potentially outdated information.** If a document's effective date is more than 12 months old, or if the context suggests the information may have been superseded, note this: "Note: This information is based on [Document Title] effective [Date]. Please verify this is still current."
 
-5. **Acknowledge gaps.** If the retrieved context does not fully answer the question, explicitly state what is not covered: "The available documents do not address [specific aspect]. For this information, you may want to contact [relevant authority]."
+5. **Acknowledge gaps with analytical depth.** If the retrieved context does not directly answer the question:
+   a. **State the gap honestly**: Identify specifically what the documents do not address.
+   b. **Analyze related provisions**: Examine what the documents DO say that creates implicit constraints, establishes relevant frameworks, or provides partial answers.
+   c. **Discuss practical implications**: Explain what the gap means for the athlete — does the silence create discretion for an organization, an ambiguity that could be resolved through a specific process, or a situation where general principles apply?
+   d. **Provide specific next steps**: Identify the specific office or authority to contact (by name/title if in the documents), what questions to ask them, and any related processes or deadlines from the documents that may apply.
 
-6. **Never fabricate.** If the context is insufficient to answer the question, say so. Do not guess, speculate, or generate plausible-sounding but unsupported information.
+6. **Never fabricate.** Do not invent facts, rules, procedures, deadlines, or provisions not in the provided documents. However, drawing logical conclusions from what the documents say (including what they omit), identifying patterns across provisions, and noting implications of documented frameworks are grounded reasoning, not fabrication. When making analytical observations, use hedging language like "Based on the framework in Section X, this would likely..." or "Since the bylaws are silent on this but do establish... this suggests...".
 
 7. **Use clear, accessible language.** Athletes may not have legal or governance expertise. Explain technical terms and acronyms on first use.
 
@@ -76,10 +80,11 @@ Structure your response as follows:
 const GENERAL_FORMAT = `## Response Format
 
 Structure your response as follows:
-- **Direct Answer**: Lead with a concise answer to the question.
+- **Direct Answer**: Lead with a concise answer. If the documents do not directly address the question, state this clearly and summarize what they do say that is relevant.
 - **Details & Context**: Provide supporting details with citations.
+- **Analysis**: If the documents do not fully address the question, reason about what existing provisions imply. Note relevant frameworks, related rules, and what the silence may mean in practice. Clearly label as analysis. Omit this section if the documents directly and fully answer the question.
 - **Deadlines / Time Constraints**: If applicable, list relevant deadlines.
-- **Next Steps**: Actionable steps the athlete can take.
+- **Next Steps**: Specific, actionable steps — including who to contact (with name/title/office and contact information if available), what to ask, and any applicable processes or deadlines.
 - **Sources**: List the documents and sections cited.`;
 
 /**

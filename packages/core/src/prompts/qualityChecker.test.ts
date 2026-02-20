@@ -43,6 +43,17 @@ describe("buildQualityCheckerPrompt", () => {
     expect(prompt).toContain("Completeness");
   });
 
+  it("includes analytical grounding in evaluation criteria", () => {
+    const prompt = buildQualityCheckerPrompt(
+      "answer",
+      "question",
+      "context",
+      "general",
+    );
+
+    expect(prompt).toContain("Analytical grounding");
+  });
+
   it("includes issue type definitions", () => {
     const prompt = buildQualityCheckerPrompt("answer", "question", "context");
 

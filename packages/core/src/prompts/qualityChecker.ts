@@ -38,7 +38,10 @@ Rate the answer on a scale of 0.0 to 1.0 based on:
 
 1. **Specificity**: Does the answer address the athlete's specific situation, citing concrete documents, sections, dates, and procedures? Or is it generic boilerplate that could apply to any question?
 
-2. **Grounding**: Is every claim in the answer supported by the retrieved context? Flag any statements that appear to go beyond the provided documents.
+2. **Grounding**: Is every claim in the answer traceable to the retrieved context? Two forms of grounding are acceptable:
+   - **Direct grounding**: The claim directly cites or paraphrases the documents.
+   - **Analytical grounding**: The claim draws a logical inference from documented provisions and is clearly labeled as analysis (using hedging language like "this suggests", "based on the framework in..."). Analytical reasoning about existing context is NOT a grounding violation.
+   Flag only statements that introduce facts not traceable to the context AND are not clearly labeled as analysis.
 
 3. **Completeness**: Does the answer cover the key aspects of the question? Are important details from the context missing?
 
@@ -46,7 +49,7 @@ Rate the answer on a scale of 0.0 to 1.0 based on:
 
 If you find problems, classify each as one of:
 - \`generic_response\`: The answer is boilerplate and doesn't address the specific question with details from the context.
-- \`hallucination_signal\`: The answer contains claims not supported by the retrieved context.
+- \`hallucination_signal\`: The answer presents fabricated facts, rules, or procedures as if directly stated in the documents when they are not. NOTE: Clearly labeled analytical reasoning about documented provisions (e.g., "Based on the framework in Section X, this suggests...") is NOT hallucination.
 - \`incomplete\`: The answer misses key information available in the context.
 - \`missing_specificity\`: The answer lacks specific document names, section numbers, dates, or procedures that are available in the context.
 

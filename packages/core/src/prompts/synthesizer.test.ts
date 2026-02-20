@@ -101,7 +101,7 @@ describe("buildSynthesizerPrompt", () => {
       "Cite specific sections",
       "Distinguish between organizations",
       "Flag potentially outdated information",
-      "Acknowledge gaps",
+      "Acknowledge gaps with analytical depth",
       "Never fabricate",
       "Use clear, accessible language",
     ];
@@ -110,6 +110,26 @@ describe("buildSynthesizerPrompt", () => {
       expect(factualPrompt).toContain(instruction);
       expect(generalPrompt).toContain(instruction);
     }
+  });
+
+  it("includes analytical reasoning permission in base instructions", () => {
+    const prompt = buildSynthesizerPrompt(context, userQuestion, "general");
+
+    expect(prompt).toContain("reason analytically");
+    expect(prompt).toContain("hedging language");
+  });
+
+  it("includes Analysis section in general format", () => {
+    const prompt = buildSynthesizerPrompt(context, userQuestion, "general");
+
+    expect(prompt).toContain("**Analysis**");
+    expect(prompt).toContain("Omit this section");
+  });
+
+  it("includes who to contact in Next Steps", () => {
+    const prompt = buildSynthesizerPrompt(context, userQuestion, "general");
+
+    expect(prompt).toContain("who to contact");
   });
 
   it("includes the system role description in all prompts", () => {
