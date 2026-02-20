@@ -480,4 +480,80 @@ describe("createResearcherNode — context-aware queries", () => {
       .calls[0]![0] as { query: string };
     expect(invokeArg.query).toContain("USOPC NGB governance");
   });
+
+  it("preserves partial results when one parallel search fails", async () => {
+    // First query succeeds, second query rejects
+    const tavily: TavilySearchLike = {
+      invoke: vi
+        .fn()
+        .mockResolvedValueOnce({
+          results: [
+            {
+              url: "https://usopc.org/success",
+              title: "Successful Result",
+              content: "good content",
+              score: 0.9,
+            },
+          ],
+        })
+        .mockRejectedValueOnce(new Error("Tavily timeout")),
+    };
+    const node = createResearcherNode(tavily, mockModel);
+
+    const state = makeState({
+      messages: [
+        new HumanMessage("USA Judo removed a board member"),
+        new AIMessage("I can help."),
+        new HumanMessage("What are the rules?"),
+      ],
+      topicDomain: "governance",
+    });
+
+    mockInvokeAnthropic.mockResolvedValue(new AIMessage("mock"));
+    mockExtractText.mockReturnValue('["query 1", "query 2"]');
+
+    const result = await node(state);
+
+    // Should preserve the successful result, not return empty
+    expect(result.webSearchResults).toHaveLength(1);
+    expect(result.webSearchResults![0]).toBe("good content");
+    expect(result.webSearchResultUrls).toHaveLength(1);
+    expect(result.webSearchResultUrls![0]!.url).toBe(
+      "https://usopc.org/success",
+    );
+  });
+
+  it("parses LLM response wrapped in markdown code fences", async () => {
+    const tavily = makeMockTavily({
+      results: [
+        {
+          url: "https://usopc.org/doc",
+          title: "Doc",
+          content: "content",
+          score: 0.85,
+        },
+      ],
+    });
+    const node = createResearcherNode(tavily, mockModel);
+
+    const state = makeState({
+      messages: [
+        new HumanMessage("Context message"),
+        new AIMessage("Response"),
+        new HumanMessage("Follow-up"),
+      ],
+    });
+
+    mockInvokeAnthropic.mockResolvedValue(new AIMessage("mock"));
+    // LLM wraps response in markdown code fences (common behavior)
+    mockExtractText.mockReturnValue('```json\n["fenced query"]\n```');
+
+    await node(state);
+
+    // parseLlmJson should strip the fences and parse successfully
+    expect(tavily.invoke).toHaveBeenCalledOnce();
+    const invokeArg = (tavily.invoke as ReturnType<typeof vi.fn>).mock
+      .calls[0]![0] as { query: string };
+    expect(invokeArg.query).toBe("fenced query");
+  });
 });

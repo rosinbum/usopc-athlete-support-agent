@@ -11,6 +11,7 @@ import { searchWithTavily } from "../../services/tavilyService.js";
 import {
   buildContextualQuery,
   getLastUserMessage,
+  parseLlmJson,
   stateContext,
 } from "../../utils/index.js";
 import { buildResearcherPrompt } from "../../prompts/index.js";
@@ -67,11 +68,12 @@ function buildSearchQuery(state: AgentState, userMessage: string): string {
 
 /**
  * Parses a JSON array of search query strings from the model response.
- * Returns an empty array if parsing fails.
+ * Uses {@link parseLlmJson} for length-guarded parsing with markdown
+ * fence stripping. Returns an empty array if parsing fails.
  */
 function parseSearchQueries(text: string): string[] {
   try {
-    const parsed = JSON.parse(text.trim());
+    const parsed = parseLlmJson<unknown>(text);
     if (
       Array.isArray(parsed) &&
       parsed.every((item) => typeof item === "string")
@@ -226,10 +228,24 @@ export function createResearcherNode(
         trustedDomains: TRUSTED_DOMAINS,
       });
 
-      // Execute searches in parallel
-      const rawResults = await Promise.all(
+      // Execute searches in parallel, preserving partial results on failure
+      const settled = await Promise.allSettled(
         queries.map((q) => searchWithTavily(tavilySearch, q)),
       );
+
+      const rawResults: unknown[] = [];
+      for (const outcome of settled) {
+        if (outcome.status === "fulfilled") {
+          rawResults.push(outcome.value);
+        } else {
+          log.warn("One search query failed", {
+            error:
+              outcome.reason instanceof Error
+                ? outcome.reason.message
+                : String(outcome.reason),
+          });
+        }
+      }
 
       // Collect all structured results and deduplicate by URL
       const seenUrls = new Set<string>();
