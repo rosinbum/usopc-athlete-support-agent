@@ -23,13 +23,10 @@ vi.mock("@usopc/shared", () => ({
 const mockAddVectors = vi.fn();
 const mockEmbedDocuments = vi.fn();
 
-vi.mock("@usopc/core/src/config/index", () => ({
+vi.mock("@usopc/core", () => ({
   MODEL_CONFIG: {
     embeddings: { model: "text-embedding-3-small", dimensions: 1536 },
   },
-}));
-
-vi.mock("@usopc/core/src/rag/index", () => ({
   createRawEmbeddings: vi.fn(() => ({
     embedDocuments: mockEmbedDocuments,
   })),
