@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  agentStreamToEvents,
-  legacyStateStreamToEvents,
-} from "./streamAdapter.js";
+import { agentStreamToEvents } from "./streamAdapter.js";
 import type { AgentStreamEvent } from "./streamAdapter.js";
-import type { AgentState } from "./state.js";
 import type { StreamChunk } from "./runner.js";
 
 // ---------------------------------------------------------------------------
@@ -22,32 +18,11 @@ async function* mockDualStream(
   }
 }
 
-/**
- * Creates a mock state-only stream for legacy adapter testing.
- */
-async function* mockStateStream(
-  updates: Array<Partial<AgentState>>,
-): AsyncGenerator<Partial<AgentState>> {
-  for (const update of updates) {
-    yield update;
-  }
-}
-
 async function collectEvents(
   stream: AsyncIterable<StreamChunk>,
 ): Promise<AgentStreamEvent[]> {
   const events: AgentStreamEvent[] = [];
   for await (const event of agentStreamToEvents(stream)) {
-    events.push(event);
-  }
-  return events;
-}
-
-async function collectLegacyEvents(
-  stream: AsyncIterable<Partial<AgentState>>,
-): Promise<AgentStreamEvent[]> {
-  const events: AgentStreamEvent[] = [];
-  for await (const event of legacyStateStreamToEvents(stream)) {
     events.push(event);
   }
   return events;
@@ -569,168 +544,5 @@ describe("agentStreamToEvents (dual-mode)", () => {
     expect(errorEvents).toHaveLength(1);
 
     expect(events[events.length - 1]!.type).toBe("done");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests for legacy state-only streaming
-// ---------------------------------------------------------------------------
-
-describe("legacyStateStreamToEvents", () => {
-  it("emits text deltas for new answer text", async () => {
-    const events = await collectLegacyEvents(
-      mockStateStream([
-        { answer: "Hello" },
-        { answer: "Hello world" },
-        { answer: "Hello world!" },
-      ]),
-    );
-
-    const textDeltas = events.filter((e) => e.type === "text-delta");
-    expect(textDeltas).toHaveLength(3);
-    expect(textDeltas[0]!.textDelta).toBe("Hello");
-    expect(textDeltas[1]!.textDelta).toBe(" world");
-    expect(textDeltas[2]!.textDelta).toBe("!");
-  });
-
-  it("skips text-delta when answer does not change", async () => {
-    const events = await collectLegacyEvents(
-      mockStateStream([
-        { answer: "Hello" },
-        { retrievalConfidence: 0.8 },
-        { answer: "Hello" },
-      ]),
-    );
-
-    const textDeltas = events.filter((e) => e.type === "text-delta");
-    expect(textDeltas).toHaveLength(1);
-    expect(textDeltas[0]!.textDelta).toBe("Hello");
-  });
-
-  it("emits citations event when citations appear", async () => {
-    const citations = [
-      {
-        title: "Selection Procedures",
-        documentType: "policy",
-        snippet: "Athletes are selected...",
-      },
-    ];
-
-    const events = await collectLegacyEvents(
-      mockStateStream([{ answer: "Response", citations }]),
-    );
-
-    const citationEvents = events.filter((e) => e.type === "citations");
-    expect(citationEvents).toHaveLength(1);
-    expect(citationEvents[0]!.citations).toEqual(citations);
-  });
-
-  it("does not emit citations event for empty citations array", async () => {
-    const events = await collectLegacyEvents(
-      mockStateStream([{ answer: "Response", citations: [] }]),
-    );
-
-    const citationEvents = events.filter((e) => e.type === "citations");
-    expect(citationEvents).toHaveLength(0);
-  });
-
-  it("emits escalation event when escalation appears", async () => {
-    const escalation = {
-      target: "U.S. Center for SafeSport",
-      organization: "SafeSport",
-      reason: "abuse report",
-      urgency: "immediate" as const,
-    };
-
-    const events = await collectLegacyEvents(
-      mockStateStream([{ answer: "Contact SafeSport.", escalation }]),
-    );
-
-    const escalationEvents = events.filter((e) => e.type === "escalation");
-    expect(escalationEvents).toHaveLength(1);
-    expect(escalationEvents[0]!.escalation).toEqual(escalation);
-  });
-
-  it("emits done event at end of stream", async () => {
-    const events = await collectLegacyEvents(
-      mockStateStream([{ answer: "Hello" }]),
-    );
-
-    const lastEvent = events[events.length - 1]!;
-    expect(lastEvent.type).toBe("done");
-  });
-
-  it("emits done even for empty stream", async () => {
-    const events = await collectLegacyEvents(mockStateStream([]));
-
-    expect(events).toHaveLength(1);
-    expect(events[0]!.type).toBe("done");
-  });
-
-  it("handles multiple events from a single state update", async () => {
-    const citations = [
-      { title: "Doc", documentType: "policy", snippet: "..." },
-    ];
-    const escalation = {
-      target: "SafeSport",
-      organization: "SafeSport",
-      reason: "report",
-      urgency: "immediate" as const,
-    };
-
-    const events = await collectLegacyEvents(
-      mockStateStream([{ answer: "Answer", citations, escalation }]),
-    );
-
-    const types = events.map((e) => e.type);
-    expect(types).toContain("text-delta");
-    expect(types).toContain("citations");
-    expect(types).toContain("escalation");
-    expect(types).toContain("done");
-  });
-
-  it("does not emit duplicate citations events", async () => {
-    const citations = [
-      { title: "Doc", documentType: "policy", snippet: "..." },
-    ];
-
-    const events = await collectLegacyEvents(
-      mockStateStream([
-        { answer: "Hello", citations },
-        { answer: "Hello world", citations },
-      ]),
-    );
-
-    const citationEvents = events.filter((e) => e.type === "citations");
-    expect(citationEvents).toHaveLength(1);
-  });
-
-  it("propagates errors from source stream", async () => {
-    async function* failingStream(): AsyncGenerator<Partial<AgentState>> {
-      yield { answer: "ok" };
-      throw new Error("Source stream failed");
-    }
-
-    const events: AgentStreamEvent[] = [];
-    await expect(async () => {
-      for await (const event of legacyStateStreamToEvents(failingStream())) {
-        events.push(event);
-      }
-    }).rejects.toThrow("Source stream failed");
-
-    expect(events.some((e) => e.type === "text-delta")).toBe(true);
-  });
-
-  it("handles answer going from undefined to a value", async () => {
-    const events = await collectLegacyEvents(
-      mockStateStream([
-        { topicDomain: "safesport" },
-        { answer: "SafeSport info" },
-      ]),
-    );
-
-    const textDeltas = events.filter((e) => e.type === "text-delta");
-    expect(textDeltas).toHaveLength(1);
-    expect(textDeltas[0]!.textDelta).toBe("SafeSport info");
   });
 });

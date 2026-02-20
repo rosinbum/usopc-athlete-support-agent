@@ -68,6 +68,31 @@ export class CircuitBreakerError extends AppError {
 }
 
 /**
+ * Detects timeout errors using structured checks rather than fragile string
+ * matching. Covers:
+ * - Internal circuit breaker timeouts (from withTimeout below)
+ * - Node.js network timeouts (ETIMEDOUT, ESOCKETTIMEDOUT)
+ * - Web API AbortError (used by fetch and many SDKs)
+ * - Standard TimeoutError (e.g. @anthropic-ai/sdk APIConnectionTimeoutError)
+ */
+function isTimeoutError(error: Error): boolean {
+  // Internal circuit breaker timeout — message set by withTimeout below
+  if (error.message.startsWith("Request timeout after ")) {
+    return true;
+  }
+  // Node.js network-layer timeouts
+  const code = (error as NodeJS.ErrnoException).code;
+  if (code === "ETIMEDOUT" || code === "ESOCKETTIMEDOUT") {
+    return true;
+  }
+  // AbortError (fetch, Anthropic SDK, Tavily) and standard TimeoutError
+  if (error.name === "AbortError" || error.name === "TimeoutError") {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Wraps a promise with a timeout, rejecting if it takes too long.
  */
 function withTimeout<T>(
@@ -254,7 +279,7 @@ export class CircuitBreaker {
 
   private onFailure(error: Error): void {
     // Check if error is a timeout
-    if (error.message.includes("Request timeout")) {
+    if (isTimeoutError(error)) {
       this.totalTimeouts++;
     }
 
