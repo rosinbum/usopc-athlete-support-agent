@@ -1,10 +1,10 @@
 import type { Document } from "@langchain/core/documents";
 import { createLogger, getPool, type AuthorityLevel } from "@usopc/shared";
-import { MODEL_CONFIG } from "@usopc/core/src/config/index";
 import {
+  MODEL_CONFIG,
   createRawEmbeddings,
   createVectorStore,
-} from "@usopc/core/src/rag/index";
+} from "@usopc/core";
 import { loadPdf } from "./loaders/pdfLoader.js";
 import { loadWeb } from "./loaders/webLoader.js";
 import { cleanText } from "./transformers/cleaner.js";
