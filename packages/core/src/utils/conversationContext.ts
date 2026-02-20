@@ -1,4 +1,5 @@
 import type { BaseMessage } from "@langchain/core/messages";
+import { parseEnvInt } from "@usopc/shared";
 
 /**
  * Default number of conversation turns to include in context.
@@ -20,10 +21,7 @@ const DEFAULT_SUMMARY_MAX_TURNS = 2;
  * Configurable via CONVERSATION_MAX_TURNS env var (set in sst.config.ts).
  */
 export function getMaxTurns(): number {
-  const value = process.env.CONVERSATION_MAX_TURNS;
-  if (!value) return DEFAULT_MAX_TURNS;
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? DEFAULT_MAX_TURNS : parsed;
+  return parseEnvInt("CONVERSATION_MAX_TURNS", DEFAULT_MAX_TURNS);
 }
 
 /**
@@ -31,10 +29,7 @@ export function getMaxTurns(): number {
  * Configurable via SUMMARY_MAX_TURNS env var (set in sst.config.ts).
  */
 export function getSummaryMaxTurns(): number {
-  const value = process.env.SUMMARY_MAX_TURNS;
-  if (!value) return DEFAULT_SUMMARY_MAX_TURNS;
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? DEFAULT_SUMMARY_MAX_TURNS : parsed;
+  return parseEnvInt("SUMMARY_MAX_TURNS", DEFAULT_SUMMARY_MAX_TURNS);
 }
 
 /**

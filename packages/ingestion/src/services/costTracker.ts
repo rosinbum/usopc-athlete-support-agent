@@ -1,4 +1,9 @@
-import { createLogger, createAppTable } from "@usopc/shared";
+import {
+  createLogger,
+  createAppTable,
+  parseEnvInt,
+  parseEnvFloat,
+} from "@usopc/shared";
 import { getAppTableName } from "../entities/index.js";
 
 const logger = createLogger({ service: "cost-tracker" });
@@ -235,14 +240,10 @@ export class CostTracker {
   async checkBudget(service: "tavily" | "anthropic"): Promise<BudgetStatus> {
     const budget =
       service === "tavily"
-        ? parseInt(
-            process.env.TAVILY_MONTHLY_BUDGET ??
-              String(DEFAULT_TAVILY_MONTHLY_BUDGET),
-            10,
-          )
-        : parseFloat(
-            process.env.ANTHROPIC_MONTHLY_BUDGET ??
-              String(DEFAULT_ANTHROPIC_MONTHLY_BUDGET),
+        ? parseEnvInt("TAVILY_MONTHLY_BUDGET", DEFAULT_TAVILY_MONTHLY_BUDGET)
+        : parseEnvFloat(
+            "ANTHROPIC_MONTHLY_BUDGET",
+            DEFAULT_ANTHROPIC_MONTHLY_BUDGET,
           );
 
     const stats = await this.getUsageStats(service, "monthly");

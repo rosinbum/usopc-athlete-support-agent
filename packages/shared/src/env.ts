@@ -1,4 +1,5 @@
 import { Resource } from "sst";
+import { z } from "zod";
 
 /**
  * Retrieves a required environment variable. Throws if the variable is not set
@@ -137,4 +138,38 @@ export function isDevelopment(): boolean {
   return (
     process.env.NODE_ENV === "development" || process.env.NODE_ENV === undefined
   );
+}
+
+/**
+ * Parses an environment variable as an integer using Zod.
+ * Throws with a clear message if set but not a valid integer.
+ * Returns `defaultValue` if the variable is unset or empty.
+ */
+export function parseEnvInt(key: string, defaultValue: number): number {
+  const raw = process.env[key];
+  if (!raw) return defaultValue;
+  const result = z.coerce.number().int().safeParse(raw);
+  if (!result.success) {
+    throw new Error(
+      `Invalid integer value for ${key}: "${raw}". Expected a whole number.`,
+    );
+  }
+  return result.data;
+}
+
+/**
+ * Parses an environment variable as a float using Zod.
+ * Throws with a clear message if set but not a valid number.
+ * Returns `defaultValue` if the variable is unset or empty.
+ */
+export function parseEnvFloat(key: string, defaultValue: number): number {
+  const raw = process.env[key];
+  if (!raw) return defaultValue;
+  const result = z.coerce.number().safeParse(raw);
+  if (!result.success) {
+    throw new Error(
+      `Invalid numeric value for ${key}: "${raw}". Expected a number.`,
+    );
+  }
+  return result.data;
 }

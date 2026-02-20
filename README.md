@@ -1,6 +1,6 @@
 # USOPC Athlete Support Agent
 
-> **Work in Progress**: This project is under active development and should be treated as a prototype. It represents approximately 76.7 hours of development time and is not yet production-ready. Features may be incomplete, APIs may change, and the knowledge base needs additional content and quality improvements.
+> **Work in Progress**: This project is under active development and should be treated as a prototype. It represents approximately 77.0 hours of development time and is not yet production-ready. Features may be incomplete, APIs may change, and the knowledge base needs additional content and quality improvements.
 
 An AI-powered governance and compliance assistant for U.S. Olympic and Paralympic athletes. Ask questions about anti-doping rules, athlete rights, competition eligibility, and other USOPC policies — get accurate, cited answers with appropriate disclaimers.
 
@@ -144,10 +144,10 @@ See [CLAUDE.md](./CLAUDE.md) for detailed development guidelines.
 
 <!-- HOURS:START -->
 
-**Tracked build time:** 76.7 hours
+**Tracked build time:** 77.0 hours
 
 - Method: terminal-activity-based (idle cutoff: 10 min)
-- Last updated: 2026-02-20T02:16:16.671Z
+- Last updated: 2026-02-20T02:33:40.436Z
 <!-- HOURS:END -->
 
 ## License

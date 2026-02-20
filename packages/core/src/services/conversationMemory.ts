@@ -1,7 +1,7 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
-import { logger } from "@usopc/shared";
+import { logger, parseEnvInt } from "@usopc/shared";
 import { getModelConfig } from "../config/index.js";
 import {
   invokeAnthropic,
@@ -19,10 +19,7 @@ const DEFAULT_SUMMARY_TTL_MS = 3_600_000;
  * Configurable via SUMMARY_TTL_MS env var (set in sst.config.ts).
  */
 export function getSummaryTtlMs(): number {
-  const value = process.env.SUMMARY_TTL_MS;
-  if (!value) return DEFAULT_SUMMARY_TTL_MS;
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? DEFAULT_SUMMARY_TTL_MS : parsed;
+  return parseEnvInt("SUMMARY_TTL_MS", DEFAULT_SUMMARY_TTL_MS);
 }
 
 /**

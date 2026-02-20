@@ -31,9 +31,11 @@ describe("conversationContext", () => {
       expect(getMaxTurns()).toBe(10);
     });
 
-    it("returns default for invalid (non-numeric) value", () => {
+    it("throws for invalid (non-numeric) value", () => {
       process.env.CONVERSATION_MAX_TURNS = "invalid";
-      expect(getMaxTurns()).toBe(5);
+      expect(() => getMaxTurns()).toThrow(
+        'Invalid integer value for CONVERSATION_MAX_TURNS: "invalid"',
+      );
     });
 
     it("returns default for empty string", () => {
