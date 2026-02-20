@@ -104,6 +104,7 @@ describe("buildSynthesizerPrompt", () => {
       "Acknowledge gaps with analytical depth",
       "Never fabricate",
       "Use clear, accessible language",
+      "Include contact details with referrals",
     ];
 
     for (const instruction of baseInstructions) {
