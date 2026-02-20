@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { ParamBuilder } from "./paramBuilder.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,56 +53,62 @@ export async function updateChunkMetadataBySourceId(
   sourceId: string,
   updates: ChunkMetadataUpdates,
 ): Promise<number> {
-  // Build the JSONB patch and extra column updates linearly.
-  // Final params: $1 = sourceId, $2 = jsonb patch, $3+ = column values
   const jsonbPatch: Record<string, unknown> = {};
-  const extraClauses: string[] = [];
-  const extraParams: unknown[] = [];
 
   if (updates.title !== undefined) {
     jsonbPatch.documentTitle = updates.title;
-    extraClauses.push(`document_title = $${extraParams.length + 3}`);
-    extraParams.push(updates.title);
   }
-
   if (updates.documentType !== undefined) {
     jsonbPatch.documentType = updates.documentType;
-    extraClauses.push(`document_type = $${extraParams.length + 3}`);
-    extraParams.push(updates.documentType);
   }
-
   if (updates.topicDomains !== undefined) {
     jsonbPatch.topicDomain = updates.topicDomains[0] ?? null;
     jsonbPatch.topicDomains = updates.topicDomains;
-    extraClauses.push(`topic_domain = $${extraParams.length + 3}`);
-    extraParams.push(updates.topicDomains[0] ?? null);
   }
-
   if (updates.ngbId !== undefined) {
     jsonbPatch.ngbId = updates.ngbId;
-    extraClauses.push(`ngb_id = $${extraParams.length + 3}`);
-    extraParams.push(updates.ngbId);
   }
-
   if (updates.authorityLevel !== undefined) {
     jsonbPatch.authorityLevel = updates.authorityLevel;
-    extraClauses.push(`authority_level = $${extraParams.length + 3}`);
-    extraParams.push(updates.authorityLevel);
   }
 
   if (Object.keys(jsonbPatch).length === 0) {
     return 0;
   }
 
-  const setClauses = [`metadata = metadata || $2::jsonb`, ...extraClauses];
-  const params: unknown[] = [
-    sourceId,
-    JSON.stringify(jsonbPatch),
-    ...extraParams,
-  ];
+  // Use ParamBuilder so that $N indices are derived automatically from
+  // insertion order. Adding or reordering params here never silently
+  // breaks downstream placeholders.
+  const p = new ParamBuilder();
+  const sourceIdRef = p.add(sourceId); // $1 — used in WHERE
+  const jsonbRef = p.add(JSON.stringify(jsonbPatch)); // $2 — used in SET
 
-  const sql = `UPDATE document_chunks SET ${setClauses.join(", ")} WHERE metadata->>'sourceId' = $1`;
-  const result = await pool.query(sql, params);
+  const extraClauses: string[] = [];
+
+  if (updates.title !== undefined) {
+    extraClauses.push(`document_title = ${p.add(updates.title)}`);
+  }
+  if (updates.documentType !== undefined) {
+    extraClauses.push(`document_type = ${p.add(updates.documentType)}`);
+  }
+  if (updates.topicDomains !== undefined) {
+    extraClauses.push(
+      `topic_domain = ${p.add(updates.topicDomains[0] ?? null)}`,
+    );
+  }
+  if (updates.ngbId !== undefined) {
+    extraClauses.push(`ngb_id = ${p.add(updates.ngbId)}`);
+  }
+  if (updates.authorityLevel !== undefined) {
+    extraClauses.push(`authority_level = ${p.add(updates.authorityLevel)}`);
+  }
+
+  const setClauses = [
+    `metadata = metadata || ${jsonbRef}::jsonb`,
+    ...extraClauses,
+  ];
+  const sql = `UPDATE document_chunks SET ${setClauses.join(", ")} WHERE metadata->>'sourceId' = ${sourceIdRef}`;
+  const result = await pool.query(sql, p.values());
   return result.rowCount ?? 0;
 }
 
