@@ -29,7 +29,7 @@ vi.mock("./edges/routeByDomain.js", () => ({
 }));
 
 vi.mock("./edges/needsMoreInfo.js", () => ({
-  createNeedsMoreInfo: () => vi.fn(),
+  needsMoreInfo: vi.fn(),
 }));
 
 vi.mock("./edges/routeByQuality.js", () => ({
@@ -40,15 +40,8 @@ vi.mock("./nodeMetrics.js", () => ({
   withMetrics: (_name: string, fn: unknown) => fn,
 }));
 
-vi.mock("../config/featureFlags.js", () => ({
-  getFeatureFlags: vi.fn(),
-}));
-
 import { createAgentGraph } from "./graph.js";
 import type { GraphDependencies } from "./graph.js";
-import { getFeatureFlags } from "../config/featureFlags.js";
-
-const mockGetFeatureFlags = vi.mocked(getFeatureFlags);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -71,18 +64,6 @@ function makeDeps(): GraphDependencies {
   };
 }
 
-const allFlagsOff = {
-  qualityChecker: false,
-  conversationMemory: false,
-  sourceDiscovery: false,
-  multiStepPlanner: false,
-  feedbackLoop: false,
-  retrievalExpansion: false,
-  queryPlanner: false,
-  emotionalSupport: false,
-  parallelResearch: false,
-};
-
 /**
  * Extracts node names from a compiled LangGraph graph.
  * Uses Object.keys on the nodes record structure.
@@ -104,8 +85,7 @@ describe("createAgentGraph", () => {
     vi.clearAllMocks();
   });
 
-  it("compiles without error with all flags off", () => {
-    mockGetFeatureFlags.mockReturnValue(allFlagsOff);
+  it("compiles without error", () => {
     const graph = createAgentGraph(makeDeps());
     expect(graph).toBeDefined();
     expect(typeof graph.invoke).toBe("function");
@@ -113,7 +93,6 @@ describe("createAgentGraph", () => {
   });
 
   it("registers all expected nodes", () => {
-    mockGetFeatureFlags.mockReturnValue(allFlagsOff);
     const graph = createAgentGraph(makeDeps());
     const nodes = getNodeNames(graph);
 
@@ -135,48 +114,5 @@ describe("createAgentGraph", () => {
     for (const name of expectedNodes) {
       expect(nodes).toContain(name);
     }
-  });
-
-  it("compiles with qualityChecker flag on", () => {
-    mockGetFeatureFlags.mockReturnValue({
-      ...allFlagsOff,
-      qualityChecker: true,
-    });
-    const graph = createAgentGraph(makeDeps());
-    expect(graph).toBeDefined();
-  });
-
-  it("compiles with retrievalExpansion flag on", () => {
-    mockGetFeatureFlags.mockReturnValue({
-      ...allFlagsOff,
-      retrievalExpansion: true,
-    });
-    const graph = createAgentGraph(makeDeps());
-    expect(graph).toBeDefined();
-  });
-
-  it("compiles with emotionalSupport flag on", () => {
-    mockGetFeatureFlags.mockReturnValue({
-      ...allFlagsOff,
-      emotionalSupport: true,
-    });
-    const graph = createAgentGraph(makeDeps());
-    expect(graph).toBeDefined();
-  });
-
-  it("compiles with all flags on", () => {
-    mockGetFeatureFlags.mockReturnValue({
-      qualityChecker: true,
-      conversationMemory: true,
-      sourceDiscovery: true,
-      multiStepPlanner: true,
-      feedbackLoop: true,
-      retrievalExpansion: true,
-      queryPlanner: true,
-      emotionalSupport: true,
-      parallelResearch: true,
-    });
-    const graph = createAgentGraph(makeDeps());
-    expect(graph).toBeDefined();
   });
 });

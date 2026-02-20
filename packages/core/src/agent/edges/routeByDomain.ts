@@ -1,4 +1,3 @@
-import { getFeatureFlags } from "../../config/featureFlags.js";
 import type { AgentState } from "../state.js";
 
 /**
@@ -7,12 +6,11 @@ import type { AgentState } from "../state.js";
  * Routes based on classification results:
  * - needsClarification=true -> clarify node (ask user for more info)
  * - "escalation" intent -> escalate node (SafeSport, urgent disputes, etc.)
- * - queryPlanner flag on -> queryPlanner node (decompose multi-domain queries)
- * - other intents -> retriever node
+ * - other intents -> queryPlanner node (decompose multi-domain queries)
  */
 export function routeByDomain(
   state: AgentState,
-): "clarify" | "retriever" | "escalate" | "queryPlanner" {
+): "clarify" | "escalate" | "queryPlanner" {
   // First check if clarification is needed
   if (state.needsClarification) {
     return "clarify";
@@ -23,12 +21,5 @@ export function routeByDomain(
     return "escalate";
   }
 
-  // Route through query planner when feature flag is enabled
-  const flags = getFeatureFlags();
-  if (flags.queryPlanner) {
-    return "queryPlanner";
-  }
-
-  // Default to retrieval
-  return "retriever";
+  return "queryPlanner";
 }

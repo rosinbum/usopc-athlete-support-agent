@@ -92,18 +92,6 @@ export default $config({
         rate: 60,
       },
     });
-    // Feature flags — passed through to Lambda environment
-    const featureFlags = {
-      FEATURE_QUALITY_CHECKER: process.env.FEATURE_QUALITY_CHECKER ?? "true",
-      FEATURE_CONVERSATION_MEMORY:
-        process.env.FEATURE_CONVERSATION_MEMORY ?? "true",
-      FEATURE_SOURCE_DISCOVERY: process.env.FEATURE_SOURCE_DISCOVERY ?? "true",
-      FEATURE_MULTI_STEP_PLANNER:
-        process.env.FEATURE_MULTI_STEP_PLANNER ?? "true",
-      FEATURE_FEEDBACK_LOOP: process.env.FEATURE_FEEDBACK_LOOP ?? "true",
-      FEATURE_QUERY_PLANNER: process.env.FEATURE_QUERY_PLANNER ?? "true",
-    };
-
     // Slack bot webhook
     const slackApi = new sst.aws.ApiGatewayV2("SlackApi");
     slackApi.route("POST /slack/events", {
@@ -113,7 +101,6 @@ export default $config({
       memory: "512 MB",
       environment: {
         ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
-        ...featureFlags,
       },
     });
 
@@ -254,7 +241,6 @@ export default $config({
       environment: {
         ALLOWED_ORIGIN: web.url,
         ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
-        ...featureFlags,
       },
     });
 
