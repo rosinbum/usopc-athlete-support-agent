@@ -198,8 +198,8 @@ describe("SourceConfigEntity", () => {
   });
 
   describe("getAll", () => {
-    it("returns all sources via model.scan", async () => {
-      mockScan.mockResolvedValueOnce([
+    it("queries gsi1 with SOURCE#ALL partition key", async () => {
+      mockFind.mockResolvedValueOnce([
         internalItem({ id: "src1" }),
         internalItem({ id: "src2", enabled: "false" }),
       ]);
@@ -210,10 +210,14 @@ describe("SourceConfigEntity", () => {
       expect(results[0].id).toBe("src1");
       expect(results[1].id).toBe("src2");
       expect(results[1].enabled).toBe(false);
+      expect(mockFind).toHaveBeenCalledWith(
+        { gsi1pk: "SOURCE#ALL" },
+        { index: "gsi1" },
+      );
     });
 
     it("returns empty array when no sources exist", async () => {
-      mockScan.mockResolvedValueOnce([]);
+      mockFind.mockResolvedValueOnce([]);
 
       const results = await entity.getAll();
 
