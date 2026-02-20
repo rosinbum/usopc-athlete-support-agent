@@ -23,6 +23,7 @@ export {
   ExternalServiceError,
   IngestionError,
 } from "./errors.js";
+export type { ApiError } from "./errors.js";
 
 export {
   getRequiredEnv,

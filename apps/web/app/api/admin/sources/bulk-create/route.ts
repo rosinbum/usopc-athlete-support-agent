@@ -10,6 +10,7 @@ import {
 const log = logger.child({ service: "admin-sources-bulk-create" });
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
+import { apiError } from "../../../../../lib/apiResponse.js";
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -100,9 +101,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ results }, { status: 201 });
   } catch (error) {
     log.error("Bulk create error", { error: String(error) });
-    return NextResponse.json(
-      { error: "Failed to process bulk create request" },
-      { status: 500 },
-    );
+    return apiError("Failed to process bulk create request", 500);
   }
 }

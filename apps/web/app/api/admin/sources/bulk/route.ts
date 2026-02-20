@@ -10,6 +10,7 @@ import {
 const log = logger.child({ service: "admin-sources-bulk" });
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
+import { apiError } from "../../../../../lib/apiResponse.js";
 
 interface BulkRequest {
   action: "enable" | "disable" | "ingest" | "delete";
@@ -25,14 +26,11 @@ export async function POST(request: Request) {
     const { action, ids } = body;
 
     if (!action || !ids || !Array.isArray(ids) || ids.length === 0) {
-      return NextResponse.json(
-        { error: "Invalid request: action and ids are required" },
-        { status: 400 },
-      );
+      return apiError("Invalid request: action and ids are required", 400);
     }
 
     if (!["enable", "disable", "ingest", "delete"].includes(action)) {
-      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+      return apiError("Invalid action", 400);
     }
 
     const entity = createSourceConfigEntity();
@@ -47,10 +45,7 @@ export async function POST(request: Request) {
         queueUrl = getResource("IngestionQueue").url;
         sqs = new SQSClient({});
       } catch {
-        return NextResponse.json(
-          { error: "Ingestion queue not available (dev environment)" },
-          { status: 501 },
-        );
+        return apiError("Ingestion queue not available (dev environment)", 501);
       }
     }
 
@@ -105,9 +100,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ succeeded, failed });
   } catch (error) {
     log.error("Admin bulk action error", { error: String(error) });
-    return NextResponse.json(
-      { error: "Failed to perform bulk action" },
-      { status: 500 },
-    );
+    return apiError("Failed to perform bulk action", 500);
   }
 }

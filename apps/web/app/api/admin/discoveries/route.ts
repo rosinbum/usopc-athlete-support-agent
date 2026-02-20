@@ -5,6 +5,7 @@ import type { DiscoveryStatus } from "@usopc/shared";
 const log = logger.child({ service: "admin-discoveries" });
 import { requireAdmin } from "../../../../lib/admin-api.js";
 import { createDiscoveredSourceEntity } from "../../../../lib/discovered-source.js";
+import { apiError } from "../../../../lib/apiResponse.js";
 
 const VALID_STATUSES = new Set<DiscoveryStatus>([
   "pending_metadata",
@@ -25,10 +26,7 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get("status");
 
     if (status && !VALID_STATUSES.has(status as DiscoveryStatus)) {
-      return NextResponse.json(
-        { error: "Invalid status filter" },
-        { status: 400 },
-      );
+      return apiError("Invalid status filter", 400);
     }
 
     const entity = createDiscoveredSourceEntity();
@@ -39,9 +37,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ discoveries });
   } catch (error) {
     log.error("Admin discoveries list error", { error: String(error) });
-    return NextResponse.json(
-      { error: "Failed to fetch discoveries" },
-      { status: 500 },
-    );
+    return apiError("Failed to fetch discoveries", 500);
   }
 }
