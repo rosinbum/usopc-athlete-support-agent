@@ -15,6 +15,8 @@ One of the following values:
 - "eligibility" -- Questions about athlete eligibility, citizenship requirements, age limits, qualification standards, transfer of allegiance.
 - "governance" -- Questions about USOPC structure, NGB certification, bylaws, board composition, organizational compliance, Ted Stevens Act.
 - "athlete_rights" -- Questions about athlete representation, Athletes' Advisory Council, marketing rights, Athlete Bill of Rights, sponsorship, Name/Image/Likeness.
+- "athlete_safety" -- Questions about physical safety, concussion protocols, injury prevention, return-to-play, environmental safety, or athlete well-being programs.
+- "financial_assistance" -- Questions about athlete grants, stipends, USOPC financial programs, Op Gold, training expense assistance, or financial aid for athletes.
 
 ### detectedNgbIds (required)
 An array of NGB or sport organization identifiers mentioned or implied in the query. \
