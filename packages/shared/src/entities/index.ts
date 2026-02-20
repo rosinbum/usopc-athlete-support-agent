@@ -1,6 +1,12 @@
 export { AppTableSchema } from "./schema.js";
 export { createAppTable } from "./table.js";
 export {
+  getAppTableName,
+  createSourceConfigEntity,
+  createIngestionLogEntity,
+  createDiscoveredSourceEntity,
+} from "./factory.js";
+export {
   SourceConfigEntity,
   type SourceConfig,
   type CreateSourceInput,

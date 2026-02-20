@@ -83,6 +83,12 @@ export { SportOrgEntity } from "./entities/index.js";
 export { AgentModelEntity, type AgentModelConfig } from "./entities/index.js";
 export { IngestionLogEntity, type IngestionLog } from "./entities/index.js";
 export { PromptEntity, type PromptConfig } from "./entities/index.js";
+export {
+  getAppTableName,
+  createSourceConfigEntity,
+  createIngestionLogEntity,
+  createDiscoveredSourceEntity,
+} from "./entities/index.js";
 export type {
   OlympicProgram,
   OrgStatus,
