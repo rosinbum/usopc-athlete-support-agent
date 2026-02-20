@@ -75,14 +75,18 @@ async function checkDatabase(): Promise<void> {
 // CLI arg parsing
 // ---------------------------------------------------------------------------
 
-function parseArgs(): { category?: string; tag?: string } {
+function parseArgs(): {
+  category?: string | undefined;
+  tag?: string | undefined;
+} {
   const args = process.argv.slice(2);
-  const result: { category?: string; tag?: string } = {};
+  const result: { category?: string | undefined; tag?: string | undefined } =
+    {};
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--category" && args[i + 1]) {
-      result.category = args[++i];
+      result.category = args[++i]!;
     } else if (args[i] === "--tag" && args[i + 1]) {
-      result.tag = args[++i];
+      result.tag = args[++i]!;
     }
   }
   return result;
@@ -135,7 +139,7 @@ async function runScenario(
   const traced = traceable(
     async (input: {
       messages: Array<{ role: "user" | "assistant"; content: string }>;
-      userSport?: string;
+      userSport?: string | undefined;
       scenarioId: string;
       description: string;
     }) => {
@@ -146,7 +150,7 @@ async function runScenario(
             userSport: input.userSport,
             conversationId: threadId,
           })
-        : await runPipeline(input.messages[0].content);
+        : await runPipeline(input.messages[0]!.content);
 
       return {
         answer: result.state.answer ?? "",

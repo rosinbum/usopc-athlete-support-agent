@@ -82,10 +82,10 @@ describe("loadPdf", () => {
       const docs = await loadPdf("https://example.com/document.pdf");
 
       expect(docs).toHaveLength(1);
-      expect(docs[0].pageContent).toBe("PDF document content");
-      expect(docs[0].metadata.source).toBe("https://example.com/document.pdf");
-      expect(docs[0].metadata.format).toBe("pdf");
-      expect(docs[0].metadata.pages).toBe(5);
+      expect(docs[0]!.pageContent).toBe("PDF document content");
+      expect(docs[0]!.metadata.source).toBe("https://example.com/document.pdf");
+      expect(docs[0]!.metadata.format).toBe("pdf");
+      expect(docs[0]!.metadata.pages).toBe(5);
     });
 
     it("uses fetchWithRetry with correct options", async () => {
@@ -131,7 +131,7 @@ describe("loadPdf", () => {
         expect.any(Object),
         expect.any(Object),
       );
-      expect(docs[0].pageContent).toBe("HTTPS content");
+      expect(docs[0]!.pageContent).toBe("HTTPS content");
     });
 
     it("handles http URLs", async () => {
@@ -151,7 +151,7 @@ describe("loadPdf", () => {
         expect.any(Object),
         expect.any(Object),
       );
-      expect(docs[0].pageContent).toBe("HTTP content");
+      expect(docs[0]!.pageContent).toBe("HTTP content");
     });
   });
 
@@ -167,9 +167,9 @@ describe("loadPdf", () => {
       const docs = await loadPdf("/path/to/local/document.pdf");
 
       expect(mockReadFile).toHaveBeenCalledWith("/path/to/local/document.pdf");
-      expect(docs[0].pageContent).toBe("Local PDF content");
-      expect(docs[0].metadata.source).toBe("/path/to/local/document.pdf");
-      expect(docs[0].metadata.pages).toBe(3);
+      expect(docs[0]!.pageContent).toBe("Local PDF content");
+      expect(docs[0]!.metadata.source).toBe("/path/to/local/document.pdf");
+      expect(docs[0]!.metadata.pages).toBe(3);
     });
 
     it("does not use fetchWithRetry for local files", async () => {
@@ -200,7 +200,7 @@ describe("loadPdf", () => {
       const docs = await loadPdf("https://example.com/retry.pdf");
 
       expect(mockFetchWithRetry).toHaveBeenCalledTimes(1);
-      expect(docs[0].pageContent).toBe("Content after retry");
+      expect(docs[0]!.pageContent).toBe("Content after retry");
     });
   });
 
@@ -333,7 +333,7 @@ describe("loadPdf", () => {
       const docs = await loadPdf("/path/to/valid.pdf");
 
       expect(docs).toHaveLength(1);
-      expect(docs[0].pageContent).toBe("Parsed content");
+      expect(docs[0]!.pageContent).toBe("Parsed content");
     });
   });
 });

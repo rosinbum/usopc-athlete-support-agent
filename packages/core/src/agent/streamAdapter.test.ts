@@ -72,9 +72,9 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(3);
-    expect(textDeltas[0].textDelta).toBe("Hello");
-    expect(textDeltas[1].textDelta).toBe(" world");
-    expect(textDeltas[2].textDelta).toBe("!");
+    expect(textDeltas[0]!.textDelta).toBe("Hello");
+    expect(textDeltas[1]!.textDelta).toBe(" world");
+    expect(textDeltas[2]!.textDelta).toBe("!");
   });
 
   it("filters out messages from non-synthesizer nodes", async () => {
@@ -96,7 +96,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(1);
-    expect(textDeltas[0].textDelta).toBe("Actual answer");
+    expect(textDeltas[0]!.textDelta).toBe("Actual answer");
   });
 
   it("handles array content format from messages", async () => {
@@ -119,7 +119,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(1);
-    expect(textDeltas[0].textDelta).toBe("Part 1Part 2");
+    expect(textDeltas[0]!.textDelta).toBe("Part 1Part 2");
   });
 
   it("emits citations from values mode", async () => {
@@ -137,7 +137,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const citationEvents = events.filter((e) => e.type === "citations");
     expect(citationEvents).toHaveLength(1);
-    expect(citationEvents[0].citations).toEqual(citations);
+    expect(citationEvents[0]!.citations).toEqual(citations);
   });
 
   it("does not emit citations event for empty citations array", async () => {
@@ -163,7 +163,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const escalationEvents = events.filter((e) => e.type === "escalation");
     expect(escalationEvents).toHaveLength(1);
-    expect(escalationEvents[0].escalation).toEqual(escalation);
+    expect(escalationEvents[0]!.escalation).toEqual(escalation);
   });
 
   it("emits done event at end of stream", async () => {
@@ -173,7 +173,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
       ]),
     );
 
-    const lastEvent = events[events.length - 1];
+    const lastEvent = events[events.length - 1]!;
     expect(lastEvent.type).toBe("done");
   });
 
@@ -181,7 +181,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
     const events = await collectEvents(mockDualStream([]));
 
     expect(events).toHaveLength(1);
-    expect(events[0].type).toBe("done");
+    expect(events[0]!.type).toBe("done");
   });
 
   it("handles interleaved messages and values", async () => {
@@ -236,7 +236,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(1);
-    expect(textDeltas[0].textDelta).toBe("Real content");
+    expect(textDeltas[0]!.textDelta).toBe("Real content");
   });
 
   it("skips messages without node metadata", async () => {
@@ -252,7 +252,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(1);
-    expect(textDeltas[0].textDelta).toBe("With node");
+    expect(textDeltas[0]!.textDelta).toBe("With node");
   });
 
   it("emits answer from values mode when no synthesizer tokens (clarify node)", async () => {
@@ -267,7 +267,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(1);
-    expect(textDeltas[0].textDelta).toBe("Which sport are you asking about?");
+    expect(textDeltas[0]!.textDelta).toBe("Which sport are you asking about?");
   });
 
   it("does not duplicate answer when synthesizer tokens are present", async () => {
@@ -285,8 +285,8 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(2);
-    expect(textDeltas[0].textDelta).toBe("Hello");
-    expect(textDeltas[1].textDelta).toBe(" world");
+    expect(textDeltas[0]!.textDelta).toBe("Hello");
+    expect(textDeltas[1]!.textDelta).toBe(" world");
   });
 
   it("emits incremental answer changes from values mode", async () => {
@@ -300,8 +300,8 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(2);
-    expect(textDeltas[0].textDelta).toBe("Please contact ");
-    expect(textDeltas[1].textDelta).toBe("SafeSport");
+    expect(textDeltas[0]!.textDelta).toBe("Please contact ");
+    expect(textDeltas[1]!.textDelta).toBe("SafeSport");
   });
 
   it("emits error event when stream throws", async () => {
@@ -320,11 +320,11 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const errorEvents = events.filter((e) => e.type === "error");
     expect(errorEvents).toHaveLength(1);
-    expect(errorEvents[0].error?.message).toBe("Stream broke");
-    expect(errorEvents[0].error?.code).toBe("GRAPH_ERROR");
+    expect(errorEvents[0]!.error?.message).toBe("Stream broke");
+    expect(errorEvents[0]!.error?.code).toBe("GRAPH_ERROR");
 
     // Should still emit done after error
-    const lastEvent = events[events.length - 1];
+    const lastEvent = events[events.length - 1]!;
     expect(lastEvent.type).toBe("done");
   });
 
@@ -342,8 +342,8 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const errorEvents = events.filter((e) => e.type === "error");
     expect(errorEvents).toHaveLength(1);
-    expect(errorEvents[0].error?.code).toBe("GRAPH_TIMEOUT");
-    expect(errorEvents[0].error?.message).toContain("timed out");
+    expect(errorEvents[0]!.error?.code).toBe("GRAPH_TIMEOUT");
+    expect(errorEvents[0]!.error?.message).toContain("timed out");
   });
 
   it("maps AppError to its error code", async () => {
@@ -360,7 +360,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const errorEvents = events.filter((e) => e.type === "error");
     expect(errorEvents).toHaveLength(1);
-    expect(errorEvents[0].error?.code).toBe("RETRIEVAL_ERROR");
+    expect(errorEvents[0]!.error?.code).toBe("RETRIEVAL_ERROR");
   });
 
   it("emits answer-reset when quality check fails after synthesizer tokens", async () => {
@@ -465,7 +465,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const discoveredEvents = events.filter((e) => e.type === "discovered-urls");
     expect(discoveredEvents).toHaveLength(1);
-    expect(discoveredEvents[0].discoveredUrls).toEqual(discoveredUrls);
+    expect(discoveredEvents[0]!.discoveredUrls).toEqual(discoveredUrls);
 
     // discovered-urls should come before done
     const types = events.map((e) => e.type);
@@ -518,7 +518,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
     const errorEvents = events.filter((e) => e.type === "error");
     expect(errorEvents).toHaveLength(1);
 
-    expect(events[events.length - 1].type).toBe("done");
+    expect(events[events.length - 1]!.type).toBe("done");
   });
 
   it("does not emit answer-reset when no synthesizer tokens seen", async () => {
@@ -562,13 +562,13 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(2);
-    expect(textDeltas[0].textDelta).toBe("Partial ");
-    expect(textDeltas[1].textDelta).toBe("response");
+    expect(textDeltas[0]!.textDelta).toBe("Partial ");
+    expect(textDeltas[1]!.textDelta).toBe("response");
 
     const errorEvents = events.filter((e) => e.type === "error");
     expect(errorEvents).toHaveLength(1);
 
-    expect(events[events.length - 1].type).toBe("done");
+    expect(events[events.length - 1]!.type).toBe("done");
   });
 });
 
@@ -588,9 +588,9 @@ describe("legacyStateStreamToEvents", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(3);
-    expect(textDeltas[0].textDelta).toBe("Hello");
-    expect(textDeltas[1].textDelta).toBe(" world");
-    expect(textDeltas[2].textDelta).toBe("!");
+    expect(textDeltas[0]!.textDelta).toBe("Hello");
+    expect(textDeltas[1]!.textDelta).toBe(" world");
+    expect(textDeltas[2]!.textDelta).toBe("!");
   });
 
   it("skips text-delta when answer does not change", async () => {
@@ -604,7 +604,7 @@ describe("legacyStateStreamToEvents", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(1);
-    expect(textDeltas[0].textDelta).toBe("Hello");
+    expect(textDeltas[0]!.textDelta).toBe("Hello");
   });
 
   it("emits citations event when citations appear", async () => {
@@ -622,7 +622,7 @@ describe("legacyStateStreamToEvents", () => {
 
     const citationEvents = events.filter((e) => e.type === "citations");
     expect(citationEvents).toHaveLength(1);
-    expect(citationEvents[0].citations).toEqual(citations);
+    expect(citationEvents[0]!.citations).toEqual(citations);
   });
 
   it("does not emit citations event for empty citations array", async () => {
@@ -648,7 +648,7 @@ describe("legacyStateStreamToEvents", () => {
 
     const escalationEvents = events.filter((e) => e.type === "escalation");
     expect(escalationEvents).toHaveLength(1);
-    expect(escalationEvents[0].escalation).toEqual(escalation);
+    expect(escalationEvents[0]!.escalation).toEqual(escalation);
   });
 
   it("emits done event at end of stream", async () => {
@@ -656,7 +656,7 @@ describe("legacyStateStreamToEvents", () => {
       mockStateStream([{ answer: "Hello" }]),
     );
 
-    const lastEvent = events[events.length - 1];
+    const lastEvent = events[events.length - 1]!;
     expect(lastEvent.type).toBe("done");
   });
 
@@ -664,7 +664,7 @@ describe("legacyStateStreamToEvents", () => {
     const events = await collectLegacyEvents(mockStateStream([]));
 
     expect(events).toHaveLength(1);
-    expect(events[0].type).toBe("done");
+    expect(events[0]!.type).toBe("done");
   });
 
   it("handles multiple events from a single state update", async () => {
@@ -731,6 +731,6 @@ describe("legacyStateStreamToEvents", () => {
 
     const textDeltas = events.filter((e) => e.type === "text-delta");
     expect(textDeltas).toHaveLength(1);
-    expect(textDeltas[0].textDelta).toBe("SafeSport info");
+    expect(textDeltas[0]!.textDelta).toBe("SafeSport info");
   });
 });

@@ -162,8 +162,8 @@ describe("DiscoveredSourceEntity", () => {
       const results = await entity.getAll();
 
       expect(results).toHaveLength(2);
-      expect(results[0].id).toBe("abc123");
-      expect(results[1].id).toBe("xyz789");
+      expect(results[0]!.id).toBe("abc123");
+      expect(results[1]!.id).toBe("xyz789");
       expect(mockScan).toHaveBeenCalledWith({});
     });
 
@@ -183,7 +183,7 @@ describe("DiscoveredSourceEntity", () => {
       const results = await entity.getByStatus("approved");
 
       expect(results).toHaveLength(1);
-      expect(results[0].status).toBe("approved");
+      expect(results[0]!.status).toBe("approved");
       expect(mockFind).toHaveBeenCalledWith(
         { gsi1pk: "Discovery#approved" },
         { index: "gsi1", reverse: true },

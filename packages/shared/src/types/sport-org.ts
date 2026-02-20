@@ -6,14 +6,14 @@ export interface SportOrganization {
   id: string;
   type: OrgType;
   officialName: string;
-  abbreviation?: string;
+  abbreviation?: string | undefined;
   sports: string[];
   olympicProgram: OlympicProgram | null;
   paralympicManaged: boolean;
   websiteUrl: string;
-  bylawsUrl?: string;
-  selectionProceduresUrl?: string;
-  internationalFederation?: string;
+  bylawsUrl?: string | undefined;
+  selectionProceduresUrl?: string | undefined;
+  internationalFederation?: string | undefined;
   aliases: string[];
   keywords: string[];
   status: OrgStatus;

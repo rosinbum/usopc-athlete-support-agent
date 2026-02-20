@@ -214,11 +214,11 @@ describe("conversationMemory", () => {
       expect(result).toBe(summaryText);
 
       // Verify the prompt includes conversation content
-      const promptArg = mockInvokeAnthropic.mock.calls[0][1];
+      const promptArg = mockInvokeAnthropic.mock.calls[0]![1];
       const promptContent =
-        typeof promptArg[0].content === "string"
-          ? promptArg[0].content
-          : JSON.stringify(promptArg[0].content);
+        typeof promptArg[0]!.content === "string"
+          ? promptArg[0]!.content
+          : JSON.stringify(promptArg[0]!.content);
       expect(promptContent).toContain("selection criteria");
     });
 
@@ -231,11 +231,11 @@ describe("conversationMemory", () => {
 
       await generateSummary(messages, existingSummary);
 
-      const promptArg = mockInvokeAnthropic.mock.calls[0][1];
+      const promptArg = mockInvokeAnthropic.mock.calls[0]![1];
       const promptContent =
-        typeof promptArg[0].content === "string"
-          ? promptArg[0].content
-          : JSON.stringify(promptArg[0].content);
+        typeof promptArg[0]!.content === "string"
+          ? promptArg[0]!.content
+          : JSON.stringify(promptArg[0]!.content);
       expect(promptContent).toContain(existingSummary);
     });
 

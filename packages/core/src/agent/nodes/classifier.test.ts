@@ -497,7 +497,7 @@ describe("classifierNode", () => {
       expect(result.topicDomain).toBe("dispute_resolution");
 
       // Verify the prompt sent to the model includes conversation history
-      const promptArg = mockInvoke.mock.calls[0][0];
+      const promptArg = mockInvoke.mock.calls[0]![0]!;
       const promptText =
         typeof promptArg[0]?.content === "string"
           ? promptArg[0].content

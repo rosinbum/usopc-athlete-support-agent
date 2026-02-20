@@ -87,7 +87,7 @@ export function createFetchDocumentSectionTool(pool: Pool) {
           return `No document found with ID "${documentId}"${detail}. Verify the document ID from a previous search result.`;
         }
 
-        const firstRow = result.rows[0];
+        const firstRow = result.rows[0]!;
 
         // Build a header with metadata
         const header: string[] = [];

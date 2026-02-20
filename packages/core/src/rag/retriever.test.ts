@@ -36,8 +36,8 @@ describe("retrieve", () => {
       );
 
       expect(result.documents).toHaveLength(2);
-      expect(result.documents[0].pageContent).toBe("Content 1");
-      expect(result.documents[1].pageContent).toBe("Content 2");
+      expect(result.documents[0]!.pageContent).toBe("Content 1");
+      expect(result.documents[1]!.pageContent).toBe("Content 2");
     });
 
     it("should calculate confidence from average score", async () => {
@@ -165,7 +165,7 @@ describe("retrieve", () => {
       );
       // Broad search should remove NGB filter
       expect(
-        mockVectorStore.similaritySearchWithScore.mock.calls[1][2],
+        mockVectorStore.similaritySearchWithScore.mock.calls[1]![2],
       ).toEqual(undefined);
     });
 
@@ -182,7 +182,7 @@ describe("retrieve", () => {
 
       // Second call should have only topic filter
       expect(
-        mockVectorStore.similaritySearchWithScore.mock.calls[1][2],
+        mockVectorStore.similaritySearchWithScore.mock.calls[1]![2],
       ).toEqual({ topicDomain: "safesport" });
     });
 
@@ -222,9 +222,9 @@ describe("retrieve", () => {
       );
 
       // Should be sorted by score
-      expect(result.documents[0].metadata.id).toBe("2"); // 0.9
-      expect(result.documents[1].metadata.id).toBe("3"); // 0.5
-      expect(result.documents[2].metadata.id).toBe("1"); // 0.3
+      expect(result.documents[0]!.metadata.id).toBe("2"); // 0.9
+      expect(result.documents[1]!.metadata.id).toBe("3"); // 0.5
+      expect(result.documents[2]!.metadata.id).toBe("1"); // 0.3
     });
 
     it("should not broaden when confidence is above threshold", async () => {

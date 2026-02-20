@@ -25,7 +25,9 @@ function toBaseMessages(
  */
 export async function runMultiTurnPipeline(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
-  opts?: { userSport?: string; conversationId?: string },
+  opts?:
+    | { userSport?: string | undefined; conversationId?: string | undefined }
+    | undefined,
 ): Promise<{
   state: AgentState;
   trajectory: string[];

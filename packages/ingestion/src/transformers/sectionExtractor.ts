@@ -24,7 +24,7 @@ export function extractSections(chunks: Document[]): Document[] {
     for (const pattern of SECTION_PATTERNS) {
       const match = chunk.pageContent.match(pattern);
       if (match) {
-        sectionTitle = match[1].trim();
+        sectionTitle = match[1]!.trim();
         break;
       }
     }

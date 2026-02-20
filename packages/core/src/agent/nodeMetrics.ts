@@ -4,7 +4,7 @@ import type { AgentState } from "./state.js";
 export interface NodeMetricEntry {
   name: string;
   durationMs: number;
-  error?: string;
+  error?: string | undefined;
   timestamp: number;
 }
 

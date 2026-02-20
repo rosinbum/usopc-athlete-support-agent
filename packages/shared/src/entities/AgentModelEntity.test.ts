@@ -198,7 +198,7 @@ describe("AgentModelEntity", () => {
 
       await entity.upsert(config);
 
-      const createArg = mockCreate.mock.calls[0][0] as Record<string, unknown>;
+      const createArg = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
       expect(createArg.createdAt).toBe("2024-01-01T00:00:00.000Z");
     });
 
@@ -220,7 +220,7 @@ describe("AgentModelEntity", () => {
 
       const result = await entity.upsert(config);
 
-      const createArg = mockCreate.mock.calls[0][0] as Record<string, unknown>;
+      const createArg = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
       expect(createArg.dimensions).toBe(1536);
       expect(result.dimensions).toBe(1536);
     });
@@ -241,11 +241,11 @@ describe("AgentModelEntity", () => {
       const results = await entity.getAll();
 
       expect(results).toHaveLength(3);
-      expect(results[0].id).toBe("agent");
-      expect(results[1].id).toBe("classifier");
-      expect(results[1].model).toBe("claude-haiku-4-5-20251001");
-      expect(results[2].id).toBe("embeddings");
-      expect(results[2].dimensions).toBe(1536);
+      expect(results[0]!.id).toBe("agent");
+      expect(results[1]!.id).toBe("classifier");
+      expect(results[1]!.model).toBe("claude-haiku-4-5-20251001");
+      expect(results[2]!.id).toBe("embeddings");
+      expect(results[2]!.dimensions).toBe(1536);
     });
 
     it("returns empty array when no configs exist", async () => {

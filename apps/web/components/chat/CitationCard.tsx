@@ -2,9 +2,9 @@ import { ExternalLink } from "lucide-react";
 
 interface CitationCardProps {
   title: string;
-  url?: string;
+  url?: string | undefined;
   documentType: string;
-  section?: string;
+  section?: string | undefined;
   snippet: string;
 }
 

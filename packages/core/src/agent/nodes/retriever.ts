@@ -174,7 +174,7 @@ function computeAuthorityBoost(authorityLevel: string | undefined): number {
 export function computeConfidence(scores: number[]): number {
   if (scores.length === 0) return 0;
 
-  const bestScore = scores[0];
+  const bestScore = scores[0]!;
   const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
 
   // Similarity scores from pgvector cosine distance are typically in
@@ -255,7 +255,7 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
       return {
         results,
         resultCount: results.length,
-        topScore: results.length > 0 ? results[0][1] : null,
+        topScore: results.length > 0 ? results[0]![1] : null,
       };
     },
   }).withConfig({ runName: "retriever:narrow_search" });

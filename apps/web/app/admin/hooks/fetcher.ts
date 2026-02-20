@@ -30,8 +30,12 @@ export async function mutationFetcher<T>(
 ): Promise<T> {
   const res = await fetch(url, {
     method: arg.method,
-    headers: arg.body ? { "Content-Type": "application/json" } : undefined,
-    body: arg.body ? JSON.stringify(arg.body) : undefined,
+    ...(arg.body
+      ? {
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(arg.body),
+        }
+      : {}),
   });
   if (!res.ok) throw await parseError(res);
   return res.json() as Promise<T>;

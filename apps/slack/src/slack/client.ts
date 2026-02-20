@@ -52,7 +52,7 @@ export async function postMessage(
       channel,
       text,
       blocks: blocks as never[],
-      thread_ts: threadTs,
+      ...(threadTs !== undefined ? { thread_ts: threadTs } : {}),
     });
   });
 }

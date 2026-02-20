@@ -84,7 +84,7 @@ describe("studio createGraph", () => {
     await createGraph();
     expect(mockCreateTavilySearchTool).not.toHaveBeenCalled();
 
-    const graphDeps = mockCreateAgentGraph.mock.calls[0][0];
+    const graphDeps = mockCreateAgentGraph.mock.calls[0]![0];
     // The stub should still be invocable
     expect(typeof graphDeps.tavilySearch.invoke).toBe("function");
     expect(await graphDeps.tavilySearch.invoke()).toBe("");
@@ -97,7 +97,7 @@ describe("studio createGraph", () => {
 
   it("passes model instances to createAgentGraph", async () => {
     await createGraph();
-    const graphDeps = mockCreateAgentGraph.mock.calls[0][0];
+    const graphDeps = mockCreateAgentGraph.mock.calls[0]![0];
     expect(graphDeps.agentModel).toBe(fakeAgentModel);
     expect(graphDeps.classifierModel).toBe(fakeClassifierModel);
   });

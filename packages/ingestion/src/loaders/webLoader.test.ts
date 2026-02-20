@@ -77,11 +77,11 @@ describe("loadWeb", () => {
       const docs = await loadWeb("https://example.com/page.html");
 
       expect(docs).toHaveLength(1);
-      expect(docs[0].pageContent).toContain("Important Content");
-      expect(docs[0].pageContent).toContain("main content");
-      expect(docs[0].metadata.source).toBe("https://example.com/page.html");
-      expect(docs[0].metadata.format).toBe("html");
-      expect(docs[0].metadata.title).toBe("Test Page");
+      expect(docs[0]!.pageContent).toContain("Important Content");
+      expect(docs[0]!.pageContent).toContain("main content");
+      expect(docs[0]!.metadata.source).toBe("https://example.com/page.html");
+      expect(docs[0]!.metadata.format).toBe("html");
+      expect(docs[0]!.metadata.title).toBe("Test Page");
     });
 
     it("strips navigation and non-content elements", async () => {
@@ -102,11 +102,11 @@ describe("loadWeb", () => {
 
       const docs = await loadWeb("https://example.com/page.html");
 
-      expect(docs[0].pageContent).toContain("Main content here");
-      expect(docs[0].pageContent).not.toContain("Home");
-      expect(docs[0].pageContent).not.toContain("Site Header");
-      expect(docs[0].pageContent).not.toContain("Site Footer");
-      expect(docs[0].pageContent).not.toContain("console.log");
+      expect(docs[0]!.pageContent).toContain("Main content here");
+      expect(docs[0]!.pageContent).not.toContain("Home");
+      expect(docs[0]!.pageContent).not.toContain("Site Header");
+      expect(docs[0]!.pageContent).not.toContain("Site Footer");
+      expect(docs[0]!.pageContent).not.toContain("console.log");
     });
 
     it("uses fetchWithRetry with correct options", async () => {
@@ -137,7 +137,7 @@ describe("loadWeb", () => {
 
       const docs = await loadWeb("https://example.com/page.html");
 
-      expect(docs[0].pageContent).toContain("Content after retry");
+      expect(docs[0]!.pageContent).toContain("Content after retry");
       expect(mockFetchWithRetry).toHaveBeenCalledTimes(1);
     });
   });
@@ -205,7 +205,7 @@ describe("loadWeb", () => {
 
       const docs = await loadWeb("https://example.com/page.html");
 
-      expect(docs[0].pageContent).toContain("Main content");
+      expect(docs[0]!.pageContent).toContain("Main content");
       // Body content outside main is not included when main exists
     });
 
@@ -222,7 +222,7 @@ describe("loadWeb", () => {
 
       const docs = await loadWeb("https://example.com/page.html");
 
-      expect(docs[0].pageContent).toContain("Article content");
+      expect(docs[0]!.pageContent).toContain("Article content");
     });
 
     it("extracts content from Drupal-style page with .tab-content", async () => {
@@ -246,9 +246,9 @@ describe("loadWeb", () => {
 
       const docs = await loadWeb("https://www.law.cornell.edu/uscode/text/36");
 
-      expect(docs[0].pageContent).toContain("United States Olympic");
-      expect(docs[0].pageContent).not.toContain("Quick search by citation");
-      expect(docs[0].pageContent).not.toContain("Sidebar navigation");
+      expect(docs[0]!.pageContent).toContain("United States Olympic");
+      expect(docs[0]!.pageContent).not.toContain("Quick search by citation");
+      expect(docs[0]!.pageContent).not.toContain("Sidebar navigation");
     });
 
     it("falls back to body when no main/article", async () => {
@@ -263,7 +263,7 @@ describe("loadWeb", () => {
 
       const docs = await loadWeb("https://example.com/page.html");
 
-      expect(docs[0].pageContent).toContain("Body content only");
+      expect(docs[0]!.pageContent).toContain("Body content only");
     });
   });
 });

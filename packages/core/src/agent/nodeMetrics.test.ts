@@ -53,10 +53,10 @@ describe("NodeMetricsCollector", () => {
 
     const entries = collector.getAll();
     expect(entries).toHaveLength(1);
-    expect(entries[0].name).toBe("classifier");
-    expect(entries[0].durationMs).toBe(42);
-    expect(entries[0].error).toBeUndefined();
-    expect(entries[0].timestamp).toBeGreaterThan(0);
+    expect(entries[0]!.name).toBe("classifier");
+    expect(entries[0]!.durationMs).toBe(42);
+    expect(entries[0]!.error).toBeUndefined();
+    expect(entries[0]!.timestamp).toBeGreaterThan(0);
   });
 
   it("records a metric entry with error", () => {
@@ -64,7 +64,7 @@ describe("NodeMetricsCollector", () => {
 
     const entries = collector.getAll();
     expect(entries).toHaveLength(1);
-    expect(entries[0].error).toBe("timeout");
+    expect(entries[0]!.error).toBe("timeout");
   });
 
   it("accumulates multiple entries", () => {
@@ -116,9 +116,9 @@ describe("withMetrics", () => {
     expect(result).toEqual({ answer: "test" });
     const entries = nodeMetrics.getAll();
     expect(entries).toHaveLength(1);
-    expect(entries[0].name).toBe("synthesizer");
-    expect(entries[0].durationMs).toBeGreaterThanOrEqual(0);
-    expect(entries[0].error).toBeUndefined();
+    expect(entries[0]!.name).toBe("synthesizer");
+    expect(entries[0]!.durationMs).toBeGreaterThanOrEqual(0);
+    expect(entries[0]!.error).toBeUndefined();
   });
 
   it("records duration and error for a throwing node", async () => {
@@ -129,8 +129,8 @@ describe("withMetrics", () => {
 
     const entries = nodeMetrics.getAll();
     expect(entries).toHaveLength(1);
-    expect(entries[0].name).toBe("classifier");
-    expect(entries[0].error).toBe("node exploded");
+    expect(entries[0]!.name).toBe("classifier");
+    expect(entries[0]!.error).toBe("node exploded");
   });
 
   it("passes state through to the wrapped function", async () => {

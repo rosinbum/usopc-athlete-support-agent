@@ -182,7 +182,7 @@ export function createEscalateNode(model: ChatAnthropic) {
       // Build the escalation info deterministically for analytics/tracking
       const reason =
         escalationReason ??
-        `User query requires ${urgency} escalation to ${targets[0].organization} ` +
+        `User query requires ${urgency} escalation to ${targets[0]!.organization} ` +
           `for ${domain.replace(/_/g, " ")} matter`;
 
       const escalation = buildEscalation(domain, reason, urgency);
@@ -201,7 +201,7 @@ export function createEscalateNode(model: ChatAnthropic) {
         domain,
         urgency,
         targetCount: targets.length,
-        primaryTarget: targets[0].id,
+        primaryTarget: targets[0]!.id,
         llmGenerated: true,
       });
 

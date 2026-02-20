@@ -303,9 +303,9 @@ describe("groupByFailureCode", () => {
       makeResult("SYN_INCOMPLETE"), // high
     ];
     const groups = groupByFailureCode(results);
-    expect(groups[0].code).toBe("DIS_MISSING_SAFETY");
-    expect(groups[1].code).toBe("SYN_INCOMPLETE");
-    expect(groups[2].code).toBe("SYN_WRONG_TONE");
+    expect(groups[0]!.code).toBe("DIS_MISSING_SAFETY");
+    expect(groups[1]!.code).toBe("SYN_INCOMPLETE");
+    expect(groups[2]!.code).toBe("SYN_WRONG_TONE");
   });
 });
 
@@ -315,12 +315,12 @@ describe("groupByFailureCode", () => {
 
 describe("shouldCreateIssue", () => {
   it("creates issue for critical severity with 1 failure", () => {
-    const group = groupByFailureCode([makeResult("DIS_MISSING_SAFETY")])[0];
+    const group = groupByFailureCode([makeResult("DIS_MISSING_SAFETY")])[0]!;
     expect(shouldCreateIssue(group)).toBe(true);
   });
 
   it("does not create issue for high severity with 1 failure", () => {
-    const group = groupByFailureCode([makeResult("SYN_INCOMPLETE")])[0];
+    const group = groupByFailureCode([makeResult("SYN_INCOMPLETE")])[0]!;
     expect(shouldCreateIssue(group)).toBe(false);
   });
 
@@ -328,7 +328,7 @@ describe("shouldCreateIssue", () => {
     const group = groupByFailureCode([
       makeResult("SYN_INCOMPLETE", { scenarioId: "a" }),
       makeResult("SYN_INCOMPLETE", { scenarioId: "b" }),
-    ])[0];
+    ])[0]!;
     expect(shouldCreateIssue(group)).toBe(true);
   });
 });

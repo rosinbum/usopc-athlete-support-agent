@@ -348,7 +348,7 @@ describe("cron handler", () => {
 
     // Verify the SQS message body includes s3Key and s3VersionId
     const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
-    const callArgs = vi.mocked(SendMessageCommand).mock.calls[0][0];
+    const callArgs = vi.mocked(SendMessageCommand).mock.calls[0]![0]!;
     const body = JSON.parse(callArgs.MessageBody as string);
     expect(body.s3Key).toBe("sources/src-1/hash.pdf");
     expect(body.s3VersionId).toBe("ver-1");
@@ -368,7 +368,7 @@ describe("cron handler", () => {
 
     // Message should have undefined s3Key/s3VersionId
     const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
-    const callArgs = vi.mocked(SendMessageCommand).mock.calls[0][0];
+    const callArgs = vi.mocked(SendMessageCommand).mock.calls[0]![0]!;
     const body = JSON.parse(callArgs.MessageBody as string);
     expect(body.s3Key).toBeUndefined();
     expect(body.s3VersionId).toBeUndefined();

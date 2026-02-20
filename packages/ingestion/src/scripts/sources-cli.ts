@@ -30,7 +30,7 @@ const logger = createLogger({ service: "sources-cli" });
 
 interface ListOptions {
   enabledOnly: boolean;
-  ngbId?: string;
+  ngbId?: string | undefined;
 }
 
 interface Command {
@@ -49,11 +49,11 @@ function parseArgs(): Command {
   };
 
   for (let i = 1; i < args.length; i++) {
-    const arg = args[i];
+    const arg = args[i]!;
     if (arg === "--enabled-only") {
       options.enabledOnly = true;
     } else if (arg === "--ngb" && args[i + 1]) {
-      options.ngbId = args[i + 1];
+      options.ngbId = args[i + 1]!;
       i++;
     } else if (arg === "--fix-broken") {
       options.fixBroken = true;

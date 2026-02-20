@@ -49,8 +49,8 @@ export function getDatabaseUrl(): string {
   // Attempt to use SST Resource binding (Database only exists in production stage)
   try {
     const db = (Resource as unknown as Record<string, Record<string, string>>)
-      .Database;
-    return `postgresql://${encodeURIComponent(db.username)}:${encodeURIComponent(db.password)}@${db.host}:${db.port}/${db.database}`;
+      .Database!;
+    return `postgresql://${encodeURIComponent(db["username"]!)}:${encodeURIComponent(db["password"]!)}@${db["host"]!}:${db["port"]!}/${db["database"]!}`;
   } catch {
     if (isDevelopment()) {
       return LOCAL_DEV_DATABASE_URL;

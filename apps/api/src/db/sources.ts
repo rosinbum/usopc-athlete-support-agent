@@ -28,13 +28,13 @@ export interface SourcesStats {
 }
 
 export interface ListUniqueDocumentsParams {
-  search?: string;
-  documentType?: string;
-  topicDomain?: TopicDomain;
-  ngbId?: string;
-  authorityLevel?: AuthorityLevel;
-  page?: number;
-  limit?: number;
+  search?: string | undefined;
+  documentType?: string | undefined;
+  topicDomain?: TopicDomain | undefined;
+  ngbId?: string | undefined;
+  authorityLevel?: AuthorityLevel | undefined;
+  page?: number | undefined;
+  limit?: number | undefined;
 }
 
 interface DocumentRow {

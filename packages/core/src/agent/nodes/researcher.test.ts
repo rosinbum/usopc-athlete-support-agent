@@ -101,7 +101,7 @@ describe("createResearcherNode", () => {
 
     await node(state);
     const invokeArg = (tavily.invoke as ReturnType<typeof vi.fn>).mock
-      .calls[0][0] as { query: string };
+      .calls[0]![0] as { query: string };
     expect(invokeArg.query).toContain("USADA anti-doping testing");
   });
 
@@ -112,7 +112,7 @@ describe("createResearcherNode", () => {
 
     await node(state);
     const invokeArg = (tavily.invoke as ReturnType<typeof vi.fn>).mock
-      .calls[0][0] as { query: string };
+      .calls[0]![0] as { query: string };
     expect(invokeArg.query).toBe("What are USADA whereabouts requirements?");
   });
 
@@ -212,7 +212,7 @@ describe("createResearcherNode", () => {
 
     const result = await node(state);
     expect(result.webSearchResultUrls).toHaveLength(1);
-    expect(result.webSearchResultUrls![0].url).toBe("https://usopc.org/doc1");
+    expect(result.webSearchResultUrls![0]!.url).toBe("https://usopc.org/doc1");
   });
 
   it("adds domain labels for each domain type", async () => {
@@ -235,7 +235,7 @@ describe("createResearcherNode", () => {
 
       await node(state);
       const invokeArg = (tavily.invoke as ReturnType<typeof vi.fn>).mock
-        .calls[0][0] as { query: string };
+        .calls[0]![0] as { query: string };
       expect(invokeArg.query.toLowerCase()).toContain(keyword.toLowerCase());
     }
   });

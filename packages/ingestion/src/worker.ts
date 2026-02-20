@@ -30,7 +30,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
 
   try {
     for (let idx = 0; idx < event.Records.length; idx++) {
-      const record: SQSRecord = event.Records[idx];
+      const record: SQSRecord = event.Records[idx]!;
 
       let message: IngestionMessage;
       try {
@@ -51,7 +51,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
 
         const result = await ingestSource(message.source, {
           openaiApiKey,
-          s3Key: message.s3Key,
+          ...(message.s3Key !== undefined ? { s3Key: message.s3Key } : {}),
         });
 
         if (result.status === "completed") {
@@ -70,8 +70,10 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
           try {
             const entity = createSourceConfigEntity();
             await entity.markSuccess(message.source.id, message.contentHash, {
-              s3Key: message.s3Key,
-              s3VersionId: message.s3VersionId,
+              ...(message.s3Key !== undefined ? { s3Key: message.s3Key } : {}),
+              ...(message.s3VersionId !== undefined
+                ? { s3VersionId: message.s3VersionId }
+                : {}),
             });
           } catch (statsError) {
             logger.warn(
@@ -88,7 +90,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
             message.source.id,
             message.source.url,
             "failed",
-            { errorMessage: result.error },
+            result.error !== undefined ? { errorMessage: result.error } : {},
           );
           logger.error(
             `Ingestion failed for ${message.source.id}: ${result.error}`,
@@ -127,7 +129,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
           // Mark remaining records as batch failures
           for (let r = idx + 1; r < event.Records.length; r++) {
             batchItemFailures.push({
-              itemIdentifier: event.Records[r].messageId,
+              itemIdentifier: event.Records[r]!.messageId,
             });
           }
           break;

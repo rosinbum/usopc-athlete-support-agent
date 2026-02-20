@@ -145,7 +145,7 @@ describe("SourcesAdminClient", () => {
 
     const checkboxes = screen.getAllByRole("checkbox");
     // First checkbox is "select all", next ones are individual rows
-    await user.click(checkboxes[1]);
+    await user.click(checkboxes[1]!);
 
     expect(screen.getByText("1 selected")).toBeInTheDocument();
     expect(screen.getByText("Enable")).toBeInTheDocument();
@@ -218,7 +218,7 @@ describe("SourcesAdminClient", () => {
 
     // Select a row via checkbox
     const checkboxes = screen.getAllByRole("checkbox");
-    await user.click(checkboxes[1]);
+    await user.click(checkboxes[1]!);
 
     expect(screen.getByText("1 selected")).toBeInTheDocument();
 

@@ -26,13 +26,13 @@ export interface SourceFormValues {
 }
 
 export interface SourceFormProps {
-  initialValues?: Partial<SourceFormValues>;
-  idEditable?: boolean;
+  initialValues?: Partial<SourceFormValues> | undefined;
+  idEditable?: boolean | undefined;
   submitLabel: string;
   onSubmit: (values: SourceFormValues) => Promise<void>;
-  onCancel?: () => void;
-  apiError?: string | null;
-  warning?: string | null;
+  onCancel?: (() => void) | undefined;
+  apiError?: string | null | undefined;
+  warning?: string | null | undefined;
 }
 
 interface FormErrors {

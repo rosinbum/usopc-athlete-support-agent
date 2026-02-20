@@ -8,11 +8,11 @@ export interface IngestionLog {
   sourceId: string;
   sourceUrl: string;
   status: "pending" | "in_progress" | "completed" | "failed";
-  contentHash?: string;
-  chunksCount?: number;
-  errorMessage?: string;
+  contentHash?: string | undefined;
+  chunksCount?: number | undefined;
+  errorMessage?: string | undefined;
   startedAt: string;
-  completedAt?: string;
+  completedAt?: string | undefined;
   createdAt: string;
 }
 
@@ -106,10 +106,10 @@ export class IngestionLogEntity {
     startedAt: string,
     status: IngestionLog["status"],
     fields?: {
-      contentHash?: string;
-      chunksCount?: number;
-      errorMessage?: string;
-      completedAt?: string;
+      contentHash?: string | undefined;
+      chunksCount?: number | undefined;
+      errorMessage?: string | undefined;
+      completedAt?: string | undefined;
     },
   ): Promise<void> {
     const props: Record<string, unknown> = {

@@ -53,7 +53,7 @@ export interface FormatHistoryOptions {
    * When provided, maxTurns is reduced to 2 and the summary is
    * prepended to the conversation context.
    */
-  conversationSummary?: string;
+  conversationSummary?: string | undefined;
 }
 
 /**
@@ -153,7 +153,7 @@ export function buildContextualQuery(
   }
 
   // Get the last message (current user message)
-  const lastMessage = messages[messages.length - 1];
+  const lastMessage = messages[messages.length - 1]!;
   const currentMessage = getMessageContent(lastMessage);
 
   // When a summary is available, reduce raw history and prepend the summary

@@ -80,7 +80,7 @@ describe("listUniqueDocuments", () => {
 
     await listUniqueDocuments(pool, { search: "bylaws" });
 
-    const countCall = pool.query.mock.calls[0];
+    const countCall = pool.query.mock.calls[0]!;
     expect(countCall[0]).toContain("ESCAPE");
   });
 
@@ -92,7 +92,7 @@ describe("listUniqueDocuments", () => {
     await listUniqueDocuments(pool, { search: "100%_match" });
 
     // Both count and data queries receive the escaped value
-    const countParams = pool.query.mock.calls[0][1] as string[];
+    const countParams = pool.query.mock.calls[0]![1] as string[];
     const searchParam = countParams[0];
     expect(searchParam).toContain("\\%");
     expect(searchParam).toContain("\\_");
@@ -105,7 +105,7 @@ describe("listUniqueDocuments", () => {
 
     await listUniqueDocuments(pool, {});
 
-    const dataCall = pool.query.mock.calls[1];
+    const dataCall = pool.query.mock.calls[1]!;
     expect(dataCall[0]).toContain("source_url");
     expect(dataCall[0]).not.toContain("COALESCE");
   });
@@ -118,7 +118,7 @@ describe("listUniqueDocuments", () => {
     await listUniqueDocuments(pool, {});
 
     // First call is the count query - must use subquery with GROUP BY
-    const countCall = pool.query.mock.calls[0];
+    const countCall = pool.query.mock.calls[0]!;
     expect(countCall[0]).toContain("COUNT(*) as total FROM (");
     expect(countCall[0]).toContain("GROUP BY");
   });

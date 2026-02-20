@@ -61,7 +61,7 @@ const DEFAULT_ANTHROPIC_MONTHLY_BUDGET = 10; // dollars
  * Get the current date in ISO format (YYYY-MM-DD)
  */
 function getCurrentDate(): string {
-  return new Date().toISOString().split("T")[0];
+  return new Date().toISOString().split("T")[0]!;
 }
 
 /**
@@ -71,7 +71,7 @@ function getPeriodStart(period: "daily" | "weekly" | "monthly"): string {
   const now = new Date();
 
   if (period === "daily") {
-    return now.toISOString().split("T")[0];
+    return now.toISOString().split("T")[0]!;
   }
 
   if (period === "weekly") {
@@ -79,7 +79,7 @@ function getPeriodStart(period: "daily" | "weekly" | "monthly"): string {
     const day = now.getDay();
     const diff = now.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(now.setDate(diff));
-    return monday.toISOString().split("T")[0];
+    return monday.toISOString().split("T")[0]!;
   }
 
   // monthly

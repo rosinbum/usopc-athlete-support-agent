@@ -180,7 +180,7 @@ describe("AgentRunner", () => {
       const runner = await AgentRunner.create(defaultConfig);
 
       // Graph should receive the exact instances from the factory
-      const graphDeps = mockCreateAgentGraph.mock.calls[0][0];
+      const graphDeps = mockCreateAgentGraph.mock.calls[0]![0]!;
       expect(graphDeps.agentModel).toBe(fakeAgentModel);
       expect(graphDeps.classifierModel).toBe(fakeClassifierModel);
 
@@ -210,7 +210,7 @@ describe("AgentRunner", () => {
 
       expect(result.answer).toBe("Athletes are selected via trials.");
       expect(result.citations).toHaveLength(1);
-      expect(result.citations[0].title).toBe("Selection Procedures");
+      expect(result.citations[0]!.title).toBe("Selection Procedures");
     });
 
     it("returns escalation info when present in graph output", async () => {
@@ -528,7 +528,7 @@ describe("convertMessages", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).toBeInstanceOf(HumanMessage);
-    expect(result[0].content).toBe("Hello");
+    expect(result[0]!.content).toBe("Hello");
   });
 
   it("converts assistant messages to AIMessage", () => {
@@ -538,7 +538,7 @@ describe("convertMessages", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).toBeInstanceOf(AIMessage);
-    expect(result[0].content).toBe("Hi there");
+    expect(result[0]!.content).toBe("Hi there");
   });
 
   it("converts a mixed conversation", () => {

@@ -20,7 +20,7 @@ export interface FetchWithRetryOptions {
 }
 
 export class FetchWithRetryError extends Error {
-  readonly statusCode?: number;
+  readonly statusCode?: number | undefined;
   readonly attempts: number;
   readonly url: string;
 

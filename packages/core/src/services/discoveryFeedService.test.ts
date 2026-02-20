@@ -92,7 +92,7 @@ describe("publishDiscoveredUrls", () => {
       "https://sqs.us-east-1.amazonaws.com/queue",
     );
 
-    const commandArg = MockSendMessageCommand.mock.calls[0][0];
+    const commandArg = MockSendMessageCommand.mock.calls[0]![0]!;
     const body = JSON.parse(commandArg.MessageBody!);
 
     expect(body.urls).toHaveLength(2);

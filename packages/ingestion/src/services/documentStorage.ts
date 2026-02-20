@@ -14,7 +14,7 @@ const logger = createLogger({ service: "document-storage" });
 
 export interface StoreDocumentResult {
   key: string;
-  versionId?: string;
+  versionId?: string | undefined;
 }
 
 type DocumentFormat = "pdf" | "html" | "text";

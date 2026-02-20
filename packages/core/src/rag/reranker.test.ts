@@ -21,7 +21,7 @@ describe("rerank", () => {
     ];
 
     const result = rerank(docs, { ngbIds: ["usa-swimming"] });
-    expect(result[0].pageContent).toBe("match");
+    expect(result[0]!.pageContent).toBe("match");
   });
 
   it("boosts documents matching the topic domain", () => {
@@ -31,7 +31,7 @@ describe("rerank", () => {
     ];
 
     const result = rerank(docs, { topicDomain: "safesport" });
-    expect(result[0].pageContent).toBe("safesport");
+    expect(result[0]!.pageContent).toBe("safesport");
   });
 
   it("boosts high-priority document types", () => {
@@ -41,7 +41,7 @@ describe("rerank", () => {
     ];
 
     const result = rerank(docs);
-    expect(result[0].pageContent).toBe("bylaws");
+    expect(result[0]!.pageContent).toBe("bylaws");
   });
 
   it("boosts recent documents", () => {
@@ -57,7 +57,7 @@ describe("rerank", () => {
     ];
 
     const result = rerank(docs);
-    expect(result[0].pageContent).toBe("recent");
+    expect(result[0]!.pageContent).toBe("recent");
   });
 
   it("respects maxResults", () => {
@@ -93,7 +93,7 @@ describe("rerank", () => {
       ngbIds: ["usa-swimming"],
       topicDomain: "team_selection",
     });
-    expect(result[0].pageContent).toBe("high");
+    expect(result[0]!.pageContent).toBe("high");
   });
 
   describe("authority level boosting", () => {
@@ -106,9 +106,9 @@ describe("rerank", () => {
 
       const result = rerank(docs);
       // Law should rank first, then policy, then educational guidance
-      expect(result[0].pageContent).toBe("law");
-      expect(result[1].pageContent).toBe("policy");
-      expect(result[2].pageContent).toBe("faq");
+      expect(result[0]!.pageContent).toBe("law");
+      expect(result[1]!.pageContent).toBe("policy");
+      expect(result[2]!.pageContent).toBe("faq");
     });
 
     it("stacks authority boost with NGB match boost", () => {
@@ -137,7 +137,7 @@ describe("rerank", () => {
 
       const result = rerank(docs);
       // Document with authority should rank higher
-      expect(result[0].pageContent).toBe("has-authority");
+      expect(result[0]!.pageContent).toBe("has-authority");
     });
   });
 });

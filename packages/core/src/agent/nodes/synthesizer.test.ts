@@ -148,7 +148,7 @@ describe("synthesizerNode", () => {
     expect(result.answer).toBe("Combined answer from docs and web.");
 
     // Verify the prompt includes both sources
-    const invokeArgs = mockInvoke.mock.calls[0][0];
+    const invokeArgs = mockInvoke.mock.calls[0]![0];
     const humanMessage = invokeArgs[1];
     expect(humanMessage.content).toContain("doc context");
     expect(humanMessage.content).toContain("Web result about Section 9");
@@ -166,7 +166,7 @@ describe("synthesizerNode", () => {
     });
 
     await synthesizerNode(state);
-    const invokeArgs = mockInvoke.mock.calls[0][0];
+    const invokeArgs = mockInvoke.mock.calls[0]![0];
     const humanMessage = invokeArgs[1];
     expect(humanMessage.content).toContain(
       "No documents or search results were found",
@@ -192,7 +192,7 @@ describe("synthesizerNode", () => {
     });
     await synthesizerNode(state);
 
-    const invokeArgs = mockInvoke.mock.calls[0][0];
+    const invokeArgs = mockInvoke.mock.calls[0]![0];
     const systemMessage = invokeArgs[0];
     expect(systemMessage._getType()).toBe("system");
     expect(systemMessage.content).toContain("USOPC Athlete Support");
@@ -301,7 +301,7 @@ describe("synthesizerNode", () => {
       await synthesizerNode(state);
 
       // Verify the prompt includes tone guidance
-      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const invokeArgs = mockInvoke.mock.calls[0]![0];
       const humanMessage = invokeArgs[1];
       expect(humanMessage.content).toContain("TONE GUIDANCE");
       expect(humanMessage.content).toContain("calm, reassuring");
@@ -323,7 +323,7 @@ describe("synthesizerNode", () => {
       );
 
       // Verify no tone guidance was injected
-      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const invokeArgs = mockInvoke.mock.calls[0]![0];
       const humanMessage = invokeArgs[1];
       expect(humanMessage.content).not.toContain("TONE GUIDANCE");
     });
@@ -384,7 +384,7 @@ describe("synthesizerNode", () => {
       const result = await synthesizerNode(state);
 
       // Verify critique was appended to prompt
-      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const invokeArgs = mockInvoke.mock.calls[0]![0];
       const humanMessage = invokeArgs[1];
       expect(humanMessage.content).toContain("## Quality Feedback");
       expect(humanMessage.content).toContain(
@@ -413,7 +413,7 @@ describe("synthesizerNode", () => {
 
       const result = await synthesizerNode(state);
 
-      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const invokeArgs = mockInvoke.mock.calls[0]![0];
       const humanMessage = invokeArgs[1];
       expect(humanMessage.content).not.toContain("## Quality Feedback");
       expect(result.qualityRetryCount).toBeUndefined();
@@ -436,7 +436,7 @@ describe("synthesizerNode", () => {
 
       const result = await synthesizerNode(state);
 
-      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const invokeArgs = mockInvoke.mock.calls[0]![0];
       const humanMessage = invokeArgs[1];
       expect(humanMessage.content).not.toContain("## Quality Feedback");
       expect(result.qualityRetryCount).toBeUndefined();
@@ -470,7 +470,7 @@ describe("synthesizerNode", () => {
       const result = await synthesizerNode(state);
 
       // Prompt should include guidance and tone modifiers
-      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const invokeArgs = mockInvoke.mock.calls[0]![0];
       const humanMessage = invokeArgs[1];
       expect(humanMessage.content).toContain("EMOTIONAL SUPPORT GUIDANCE");
       expect(humanMessage.content).toContain(
@@ -510,7 +510,7 @@ describe("synthesizerNode", () => {
       expect(result.answer).toContain("Here are your options...");
 
       // Prompt should use generic tone guidance
-      const invokeArgs = mockInvoke.mock.calls[0][0];
+      const invokeArgs = mockInvoke.mock.calls[0]![0];
       const humanMessage = invokeArgs[1];
       expect(humanMessage.content).toContain("IMPORTANT TONE GUIDANCE");
     });

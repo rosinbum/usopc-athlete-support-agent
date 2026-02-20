@@ -186,7 +186,7 @@ describe("Discovery Lambda", () => {
         mockNotificationService.sendDiscoveryCompletion,
       ).toHaveBeenCalled();
       const summary = vi.mocked(mockNotificationService.sendDiscoveryCompletion)
-        .mock.calls[0][0];
+        .mock.calls[0]![0]!;
       expect(summary.totalDiscovered).toBe(25);
       expect(summary.byStatus.pending).toBe(20);
     });
@@ -292,7 +292,7 @@ describe("Discovery Lambda", () => {
 
       // Should include error in summary
       const summary = vi.mocked(mockNotificationService.sendDiscoveryCompletion)
-        .mock.calls[0][0];
+        .mock.calls[0]![0]!;
       expect(summary.errors).toContain(
         "Domain discovery failed: Domain discovery failed",
       );
@@ -312,7 +312,7 @@ describe("Discovery Lambda", () => {
 
       // Should include error in summary
       const summary = vi.mocked(mockNotificationService.sendDiscoveryCompletion)
-        .mock.calls[0][0];
+        .mock.calls[0]![0]!;
       expect(summary.errors).toContain(
         "Search query discovery failed: Search failed",
       );
@@ -352,7 +352,7 @@ describe("Discovery Lambda", () => {
       await handler(mockEvent);
 
       expect(readFile).toHaveBeenCalled();
-      const callPath = vi.mocked(readFile).mock.calls[0][0] as string;
+      const callPath = vi.mocked(readFile).mock.calls[0]![0] as string;
       expect(callPath).toContain("discovery-config.json");
     });
   });

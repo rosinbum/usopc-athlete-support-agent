@@ -240,7 +240,7 @@ describe("DiscoveriesAdminClient", () => {
 
     const checkboxes = screen.getAllByRole("checkbox");
     // First checkbox is the "select all" header checkbox
-    await user.click(checkboxes[1]);
+    await user.click(checkboxes[1]!);
 
     expect(screen.getByText("1 selected")).toBeInTheDocument();
     expect(screen.getByText("Approve")).toBeInTheDocument();

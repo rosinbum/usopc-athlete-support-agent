@@ -47,7 +47,9 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}) {
         const maxResults = options.maxResults ?? 5;
 
         const tavilySearch = new TavilySearch({
-          tavilyApiKey: options.apiKey,
+          ...(options.apiKey !== undefined
+            ? { tavilyApiKey: options.apiKey }
+            : {}),
           maxResults,
           includeDomains: searchDomains,
         });

@@ -8,11 +8,11 @@ export interface AgentModelConfig {
   id: string; // "agent" | "classifier" | "embeddings"
   role: string; // description of what this model does
   model: string; // model name (e.g., "claude-sonnet-4-20250514")
-  temperature?: number;
-  maxTokens?: number;
-  dimensions?: number; // for embeddings only
-  createdAt?: string;
-  updatedAt?: string;
+  temperature?: number | undefined;
+  maxTokens?: number | undefined;
+  dimensions?: number | undefined; // for embeddings only
+  createdAt?: string | undefined;
+  updatedAt?: string | undefined;
 }
 
 export class AgentModelEntity {

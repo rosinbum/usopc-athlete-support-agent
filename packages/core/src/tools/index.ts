@@ -54,7 +54,9 @@ export interface ToolDependencies {
 export function getAllTools(deps: ToolDependencies): StructuredToolInterface[] {
   return [
     createSearchKnowledgeBaseTool(deps.vectorStore),
-    createWebSearchTool({ apiKey: deps.tavilyApiKey }),
+    createWebSearchTool(
+      deps.tavilyApiKey !== undefined ? { apiKey: deps.tavilyApiKey } : {},
+    ),
     createLookupSportOrgTool(deps.sportOrgEntity),
     createCalculateDeadlineTool(),
     createLookupContactTool(),

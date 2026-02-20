@@ -187,7 +187,7 @@ describe("escalateNode", () => {
 
     // Verify the LLM was called and the prompt includes the user message and reason
     expect(mockInvoke).toHaveBeenCalledTimes(1);
-    const invokeArgs = mockInvoke.mock.calls[0][0];
+    const invokeArgs = mockInvoke.mock.calls[0]![0];
     const humanMessage = invokeArgs[1];
     expect(humanMessage.content).toContain(
       "My coach has been emotionally abusive for months",
@@ -314,7 +314,7 @@ describe("escalateNode", () => {
     const state = makeState({ topicDomain: "dispute_resolution" });
     await escalateNode(state);
 
-    const invokeArgs = mockInvoke.mock.calls[0][0];
+    const invokeArgs = mockInvoke.mock.calls[0]![0];
     const systemMessage = invokeArgs[0];
     expect(systemMessage._getType()).toBe("system");
     expect(systemMessage.content).toContain("USOPC Athlete Support");
@@ -329,7 +329,7 @@ describe("escalateNode", () => {
     });
     await escalateNode(state);
 
-    const invokeArgs = mockInvoke.mock.calls[0][0];
+    const invokeArgs = mockInvoke.mock.calls[0]![0];
     const humanMessage = invokeArgs[1];
     // Prompt should contain verified contacts for SafeSport
     expect(humanMessage.content).toContain("U.S. Center for SafeSport");

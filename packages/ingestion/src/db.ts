@@ -44,7 +44,7 @@ export async function upsertIngestionStatus(
     // Get the most recent log for this source and update it
     const logs = await entity.getForSource(sourceId, 1);
     if (logs.length > 0) {
-      const latest = logs[0];
+      const latest = logs[0]!;
       const mappedStatus = status === "quota_exceeded" ? "failed" : status;
       await entity.updateStatus(
         sourceId,
@@ -53,10 +53,11 @@ export async function upsertIngestionStatus(
         {
           ...fields,
           completedAt: now,
-          errorMessage:
-            status === "quota_exceeded"
-              ? (fields.errorMessage ?? "Quota exceeded")
-              : fields.errorMessage,
+          ...(status === "quota_exceeded"
+            ? { errorMessage: fields.errorMessage ?? "Quota exceeded" }
+            : fields.errorMessage !== undefined
+              ? { errorMessage: fields.errorMessage }
+              : {}),
         },
       );
     }

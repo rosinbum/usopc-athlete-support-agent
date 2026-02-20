@@ -35,7 +35,7 @@ describe("CostTracker", () => {
       expect(mockModel.update).toHaveBeenCalledTimes(3);
 
       // Check that the first call has the correct increments
-      const firstCall = vi.mocked(mockModel.update).mock.calls[0];
+      const firstCall = vi.mocked(mockModel.update).mock.calls[0]!;
       expect(firstCall[1]).toEqual({
         add: {
           tavilyCalls: 1,
@@ -50,7 +50,7 @@ describe("CostTracker", () => {
 
       expect(mockModel.update).toHaveBeenCalledTimes(3);
 
-      const firstCall = vi.mocked(mockModel.update).mock.calls[0];
+      const firstCall = vi.mocked(mockModel.update).mock.calls[0]!;
       expect(firstCall[1]).toEqual({
         add: {
           tavilyCalls: 1,
@@ -79,7 +79,7 @@ describe("CostTracker", () => {
 
       expect(mockModel.update).toHaveBeenCalledTimes(3);
 
-      const firstCall = vi.mocked(mockModel.update).mock.calls[0];
+      const firstCall = vi.mocked(mockModel.update).mock.calls[0]!;
       expect(firstCall[1].add).toMatchObject({
         anthropicCalls: 1,
         anthropicInputTokens: 100_000,
@@ -94,7 +94,7 @@ describe("CostTracker", () => {
     it("should handle zero tokens", async () => {
       await costTracker.trackAnthropicCall(0, 0);
 
-      const firstCall = vi.mocked(mockModel.update).mock.calls[0];
+      const firstCall = vi.mocked(mockModel.update).mock.calls[0]!;
       expect(firstCall[1].add.anthropicCost).toBe(0);
     });
 
@@ -339,10 +339,10 @@ describe("CostTracker", () => {
       const statuses = await costTracker.checkAllBudgets();
 
       expect(statuses).toHaveLength(2);
-      expect(statuses[0].service).toBe("tavily");
-      expect(statuses[0].withinBudget).toBe(true);
-      expect(statuses[1].service).toBe("anthropic");
-      expect(statuses[1].withinBudget).toBe(true);
+      expect(statuses[0]!.service).toBe("tavily");
+      expect(statuses[0]!.withinBudget).toBe(true);
+      expect(statuses[1]!.service).toBe("anthropic");
+      expect(statuses[1]!.withinBudget).toBe(true);
     });
 
     it("should identify budget overruns", async () => {
@@ -367,8 +367,8 @@ describe("CostTracker", () => {
       const statuses = await costTracker.checkAllBudgets();
 
       expect(statuses).toHaveLength(2);
-      expect(statuses[0].withinBudget).toBe(false);
-      expect(statuses[1].withinBudget).toBe(false);
+      expect(statuses[0]!.withinBudget).toBe(false);
+      expect(statuses[1]!.withinBudget).toBe(false);
     });
   });
 

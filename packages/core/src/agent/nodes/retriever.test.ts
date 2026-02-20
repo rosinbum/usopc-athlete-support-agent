@@ -324,7 +324,7 @@ describe("createRetrieverNode", () => {
     const state = makeState({ topicDomain: "team_selection" });
 
     const result = await node(state);
-    const doc = result.retrievedDocuments![0];
+    const doc = result.retrievedDocuments![0]!;
     expect(doc.metadata.ngbId).toBe("usa-swimming");
     expect(doc.metadata.topicDomain).toBe("team_selection");
     expect(doc.metadata.documentType).toBe("selection_procedures");
@@ -354,8 +354,8 @@ describe("createRetrieverNode", () => {
     const state = makeState({ topicDomain: "governance" });
 
     const result = await node(state);
-    expect(result.retrievedDocuments![0].metadata.authorityLevel).toBe("law");
-    expect(result.retrievedDocuments![1].metadata.authorityLevel).toBe(
+    expect(result.retrievedDocuments![0]!.metadata.authorityLevel).toBe("law");
+    expect(result.retrievedDocuments![1]!.metadata.authorityLevel).toBe(
       "usopc_policy_procedure",
     );
   });
@@ -381,8 +381,10 @@ describe("createRetrieverNode", () => {
 
       const result = await node(state);
       // Law should rank first despite slightly worse similarity score
-      expect(result.retrievedDocuments![0].metadata.authorityLevel).toBe("law");
-      expect(result.retrievedDocuments![1].metadata.authorityLevel).toBe(
+      expect(result.retrievedDocuments![0]!.metadata.authorityLevel).toBe(
+        "law",
+      );
+      expect(result.retrievedDocuments![1]!.metadata.authorityLevel).toBe(
         "educational_guidance",
       );
     });
@@ -407,10 +409,12 @@ describe("createRetrieverNode", () => {
 
       const result = await node(state);
       // Educational guide should still rank first due to much better similarity
-      expect(result.retrievedDocuments![0].metadata.authorityLevel).toBe(
+      expect(result.retrievedDocuments![0]!.metadata.authorityLevel).toBe(
         "educational_guidance",
       );
-      expect(result.retrievedDocuments![1].metadata.authorityLevel).toBe("law");
+      expect(result.retrievedDocuments![1]!.metadata.authorityLevel).toBe(
+        "law",
+      );
     });
 
     it("handles documents without authority level gracefully", async () => {
@@ -506,7 +510,7 @@ describe("createRetrieverNode", () => {
       const mockFn = store.similaritySearchWithScore as ReturnType<
         typeof vi.fn
       >;
-      const searchQuery = mockFn.mock.calls[0][0] as string;
+      const searchQuery = mockFn.mock.calls[0]![0] as string;
       // Query should include the current message
       expect(searchQuery).toContain("alternates");
       // Query should include relevant context
@@ -535,7 +539,7 @@ describe("createRetrieverNode", () => {
       const mockFn = store.similaritySearchWithScore as ReturnType<
         typeof vi.fn
       >;
-      const searchQuery = mockFn.mock.calls[0][0] as string;
+      const searchQuery = mockFn.mock.calls[0]![0] as string;
       expect(searchQuery.length).toBeLessThan(longAssistantResponse.length);
     });
 
@@ -560,7 +564,7 @@ describe("createRetrieverNode", () => {
       const mockFn = store.similaritySearchWithScore as ReturnType<
         typeof vi.fn
       >;
-      const searchQuery = mockFn.mock.calls[0][0] as string;
+      const searchQuery = mockFn.mock.calls[0]![0] as string;
       expect(searchQuery).toContain("eligibility requirements");
     });
   });

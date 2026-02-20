@@ -63,7 +63,7 @@ describe("updateChunkMetadataBySourceId", () => {
     });
 
     expect(count).toBe(3);
-    const call = vi.mocked(pool.query).mock.calls[0];
+    const call = vi.mocked(pool.query).mock.calls[0]!;
     expect(call[0]).toContain("metadata = metadata || $2::jsonb");
     expect(call[0]).toContain("document_title =");
     expect(call[1]).toContain("src-1");
@@ -79,7 +79,7 @@ describe("updateChunkMetadataBySourceId", () => {
       topicDomains: ["governance", "eligibility"],
     });
 
-    const call = vi.mocked(pool.query).mock.calls[0];
+    const call = vi.mocked(pool.query).mock.calls[0]!;
     const jsonbPatch = JSON.parse(call[1]![1] as string);
     expect(jsonbPatch.topicDomain).toBe("governance");
     expect(jsonbPatch.topicDomains).toEqual(["governance", "eligibility"]);
@@ -95,7 +95,7 @@ describe("updateChunkMetadataBySourceId", () => {
       authorityLevel: "ngb_policy_procedure",
     });
 
-    const call = vi.mocked(pool.query).mock.calls[0];
+    const call = vi.mocked(pool.query).mock.calls[0]!;
     expect(call[0]).toContain("document_title =");
     expect(call[0]).toContain("ngb_id =");
     expect(call[0]).toContain("authority_level =");
@@ -121,7 +121,7 @@ describe("updateChunkMetadataBySourceId", () => {
       ngbId: null,
     });
 
-    const call = vi.mocked(pool.query).mock.calls[0];
+    const call = vi.mocked(pool.query).mock.calls[0]!;
     const jsonbPatch = JSON.parse(call[1]![1] as string);
     expect(jsonbPatch.ngbId).toBeNull();
   });

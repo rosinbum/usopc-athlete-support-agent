@@ -1639,7 +1639,8 @@ export function getScenariosByDifficulty(
 /** Get only single-turn scenarios (for use with runPipeline). */
 export function getSingleTurnScenarios(): QualityReviewScenario[] {
   return qualityReviewScenarios.filter(
-    (s) => s.input.messages.length === 1 && s.input.messages[0].role === "user",
+    (s) =>
+      s.input.messages.length === 1 && s.input.messages[0]!.role === "user",
   );
 }
 
@@ -1648,6 +1649,6 @@ export function getMultiTurnScenarios(): QualityReviewScenario[] {
   return qualityReviewScenarios.filter(
     (s) =>
       s.input.messages.length > 1 ||
-      (s.input.messages.length === 1 && s.input.messages[0].role !== "user"),
+      (s.input.messages.length === 1 && s.input.messages[0]!.role !== "user"),
   );
 }

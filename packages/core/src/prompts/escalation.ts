@@ -112,7 +112,7 @@ export function buildEscalation(
   const targets = getEscalationTargets(domain);
   if (targets.length === 0) return undefined;
 
-  const primary = targets[0];
+  const primary = targets[0]!;
   return {
     target: primary.id,
     organization: primary.organization,

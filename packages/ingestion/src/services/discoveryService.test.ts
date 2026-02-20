@@ -82,8 +82,8 @@ describe("DiscoveryService", () => {
 
       // Should deduplicate to 2 unique URLs
       expect(results).toHaveLength(2);
-      expect(results[0].url).toBe("https://usopc.org/governance");
-      expect(results[1].url).toBe("https://usopc.org/bylaws");
+      expect(results[0]!.url).toBe("https://usopc.org/governance");
+      expect(results[1]!.url).toBe("https://usopc.org/bylaws");
     });
 
     it("should extract title from URL", async () => {
@@ -93,7 +93,7 @@ describe("DiscoveryService", () => {
 
       const results = await service.discoverFromMap("usopc.org");
 
-      expect(results[0].title).toBe("athlete safety policy");
+      expect(results[0]!.title).toBe("athlete safety policy");
     });
 
     it("should handle map API errors", async () => {
