@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { Components } from "react-markdown";
+import { useDebounce } from "../../hooks/useDebounce.js";
 
 interface MarkdownMessageProps {
   content: string;
@@ -91,7 +92,13 @@ const components: Components = {
   ),
 };
 
+// One animation frame (~16ms): batches token-level streaming updates so the
+// markdown AST is not re-parsed on every incoming token (100-500 parses/response).
+const STREAMING_DEBOUNCE_MS = 16;
+
 export function MarkdownMessage({ content }: MarkdownMessageProps) {
+  const debouncedContent = useDebounce(content, STREAMING_DEBOUNCE_MS);
+
   return (
     <div className="text-sm leading-relaxed markdown-content">
       {/* Security: raw HTML is disabled by default in react-markdown.
@@ -101,7 +108,7 @@ export function MarkdownMessage({ content }: MarkdownMessageProps) {
         rehypePlugins={[rehypeHighlight]}
         components={components}
       >
-        {content}
+        {debouncedContent}
       </ReactMarkdown>
     </div>
   );
