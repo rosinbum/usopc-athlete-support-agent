@@ -8,7 +8,6 @@ import {
 } from "../../services/anthropicService.js";
 import {
   buildContextualQuery,
-  getLastUserMessage,
   stateContext,
   parseLlmJson,
 } from "../../utils/index.js";
