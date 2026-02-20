@@ -43,6 +43,8 @@ export const AppTableSchema = {
       lastError: { type: String },
       s3Key: { type: String },
       s3VersionId: { type: String },
+      gsi1pk: { type: String, value: "SOURCE#ALL" },
+      gsi1sk: { type: String, value: "${createdAt}" },
       createdAt: { type: String },
       updatedAt: { type: String },
     },

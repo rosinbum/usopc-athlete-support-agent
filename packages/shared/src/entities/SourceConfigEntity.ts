@@ -63,6 +63,7 @@ export interface MarkSuccessOptions {
  * GSIs:
  * - ngbId-index: Query sources by NGB
  * - enabled-priority-index: Query enabled sources
+ * - gsi1: Query all sources via static partition key "SOURCE#ALL"
  */
 export class SourceConfigEntity {
   private model;
@@ -166,10 +167,13 @@ export class SourceConfigEntity {
 
   /**
    * Get all source configurations (enabled and disabled).
-   * OneTable handles pagination internally.
+   * Queries the gsi1 index using the static partition key "SOURCE#ALL"
+   * to avoid a full table scan.
    */
   async getAll(): Promise<SourceConfig[]> {
-    const items = await this.model.scan({} as never);
+    const items = await this.model.find({ gsi1pk: "SOURCE#ALL" } as never, {
+      index: "gsi1",
+    });
     return items.map((item) =>
       this.toExternal(item as unknown as Record<string, unknown>),
     );
