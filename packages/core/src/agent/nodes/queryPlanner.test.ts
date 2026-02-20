@@ -123,8 +123,8 @@ describe("queryPlannerNode", () => {
 
     expect(result.isComplexQuery).toBe(true);
     expect(result.subQueries).toHaveLength(2);
-    expect(result.subQueries![0].domain).toBe("anti_doping");
-    expect(result.subQueries![1].domain).toBe("team_selection");
+    expect(result.subQueries![0]!.domain).toBe("anti_doping");
+    expect(result.subQueries![1]!.domain).toBe("team_selection");
   });
 
   it("passes through simple queries", async () => {
@@ -280,8 +280,8 @@ describe("parseQueryPlannerResponse", () => {
 
     expect(output.isComplex).toBe(true);
     expect(output.subQueries).toHaveLength(2);
-    expect(output.subQueries[0].domain).toBe("anti_doping");
-    expect(output.subQueries[1].ngbIds).toEqual(["usa-swimming"]);
+    expect(output.subQueries[0]!.domain).toBe("anti_doping");
+    expect(output.subQueries[1]!.ngbIds).toEqual(["usa-swimming"]);
     expect(warnings).toHaveLength(0);
   });
 
@@ -372,7 +372,7 @@ describe("parseQueryPlannerResponse", () => {
       }),
     );
 
-    expect(output.subQueries[0].intent).toBe("general");
+    expect(output.subQueries[0]!.intent).toBe("general");
     expect(warnings.length).toBeGreaterThan(0);
   });
 
@@ -438,7 +438,7 @@ describe("parseQueryPlannerResponse", () => {
       }),
     );
 
-    expect(output.subQueries[0].ngbIds).toEqual(["valid-id"]);
+    expect(output.subQueries[0]!.ngbIds).toEqual(["valid-id"]);
   });
 
   it("limits to 4 sub-queries", () => {

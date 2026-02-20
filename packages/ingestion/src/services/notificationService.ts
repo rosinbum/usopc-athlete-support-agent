@@ -36,8 +36,8 @@ export interface BudgetAlert {
 
 export interface NotificationChannels {
   cloudWatch: boolean; // always enabled
-  slack?: string; // webhook URL
-  email?: string; // SES email address
+  slack?: string | undefined; // webhook URL
+  email?: string | undefined; // SES email address
 }
 
 // ---------------------------------------------------------------------------

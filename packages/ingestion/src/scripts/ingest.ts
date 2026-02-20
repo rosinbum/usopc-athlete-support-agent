@@ -34,7 +34,7 @@ const logger = createLogger({ service: "ingestion-cli" });
 // ---------------------------------------------------------------------------
 
 export interface ParsedArgs {
-  sourceId?: string;
+  sourceId?: string | undefined;
   all: boolean;
   resume: boolean;
   force: boolean;
@@ -176,15 +176,15 @@ async function main(): Promise<void> {
 
     const result = await ingestSource(source, {
       openaiApiKey,
-      s3Key,
+      ...(s3Key !== undefined ? { s3Key } : {}),
     });
 
     // Update DynamoDB ingestion stats
     try {
       if (result.status === "completed" && contentHash) {
         await entity.markSuccess(source.id, contentHash, {
-          s3Key,
-          s3VersionId,
+          ...(s3Key !== undefined ? { s3Key } : {}),
+          ...(s3VersionId !== undefined ? { s3VersionId } : {}),
         });
       } else if (result.status === "failed") {
         await entity.markFailure(source.id, result.error ?? "Unknown error");
@@ -210,12 +210,12 @@ async function main(): Promise<void> {
     const results: {
       sourceId: string;
       status: string;
-      error?: string;
+      error?: string | undefined;
       chunksCount: number;
     }[] = [];
 
     for (let i = 0; i < sources.length; i++) {
-      const source: IngestionSource = sources[i];
+      const source: IngestionSource = sources[i]!;
 
       if (!force) {
         const config = await entity.getById(source.id);
@@ -341,7 +341,7 @@ async function main(): Promise<void> {
 
       const result = await ingestSource(source, {
         openaiApiKey,
-        s3Key: batchS3Key,
+        ...(batchS3Key !== undefined ? { s3Key: batchS3Key } : {}),
       });
       results.push(result);
 
@@ -349,8 +349,10 @@ async function main(): Promise<void> {
       try {
         if (result.status === "completed" && batchContentHash) {
           await entity.markSuccess(source.id, batchContentHash, {
-            s3Key: batchS3Key,
-            s3VersionId: batchS3VersionId,
+            ...(batchS3Key !== undefined ? { s3Key: batchS3Key } : {}),
+            ...(batchS3VersionId !== undefined
+              ? { s3VersionId: batchS3VersionId }
+              : {}),
           });
         } else if (result.status === "failed") {
           await entity.markFailure(source.id, result.error ?? "Unknown error");

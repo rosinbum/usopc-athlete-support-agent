@@ -84,7 +84,7 @@ describe("createVectorStore", () => {
     it("should not pass postgresConnectionOptions", async () => {
       await createVectorStore(mockEmbeddings);
 
-      const callArgs = mockInitialize.mock.calls[0][1];
+      const callArgs = mockInitialize.mock.calls[0]![1]!;
       expect(callArgs).not.toHaveProperty("postgresConnectionOptions");
     });
   });

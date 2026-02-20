@@ -22,11 +22,11 @@ const DOCUMENT_TYPES = [
 ];
 
 export interface SourceFiltersState {
-  search?: string;
-  documentType?: string;
-  topicDomain?: string;
-  ngbId?: string;
-  authorityLevel?: string;
+  search?: string | undefined;
+  documentType?: string | undefined;
+  topicDomain?: string | undefined;
+  ngbId?: string | undefined;
+  authorityLevel?: string | undefined;
 }
 
 interface SourceFiltersProps {

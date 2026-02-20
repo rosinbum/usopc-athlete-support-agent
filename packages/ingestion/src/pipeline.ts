@@ -49,14 +49,14 @@ export interface IngestionSource {
   ngbId: string | null;
   priority: "high" | "medium" | "low";
   description: string;
-  authorityLevel?: AuthorityLevel;
+  authorityLevel?: AuthorityLevel | undefined;
 }
 
 export interface IngestionResult {
   sourceId: string;
   status: "completed" | "failed";
   chunksCount: number;
-  error?: string;
+  error?: string | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -165,10 +165,10 @@ async function embedBatchWithRetry(
 
       // Validate dimensions before inserting — OpenAI occasionally returns
       // wrong dimensions during server instability.
-      if (vectors.length > 0 && vectors[0].length !== expectedDimensions) {
+      if (vectors.length > 0 && vectors[0]!.length !== expectedDimensions) {
         throw new EmbeddingDimensionError(
           expectedDimensions,
-          vectors[0].length,
+          vectors[0]!.length,
         );
       }
 
@@ -232,8 +232,8 @@ export async function ingestSource(
   source: IngestionSource,
   options: {
     openaiApiKey: string;
-    s3Key?: string;
-    vectorStore?: Awaited<ReturnType<typeof createVectorStore>>;
+    s3Key?: string | undefined;
+    vectorStore?: Awaited<ReturnType<typeof createVectorStore>> | undefined;
   },
 ): Promise<IngestionResult> {
   logger.info(`Starting ingestion for source: ${source.id}`, {
@@ -271,9 +271,11 @@ export async function ingestSource(
     });
 
     // 4. Enrich metadata
-    const enriched = enrichMetadata(chunks, source, {
-      s3Key: options.s3Key,
-    });
+    const enriched = enrichMetadata(
+      chunks,
+      source,
+      options.s3Key !== undefined ? { s3Key: options.s3Key } : undefined,
+    );
 
     // 5. Extract section titles
     const withSections = extractSections(enriched);
@@ -302,14 +304,14 @@ export async function ingestSource(
       await embedBatchWithRetry(
         vectorStore,
         embeddings,
-        batches[i],
+        batches[i]!,
         MODEL_CONFIG.embeddings.dimensions,
         source.id,
         i,
         batches.length,
       );
       logger.info(
-        `Batch ${i + 1}/${batches.length} complete (${batches[i].length} chunks)`,
+        `Batch ${i + 1}/${batches.length} complete (${batches[i]!.length} chunks)`,
         { sourceId: source.id },
       );
     }
@@ -371,11 +373,11 @@ export async function ingestAll(
   for (let i = 0; i < sources.length; i++) {
     // Wait between sources to avoid TPM overlap from the previous source's
     // last batch. Skip the delay for the first source.
-    if (i > 0 && results[i - 1].status === "completed") {
+    if (i > 0 && results[i - 1]!.status === "completed") {
       logger.info("Waiting 15s between sources for TPM window reset...");
       await sleep(15_000);
     }
-    const result = await ingestSource(sources[i], {
+    const result = await ingestSource(sources[i]!, {
       openaiApiKey: options.openaiApiKey,
       vectorStore,
     });

@@ -44,7 +44,7 @@ function parseArgs(): CliArgs {
     if (args[i] === "--tag" && args[i + 1]) {
       tag = args[++i];
     } else if (args[i] === "--threshold" && args[i + 1]) {
-      threshold = parseFloat(args[++i]);
+      threshold = parseFloat(args[++i]!);
     } else if (args[i] === "--dry-run") {
       dryRun = true;
     }

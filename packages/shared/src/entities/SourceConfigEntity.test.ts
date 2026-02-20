@@ -144,7 +144,7 @@ describe("SourceConfigEntity", () => {
       );
 
       // Null fields should be stripped from the internal call
-      const createArg = mockCreate.mock.calls[0][0] as Record<string, unknown>;
+      const createArg = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
       expect(createArg.ngbId).toBeUndefined();
       expect(createArg.lastIngestedAt).toBeUndefined();
       expect(createArg.lastError).toBeUndefined();
@@ -207,9 +207,9 @@ describe("SourceConfigEntity", () => {
       const results = await entity.getAll();
 
       expect(results).toHaveLength(2);
-      expect(results[0].id).toBe("src1");
-      expect(results[1].id).toBe("src2");
-      expect(results[1].enabled).toBe(false);
+      expect(results[0]!.id).toBe("src1");
+      expect(results[1]!.id).toBe("src2");
+      expect(results[1]!.enabled).toBe(false);
       expect(mockFind).toHaveBeenCalledWith(
         { gsi1pk: "SOURCE#ALL" },
         { index: "gsi1" },
@@ -262,7 +262,7 @@ describe("SourceConfigEntity", () => {
       const results = await entity.getByNgb("usa-swimming");
 
       expect(results).toHaveLength(1);
-      expect(results[0].ngbId).toBe("usa-swimming");
+      expect(results[0]!.ngbId).toBe("usa-swimming");
       expect(mockFind).toHaveBeenCalledWith(
         { ngbId: "usa-swimming" },
         { index: "ngbId-index" },

@@ -675,11 +675,11 @@ export function SourcesAdminClient() {
             }
             onPrev={() => {
               const idx = sorted.findIndex((s) => s.id === openSourceId);
-              if (idx > 0) setOpenSourceId(sorted[idx - 1].id);
+              if (idx > 0) setOpenSourceId(sorted[idx - 1]!.id);
             }}
             onNext={() => {
               const idx = sorted.findIndex((s) => s.id === openSourceId);
-              if (idx < sorted.length - 1) setOpenSourceId(sorted[idx + 1].id);
+              if (idx < sorted.length - 1) setOpenSourceId(sorted[idx + 1]!.id);
             }}
           />
         )}

@@ -153,7 +153,7 @@ export function createLookupSportOrgTool(sportOrgEntity: SportOrgEntity) {
         }
 
         // Return the best match. If there are close runners-up, mention them.
-        const best = scored[0];
+        const best = scored[0]!;
         let result = formatOrgResult(best.org);
 
         // Include up to 2 runners-up if they scored within 50% of the best

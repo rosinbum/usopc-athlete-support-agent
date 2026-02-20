@@ -172,7 +172,7 @@ describe("PromptEntity", () => {
       );
 
       // createdAt should NOT be in the update call
-      const updateArg = mockUpdate.mock.calls[0][0] as Record<string, unknown>;
+      const updateArg = mockUpdate.mock.calls[0]![0] as Record<string, unknown>;
       expect(updateArg.createdAt).toBeUndefined();
 
       expect(result.content).toBe("Updated classifier prompt");
@@ -188,7 +188,7 @@ describe("PromptEntity", () => {
         version: 1,
       });
 
-      const createArg = mockCreate.mock.calls[0][0] as Record<string, unknown>;
+      const createArg = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
       expect(createArg.domain).toBeUndefined();
     });
   });
@@ -204,9 +204,9 @@ describe("PromptEntity", () => {
       const results = await entity.getAll();
 
       expect(results).toHaveLength(3);
-      expect(results[0].name).toBe("classifier");
-      expect(results[1].name).toBe("synthesizer");
-      expect(results[2].name).toBe("system");
+      expect(results[0]!.name).toBe("classifier");
+      expect(results[1]!.name).toBe("synthesizer");
+      expect(results[2]!.name).toBe("system");
     });
 
     it("returns empty array when no prompts exist", async () => {

@@ -112,7 +112,7 @@ export class CircuitBreaker {
   private readonly resetTimeout: number;
   private readonly requestTimeout: number;
   private readonly successThreshold: number;
-  private readonly logger?: Logger;
+  private readonly logger?: Logger | undefined;
   private readonly shouldRecordFailure: (error: Error) => boolean;
 
   private state: CircuitBreakerState = "closed";

@@ -44,8 +44,8 @@ export interface CreateSourceInput {
 }
 
 export interface MarkSuccessOptions {
-  s3Key?: string;
-  s3VersionId?: string;
+  s3Key?: string | undefined;
+  s3VersionId?: string | undefined;
 }
 
 // ---------------------------------------------------------------------------

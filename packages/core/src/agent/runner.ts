@@ -33,21 +33,21 @@ export type StreamChunk =
 
 export interface AgentRunnerConfig {
   databaseUrl: string;
-  openaiApiKey?: string;
-  tavilyApiKey?: string;
+  openaiApiKey?: string | undefined;
+  tavilyApiKey?: string | undefined;
 }
 
 export interface AgentInput {
   messages: BaseMessage[];
-  userSport?: string;
-  conversationId?: string;
-  conversationSummary?: string;
+  userSport?: string | undefined;
+  conversationId?: string | undefined;
+  conversationSummary?: string | undefined;
 }
 
 export interface AgentOutput {
   answer: string;
   citations: Citation[];
-  escalation?: EscalationInfo;
+  escalation?: EscalationInfo | undefined;
 }
 
 /**

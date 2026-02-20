@@ -22,21 +22,21 @@ export type EmotionalState = "neutral" | "distressed" | "panicked" | "fearful";
 
 export interface Citation {
   title: string;
-  url?: string;
+  url?: string | undefined;
   documentType: string;
-  section?: string;
-  effectiveDate?: string;
+  section?: string | undefined;
+  effectiveDate?: string | undefined;
   snippet: string;
-  authorityLevel?: AuthorityLevel;
-  s3Key?: string;
+  authorityLevel?: AuthorityLevel | undefined;
+  s3Key?: string | undefined;
 }
 
 export interface EscalationInfo {
   target: string;
   organization: string;
-  contactEmail?: string;
-  contactPhone?: string;
-  contactUrl?: string;
+  contactEmail?: string | undefined;
+  contactPhone?: string | undefined;
+  contactUrl?: string | undefined;
   reason: string;
   urgency: "immediate" | "standard";
 }
@@ -48,16 +48,16 @@ export interface RetrievedDocument {
 }
 
 export interface DocumentMetadata {
-  ngbId?: string;
-  topicDomain?: TopicDomain;
-  documentType?: string;
-  sourceUrl?: string;
-  documentTitle?: string;
-  sectionTitle?: string;
-  effectiveDate?: string;
-  ingestedAt?: string;
-  authorityLevel?: AuthorityLevel;
-  s3Key?: string;
+  ngbId?: string | undefined;
+  topicDomain?: TopicDomain | undefined;
+  documentType?: string | undefined;
+  sourceUrl?: string | undefined;
+  documentTitle?: string | undefined;
+  sectionTitle?: string | undefined;
+  effectiveDate?: string | undefined;
+  ingestedAt?: string | undefined;
+  authorityLevel?: AuthorityLevel | undefined;
+  s3Key?: string | undefined;
 }
 
 export type QualityIssueType =
@@ -107,6 +107,6 @@ export interface DiscoveryFeedMessage {
     discoveryMethod: "agent" | "map" | "search";
     discoveredFrom: string;
   }>;
-  autoApprovalThreshold?: number;
+  autoApprovalThreshold?: number | undefined;
   timestamp: string;
 }

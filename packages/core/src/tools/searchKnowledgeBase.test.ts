@@ -114,7 +114,7 @@ describe("createSearchKnowledgeBaseTool", () => {
 
       // With filter, should use narrowFilterTopK (typically 5)
       const calls = mockVectorStore.similaritySearchWithScore.mock.calls;
-      expect(calls[0][1]).toBeLessThanOrEqual(10);
+      expect(calls[0]![1]).toBeLessThanOrEqual(10);
     });
   });
 

@@ -139,7 +139,7 @@ describe("IngestionLogEntity", () => {
         status: "in_progress",
       });
 
-      const createArg = mockCreate.mock.calls[0][0] as Record<string, unknown>;
+      const createArg = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
       expect(createArg.contentHash).toBeUndefined();
       expect(createArg.chunksCount).toBeUndefined();
       expect(createArg.errorMessage).toBeUndefined();

@@ -142,8 +142,8 @@ describe("citationBuilderNode", () => {
     });
 
     const result = await citationBuilderNode(state);
-    expect(result.citations![0].snippet).toHaveLength(203); // 200 + "..."
-    expect(result.citations![0].snippet!.endsWith("...")).toBe(true);
+    expect(result.citations![0]!.snippet).toHaveLength(203); // 200 + "..."
+    expect(result.citations![0]!.snippet!.endsWith("...")).toBe(true);
   });
 
   it("does not add ellipsis to short content", async () => {
@@ -153,7 +153,7 @@ describe("citationBuilderNode", () => {
     });
 
     const result = await citationBuilderNode(state);
-    expect(result.citations![0].snippet).toBe(shortContent);
+    expect(result.citations![0]!.snippet).toBe(shortContent);
   });
 
   it("uses 'Unknown Document' for missing document title", async () => {
@@ -162,7 +162,7 @@ describe("citationBuilderNode", () => {
     });
 
     const result = await citationBuilderNode(state);
-    expect(result.citations![0].title).toBe("Unknown Document");
+    expect(result.citations![0]!.title).toBe("Unknown Document");
   });
 
   it("uses 'document' for missing document type", async () => {
@@ -171,7 +171,7 @@ describe("citationBuilderNode", () => {
     });
 
     const result = await citationBuilderNode(state);
-    expect(result.citations![0].documentType).toBe("document");
+    expect(result.citations![0]!.documentType).toBe("document");
   });
 
   it("includes authorityLevel when present in document metadata", async () => {
@@ -189,7 +189,7 @@ describe("citationBuilderNode", () => {
     });
 
     const result = await citationBuilderNode(state);
-    expect(result.citations![0].authorityLevel).toBe("law");
+    expect(result.citations![0]!.authorityLevel).toBe("law");
   });
 
   it("omits authorityLevel when not present in document metadata", async () => {
@@ -205,6 +205,6 @@ describe("citationBuilderNode", () => {
     });
 
     const result = await citationBuilderNode(state);
-    expect(result.citations![0].authorityLevel).toBeUndefined();
+    expect(result.citations![0]!.authorityLevel).toBeUndefined();
   });
 });

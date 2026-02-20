@@ -29,8 +29,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async jwt({ token, profile }) {
       if (profile) {
-        token.email = profile.email;
-        token.name = profile.name;
+        token.email = profile.email ?? null;
+        token.name = profile.name ?? null;
         token.picture = (profile as Record<string, unknown>)
           .avatar_url as string;
       }

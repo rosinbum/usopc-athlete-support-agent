@@ -19,9 +19,9 @@ describe("parseSourceCSV", () => {
     const { rows, parseErrors } = parseSourceCSV(csv);
     expect(parseErrors).toHaveLength(0);
     expect(rows).toHaveLength(1);
-    expect(rows[0].title).toBe("USOPC Bylaws");
-    expect(rows[0].documentType).toBe("bylaws");
-    expect(rows[0].url).toBe("https://example.com/bylaws.pdf");
+    expect(rows[0]!.title).toBe("USOPC Bylaws");
+    expect(rows[0]!.documentType).toBe("bylaws");
+    expect(rows[0]!.url).toBe("https://example.com/bylaws.pdf");
   });
 
   it("parses multiple rows", () => {
@@ -44,8 +44,8 @@ describe("parseSourceCSV", () => {
 
     const { rows } = parseSourceCSV(csv);
     expect(rows).toHaveLength(1);
-    expect(rows[0].title).toBe("My Source");
-    expect(rows[0].documentType).toBe("policy");
+    expect(rows[0]!.title).toBe("My Source");
+    expect(rows[0]!.documentType).toBe("policy");
   });
 
   it("skips empty lines", () => {
@@ -83,8 +83,8 @@ describe("validateSourceRows — defaults", () => {
     ];
 
     const results = validateSourceRows(rows, new Set());
-    expect(results[0].status).toBe("valid");
-    expect(results[0].data.id).toBe("usopc-athlete-handbook");
+    expect(results[0]!.status).toBe("valid");
+    expect(results[0]!.data.id).toBe("usopc-athlete-handbook");
   });
 
   it("applies default format (pdf), priority (medium), and authorityLevel (educational_guidance)", () => {
@@ -104,10 +104,10 @@ describe("validateSourceRows — defaults", () => {
     ];
 
     const results = validateSourceRows(rows, new Set());
-    expect(results[0].status).toBe("valid");
-    expect(results[0].data.format).toBe("pdf");
-    expect(results[0].data.priority).toBe("medium");
-    expect(results[0].data.authorityLevel).toBe("educational_guidance");
+    expect(results[0]!.status).toBe("valid");
+    expect(results[0]!.data.format).toBe("pdf");
+    expect(results[0]!.data.priority).toBe("medium");
+    expect(results[0]!.data.authorityLevel).toBe("educational_guidance");
   });
 
   it("sets ngbId to null when empty", () => {
@@ -127,7 +127,7 @@ describe("validateSourceRows — defaults", () => {
     ];
 
     const results = validateSourceRows(rows, new Set());
-    expect(results[0].data.ngbId).toBeNull();
+    expect(results[0]!.data.ngbId).toBeNull();
   });
 
   it("splits pipe-delimited topicDomains", () => {
@@ -147,8 +147,8 @@ describe("validateSourceRows — defaults", () => {
     ];
 
     const results = validateSourceRows(rows, new Set());
-    expect(results[0].status).toBe("valid");
-    expect(results[0].data.topicDomains).toEqual([
+    expect(results[0]!.status).toBe("valid");
+    expect(results[0]!.data.topicDomains).toEqual([
       "governance",
       "safesport",
       "eligibility",
@@ -173,8 +173,8 @@ describe("validateSourceRows — validation", () => {
     ];
 
     const results = validateSourceRows(rows, new Set());
-    expect(results[0].status).toBe("invalid");
-    expect(results[0].errors.some((e) => e.includes("Title"))).toBe(true);
+    expect(results[0]!.status).toBe("invalid");
+    expect(results[0]!.errors.some((e) => e.includes("Title"))).toBe(true);
   });
 
   it("marks row invalid for bad URL", () => {
@@ -189,8 +189,8 @@ describe("validateSourceRows — validation", () => {
     ];
 
     const results = validateSourceRows(rows, new Set());
-    expect(results[0].status).toBe("invalid");
-    expect(results[0].errors.some((e) => e.includes("url"))).toBe(true);
+    expect(results[0]!.status).toBe("invalid");
+    expect(results[0]!.errors.some((e) => e.includes("url"))).toBe(true);
   });
 
   it("marks row invalid for unrecognized documentType", () => {
@@ -205,8 +205,8 @@ describe("validateSourceRows — validation", () => {
     ];
 
     const results = validateSourceRows(rows, new Set());
-    expect(results[0].status).toBe("invalid");
-    expect(results[0].errors.some((e) => e.includes("documentType"))).toBe(
+    expect(results[0]!.status).toBe("invalid");
+    expect(results[0]!.errors.some((e) => e.includes("documentType"))).toBe(
       true,
     );
   });
@@ -223,8 +223,8 @@ describe("validateSourceRows — validation", () => {
     ];
 
     const results = validateSourceRows(rows, new Set());
-    expect(results[0].status).toBe("invalid");
-    expect(results[0].errors.some((e) => e.includes("topicDomains"))).toBe(
+    expect(results[0]!.status).toBe("invalid");
+    expect(results[0]!.errors.some((e) => e.includes("topicDomains"))).toBe(
       true,
     );
   });
@@ -241,8 +241,8 @@ describe("validateSourceRows — validation", () => {
     ];
 
     const results = validateSourceRows(rows, new Set());
-    expect(results[0].status).toBe("invalid");
-    expect(results[0].errors.some((e) => e.includes("topicDomains"))).toBe(
+    expect(results[0]!.status).toBe("invalid");
+    expect(results[0]!.errors.some((e) => e.includes("topicDomains"))).toBe(
       true,
     );
   });
@@ -270,8 +270,8 @@ describe("validateSourceRows — duplicates", () => {
     ];
 
     const results = validateSourceRows(rows, new Set(["existing-source"]));
-    expect(results[0].status).toBe("duplicate");
-    expect(results[0].errors[0]).toContain("Duplicate ID");
+    expect(results[0]!.status).toBe("duplicate");
+    expect(results[0]!.errors[0]).toContain("Duplicate ID");
   });
 
   it("marks second row as duplicate when two rows have the same generated id", () => {
@@ -293,8 +293,8 @@ describe("validateSourceRows — duplicates", () => {
     ];
 
     const results = validateSourceRows(rows, new Set());
-    expect(results[0].status).toBe("valid");
-    expect(results[1].status).toBe("duplicate");
+    expect(results[0]!.status).toBe("valid");
+    expect(results[1]!.status).toBe("duplicate");
   });
 });
 
@@ -309,7 +309,7 @@ describe("CSV_TEMPLATE", () => {
     expect(rows).toHaveLength(1);
 
     const results = validateSourceRows(rows, new Set());
-    expect(results[0].status).toBe("valid");
-    expect(results[0].data.title).toBe("USOPC Bylaws");
+    expect(results[0]!.status).toBe("valid");
+    expect(results[0]!.data.title).toBe("USOPC Bylaws");
   });
 });

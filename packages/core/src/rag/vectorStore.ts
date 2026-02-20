@@ -34,6 +34,8 @@ export async function createVectorStore(
   return await PGVectorStore.initialize(embeddings, {
     pool,
     tableName: mergedConfig.tableName!,
-    columns: mergedConfig.columns,
+    ...(mergedConfig.columns !== undefined
+      ? { columns: mergedConfig.columns }
+      : {}),
   });
 }

@@ -67,9 +67,9 @@ interface ClassifierOutput {
   queryIntent: QueryIntent;
   hasTimeConstraint: boolean;
   shouldEscalate: boolean;
-  escalationReason?: string;
+  escalationReason?: string | undefined;
   needsClarification: boolean;
-  clarificationQuestion?: string;
+  clarificationQuestion?: string | undefined;
   emotionalState: EmotionalState;
 }
 

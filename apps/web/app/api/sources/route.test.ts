@@ -45,7 +45,7 @@ describe("GET /api/sources", () => {
     await GET(request);
 
     // The count query (first call) receives the escaped search param
-    const countParams = mockQuery.mock.calls[0][1] as string[];
+    const countParams = mockQuery.mock.calls[0]![1] as string[];
     const searchParam = countParams[0];
     expect(searchParam).toContain("\\%");
     expect(searchParam).toContain("\\_");
@@ -60,7 +60,7 @@ describe("GET /api/sources", () => {
     const request = new Request("http://localhost/api/sources?search=bylaws");
     await GET(request);
 
-    const countSql = mockQuery.mock.calls[0][0] as string;
+    const countSql = mockQuery.mock.calls[0]![0] as string;
     expect(countSql).toContain("ESCAPE");
   });
 });

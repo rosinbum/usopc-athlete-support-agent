@@ -106,7 +106,7 @@ describe("NotificationService", () => {
       );
 
       const body = JSON.parse(
-        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+        vi.mocked(mockFetch).mock.calls[0]![1]!.body as string,
       );
       expect(body.text).toContain("Source Discovery Run Complete");
       expect(body.text).toContain("Total Discovered: 25");
@@ -144,7 +144,7 @@ describe("NotificationService", () => {
       await service.sendDiscoveryCompletion(summaryWithErrors);
 
       const body = JSON.parse(
-        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+        vi.mocked(mockFetch).mock.calls[0]![1]!.body as string,
       );
       expect(body.text).toContain("Errors:");
       expect(body.text).toContain("Failed to fetch example.com");
@@ -156,7 +156,7 @@ describe("NotificationService", () => {
       service = new NotificationService({ email: "admin@test.com" });
 
       const { SESClient } = await import("@aws-sdk/client-ses");
-      const mockSend = vi.mocked(SESClient).mock.results[0].value.send;
+      const mockSend = vi.mocked(SESClient).mock.results[0]!.value.send;
       vi.mocked(mockSend).mockResolvedValue({});
 
       await service.sendDiscoveryCompletion(mockSummary);
@@ -191,7 +191,7 @@ describe("NotificationService", () => {
       await service.sendBudgetAlert(warningAlert);
 
       const body = JSON.parse(
-        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+        vi.mocked(mockFetch).mock.calls[0]![1]!.body as string,
       );
       expect(body.text).toContain("Budget Warning");
       expect(body.text).toContain("tavily");
@@ -208,7 +208,7 @@ describe("NotificationService", () => {
       await service.sendBudgetAlert(criticalAlert);
 
       const body = JSON.parse(
-        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+        vi.mocked(mockFetch).mock.calls[0]![1]!.body as string,
       );
       expect(body.text).toContain("Budget CRITICAL");
       expect(body.text).toContain("anthropic");
@@ -226,7 +226,7 @@ describe("NotificationService", () => {
       await service.sendBudgetAlert(warningAlert);
 
       const body = JSON.parse(
-        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+        vi.mocked(mockFetch).mock.calls[0]![1]!.body as string,
       );
       expect(body.text).toContain("Usage: 800 credits");
       expect(body.text).toContain("Budget: 1000 credits");
@@ -241,7 +241,7 @@ describe("NotificationService", () => {
       await service.sendBudgetAlert(criticalAlert);
 
       const body = JSON.parse(
-        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+        vi.mocked(mockFetch).mock.calls[0]![1]!.body as string,
       );
       expect(body.text).toContain("Usage: $12.5000");
       expect(body.text).toContain("Budget: $10.00");
@@ -258,7 +258,7 @@ describe("NotificationService", () => {
       await service.sendError("discovery-lambda", "Database connection failed");
 
       const body = JSON.parse(
-        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+        vi.mocked(mockFetch).mock.calls[0]![1]!.body as string,
       );
       expect(body.text).toContain("Error: discovery-lambda");
       expect(body.text).toContain("Database connection failed");
@@ -274,7 +274,7 @@ describe("NotificationService", () => {
       await service.sendError("discovery-lambda", error);
 
       const body = JSON.parse(
-        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+        vi.mocked(mockFetch).mock.calls[0]![1]!.body as string,
       );
       expect(body.text).toContain("Error: discovery-lambda");
       expect(body.text).toContain("Something went wrong");
@@ -290,7 +290,7 @@ describe("NotificationService", () => {
       await service.sendError("test-context", error);
 
       const body = JSON.parse(
-        vi.mocked(mockFetch).mock.calls[0][1]!.body as string,
+        vi.mocked(mockFetch).mock.calls[0]![1]!.body as string,
       );
       expect(body.text).toContain("Stack:");
     });

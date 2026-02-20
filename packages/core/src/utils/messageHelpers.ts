@@ -21,7 +21,7 @@ export function isUserMessage(msg: BaseMessage): boolean {
  */
 export function getLastUserMessage(messages: BaseMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
+    const msg = messages[i]!;
     if (isUserMessage(msg)) {
       return typeof msg.content === "string"
         ? msg.content

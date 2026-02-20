@@ -39,7 +39,7 @@ describe("createLogger", () => {
       log.info("Test message");
 
       expect(stdoutCalls).toHaveLength(1);
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.level).toBe("info");
       expect(output.message).toBe("Test message");
       expect(output.timestamp).toBeDefined();
@@ -50,7 +50,7 @@ describe("createLogger", () => {
       log.error("Error message");
 
       expect(stderrCalls).toHaveLength(1);
-      const output = JSON.parse(stderrCalls[0].replace("\n", ""));
+      const output = JSON.parse(stderrCalls[0]!.replace("\n", ""));
       expect(output.level).toBe("error");
       expect(output.message).toBe("Error message");
     });
@@ -60,7 +60,7 @@ describe("createLogger", () => {
       log.warn("Warning message");
 
       expect(stdoutCalls).toHaveLength(1);
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.level).toBe("warn");
     });
 
@@ -70,7 +70,7 @@ describe("createLogger", () => {
       log.debug("Debug message");
 
       expect(stdoutCalls).toHaveLength(1);
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.level).toBe("debug");
     });
   });
@@ -143,7 +143,7 @@ describe("createLogger", () => {
       const log = createLogger({ service: "test-service" });
       log.info("Test");
 
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.service).toBe("test-service");
     });
 
@@ -151,7 +151,7 @@ describe("createLogger", () => {
       const log = createLogger();
       log.info("Test", { requestId: "req-123" });
 
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.requestId).toBe("req-123");
     });
 
@@ -159,7 +159,7 @@ describe("createLogger", () => {
       const log = createLogger({ service: "my-service" });
       log.info("Test", { requestId: "req-123" });
 
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.service).toBe("my-service");
       expect(output.requestId).toBe("req-123");
     });
@@ -168,7 +168,7 @@ describe("createLogger", () => {
       const log = createLogger({ service: "default" });
       log.info("Test", { service: "override" });
 
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.service).toBe("override");
     });
   });
@@ -179,7 +179,7 @@ describe("createLogger", () => {
       const child = parent.child({ component: "child" });
       child.info("Test");
 
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.service).toBe("parent");
       expect(output.component).toBe("child");
     });
@@ -189,7 +189,7 @@ describe("createLogger", () => {
       const child = parent.child({ service: "child" });
       child.info("Test");
 
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.service).toBe("child");
     });
 
@@ -198,7 +198,7 @@ describe("createLogger", () => {
       parent.child({ extra: "child-only" });
       parent.info("Parent log");
 
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.service).toBe("parent");
       expect(output.extra).toBeUndefined();
     });
@@ -209,7 +209,7 @@ describe("createLogger", () => {
       const child2 = child1.child({ level: "child2" });
       child2.info("Test");
 
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.level).toBe("child2"); // level from context overrides log level key
     });
   });
@@ -219,7 +219,7 @@ describe("createLogger", () => {
       const log = createLogger();
       log.info("Test");
 
-      const call = stdoutCalls[0];
+      const call = stdoutCalls[0]!;
       expect(call.endsWith("\n")).toBe(true);
       expect(() => JSON.parse(call)).not.toThrow();
     });
@@ -228,7 +228,7 @@ describe("createLogger", () => {
       const log = createLogger();
       log.info("Test");
 
-      const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+      const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
       expect(output.timestamp).toMatch(
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/,
       );
@@ -256,7 +256,7 @@ describe("logger (default export)", () => {
   it("is preconfigured with usopc-agent service", () => {
     logger.info("Test");
 
-    const output = JSON.parse(stdoutCalls[0].replace("\n", ""));
+    const output = JSON.parse(stdoutCalls[0]!.replace("\n", ""));
     expect(output.service).toBe("usopc-agent");
   });
 

@@ -140,7 +140,7 @@ describe("SportOrgEntity", () => {
       await entity.create(orgWithNullProgram);
 
       // Null fields should be stripped from the internal call
-      const createArg = mockCreate.mock.calls[0][0] as Record<string, unknown>;
+      const createArg = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
       expect(createArg.olympicProgram).toBeUndefined();
     });
   });
@@ -206,8 +206,8 @@ describe("SportOrgEntity", () => {
       const results = await entity.getAll();
 
       expect(results).toHaveLength(2);
-      expect(results[0].id).toBe("usa-swimming");
-      expect(results[1].id).toBe("usatf");
+      expect(results[0]!.id).toBe("usa-swimming");
+      expect(results[1]!.id).toBe("usatf");
     });
 
     it("returns empty array when no organizations exist", async () => {
@@ -246,7 +246,7 @@ describe("SportOrgEntity", () => {
       const results = await entity.search("Swimming");
 
       expect(results).toHaveLength(1);
-      expect(results[0].id).toBe("usa-swimming");
+      expect(results[0]!.id).toBe("usa-swimming");
     });
 
     it("matches by abbreviation", async () => {
@@ -255,7 +255,7 @@ describe("SportOrgEntity", () => {
       const results = await entity.search("USATF");
 
       expect(results).toHaveLength(1);
-      expect(results[0].id).toBe("usatf");
+      expect(results[0]!.id).toBe("usatf");
     });
 
     it("matches by sport name", async () => {
@@ -264,7 +264,7 @@ describe("SportOrgEntity", () => {
       const results = await entity.search("Snowboarding");
 
       expect(results).toHaveLength(1);
-      expect(results[0].id).toBe("usss");
+      expect(results[0]!.id).toBe("usss");
     });
 
     it("matches by alias", async () => {
@@ -273,7 +273,7 @@ describe("SportOrgEntity", () => {
       const results = await entity.search("US Track");
 
       expect(results).toHaveLength(1);
-      expect(results[0].id).toBe("usatf");
+      expect(results[0]!.id).toBe("usatf");
     });
 
     it("matches by keyword", async () => {
@@ -282,7 +282,7 @@ describe("SportOrgEntity", () => {
       const results = await entity.search("marathon");
 
       expect(results).toHaveLength(1);
-      expect(results[0].id).toBe("usatf");
+      expect(results[0]!.id).toBe("usatf");
     });
 
     it("is case-insensitive", async () => {
@@ -291,7 +291,7 @@ describe("SportOrgEntity", () => {
       const results = await entity.search("swimming");
 
       expect(results).toHaveLength(1);
-      expect(results[0].id).toBe("usa-swimming");
+      expect(results[0]!.id).toBe("usa-swimming");
     });
 
     it("returns empty array when nothing matches", async () => {
@@ -333,7 +333,7 @@ describe("SportOrgEntity", () => {
         olympicProgram: null,
       });
 
-      const updateArg = mockUpdate.mock.calls[0][0] as Record<string, unknown>;
+      const updateArg = mockUpdate.mock.calls[0]![0] as Record<string, unknown>;
       expect(updateArg.olympicProgram).toBeUndefined();
     });
   });

@@ -111,8 +111,10 @@ export function getAcknowledgment(
   domain?: TopicDomain,
 ): string {
   if (state === "neutral") return "";
-  const stateMap = ACKNOWLEDGMENTS[state];
-  return (domain && stateMap[domain]) || stateMap._default;
+  const stateMap = ACKNOWLEDGMENTS[state]!;
+  return (
+    ((domain !== undefined && stateMap[domain]) || stateMap._default) ?? ""
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +163,11 @@ const SAFETY_RESOURCES: Record<string, string[]> = {
  * All domains include the USOPC Mental Health Support line.
  */
 export function getSafetyResources(domain?: TopicDomain): string[] {
-  return (domain && SAFETY_RESOURCES[domain]) || SAFETY_RESOURCES._default;
+  return (
+    ((domain !== undefined && SAFETY_RESOURCES[domain]) ||
+      SAFETY_RESOURCES._default) ??
+    []
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -275,6 +281,8 @@ export function getGuidance(
   domain?: TopicDomain,
 ): string {
   if (state === "neutral") return "";
-  const stateMap = GUIDANCE[state];
-  return (domain && stateMap[domain]) || stateMap._default;
+  const stateMap = GUIDANCE[state]!;
+  return (
+    ((domain !== undefined && stateMap[domain]) || stateMap._default) ?? ""
+  );
 }

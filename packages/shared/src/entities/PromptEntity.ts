@@ -7,10 +7,10 @@ const logger = createLogger({ service: "prompt-entity" });
 export interface PromptConfig {
   name: string;
   content: string;
-  domain?: string;
+  domain?: string | undefined;
   version: number;
-  updatedAt?: string;
-  createdAt?: string;
+  updatedAt?: string | undefined;
+  createdAt?: string | undefined;
 }
 
 export class PromptEntity {

@@ -120,10 +120,10 @@ async function main(): Promise<void> {
 
         let succeeded = 0;
         let totalChunks = 0;
-        const failures: { sourceId: string; error?: string }[] = [];
+        const failures: { sourceId: string; error?: string | undefined }[] = [];
 
         for (let i = 0; i < sources.length; i++) {
-          const source = sources[i];
+          const source = sources[i]!;
 
           // Wait between sources for TPM window reset
           if (i > 0 && totalChunks > 0) {

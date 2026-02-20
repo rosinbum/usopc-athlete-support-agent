@@ -16,8 +16,8 @@ interface DiscoveryConfigFile {
 
 interface CliOptions {
   dryRun: boolean;
-  domain?: string;
-  query?: string;
+  domain?: string | undefined;
+  query?: string | undefined;
   json: boolean;
 }
 
@@ -42,9 +42,9 @@ function parseArgs(): CliOptions {
     } else if (arg === "--json") {
       options.json = true;
     } else if (arg === "--domain") {
-      options.domain = args[++i];
+      options.domain = args[++i]!;
     } else if (arg === "--query") {
-      options.query = args[++i];
+      options.query = args[++i]!;
     } else {
       console.error(`Unknown argument: ${arg}`);
       printHelp();
@@ -165,7 +165,7 @@ async function main() {
     const orchestrator = createDiscoveryOrchestrator({
       autoApprovalThreshold: config.autoApprovalThreshold,
       dryRun: options.dryRun,
-      onProgress: options.json ? undefined : displayProgress,
+      ...(options.json ? {} : { onProgress: displayProgress }),
     });
 
     // Run discovery from domains

@@ -74,8 +74,8 @@ export function useDiscoveryAction(id: string) {
 
 interface BulkDiscoveryActionArg {
   action: "approve" | "reject" | "send_to_sources";
-  ids?: string[];
-  reason?: string;
+  ids?: string[] | undefined;
+  reason?: string | undefined;
 }
 
 interface BulkDiscoveryResponse {

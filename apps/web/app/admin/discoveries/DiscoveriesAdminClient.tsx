@@ -747,12 +747,12 @@ export function DiscoveriesAdminClient() {
             }
             onPrev={() => {
               const idx = sorted.findIndex((d) => d.id === openDiscoveryId);
-              if (idx > 0) setOpenDiscoveryId(sorted[idx - 1].id);
+              if (idx > 0) setOpenDiscoveryId(sorted[idx - 1]!.id);
             }}
             onNext={() => {
               const idx = sorted.findIndex((d) => d.id === openDiscoveryId);
               if (idx < sorted.length - 1)
-                setOpenDiscoveryId(sorted[idx + 1].id);
+                setOpenDiscoveryId(sorted[idx + 1]!.id);
             }}
           />
         )}

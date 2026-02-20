@@ -26,8 +26,8 @@ export interface IngestionMessage {
   source: IngestionSource;
   contentHash: string;
   triggeredAt: string;
-  s3Key?: string;
-  s3VersionId?: string;
+  s3Key?: string | undefined;
+  s3VersionId?: string | undefined;
 }
 
 // ---------------------------------------------------------------------------

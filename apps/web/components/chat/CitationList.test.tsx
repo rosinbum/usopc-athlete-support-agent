@@ -43,7 +43,7 @@ describe("CitationList", () => {
   });
 
   it("renders a single citation correctly", () => {
-    render(<CitationList citations={[mockCitations[0]]} />);
+    render(<CitationList citations={[mockCitations[0]!]} />);
     expect(screen.getByText(/Sources \(1\)/)).toBeInTheDocument();
     expect(screen.getByText("SafeSport Policy")).toBeInTheDocument();
   });

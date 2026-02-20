@@ -116,7 +116,7 @@ export class DiscoveryService {
       const response = await this.circuitBreaker.execute(async () => {
         return await this.client.search(query, {
           maxResults,
-          includeDomains,
+          ...(includeDomains !== undefined ? { includeDomains } : {}),
         });
       });
 
@@ -198,7 +198,7 @@ export class DiscoveryService {
       if (segments.length === 0) return parsed.hostname;
 
       // Use the last segment, decode and clean it up
-      const lastSegment = segments[segments.length - 1];
+      const lastSegment = segments[segments.length - 1]!;
       return decodeURIComponent(lastSegment)
         .replace(/[-_]/g, " ")
         .replace(/\.[^.]+$/, "") // remove file extension

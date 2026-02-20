@@ -317,7 +317,7 @@ describe("DiscoveryOrchestrator", () => {
 
       await orchestrator.discoverFromDomains(["usopc.org"], 10);
 
-      const commandArg = MockSendMessageCommand.mock.calls[0][0];
+      const commandArg = MockSendMessageCommand.mock.calls[0]![0]!;
       const body = JSON.parse(commandArg.MessageBody!);
       expect(body.autoApprovalThreshold).toBe(0.9);
       expect(body.urls).toHaveLength(1);

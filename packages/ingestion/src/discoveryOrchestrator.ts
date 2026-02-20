@@ -20,11 +20,11 @@ export interface OrchestratorConfig extends DiscoveryConfig {
    * Dry run mode: discover URLs but don't enqueue to SQS.
    * @default false
    */
-  dryRun?: boolean;
+  dryRun?: boolean | undefined;
   /**
    * Progress callback for real-time updates.
    */
-  onProgress?: (stats: DiscoveryStats) => void;
+  onProgress?: ((stats: DiscoveryStats) => void) | undefined;
 }
 
 /**

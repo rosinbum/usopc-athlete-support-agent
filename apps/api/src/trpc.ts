@@ -5,7 +5,7 @@ import { getOptionalSecretValue } from "@usopc/shared";
 // Context type
 export interface Context {
   requestId: string;
-  apiKey?: string;
+  apiKey?: string | undefined;
 }
 
 // Create context from request
