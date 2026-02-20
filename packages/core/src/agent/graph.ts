@@ -21,7 +21,6 @@ import { routeByDomain } from "./edges/routeByDomain.js";
 import { needsMoreInfo } from "./edges/needsMoreInfo.js";
 import { routeByQuality } from "./edges/routeByQuality.js";
 import { withMetrics } from "./nodeMetrics.js";
-import { getFeatureFlags } from "../config/featureFlags.js";
 
 /**
  * External dependencies injected into the LangGraph agent at construction time.
@@ -46,26 +45,18 @@ export interface GraphDependencies {
 /**
  * Creates and compiles the full LangGraph agent.
  *
- * Graph flow (quality checker OFF):
- *   START -> classifier -> (routeByDomain) -> clarify | retriever | escalate
+ * Graph flow:
+ *   START -> classifier -> (routeByDomain) -> clarify | queryPlanner | escalate
  *     clarify -> END
+ *     queryPlanner -> retriever
  *     retriever -> (needsMoreInfo) -> emotionalSupport | retrievalExpander | researcher
  *     retrievalExpander -> (needsMoreInfo) -> emotionalSupport | researcher
  *     researcher -> emotionalSupport -> synthesizer
- *     synthesizer -> citationBuilder -> disclaimerGuard -> END
- *     escalate -> citationBuilder -> disclaimerGuard -> END
- *
- * Graph flow (query planner ON):
- *   ...same as above, but classifier routes through queryPlanner before retriever:
- *     classifier -> queryPlanner -> retriever
- *
- * Graph flow (quality checker ON):
- *   ...same as above, but:
  *     synthesizer -> qualityChecker -> (routeByQuality) -> citationBuilder | emotionalSupport(retry)
+ *     citationBuilder -> disclaimerGuard -> END
+ *     escalate -> citationBuilder -> disclaimerGuard -> END
  */
 export function createAgentGraph(deps: GraphDependencies) {
-  const flags = getFeatureFlags();
-
   // All nodes registered unconditionally for TypeScript generic tracking.
   const builder = new StateGraph(AgentStateAnnotation)
     .addNode(
@@ -148,17 +139,12 @@ export function createAgentGraph(deps: GraphDependencies) {
   );
   builder.addEdge("researcher", preSynth);
 
-  if (flags.qualityChecker) {
-    // Quality checker loop: synthesizer → qualityChecker → route → {citationBuilder | synthesizer(retry)}
-    builder.addEdge("synthesizer", "qualityChecker");
-    builder.addConditionalEdges("qualityChecker", routeByQuality, {
-      citationBuilder: "citationBuilder" as const,
-      synthesizer: preSynth,
-    });
-  } else {
-    // Default: synthesizer → citationBuilder (no quality checking)
-    builder.addEdge("synthesizer", "citationBuilder");
-  }
+  // Quality checker loop: synthesizer → qualityChecker → route → {citationBuilder | synthesizer(retry)}
+  builder.addEdge("synthesizer", "qualityChecker");
+  builder.addConditionalEdges("qualityChecker", routeByQuality, {
+    citationBuilder: "citationBuilder" as const,
+    synthesizer: preSynth,
+  });
 
   builder.addEdge("escalate", "citationBuilder");
   builder.addEdge("citationBuilder", "disclaimerGuard");

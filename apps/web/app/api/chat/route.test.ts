@@ -41,7 +41,6 @@ vi.mock("@usopc/core", () => ({
       next: vi.fn(async () => ({ done: true, value: undefined })),
     }),
   })),
-  getFeatureFlags: vi.fn(() => ({ conversationMemory: false })),
   loadSummary: vi.fn(),
   saveSummary: vi.fn(),
   generateSummary: vi.fn(),

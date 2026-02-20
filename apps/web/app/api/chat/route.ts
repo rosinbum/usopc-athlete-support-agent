@@ -92,17 +92,15 @@ export async function POST(req: Request) {
     const {
       AgentRunner,
       agentStreamToEvents,
-      getFeatureFlags,
       loadSummary,
       saveSummary,
       generateSummary,
       publishDiscoveredUrls,
     } = await import("@usopc/core");
 
-    // Load existing conversation summary if feature is enabled
-    const flags = getFeatureFlags();
+    // Load existing conversation summary
     let conversationSummary: string | undefined;
-    if (flags.conversationMemory && conversationId) {
+    if (conversationId) {
       conversationSummary = await loadSummary(conversationId);
     }
 
@@ -149,7 +147,7 @@ export async function POST(req: Request) {
         }
 
         // Fire-and-forget: generate and save updated summary after stream completes
-        if (flags.conversationMemory && conversationId) {
+        if (conversationId) {
           generateSummary(
             langchainMessages,
             conversationSummary,
