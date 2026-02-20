@@ -21,6 +21,8 @@ import {
   getSecretValue,
   isProduction,
   isDevelopment,
+  parseEnvInt,
+  parseEnvFloat,
 } from "./env.js";
 
 describe("getRequiredEnv", () => {
@@ -298,5 +300,95 @@ describe("isDevelopment", () => {
   it("returns false when NODE_ENV is test", () => {
     process.env.NODE_ENV = "test";
     expect(isDevelopment()).toBe(false);
+  });
+});
+
+describe("parseEnvInt", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("returns default when env var is not set", () => {
+    delete process.env.MY_INT;
+    expect(parseEnvInt("MY_INT", 42)).toBe(42);
+  });
+
+  it("returns default when env var is empty string", () => {
+    process.env.MY_INT = "";
+    expect(parseEnvInt("MY_INT", 42)).toBe(42);
+  });
+
+  it("parses a valid integer", () => {
+    process.env.MY_INT = "10";
+    expect(parseEnvInt("MY_INT", 42)).toBe(10);
+  });
+
+  it("parses a negative integer", () => {
+    process.env.MY_INT = "-5";
+    expect(parseEnvInt("MY_INT", 42)).toBe(-5);
+  });
+
+  it("throws for a non-integer string", () => {
+    process.env.MY_INT = "abc";
+    expect(() => parseEnvInt("MY_INT", 42)).toThrow(
+      'Invalid integer value for MY_INT: "abc". Expected a whole number.',
+    );
+  });
+
+  it("throws for a float string", () => {
+    process.env.MY_INT = "1.5";
+    expect(() => parseEnvInt("MY_INT", 42)).toThrow(
+      'Invalid integer value for MY_INT: "1.5". Expected a whole number.',
+    );
+  });
+});
+
+describe("parseEnvFloat", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("returns default when env var is not set", () => {
+    delete process.env.MY_FLOAT;
+    expect(parseEnvFloat("MY_FLOAT", 3.14)).toBe(3.14);
+  });
+
+  it("returns default when env var is empty string", () => {
+    process.env.MY_FLOAT = "";
+    expect(parseEnvFloat("MY_FLOAT", 3.14)).toBe(3.14);
+  });
+
+  it("parses a valid float", () => {
+    process.env.MY_FLOAT = "2.5";
+    expect(parseEnvFloat("MY_FLOAT", 3.14)).toBe(2.5);
+  });
+
+  it("parses a whole number as float", () => {
+    process.env.MY_FLOAT = "7";
+    expect(parseEnvFloat("MY_FLOAT", 3.14)).toBe(7);
+  });
+
+  it("parses a negative float", () => {
+    process.env.MY_FLOAT = "-1.5";
+    expect(parseEnvFloat("MY_FLOAT", 3.14)).toBe(-1.5);
+  });
+
+  it("throws for a non-numeric string", () => {
+    process.env.MY_FLOAT = "abc";
+    expect(() => parseEnvFloat("MY_FLOAT", 3.14)).toThrow(
+      'Invalid numeric value for MY_FLOAT: "abc". Expected a number.',
+    );
   });
 });

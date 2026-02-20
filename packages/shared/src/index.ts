@@ -33,6 +33,8 @@ export {
   getOptionalSecretValue,
   isProduction,
   isDevelopment,
+  parseEnvInt,
+  parseEnvFloat,
 } from "./env.js";
 
 export { getPool, closePool, getPoolStatus, type PoolStatus } from "./pool.js";
