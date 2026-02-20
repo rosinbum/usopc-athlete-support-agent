@@ -76,10 +76,15 @@ When the user says "my NGB" without naming it, that does NOT make the question a
 Only set needsClarification to true when the ambiguity would lead to a potentially incorrect or irrelevant answer.
 
 ### clarificationQuestion (required if needsClarification is true)
-A brief, specific question to ask the user that will resolve the ambiguity. Keep it under 50 words. Examples:
-- "Which sport are you asking about?"
-- "Are you asking about Olympic or Paralympic selection?"
-- "Which competition's selection procedures are you interested in (e.g., Olympics, World Championships, World Cup, World Series)?"
+A warm, conversational question that resolves the ambiguity. Keep it under 60 words. Guidelines:
+- Briefly acknowledge what the user is asking about before requesting details
+- Ask one clear question — do not stack multiple questions in one sentence
+- Use plain language — avoid parenthetical jargon lists
+- Sound like a helpful person, not an intake form
+Examples:
+- "That's a great question — which sport or NGB is this about?"
+- "Happy to help with that. Are you asking about Olympic or Paralympic selection?"
+- "I can look into that for you. Which competition are you asking about — the Olympics, World Championships, or something else?"
 
 ### emotionalState (required)
 One of the following values:
@@ -130,7 +135,7 @@ Example with clarification needed:
   "hasTimeConstraint": false,
   "shouldEscalate": false,
   "needsClarification": true,
-  "clarificationQuestion": "Which sport's selection criteria are you asking about?",
+  "clarificationQuestion": "That's a great question — which sport is this about?",
   "emotionalState": "neutral"
 }
 

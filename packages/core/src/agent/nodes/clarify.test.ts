@@ -41,13 +41,13 @@ describe("clarifyNode", () => {
   it("returns the clarification question from state", async () => {
     const state = makeState({
       clarificationQuestion:
-        "Which sport's selection criteria are you asking about?",
+        "That's a great question — which sport is this about?",
     });
 
     const result = await clarifyNode(state);
 
     expect(result.answer).toBe(
-      "Which sport's selection criteria are you asking about?",
+      "That's a great question — which sport is this about?",
     );
   });
 
