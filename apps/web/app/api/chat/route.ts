@@ -4,9 +4,24 @@ import {
   type JSONValue,
 } from "ai";
 import { getResource, logger } from "@usopc/shared";
+import { z } from "zod";
 import { auth } from "../../../auth.js";
 
 const log = logger.child({ service: "chat-route" });
+
+const ChatRequestSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().max(10_000, "Message too long"),
+      }),
+    )
+    .min(1, "At least one message is required")
+    .max(50, "Too many messages"),
+  userSport: z.string().optional(),
+  conversationId: z.string().uuid().optional(),
+});
 
 const discoveryFeedQueueUrl = getResource("DiscoveryFeedQueue").url;
 
@@ -82,7 +97,12 @@ export async function POST(req: Request) {
 
   try {
     log.info("POST /api/chat called");
-    const { messages, userSport, conversationId } = await req.json();
+    const body = await req.json();
+    const parsed = ChatRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return Response.json({ error: "Invalid request" }, { status: 400 });
+    }
+    const { messages, userSport, conversationId } = parsed.data;
     const runner = await getRunner();
     log.info("Runner initialized", {
       tracingEnabled: process.env.LANGCHAIN_TRACING_V2,
