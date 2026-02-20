@@ -53,10 +53,6 @@ async function* fakeStream(chunks: StreamChunk[]): AsyncGenerator<StreamChunk> {
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("../../../auth.js", () => ({
-  auth: vi.fn(),
-}));
-
 // Include AppError — streamAdapter.ts imports it for instanceof checks
 vi.mock("@usopc/shared", () => {
   class AppError extends Error {
@@ -79,6 +75,7 @@ vi.mock("@usopc/shared", () => {
     getDatabaseUrl: vi.fn(() => "postgres://localhost/test"),
     getSecretValue: vi.fn(() => "test-key"),
     getOptionalEnv: vi.fn(() => undefined),
+    createConversationSummaryEntity: vi.fn(() => ({})),
   };
 });
 
@@ -108,6 +105,8 @@ vi.mock("@usopc/core", async () => {
     saveSummary: mockSaveSummary,
     generateSummary: mockGenerateSummary,
     publishDiscoveredUrls: mockPublishDiscoveredUrls,
+    setSummaryStore: vi.fn(),
+    DynamoSummaryStore: vi.fn(() => ({})),
   };
 });
 
@@ -129,11 +128,7 @@ vi.mock("ai", async (importOriginal) => {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-async function importWithAuth(session: unknown) {
-  const { auth } = await import("../../../auth.js");
-  vi.mocked(auth).mockResolvedValue(
-    session as Awaited<ReturnType<typeof auth>>,
-  );
+async function importRoute() {
   return import("./route.js");
 }
 
@@ -158,7 +153,6 @@ async function waitForFireAndForget() {
   await new Promise((r) => setTimeout(r, 20));
 }
 
-const session = { user: { email: "test@example.com" } };
 const simpleBody = {
   messages: [{ role: "user", content: "Hello" }],
 };
@@ -193,7 +187,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       ];
       mockRunnerStream.mockReturnValue(fakeStream(chunks));
 
-      const { POST } = await importWithAuth(session);
+      const { POST } = await importRoute();
       await POST(makePOSTRequest(simpleBody));
       await waitForStream();
 
@@ -219,7 +213,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       const chunks: StreamChunk[] = [["values", { citations }]];
       mockRunnerStream.mockReturnValue(fakeStream(chunks));
 
-      const { POST } = await importWithAuth(session);
+      const { POST } = await importRoute();
       await POST(makePOSTRequest(simpleBody));
       await waitForStream();
 
@@ -245,7 +239,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       }
       mockRunnerStream.mockReturnValue(errorStream());
 
-      const { POST } = await importWithAuth(session);
+      const { POST } = await importRoute();
       await POST(makePOSTRequest(simpleBody));
       await waitForStream();
 
@@ -292,7 +286,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       ];
       mockRunnerStream.mockReturnValue(fakeStream(chunks));
 
-      const { POST } = await importWithAuth(session);
+      const { POST } = await importRoute();
       await POST(makePOSTRequest(simpleBody));
       await waitForStream();
 
@@ -325,7 +319,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       ];
       mockRunnerStream.mockReturnValue(fakeStream(chunks));
 
-      const { POST } = await importWithAuth(session);
+      const { POST } = await importRoute();
       await POST(makePOSTRequest(simpleBody));
       await waitForStream();
 
@@ -344,7 +338,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       mockLoadSummary.mockResolvedValue("prior summary");
       mockRunnerStream.mockReturnValue(fakeStream([]));
 
-      const { POST } = await importWithAuth(session);
+      const { POST } = await importRoute();
       await POST(
         makePOSTRequest({
           messages: [{ role: "user", content: "Hello" }],
@@ -376,7 +370,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       const chunks: StreamChunk[] = [["values", { webSearchResultUrls: urls }]];
       mockRunnerStream.mockReturnValue(fakeStream(chunks));
 
-      const { POST } = await importWithAuth(session);
+      const { POST } = await importRoute();
       await POST(makePOSTRequest(simpleBody));
       await waitForFireAndForget();
 
@@ -396,7 +390,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       mockRunnerStream.mockReturnValue(fakeStream([]));
       mockGenerateSummary.mockResolvedValue("new summary");
 
-      const { POST } = await importWithAuth(session);
+      const { POST } = await importRoute();
       await POST(
         makePOSTRequest({
           messages: [{ role: "user", content: "Hello" }],
@@ -412,7 +406,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
     it("does not save summary when no conversationId", async () => {
       mockRunnerStream.mockReturnValue(fakeStream([]));
 
-      const { POST } = await importWithAuth(session);
+      const { POST } = await importRoute();
       await POST(makePOSTRequest(simpleBody));
       await waitForFireAndForget();
 
@@ -428,7 +422,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
     it("does not call publishDiscoveredUrls for empty stream", async () => {
       mockRunnerStream.mockReturnValue(fakeStream([]));
 
-      const { POST } = await importWithAuth(session);
+      const { POST } = await importRoute();
       await POST(makePOSTRequest(simpleBody));
       await waitForFireAndForget();
 

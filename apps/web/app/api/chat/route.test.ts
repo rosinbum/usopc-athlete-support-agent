@@ -4,10 +4,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 let shouldFailInit = false;
 let initCallCount = 0;
 
-vi.mock("../../../auth.js", () => ({
-  auth: vi.fn(),
-}));
-
 vi.mock("@usopc/shared", () => ({
   logger: {
     child: vi.fn(() => ({
@@ -27,12 +23,14 @@ vi.mock("@usopc/shared", () => ({
   }),
   getSecretValue: vi.fn(() => "test-key"),
   getOptionalEnv: vi.fn(() => undefined),
+  createConversationSummaryEntity: vi.fn(() => ({})),
 }));
 
 vi.mock("@usopc/core", () => ({
   AgentRunner: {
     create: vi.fn(async () => ({
       stream: vi.fn(),
+      classifierModel: {},
     })),
     convertMessages: vi.fn(() => []),
   },
@@ -45,6 +43,8 @@ vi.mock("@usopc/core", () => ({
   saveSummary: vi.fn(),
   generateSummary: vi.fn(async () => ""),
   publishDiscoveredUrls: vi.fn(),
+  setSummaryStore: vi.fn(),
+  DynamoSummaryStore: vi.fn(() => ({})),
 }));
 
 vi.mock("sst", () => ({
@@ -67,11 +67,7 @@ vi.mock("ai", () => ({
   ),
 }));
 
-async function importWithAuth(session: unknown) {
-  const { auth } = await import("../../../auth.js");
-  vi.mocked(auth).mockResolvedValue(
-    session as Awaited<ReturnType<typeof auth>>,
-  );
+async function importRoute() {
   return import("./route.js");
 }
 
@@ -84,27 +80,10 @@ describe("POST /api/chat", () => {
     vi.resetModules();
   });
 
-  it("returns 401 when not authenticated", async () => {
-    const { POST } = await importWithAuth(null);
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({ messages: [] }),
-      headers: { "Content-Type": "application/json" },
-    });
-
-    const response = await POST(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(body.error).toBe("Unauthorized");
-  });
-
   it("returns 500 with generic message when runner init fails", async () => {
     shouldFailInit = true;
 
-    const { POST } = await importWithAuth({
-      user: { email: "test@example.com" },
-    });
+    const { POST } = await importRoute();
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
@@ -126,9 +105,7 @@ describe("POST /api/chat", () => {
   it("clears cached runner after failure so next call retries", async () => {
     shouldFailInit = true;
 
-    const { POST } = await importWithAuth({
-      user: { email: "test@example.com" },
-    });
+    const { POST } = await importRoute();
 
     // First request fails
     const req1 = new Request("http://localhost/api/chat", {
@@ -151,9 +128,7 @@ describe("POST /api/chat", () => {
   });
 
   it("returns 500 on malformed request body", async () => {
-    const { POST } = await importWithAuth({
-      user: { email: "test@example.com" },
-    });
+    const { POST } = await importRoute();
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: "not json",
@@ -176,10 +151,8 @@ describe("input validation", () => {
     vi.resetModules();
   });
 
-  const session = { user: { email: "test@example.com" } };
-
   it("returns 400 when messages array is empty", async () => {
-    const { POST } = await importWithAuth(session);
+    const { POST } = await importRoute();
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({ messages: [] }),
@@ -194,7 +167,7 @@ describe("input validation", () => {
   });
 
   it("returns 400 when messages array exceeds 50 entries", async () => {
-    const { POST } = await importWithAuth(session);
+    const { POST } = await importRoute();
     const messages = Array.from({ length: 51 }, (_, i) => ({
       role: i % 2 === 0 ? "user" : "assistant",
       content: "Hello",
@@ -213,7 +186,7 @@ describe("input validation", () => {
   });
 
   it("returns 400 when message content exceeds 10,000 chars", async () => {
-    const { POST } = await importWithAuth(session);
+    const { POST } = await importRoute();
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
@@ -230,7 +203,7 @@ describe("input validation", () => {
   });
 
   it("returns 400 when message role is invalid", async () => {
-    const { POST } = await importWithAuth(session);
+    const { POST } = await importRoute();
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
@@ -247,7 +220,7 @@ describe("input validation", () => {
   });
 
   it("returns 400 when conversationId is not a UUID", async () => {
-    const { POST } = await importWithAuth(session);
+    const { POST } = await importRoute();
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
@@ -265,7 +238,7 @@ describe("input validation", () => {
   });
 
   it("returns 200 when conversationId is a valid UUID", async () => {
-    const { POST } = await importWithAuth(session);
+    const { POST } = await importRoute();
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
@@ -281,7 +254,7 @@ describe("input validation", () => {
   });
 
   it("returns 200 when messages are within limits", async () => {
-    const { POST } = await importWithAuth(session);
+    const { POST } = await importRoute();
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
