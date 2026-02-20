@@ -222,7 +222,7 @@ describe("classifierNode", () => {
     expect(result.hasTimeConstraint).toBe(false);
   });
 
-  it("defaults invalid topicDomain to team_selection", async () => {
+  it("leaves topicDomain undefined when classifier returns an invalid domain", async () => {
     mockInvoke.mockResolvedValueOnce(
       classifierResponse({
         topicDomain: "invalid_domain",
@@ -235,8 +235,10 @@ describe("classifierNode", () => {
 
     const state = makeState();
     const result = await classifierNode(state);
-    // parseClassifierResponse defaults invalid domain to "team_selection"
-    expect(result.topicDomain).toBe("team_selection");
+    // parseClassifierResponse leaves topicDomain undefined for invalid domains
+    // so retrieval falls back to broader (unfiltered) search instead of biasing
+    // toward team_selection documents.
+    expect(result.topicDomain).toBeUndefined();
   });
 
   it("defaults invalid queryIntent to general", async () => {
@@ -772,7 +774,37 @@ describe("parseClassifierResponse", () => {
     expect(warnings).toHaveLength(0);
   });
 
-  it("warns on invalid topicDomain and defaults to team_selection", () => {
+  it("accepts athlete_safety as a valid domain", () => {
+    const { output, warnings } = parseClassifierResponse(
+      JSON.stringify({
+        topicDomain: "athlete_safety",
+        detectedNgbIds: [],
+        queryIntent: "factual",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+      }),
+    );
+
+    expect(output.topicDomain).toBe("athlete_safety");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("accepts financial_assistance as a valid domain", () => {
+    const { output, warnings } = parseClassifierResponse(
+      JSON.stringify({
+        topicDomain: "financial_assistance",
+        detectedNgbIds: [],
+        queryIntent: "factual",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+      }),
+    );
+
+    expect(output.topicDomain).toBe("financial_assistance");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("warns on invalid topicDomain and leaves it undefined", () => {
     const { output, warnings } = parseClassifierResponse(
       JSON.stringify({
         topicDomain: "made_up_domain",
@@ -783,7 +815,7 @@ describe("parseClassifierResponse", () => {
       }),
     );
 
-    expect(output.topicDomain).toBe("team_selection");
+    expect(output.topicDomain).toBeUndefined();
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain("Invalid topicDomain");
     expect(warnings[0]).toContain("made_up_domain");
@@ -816,7 +848,7 @@ describe("parseClassifierResponse", () => {
       }),
     );
 
-    expect(output.topicDomain).toBe("team_selection");
+    expect(output.topicDomain).toBeUndefined();
     expect(output.queryIntent).toBe("general");
     expect(warnings).toHaveLength(2);
   });

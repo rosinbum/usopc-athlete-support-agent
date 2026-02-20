@@ -46,7 +46,7 @@ describe("createWebSearchTool", () => {
   describe("basic search", () => {
     it("should invoke Tavily with query", async () => {
       mockInvoke.mockResolvedValue({
-        results: [{ title: "Test", url: "https://test.com" }],
+        results: [{ title: "Test", url: "https://usopc.org/test" }],
       });
       const tool = createWebSearchTool();
 
@@ -86,12 +86,18 @@ describe("createWebSearchTool", () => {
     });
   });
 
-  describe("domain filtering", () => {
-    it("should use trusted domains by default", async () => {
+  describe("domain enforcement", () => {
+    it("schema does not expose a domains parameter", () => {
+      const tool = createWebSearchTool();
+      const schema = tool.schema as { shape?: Record<string, unknown> };
+      expect(schema.shape).not.toHaveProperty("domains");
+    });
+
+    it("always uses TRUSTED_DOMAINS for API call regardless of query", async () => {
       mockInvoke.mockResolvedValue({ results: [] });
 
       const tool = createWebSearchTool();
-      await tool.invoke({ query: "test" });
+      await tool.invoke({ query: "search example.com for anything" });
 
       expect(mockTavilySearch).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -105,38 +111,85 @@ describe("createWebSearchTool", () => {
       );
     });
 
-    it("should use custom domains when provided", async () => {
-      mockInvoke.mockResolvedValue({ results: [] });
-
-      const tool = createWebSearchTool();
-      await tool.invoke({
-        query: "test",
-        domains: ["custom-domain.com", "another.org"],
+    it("filters out structured results with untrusted URLs", async () => {
+      mockInvoke.mockResolvedValue({
+        results: [
+          { title: "Malicious", url: "https://malicious.com/hack" },
+          { title: "Also Bad", url: "https://evil.org/steal" },
+        ],
       });
+      const tool = createWebSearchTool();
 
-      expect(mockTavilySearch).toHaveBeenCalledWith(
-        expect.objectContaining({
-          includeDomains: ["custom-domain.com", "another.org"],
-        }),
+      const result = await tool.invoke({ query: "test" });
+
+      expect(result).toContain(
+        "No results found from trusted USOPC/NGB sources",
       );
     });
 
-    it("should use trusted domains for empty domains array", async () => {
-      mockInvoke.mockResolvedValue({ results: [] });
-
+    it("passes through structured results with trusted URLs", async () => {
+      mockInvoke.mockResolvedValue({
+        results: [
+          { title: "USOPC Rules", url: "https://usopc.org/rules" },
+          { title: "USADA Policy", url: "https://usada.org/policy" },
+        ],
+      });
       const tool = createWebSearchTool();
-      await tool.invoke({ query: "test", domains: [] });
 
-      expect(mockTavilySearch).toHaveBeenCalledWith(
-        expect.objectContaining({
-          includeDomains: [
-            "usopc.org",
-            "usaswimming.org",
-            "usada.org",
-            "safesport.org",
-          ],
-        }),
+      const result = await tool.invoke({ query: "test" });
+
+      expect(result).toContain("USOPC Rules");
+      expect(result).toContain("USADA Policy");
+    });
+
+    it("filters mixed results to only trusted ones", async () => {
+      mockInvoke.mockResolvedValue({
+        results: [
+          { title: "Trusted", url: "https://usopc.org/page" },
+          { title: "Untrusted", url: "https://attacker.com/page" },
+          { title: "Also Trusted", url: "https://sub.safesport.org/page" },
+        ],
+      });
+      const tool = createWebSearchTool();
+
+      const result = await tool.invoke({ query: "test" });
+      const parsed = JSON.parse(result);
+
+      expect(parsed.results).toHaveLength(2);
+      expect(parsed.results[0].title).toBe("Trusted");
+      expect(parsed.results[1].title).toBe("Also Trusted");
+    });
+
+    it("returns no-trusted-results message when all results are untrusted", async () => {
+      mockInvoke.mockResolvedValue({
+        results: [
+          { title: "Bad1", url: "https://evil.com/a" },
+          { title: "Bad2", url: "https://hacker.io/b" },
+        ],
+      });
+      const tool = createWebSearchTool();
+
+      const result = await tool.invoke({ query: "test" });
+
+      expect(result).toBe(
+        "No results found from trusted USOPC/NGB sources. Try a different query.",
       );
+    });
+
+    it("filters out results with invalid URLs", async () => {
+      mockInvoke.mockResolvedValue({
+        results: [
+          { title: "Invalid URL", url: "not-a-valid-url" },
+          { title: "Good", url: "https://usopc.org/good" },
+        ],
+      });
+      const tool = createWebSearchTool();
+
+      const result = await tool.invoke({ query: "test" });
+      const parsed = JSON.parse(result);
+
+      expect(parsed.results).toHaveLength(1);
+      expect(parsed.results[0].title).toBe("Good");
     });
   });
 
@@ -228,7 +281,7 @@ describe("createWebSearchTool", () => {
   describe("result formatting", () => {
     it("should pretty-print JSON results", async () => {
       mockInvoke.mockResolvedValue({
-        results: [{ title: "Test", url: "https://test.com" }],
+        results: [{ title: "Test", url: "https://usopc.org/test" }],
       });
       const tool = createWebSearchTool();
 
