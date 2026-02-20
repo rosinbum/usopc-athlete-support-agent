@@ -4,6 +4,7 @@ import { AppTableSchema } from "./schema.js";
 import { SourceConfigEntity } from "./SourceConfigEntity.js";
 import { IngestionLogEntity } from "./IngestionLogEntity.js";
 import { DiscoveredSourceEntity } from "./DiscoveredSourceEntity.js";
+import { ConversationSummaryEntity } from "./ConversationSummaryEntity.js";
 import { getResource } from "../resources.js";
 
 const tableCache = new Map<string, Table<typeof AppTableSchema>>();
@@ -40,6 +41,14 @@ export function createDiscoveredSourceEntity(
   tableName?: string,
 ): DiscoveredSourceEntity {
   return new DiscoveredSourceEntity(
+    getOrCreateAppTable(tableName ?? getAppTableName()),
+  );
+}
+
+export function createConversationSummaryEntity(
+  tableName?: string,
+): ConversationSummaryEntity {
+  return new ConversationSummaryEntity(
     getOrCreateAppTable(tableName ?? getAppTableName()),
   );
 }

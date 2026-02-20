@@ -76,6 +76,7 @@ export default $config({
         "enabled-priority-index": { hashKey: "enabled", rangeKey: "sk" },
         gsi1: { hashKey: "gsi1pk", rangeKey: "gsi1sk" },
       },
+      ttl: "ttl",
     });
 
     // S3 bucket for document storage (cache/archive)

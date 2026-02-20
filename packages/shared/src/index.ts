@@ -87,10 +87,15 @@ export { AgentModelEntity, type AgentModelConfig } from "./entities/index.js";
 export { IngestionLogEntity, type IngestionLog } from "./entities/index.js";
 export { PromptEntity, type PromptConfig } from "./entities/index.js";
 export {
+  ConversationSummaryEntity,
+  type ConversationSummary,
+} from "./entities/index.js";
+export {
   getAppTableName,
   createSourceConfigEntity,
   createIngestionLogEntity,
   createDiscoveredSourceEntity,
+  createConversationSummaryEntity,
 } from "./entities/index.js";
 export type {
   OlympicProgram,
