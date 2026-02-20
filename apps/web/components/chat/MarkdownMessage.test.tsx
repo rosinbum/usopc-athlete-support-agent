@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, act } from "@testing-library/react";
 import { MarkdownMessage } from "./MarkdownMessage.js";
 
 describe("MarkdownMessage", () => {
@@ -141,6 +141,42 @@ const x = 1;
     render(<MarkdownMessage content="This is ~~deleted~~ text" />);
     const deletedText = screen.getByText("deleted");
     expect(deletedText.tagName).toBe("DEL");
+  });
+
+  describe("streaming debounce", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("does not immediately re-render when content changes rapidly (simulating streaming)", () => {
+      const { rerender } = render(<MarkdownMessage content="Hello" />);
+      expect(screen.getByText("Hello")).toBeInTheDocument();
+
+      // Simulate rapid token updates — none should replace "Hello" yet
+      rerender(<MarkdownMessage content="Hello world" />);
+      rerender(<MarkdownMessage content="Hello world, how" />);
+      rerender(<MarkdownMessage content="Hello world, how are you?" />);
+
+      // Debounce window not elapsed — still showing original content
+      expect(screen.getByText("Hello")).toBeInTheDocument();
+    });
+
+    it("renders the final content after the debounce window elapses", () => {
+      const { rerender } = render(<MarkdownMessage content="Hello" />);
+
+      rerender(<MarkdownMessage content="Hello world" />);
+      rerender(<MarkdownMessage content="Hello world, how are you?" />);
+
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+
+      expect(screen.getByText("Hello world, how are you?")).toBeInTheDocument();
+    });
   });
 
   it("renders complex nested markdown", () => {
