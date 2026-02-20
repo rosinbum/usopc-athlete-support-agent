@@ -24,38 +24,63 @@ apps/
 The core agent is a compiled [LangGraph](https://langchain-ai.github.io/langgraph/) state machine in `packages/core/src/agent/graph.ts`:
 
 ```
-START → classifier → clarify | retriever | escalate
-             ↓            ↓          ↓
-        needsClarification?      needsMoreInfo?
-             ↓                  ↓       ↓
-            END          synthesizer  researcher
-                              ↓           ↓
-                              └─────┬─────┘
-                                    ↓
-                             citationBuilder → disclaimerGuard → END
+START → classifier → (routeByDomain) ─→ clarify → END
+                                      ├→ escalate ────────────────────────────┐
+                                      └→ queryPlanner → retriever             │
+                                                            │                 │
+                                                      (needsMoreInfo)         │
+                                                       ╱    │    ╲            │
+                              emotionalSupport ← researcher │  retrievalExpander
+                                     │                      │        │
+                                     ↓                      │  (needsMoreInfo)
+                                synthesizer ←───────────────┘   ╱         ╲
+                                     │                  researcher   emotionalSupport
+                               qualityChecker                           │
+                                     │                            synthesizer ↑
+                               (routeByQuality)
+                                ╱           ╲
+                         citationBuilder    retry → emotionalSupport → synthesizer
+                                │
+                         disclaimerGuard ←── escalate (via citationBuilder)
+                                │
+                               END
 ```
 
-**Routing logic**:
+**Routing logic** (3 conditional edges):
 
 ```
-START → classifier → (routeByDomain) → clarify | retriever | escalate
+START → classifier → (routeByDomain) → clarify | queryPlanner | escalate
   clarify → END
-  retriever → (needsMoreInfo) → synthesizer | researcher
-  researcher → synthesizer
-  synthesizer → citationBuilder → disclaimerGuard → END
+  queryPlanner → retriever
+  retriever → (needsMoreInfo) → emotionalSupport→synthesizer | researcher | retrievalExpander
+  retrievalExpander → (needsMoreInfo) → emotionalSupport→synthesizer | researcher
+  researcher → emotionalSupport → synthesizer
+  synthesizer → qualityChecker → (routeByQuality) → citationBuilder | retry(emotionalSupport→synthesizer)
   escalate → citationBuilder → disclaimerGuard → END
 ```
 
-**Nodes**:
+**Nodes** (12):
 
-- `classifier`: Analyzes query to determine domain, intent, and whether clarification is needed
-- `clarify`: Returns a clarifying question when the query is ambiguous
-- `retriever`: Performs pgvector similarity search on embedded documents
-- `researcher`: Queries Tavily for additional web context
-- `synthesizer`: Generates the response via Claude (with adaptive formatting based on query intent)
-- `citationBuilder`: Extracts and formats source citations
-- `disclaimerGuard`: Adds disclaimers for sensitive topics
-- `escalate`: Routes urgent matters (abuse reports, imminent deadlines) to appropriate authorities
+| Node                | Description                                                          | Model      |
+| ------------------- | -------------------------------------------------------------------- | ---------- |
+| `classifier`        | Analyzes query to determine domain, intent, emotional state          | Haiku      |
+| `clarify`           | Returns a clarifying question when the query is ambiguous            | None       |
+| `queryPlanner`      | Decomposes complex multi-domain queries into sub-queries             | Haiku      |
+| `retriever`         | Performs pgvector similarity search on embedded documents            | Embeddings |
+| `retrievalExpander` | Reformulates queries on low confidence, re-searches + merges results | Haiku      |
+| `researcher`        | Queries Tavily for additional web context                            | None       |
+| `emotionalSupport`  | Generates domain-aware, trauma-informed support guidance             | None       |
+| `synthesizer`       | Generates the response via Claude with adaptive formatting           | Sonnet     |
+| `qualityChecker`    | Scores answer quality (0–1), detects issues, triggers retry          | Haiku      |
+| `citationBuilder`   | Extracts and formats source citations with deduplication             | None       |
+| `disclaimerGuard`   | Adds domain-specific disclaimers (legal, SafeSport, anti-doping)     | None       |
+| `escalate`          | Routes urgent matters (abuse, imminent deadlines) to contacts        | Sonnet     |
+
+**Conditional edges**:
+
+- **`routeByDomain`** (after classifier): `needsClarification` → clarify; `queryIntent === "escalation"` → escalate; default → queryPlanner
+- **`needsMoreInfo`** (after retriever and retrievalExpander): confidence ≥ 0.75 → emotionalSupport → synthesizer; gray-zone (0.5–0.75) → researcher; low confidence + not expanded → retrievalExpander; low + already expanded → researcher
+- **`routeByQuality`** (after qualityChecker): passed or max retries (1) exhausted → citationBuilder; failed → retry via emotionalSupport → synthesizer
 
 Agent tools are in `packages/core/src/tools/`.
 
@@ -82,6 +107,8 @@ export function createSynthesizerNode(model: ChatAnthropic) {
 ```
 
 **Lifecycle:** In Lambda, model instances live for the container's lifetime (cold start → warm reuse). Config changes (model name, temperature, maxTokens) take effect only on cold start. The `conversationMemory` service receives its model via `initConversationMemoryModel()` called from the entry point.
+
+**Runtime model configuration:** Model names, temperature, and token limits are defined in `config/models.ts` (`MODEL_CONFIG`) with hardcoded defaults. In production, `getModelConfig()` reads overrides from DynamoDB (`AgentModelEntity`) with a 5-minute TTL cache. If DynamoDB is unavailable, the hardcoded defaults are used. Changes to DynamoDB config take effect on the next cold start (or after cache expiry within a warm container). There are no feature flags — all graph features (quality checker, retrieval expansion, query planning, emotional support) are always enabled.
 
 ## Ingestion Pipeline
 
@@ -192,6 +219,99 @@ Defined in `sst.config.ts`. Production uses Aurora Serverless v2 with pgvector; 
 - **Crons**: `DiscoveryCron` (weekly discovery), `IngestionCron` (weekly ingestion)
 
 Use `pnpm dev` (which runs `sst dev`) for local development to inject secrets. For scripts needing SST resources, use `sst shell -- <command>` or the wrapped npm scripts.
+
+## Connection Pool
+
+The database connection pool is a singleton in `packages/shared/src/pool.ts`. All packages import `getPool()` from `@usopc/shared` — there is no per-app pool.
+
+**Singleton pattern:**
+
+```typescript
+// Lazy-initialized, one pool per Lambda container
+let pool: Pool | null = null;
+
+export function getPool(): Pool {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: getDatabaseUrl(),
+      max: 5,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
+  }
+  return pool;
+}
+```
+
+**Configuration:**
+
+| Setting                   | Value  | Purpose                                          |
+| ------------------------- | ------ | ------------------------------------------------ |
+| `max`                     | 5      | Max connections per Lambda instance              |
+| `idleTimeoutMillis`       | 30,000 | Close idle connections after 30s                 |
+| `connectionTimeoutMillis` | 5,000  | Fail if a connection can't be acquired within 5s |
+
+**Connection string resolution** (`getDatabaseUrl()` in `packages/shared/src/env.ts`):
+
+1. `DATABASE_URL` environment variable (highest priority)
+2. SST Resource binding (`Resource.Database` — host, port, username, password, database fields)
+3. Development fallback: `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`
+4. Throws if none available
+
+**Consumers:** The vector store (`PGVectorStore`), ingestion pipeline, API tRPC db client, and web admin API routes all call `getPool()` and share the same pool instance.
+
+**Observability:** `getPoolStatus()` returns `{ totalConnections, idleConnections, waitingRequests }` (or `null` if the pool hasn't been created yet). Useful for health checks and debugging connection leaks.
+
+**Lambda lifecycle:** The pool persists across warm invocations within the same Lambda container. `closePool()` drains connections and resets the singleton — used in tests and for graceful shutdown.
+
+**Exhaustion behavior:** When all 5 connections are in use, `pg.Pool` queues additional requests internally. If a connection isn't released within `connectionTimeoutMillis` (5s), the queued request rejects with a timeout error.
+
+| Environment | Database                            | Pool behavior                                   |
+| ----------- | ----------------------------------- | ----------------------------------------------- |
+| Development | Local Docker Postgres with pgvector | Single pool, 5 connections to localhost         |
+| Production  | Aurora Serverless v2                | 5 connections per Lambda instance, auto-scaling |
+
+## LangGraph State Management
+
+The agent's shared state is defined by `AgentStateAnnotation` in `packages/core/src/agent/state.ts`. It extends LangGraph's built-in `MessagesAnnotation` and adds 26 domain-specific fields.
+
+**Reducer strategy:** The `messages` field uses LangGraph's built-in add-messages reducer (appends new messages). All other fields use **last-write-wins** — when a node returns a partial update, the new value replaces the previous one entirely.
+
+### State Fields by Function
+
+| Group                      | Fields                                                                                                                                                   | Written by                                                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| **Routing/Classification** | `topicDomain`, `queryIntent`, `detectedNgbIds`, `emotionalState`, `hasTimeConstraint`, `needsClarification`, `clarificationQuestion`, `escalationReason` | `classifier`                                                    |
+| **Retrieval/Knowledge**    | `retrievedDocuments`, `retrievalConfidence`, `webSearchResults`, `webSearchResultUrls`, `retrievalStatus`                                                | `retriever`, `retrievalExpander`, `researcher`                  |
+| **Complex Query**          | `isComplexQuery`, `subQueries`                                                                                                                           | `queryPlanner`                                                  |
+| **Quality Iteration**      | `qualityCheckResult`, `qualityRetryCount`, `expansionAttempted`, `reformulatedQueries`                                                                   | `qualityChecker`, `retrievalExpander`                           |
+| **Emotional Support**      | `emotionalSupportContext`                                                                                                                                | `emotionalSupport`                                              |
+| **Response/Safety**        | `answer`, `citations`, `disclaimerRequired`, `escalation`                                                                                                | `synthesizer`, `citationBuilder`, `disclaimerGuard`, `escalate` |
+| **User Context**           | `conversationId`, `conversationSummary`, `userSport`                                                                                                     | Input via `buildInitialState()`                                 |
+
+### Initial State
+
+`AgentRunner.buildInitialState()` passes only four fields from the caller; everything else uses Annotation defaults (empty arrays, `undefined`, `false`, `0`, etc.):
+
+```typescript
+return {
+  messages: input.messages,
+  userSport: input.userSport,
+  conversationId: input.conversationId,
+  conversationSummary: input.conversationSummary,
+};
+```
+
+### Adding a New State Field
+
+> **Critical gotcha:** Adding a field to `AgentStateAnnotation` is a cross-package change. CI will fail if any state constructor is missing the new field. Update all of these:
+>
+> 1. `packages/core/src/agent/state.ts` — the Annotation definition
+> 2. `packages/evals/src/helpers/stateFactory.ts` — `makeTestState()`
+> 3. `packages/evals/src/helpers/pipeline.ts` and `multiTurnPipeline.ts` — state construction
+> 4. All `packages/core/src/agent/nodes/*.test.ts` and `edges/*.test.ts` — test fixtures
+>
+> **Search strategy:** `grep -r "webSearchResults: \[\]" packages/` finds all state object literals that need updating.
 
 ## Admin Data Fetching (SWR)
 
