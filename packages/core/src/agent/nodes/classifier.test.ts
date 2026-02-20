@@ -305,7 +305,8 @@ describe("classifierNode", () => {
         hasTimeConstraint: false,
         shouldEscalate: false,
         needsClarification: true,
-        clarificationQuestion: "Which sport are you asking about?",
+        clarificationQuestion:
+          "That's a great question — which sport is this about?",
       }),
     );
 
@@ -316,7 +317,7 @@ describe("classifierNode", () => {
 
     expect(result.needsClarification).toBe(true);
     expect(result.clarificationQuestion).toBe(
-      "Which sport are you asking about?",
+      "That's a great question — which sport is this about?",
     );
   });
 
@@ -444,7 +445,8 @@ describe("classifierNode", () => {
           hasTimeConstraint: false,
           shouldEscalate: false,
           needsClarification: true,
-          clarificationQuestion: "Which sport are you asking about?",
+          clarificationQuestion:
+            "Happy to help with that. Which sport are you asking about?",
         }),
       );
 
@@ -457,7 +459,7 @@ describe("classifierNode", () => {
       // Without context, classifier should ask for clarification
       expect(result.needsClarification).toBe(true);
       expect(result.clarificationQuestion).toBe(
-        "Which sport are you asking about?",
+        "Happy to help with that. Which sport are you asking about?",
       );
     });
   });
