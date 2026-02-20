@@ -173,6 +173,14 @@ export const AppTableSchema = {
       updatedAt: { type: String },
       createdAt: { type: String },
     },
+    ConversationSummary: {
+      pk: { type: String, value: "Conversation#${conversationId}" },
+      sk: { type: String, value: "Summary" },
+      conversationId: { type: String, required: true },
+      summary: { type: String, required: true },
+      ttl: { type: Number },
+      updatedAt: { type: String },
+    },
     UsageMetric: {
       pk: { type: String, value: "Usage#${service}" },
       sk: { type: String, value: "${period}#${date}" }, // e.g., "daily#2026-02-15"

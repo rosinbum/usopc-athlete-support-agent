@@ -50,3 +50,5 @@ export {
   normalizeUrl,
   urlToId,
 } from "./discoveryFeedService.js";
+
+export { DynamoSummaryStore } from "./dynamoSummaryStore.js";

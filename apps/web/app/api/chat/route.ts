@@ -31,8 +31,12 @@ let runnerPromise: Promise<any> | null = null;
 
 async function initRunner() {
   // Import shared utils first to set env vars
-  const { getDatabaseUrl, getSecretValue, getOptionalEnv } =
-    await import("@usopc/shared");
+  const {
+    getDatabaseUrl,
+    getSecretValue,
+    getOptionalEnv,
+    createConversationSummaryEntity,
+  } = await import("@usopc/shared");
 
   // Set env vars BEFORE importing @usopc/core (which loads LangChain)
   process.env.ANTHROPIC_API_KEY = getSecretValue(
@@ -68,7 +72,12 @@ async function initRunner() {
   }
 
   // Now import the agent (which loads LangChain with env vars set)
-  const { AgentRunner } = await import("@usopc/core");
+  const { AgentRunner, setSummaryStore, DynamoSummaryStore } =
+    await import("@usopc/core");
+
+  // Replace in-memory store with DynamoDB-backed store
+  const summaryEntity = createConversationSummaryEntity();
+  setSummaryStore(new DynamoSummaryStore(summaryEntity));
 
   return await AgentRunner.create({
     databaseUrl: getDatabaseUrl(),
