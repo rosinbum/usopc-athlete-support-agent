@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import {
   getPool,
@@ -12,26 +13,32 @@ import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 import { apiError } from "../../../../../lib/apiResponse.js";
 
-interface BulkRequest {
-  action: "enable" | "disable" | "ingest" | "delete";
-  ids: string[];
-}
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+const bulkSchema = z.object({
+  action: z.enum(["enable", "disable", "ingest", "delete"]),
+  ids: z
+    .array(z.string().min(1))
+    .min(1, "At least one ID is required")
+    .max(100),
+});
 
 export async function POST(request: Request) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
   try {
-    const body: BulkRequest = await request.json();
-    const { action, ids } = body;
+    const body = await request.json();
+    const result = bulkSchema.safeParse(body);
 
-    if (!action || !ids || !Array.isArray(ids) || ids.length === 0) {
-      return apiError("Invalid request: action and ids are required", 400);
+    if (!result.success) {
+      const firstError = result.error.errors[0]?.message ?? "Invalid input";
+      return apiError(firstError, 400);
     }
 
-    if (!["enable", "disable", "ingest", "delete"].includes(action)) {
-      return apiError("Invalid action", 400);
-    }
+    const { action, ids } = result.data;
 
     const entity = createSourceConfigEntity();
     let succeeded = 0;
