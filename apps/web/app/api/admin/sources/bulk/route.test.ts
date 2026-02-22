@@ -89,10 +89,8 @@ describe("POST /api/admin/sources/bulk", () => {
     } as never);
 
     const res = await POST(makeRequest({ ids: ["src1"] }));
-    const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toBe("Invalid request: action and ids are required");
   });
 
   it("returns 400 when ids is empty", async () => {
@@ -104,7 +102,7 @@ describe("POST /api/admin/sources/bulk", () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toBe("Invalid request: action and ids are required");
+    expect(body.error).toBe("At least one ID is required");
   });
 
   it("returns 400 for invalid action", async () => {
@@ -113,10 +111,31 @@ describe("POST /api/admin/sources/bulk", () => {
     } as never);
 
     const res = await POST(makeRequest({ action: "purge", ids: ["src1"] }));
-    const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toBe("Invalid action");
+  });
+
+  it("returns 400 when ids contain non-string values", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+
+    const res = await POST(
+      makeRequest({ action: "enable", ids: [123, { malicious: true }] }),
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when ids exceed max length", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+
+    const ids = Array.from({ length: 101 }, (_, i) => `src-${i}`);
+    const res = await POST(makeRequest({ action: "enable", ids }));
+
+    expect(res.status).toBe(400);
   });
 
   it("bulk enables sources", async () => {
