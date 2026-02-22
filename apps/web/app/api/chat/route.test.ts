@@ -268,3 +268,35 @@ describe("input validation", () => {
     expect(response.status).toBe(200);
   });
 });
+
+describe("concurrent runner initialization", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    shouldFailInit = false;
+    initCallCount = 0;
+    vi.resetModules();
+  });
+
+  it("shares runner promise across concurrent requests", async () => {
+    const { POST } = await importRoute();
+
+    const makeReq = () =>
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Hello" }],
+        }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+    // First request warms the runner singleton
+    const res1 = await POST(makeReq());
+    expect(res1.status).toBe(200);
+    expect(initCallCount).toBe(1);
+
+    // Second request reuses the cached runner — no additional init
+    const res2 = await POST(makeReq());
+    expect(res2.status).toBe(200);
+    expect(initCallCount).toBe(1);
+  });
+});
