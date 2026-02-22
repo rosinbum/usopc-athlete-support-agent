@@ -25,20 +25,7 @@ interface SourcesListResponse {
   totalPages: number;
 }
 
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "Never";
-  try {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return dateString;
-  }
-}
+import { formatDateTime } from "../../lib/format-date.js";
 
 export function SourcesClient() {
   const [stats, setStats] = useState<SourcesStats | null>(null);
@@ -128,7 +115,7 @@ export function SourcesClient() {
             <span className="text-sm">Last Ingested</span>
           </div>
           <p className="text-lg font-medium text-gray-900">
-            {stats ? formatDate(stats.lastIngestedAt) : "—"}
+            {stats ? formatDateTime(stats.lastIngestedAt) : "—"}
           </p>
         </div>
       </div>

@@ -15,32 +15,8 @@ import {
   useDiscovery,
   useDiscoveryAction,
 } from "../../hooks/use-discoveries.js";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "N/A";
-  try {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return dateString;
-  }
-}
-
-function formatLabel(key: string): string {
-  return key
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (c) => c.toUpperCase())
-    .trim();
-}
+import { formatDateTime } from "../../../../lib/format-date.js";
+import { camelToLabel } from "../../../../lib/format-label.js";
 
 function confidenceDisplay(value: number | null): string {
   if (value === null) return "N/A";
@@ -227,7 +203,7 @@ export function DiscoveryDetailPanel({
     },
     "Discovery Info": {
       discoveryMethod: discovery.discoveryMethod,
-      discoveredAt: formatDate(discovery.discoveredAt),
+      discoveredAt: formatDateTime(discovery.discoveredAt, "N/A"),
       discoveredFrom: discovery.discoveredFrom ?? "N/A",
     },
     "Metadata Evaluation": {
@@ -296,7 +272,7 @@ export function DiscoveryDetailPanel({
           {badge.label}
         </span>
       ),
-      reviewedAt: formatDate(discovery.reviewedAt),
+      reviewedAt: formatDateTime(discovery.reviewedAt, "N/A"),
       reviewedBy: discovery.reviewedBy ?? "N/A",
       rejectionReason: discovery.rejectionReason ?? "N/A",
     },
@@ -304,8 +280,8 @@ export function DiscoveryDetailPanel({
       sourceConfigId: discovery.sourceConfigId ?? "Not linked",
     },
     Timestamps: {
-      createdAt: formatDate(discovery.createdAt),
-      updatedAt: formatDate(discovery.updatedAt),
+      createdAt: formatDateTime(discovery.createdAt, "N/A"),
+      updatedAt: formatDateTime(discovery.updatedAt, "N/A"),
     },
   };
 
@@ -429,7 +405,7 @@ export function DiscoveryDetailPanel({
             <dl className="space-y-2">
               {Object.entries(sectionFields).map(([key, value]) => (
                 <div key={key}>
-                  <dt className="text-xs text-gray-400">{formatLabel(key)}</dt>
+                  <dt className="text-xs text-gray-400">{camelToLabel(key)}</dt>
                   <dd className="text-sm text-gray-900 break-words">{value}</dd>
                 </div>
               ))}

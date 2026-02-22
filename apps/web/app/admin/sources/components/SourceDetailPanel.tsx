@@ -19,32 +19,8 @@ import {
   useSourceIngest,
   type SourceActionArg,
 } from "../../hooks/use-sources.js";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "Never";
-  try {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return dateString;
-  }
-}
-
-function formatLabel(key: string): string {
-  return key
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (c) => c.toUpperCase())
-    .trim();
-}
+import { formatDateTime } from "../../../../lib/format-date.js";
+import { camelToLabel } from "../../../../lib/format-label.js";
 
 const SCALAR_FIELDS = [
   "title",
@@ -323,7 +299,7 @@ export function SourceDetailPanel({
     Status: {
       enabled: source.enabled ? "Yes" : "No",
       chunkCount: String(chunkCount),
-      lastIngestedAt: formatDate(source.lastIngestedAt),
+      lastIngestedAt: formatDateTime(source.lastIngestedAt),
       consecutiveFailures: String(source.consecutiveFailures),
       lastError: source.lastError ?? "None",
     },
@@ -332,8 +308,8 @@ export function SourceDetailPanel({
       s3VersionId: source.s3VersionId ?? "\u2014",
     },
     Timestamps: {
-      createdAt: formatDate(source.createdAt),
-      updatedAt: formatDate(source.updatedAt),
+      createdAt: formatDateTime(source.createdAt),
+      updatedAt: formatDateTime(source.updatedAt),
     },
   };
 
@@ -449,7 +425,7 @@ export function SourceDetailPanel({
             <dl className="space-y-2">
               {Object.entries(sectionFields).map(([key, value]) => (
                 <div key={key}>
-                  <dt className="text-xs text-gray-400">{formatLabel(key)}</dt>
+                  <dt className="text-xs text-gray-400">{camelToLabel(key)}</dt>
                   <dd className="text-sm text-gray-900 break-words">{value}</dd>
                 </div>
               ))}
