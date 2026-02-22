@@ -15,16 +15,15 @@ vi.mock("../../../../../../lib/source-config.js", () => ({
   createSourceConfigEntity: vi.fn(),
 }));
 
-const mockSqsSend = vi.fn();
-vi.mock("@aws-sdk/client-sqs", () => ({
-  SQSClient: vi.fn(() => ({ send: mockSqsSend })),
-  SendMessageCommand: vi.fn((input: unknown) => input),
+vi.mock("@usopc/shared", () => ({
+  logger: {
+    child: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() })),
+  },
 }));
 
-vi.mock("sst", () => ({
-  Resource: {
-    IngestionQueue: { url: "https://sqs.us-east-1.amazonaws.com/test-queue" },
-  },
+const mockTriggerIngestion = vi.fn();
+vi.mock("../../../../../../lib/services/source-service.js", () => ({
+  triggerIngestion: (...args: unknown[]) => mockTriggerIngestion(...args),
 }));
 
 import { auth } from "../../../../../../auth.js";
@@ -103,14 +102,14 @@ describe("POST /api/admin/sources/[id]/ingest", () => {
     expect(body.error).toBe("Source not found");
   });
 
-  it("sends SQS message and returns success", async () => {
+  it("delegates to triggerIngestion and returns success", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCE),
     } as never);
-    mockSqsSend.mockResolvedValueOnce({});
+    mockTriggerIngestion.mockResolvedValueOnce({ triggered: true });
 
     const res = await POST(
       new Request("http://localhost/api/admin/sources/usopc-bylaws/ingest", {
@@ -123,17 +122,17 @@ describe("POST /api/admin/sources/[id]/ingest", () => {
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.sourceId).toBe("usopc-bylaws");
-    expect(mockSqsSend).toHaveBeenCalledOnce();
+    expect(mockTriggerIngestion).toHaveBeenCalledWith(SAMPLE_SOURCE);
   });
 
-  it("returns 500 when SQS send fails", async () => {
+  it("returns 501 when triggerIngestion fails", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCE),
     } as never);
-    mockSqsSend.mockRejectedValueOnce(new Error("SQS error"));
+    mockTriggerIngestion.mockRejectedValueOnce(new Error("Queue unavailable"));
 
     const res = await POST(
       new Request("http://localhost/api/admin/sources/usopc-bylaws/ingest", {
@@ -143,7 +142,7 @@ describe("POST /api/admin/sources/[id]/ingest", () => {
     );
     const body = await res.json();
 
-    expect(res.status).toBe(500);
-    expect(body.error).toBe("Failed to trigger ingestion");
+    expect(res.status).toBe(501);
+    expect(body.error).toBe("Ingestion queue not available (dev environment)");
   });
 });

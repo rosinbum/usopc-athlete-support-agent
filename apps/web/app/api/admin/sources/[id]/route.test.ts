@@ -15,36 +15,21 @@ vi.mock("../../../../../lib/source-config.js", () => ({
   createSourceConfigEntity: vi.fn(),
 }));
 
-const mockDeleteChunks = vi.fn().mockResolvedValue(0);
-const mockUpdateChunkMetadata = vi.fn().mockResolvedValue(0);
 const mockCountChunks = vi.fn().mockResolvedValue(0);
 
 vi.mock("@usopc/shared", () => ({
   getPool: () => "mock-pool",
-  deleteChunksBySourceId: (...args: unknown[]) => mockDeleteChunks(...args),
-  updateChunkMetadataBySourceId: (...args: unknown[]) =>
-    mockUpdateChunkMetadata(...args),
   countChunksBySourceId: (...args: unknown[]) => mockCountChunks(...args),
-  getResource: vi.fn((key: string) => {
-    if (key === "IngestionQueue")
-      return { url: "https://sqs.us-east-1.amazonaws.com/test-queue" };
-    throw new Error(`SST Resource '${key}' not available`);
-  }),
   logger: {
     child: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() })),
   },
 }));
 
-const mockSqsSend = vi.fn();
-vi.mock("@aws-sdk/client-sqs", () => ({
-  SQSClient: vi.fn(() => ({ send: mockSqsSend })),
-  SendMessageCommand: vi.fn((input: unknown) => input),
-}));
-
-vi.mock("sst", () => ({
-  Resource: {
-    IngestionQueue: { url: "https://sqs.us-east-1.amazonaws.com/test-queue" },
-  },
+const mockUpdateSource = vi.fn();
+const mockDeleteSource = vi.fn();
+vi.mock("../../../../../lib/services/source-service.js", () => ({
+  updateSource: (...args: unknown[]) => mockUpdateSource(...args),
+  deleteSource: (...args: unknown[]) => mockDeleteSource(...args),
 }));
 
 import { auth } from "../../../../../auth.js";
@@ -245,12 +230,14 @@ describe("PATCH /api/admin/sources/[id]", () => {
     expect(res.status).toBe(400);
   });
 
-  it("updates no-vector-impact fields (enabled only)", async () => {
+  it("delegates to updateSource and returns result", async () => {
     const updated = { ...SAMPLE_SOURCE, enabled: false };
     authedAdmin();
-    mockCreateEntity.mockReturnValueOnce({
-      update: vi.fn().mockResolvedValueOnce(updated),
-    } as never);
+    mockCreateEntity.mockReturnValueOnce("mock-entity" as never);
+    mockUpdateSource.mockResolvedValueOnce({
+      source: updated,
+      actions: {},
+    });
 
     const res = await PATCH(
       new Request("http://localhost/api/admin/sources/usopc-bylaws", {
@@ -264,17 +251,22 @@ describe("PATCH /api/admin/sources/[id]", () => {
     expect(res.status).toBe(200);
     expect(body.source.enabled).toBe(false);
     expect(body.actions).toEqual({});
-    expect(mockDeleteChunks).not.toHaveBeenCalled();
-    expect(mockUpdateChunkMetadata).not.toHaveBeenCalled();
+    expect(mockUpdateSource).toHaveBeenCalledWith(
+      "usopc-bylaws",
+      { enabled: false },
+      "mock-entity",
+      "mock-pool",
+    );
   });
 
-  it("updates metadata-only fields and syncs chunks", async () => {
+  it("returns metadata update actions from service", async () => {
     const updated = { ...SAMPLE_SOURCE, title: "Updated Title" };
     authedAdmin();
-    mockCreateEntity.mockReturnValueOnce({
-      update: vi.fn().mockResolvedValueOnce(updated),
-    } as never);
-    mockUpdateChunkMetadata.mockResolvedValueOnce(5);
+    mockCreateEntity.mockReturnValueOnce("mock-entity" as never);
+    mockUpdateSource.mockResolvedValueOnce({
+      source: updated,
+      actions: { chunksUpdated: 5 },
+    });
 
     const res = await PATCH(
       new Request("http://localhost/api/admin/sources/usopc-bylaws", {
@@ -288,21 +280,16 @@ describe("PATCH /api/admin/sources/[id]", () => {
     expect(res.status).toBe(200);
     expect(body.source.title).toBe("Updated Title");
     expect(body.actions.chunksUpdated).toBe(5);
-    expect(mockUpdateChunkMetadata).toHaveBeenCalledWith(
-      "mock-pool",
-      "usopc-bylaws",
-      { title: "Updated Title" },
-    );
   });
 
-  it("deletes chunks and triggers re-ingestion for content-affecting changes", async () => {
+  it("returns content change actions from service", async () => {
     const updated = { ...SAMPLE_SOURCE, url: "https://example.com/new.pdf" };
     authedAdmin();
-    mockCreateEntity.mockReturnValueOnce({
-      update: vi.fn().mockResolvedValueOnce(updated),
-    } as never);
-    mockDeleteChunks.mockResolvedValueOnce(10);
-    mockSqsSend.mockResolvedValueOnce({});
+    mockCreateEntity.mockReturnValueOnce("mock-entity" as never);
+    mockUpdateSource.mockResolvedValueOnce({
+      source: updated,
+      actions: { chunksDeleted: 10, reIngestionTriggered: true },
+    });
 
     const res = await PATCH(
       new Request("http://localhost/api/admin/sources/usopc-bylaws", {
@@ -316,8 +303,6 @@ describe("PATCH /api/admin/sources/[id]", () => {
     expect(res.status).toBe(200);
     expect(body.actions.chunksDeleted).toBe(10);
     expect(body.actions.reIngestionTriggered).toBe(true);
-    expect(mockDeleteChunks).toHaveBeenCalledWith("mock-pool", "usopc-bylaws");
-    expect(mockSqsSend).toHaveBeenCalledOnce();
   });
 
   it("content-affecting change wins over metadata change", async () => {
@@ -327,11 +312,11 @@ describe("PATCH /api/admin/sources/[id]", () => {
       title: "New Title",
     };
     authedAdmin();
-    mockCreateEntity.mockReturnValueOnce({
-      update: vi.fn().mockResolvedValueOnce(updated),
-    } as never);
-    mockDeleteChunks.mockResolvedValueOnce(3);
-    mockSqsSend.mockResolvedValueOnce({});
+    mockCreateEntity.mockReturnValueOnce("mock-entity" as never);
+    mockUpdateSource.mockResolvedValueOnce({
+      source: updated,
+      actions: { chunksDeleted: 3, reIngestionTriggered: true },
+    });
 
     const res = await PATCH(
       new Request("http://localhost/api/admin/sources/usopc-bylaws", {
@@ -348,7 +333,12 @@ describe("PATCH /api/admin/sources/[id]", () => {
     expect(res.status).toBe(200);
     expect(body.actions.chunksDeleted).toBe(3);
     expect(body.actions.reIngestionTriggered).toBe(true);
-    expect(mockUpdateChunkMetadata).not.toHaveBeenCalled();
+    expect(mockUpdateSource).toHaveBeenCalledWith(
+      "usopc-bylaws",
+      { url: "https://example.com/new.pdf", title: "New Title" },
+      "mock-entity",
+      "mock-pool",
+    );
   });
 
   it("accepts all new field types", async () => {
@@ -358,10 +348,11 @@ describe("PATCH /api/admin/sources/[id]", () => {
       topicDomains: ["eligibility", "governance"],
     };
     authedAdmin();
-    mockCreateEntity.mockReturnValueOnce({
-      update: vi.fn().mockResolvedValueOnce(updated),
-    } as never);
-    mockUpdateChunkMetadata.mockResolvedValueOnce(2);
+    mockCreateEntity.mockReturnValueOnce("mock-entity" as never);
+    mockUpdateSource.mockResolvedValueOnce({
+      source: updated,
+      actions: { chunksUpdated: 2 },
+    });
 
     const res = await PATCH(
       new Request("http://localhost/api/admin/sources/usopc-bylaws", {
@@ -437,14 +428,12 @@ describe("DELETE /api/admin/sources/[id]", () => {
     expect(body.error).toBe("Source not found");
   });
 
-  it("deletes chunks then config and returns counts", async () => {
-    const mockEntityDelete = vi.fn().mockResolvedValueOnce(undefined);
+  it("delegates to deleteSource and returns result", async () => {
     authedAdmin();
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCE),
-      delete: mockEntityDelete,
     } as never);
-    mockDeleteChunks.mockResolvedValueOnce(15);
+    mockDeleteSource.mockResolvedValueOnce({ chunksDeleted: 15 });
 
     const res = await DELETE(
       new Request("http://localhost/api/admin/sources/usopc-bylaws", {
@@ -458,7 +447,10 @@ describe("DELETE /api/admin/sources/[id]", () => {
     expect(body.success).toBe(true);
     expect(body.sourceId).toBe("usopc-bylaws");
     expect(body.chunksDeleted).toBe(15);
-    expect(mockDeleteChunks).toHaveBeenCalledWith("mock-pool", "usopc-bylaws");
-    expect(mockEntityDelete).toHaveBeenCalledWith("usopc-bylaws");
+    expect(mockDeleteSource).toHaveBeenCalledWith(
+      "usopc-bylaws",
+      expect.anything(),
+      "mock-pool",
+    );
   });
 });

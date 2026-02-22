@@ -15,10 +15,8 @@ vi.mock("../../../../../lib/source-config.js", () => ({
   createSourceConfigEntity: vi.fn(),
 }));
 
-const mockDeleteChunks = vi.fn().mockResolvedValue(0);
 vi.mock("@usopc/shared", () => ({
   getPool: () => "mock-pool",
-  deleteChunksBySourceId: (...args: unknown[]) => mockDeleteChunks(...args),
   getResource: vi.fn((key: string) => {
     if (key === "IngestionQueue")
       return { url: "https://sqs.us-east-1.amazonaws.com/test-queue" };
@@ -29,16 +27,11 @@ vi.mock("@usopc/shared", () => ({
   },
 }));
 
-const mockSqsSend = vi.fn();
-vi.mock("@aws-sdk/client-sqs", () => ({
-  SQSClient: vi.fn(() => ({ send: mockSqsSend })),
-  SendMessageCommand: vi.fn((input: unknown) => input),
-}));
-
-vi.mock("sst", () => ({
-  Resource: {
-    IngestionQueue: { url: "https://sqs.us-east-1.amazonaws.com/test-queue" },
-  },
+const mockTriggerIngestion = vi.fn();
+const mockDeleteSource = vi.fn();
+vi.mock("../../../../../lib/services/source-service.js", () => ({
+  triggerIngestion: (...args: unknown[]) => mockTriggerIngestion(...args),
+  deleteSource: (...args: unknown[]) => mockDeleteSource(...args),
 }));
 
 import { auth } from "../../../../../auth.js";
@@ -211,14 +204,14 @@ describe("POST /api/admin/sources/bulk", () => {
     expect(body.failed).toBe(1);
   });
 
-  it("bulk ingests sources via SQS", async () => {
+  it("bulk ingests sources via triggerIngestion", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCE),
     } as never);
-    mockSqsSend.mockResolvedValueOnce({});
+    mockTriggerIngestion.mockResolvedValueOnce({ triggered: true });
 
     const res = await POST(
       makeRequest({ action: "ingest", ids: ["usopc-bylaws"] }),
@@ -228,18 +221,15 @@ describe("POST /api/admin/sources/bulk", () => {
     expect(res.status).toBe(200);
     expect(body.succeeded).toBe(1);
     expect(body.failed).toBe(0);
-    expect(mockSqsSend).toHaveBeenCalledOnce();
+    expect(mockTriggerIngestion).toHaveBeenCalledWith(SAMPLE_SOURCE);
   });
 
-  it("bulk deletes sources with chunk cleanup", async () => {
-    const mockEntityDelete = vi.fn().mockResolvedValue(undefined);
+  it("bulk deletes sources via deleteSource", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },
     } as never);
-    mockCreateEntity.mockReturnValueOnce({
-      delete: mockEntityDelete,
-    } as never);
-    mockDeleteChunks.mockResolvedValue(5);
+    mockCreateEntity.mockReturnValueOnce("mock-entity" as never);
+    mockDeleteSource.mockResolvedValue({ chunksDeleted: 5 });
 
     const res = await POST(
       makeRequest({ action: "delete", ids: ["src1", "src2"] }),
@@ -249,9 +239,17 @@ describe("POST /api/admin/sources/bulk", () => {
     expect(res.status).toBe(200);
     expect(body.succeeded).toBe(2);
     expect(body.failed).toBe(0);
-    expect(mockDeleteChunks).toHaveBeenCalledTimes(2);
-    expect(mockEntityDelete).toHaveBeenCalledWith("src1");
-    expect(mockEntityDelete).toHaveBeenCalledWith("src2");
+    expect(mockDeleteSource).toHaveBeenCalledTimes(2);
+    expect(mockDeleteSource).toHaveBeenCalledWith(
+      "src1",
+      "mock-entity",
+      "mock-pool",
+    );
+    expect(mockDeleteSource).toHaveBeenCalledWith(
+      "src2",
+      "mock-entity",
+      "mock-pool",
+    );
   });
 
   it("counts failure when source not found for ingest", async () => {

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { getResource, logger } from "@usopc/shared";
+import { logger } from "@usopc/shared";
 import { requireAdmin } from "../../../../../../lib/admin-api.js";
 import { apiError } from "../../../../../../lib/apiResponse.js";
 
 const log = logger.child({ service: "admin-sources-ingest" });
 import { createSourceConfigEntity } from "../../../../../../lib/source-config.js";
+import { triggerIngestion } from "../../../../../../lib/services/source-service.js";
 
 export async function POST(
   _request: Request,
@@ -23,39 +23,11 @@ export async function POST(
       return apiError("Source not found", 404);
     }
 
-    // Get the queue URL from SST Resource (only available in production)
-    let queueUrl: string;
     try {
-      queueUrl = getResource("IngestionQueue").url;
+      await triggerIngestion(source);
     } catch {
       return apiError("Ingestion queue not available (dev environment)", 501);
     }
-
-    const message = {
-      source: {
-        id: source.id,
-        title: source.title,
-        documentType: source.documentType,
-        topicDomains: source.topicDomains,
-        url: source.url,
-        format: source.format,
-        ngbId: source.ngbId,
-        priority: source.priority,
-        description: source.description,
-        authorityLevel: source.authorityLevel,
-      },
-      contentHash: "manual",
-      triggeredAt: new Date().toISOString(),
-    };
-
-    const sqs = new SQSClient({});
-    await sqs.send(
-      new SendMessageCommand({
-        QueueUrl: queueUrl,
-        MessageBody: JSON.stringify(message),
-        MessageGroupId: source.id,
-      }),
-    );
 
     return NextResponse.json({ success: true, sourceId: id });
   } catch (error) {
