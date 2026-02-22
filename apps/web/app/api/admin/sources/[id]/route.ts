@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { z } from "zod";
 import {
   getPool,
-  deleteChunksBySourceId,
-  updateChunkMetadataBySourceId,
   countChunksBySourceId,
-  getResource,
   logger,
   type SourceConfig,
 } from "@usopc/shared";
@@ -15,6 +11,10 @@ const log = logger.child({ service: "admin-sources" });
 import { requireAdmin } from "../../../../../lib/admin-api.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 import { apiError } from "../../../../../lib/apiResponse.js";
+import {
+  updateSource,
+  deleteSource,
+} from "../../../../../lib/services/source-service.js";
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -37,18 +37,6 @@ const patchSourceSchema = z
   .refine((obj) => Object.keys(obj).length > 0, {
     message: "No valid fields to update",
   });
-
-// Fields that require re-ingestion (content changes)
-const CONTENT_AFFECTING_FIELDS = new Set(["url", "format"]);
-
-// Fields that require chunk metadata updates (no re-ingestion)
-const METADATA_FIELDS = new Set([
-  "title",
-  "documentType",
-  "topicDomains",
-  "ngbId",
-  "authorityLevel",
-]);
 
 // ---------------------------------------------------------------------------
 // GET
@@ -103,86 +91,9 @@ export async function PATCH(
 
     // Cast is safe — Zod has validated the values above
     const data = result.data as Partial<Omit<SourceConfig, "id" | "createdAt">>;
-    const changedKeys = Object.keys(data);
-
-    const hasContentChange = changedKeys.some((k) =>
-      CONTENT_AFFECTING_FIELDS.has(k),
-    );
-    const hasMetadataChange = changedKeys.some((k) => METADATA_FIELDS.has(k));
-
-    const actions: Record<string, unknown> = {};
-    const pool = getPool();
-
-    if (hasContentChange) {
-      // Content-affecting: delete old chunks, update config, trigger re-ingestion
-      const chunksDeleted = await deleteChunksBySourceId(pool, id);
-      actions.chunksDeleted = chunksDeleted;
-
-      // Update the source config in DynamoDB
-      const entity = createSourceConfigEntity();
-      const source = await entity.update(id, data);
-
-      // Trigger re-ingestion via SQS
-      try {
-        const queueUrl = getResource("IngestionQueue").url;
-
-        const message = {
-          source: {
-            id: source.id,
-            title: source.title,
-            documentType: source.documentType,
-            topicDomains: source.topicDomains,
-            url: source.url,
-            format: source.format,
-            ngbId: source.ngbId,
-            priority: source.priority,
-            description: source.description,
-            authorityLevel: source.authorityLevel,
-          },
-          contentHash: "manual",
-          triggeredAt: new Date().toISOString(),
-        };
-
-        const sqs = new SQSClient({});
-        await sqs.send(
-          new SendMessageCommand({
-            QueueUrl: queueUrl,
-            MessageBody: JSON.stringify(message),
-            MessageGroupId: source.id,
-          }),
-        );
-        actions.reIngestionTriggered = true;
-      } catch {
-        // SQS not available in dev — still proceed with the update
-        actions.reIngestionTriggered = false;
-      }
-
-      return NextResponse.json({ source, actions });
-    }
-
-    if (hasMetadataChange) {
-      // Metadata-only: update chunks in PG, then update DynamoDB
-      const metadataUpdates: Record<string, unknown> = {};
-      if (data.title !== undefined) metadataUpdates.title = data.title;
-      if (data.documentType !== undefined)
-        metadataUpdates.documentType = data.documentType;
-      if (data.topicDomains !== undefined)
-        metadataUpdates.topicDomains = data.topicDomains;
-      if (data.ngbId !== undefined) metadataUpdates.ngbId = data.ngbId;
-      if (data.authorityLevel !== undefined)
-        metadataUpdates.authorityLevel = data.authorityLevel;
-
-      const chunksUpdated = await updateChunkMetadataBySourceId(
-        pool,
-        id,
-        metadataUpdates,
-      );
-      actions.chunksUpdated = chunksUpdated;
-    }
-
-    // Update DynamoDB (covers metadata-only and no-vector-impact fields)
     const entity = createSourceConfigEntity();
-    const source = await entity.update(id, data);
+    const pool = getPool();
+    const { source, actions } = await updateSource(id, data, entity, pool);
 
     return NextResponse.json({ source, actions });
   } catch (error) {
@@ -211,12 +122,8 @@ export async function DELETE(
       return apiError("Source not found", 404);
     }
 
-    // Delete chunks from PG first (safer ordering)
     const pool = getPool();
-    const chunksDeleted = await deleteChunksBySourceId(pool, id);
-
-    // Delete config from DynamoDB
-    await entity.delete(id);
+    const { chunksDeleted } = await deleteSource(id, entity, pool);
 
     return NextResponse.json({
       success: true,
