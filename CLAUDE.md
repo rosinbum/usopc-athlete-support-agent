@@ -155,6 +155,8 @@ Custom Claude Code skills that automate the development workflow. Use these inst
 | `/implement <issue>`                | Full issue-to-code workflow — worktree setup, code exploration, test scaffolding, implementation |
 | `/address-pr-comments`              | Address review comments on the current PR — fetches comments, applies fixes, updates PR          |
 | `/resolve-readme`                   | Resolve the recurring README.md merge conflict caused by the hours timestamp pre-commit hook     |
+| `/resolve-review <finding-id>`      | Resolve a code review finding — validates, creates issue, sets up worktree, implements fix       |
+| `/dev-workflow <issue>`             | Shared implementation workflow (explore → plan → scaffold → implement → quality → stage)         |
 | `/fix-bugs [--limit N] [--dry-run]` | Autonomous bug-fixing — fetches open bug issues and spawns parallel bug-fixer agents             |
 
 ### Sub-Agents
