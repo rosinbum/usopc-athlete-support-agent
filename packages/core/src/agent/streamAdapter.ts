@@ -15,12 +15,14 @@ export interface AgentStreamEvent {
     | "escalation"
     | "answer-reset"
     | "discovered-urls"
+    | "status"
     | "error"
     | "done";
   textDelta?: string;
   citations?: Citation[];
   escalation?: EscalationInfo;
   discoveredUrls?: WebSearchResult[];
+  status?: string;
   error?: { message: string; code?: string };
 }
 
@@ -30,6 +32,22 @@ export interface AgentStreamEvent {
  * classifier JSON output or other intermediate data.
  */
 const STREAMING_NODES = new Set(["synthesizer"]);
+
+/**
+ * Human-readable status labels for LLM-calling graph nodes.
+ * Nodes not listed here (emotionalSupport, citationBuilder, disclaimerGuard,
+ * clarify) are either too fast or produce the final answer directly.
+ */
+const NODE_STATUS_LABELS: Record<string, string> = {
+  classifier: "Understanding your question...",
+  queryPlanner: "Planning search strategy...",
+  retriever: "Searching governance documents...",
+  retrievalExpander: "Broadening search...",
+  researcher: "Searching the web...",
+  synthesizer: "Preparing your answer...",
+  qualityChecker: "Reviewing answer quality...",
+  escalate: "Preparing your answer...",
+};
 
 /**
  * Extracts text content from an AIMessageChunk's content field.
@@ -88,6 +106,10 @@ export async function* agentStreamToEvents(
   // Track if we've seen any messages from synthesizer - if so, don't emit
   // answer from values to avoid duplication
   let seenSynthesizerTokens = false;
+  // Track which node's status we last emitted to avoid duplicates
+  let lastStatusNode = "";
+  // Track whether retriever status was emitted from values mode
+  let retrieverStatusEmitted = false;
 
   try {
     for await (const chunk of stream) {
@@ -100,8 +122,20 @@ export async function* agentStreamToEvents(
           { langgraph_node?: string },
         ];
 
-        // Only stream tokens from specific nodes (synthesizer)
         const nodeName = metadata?.langgraph_node;
+
+        // Emit status update when the active node changes (before token processing)
+        if (
+          nodeName &&
+          nodeName !== lastStatusNode &&
+          !seenSynthesizerTokens &&
+          NODE_STATUS_LABELS[nodeName]
+        ) {
+          lastStatusNode = nodeName;
+          yield { type: "status", status: NODE_STATUS_LABELS[nodeName] };
+        }
+
+        // Only stream tokens from specific nodes (synthesizer)
         if (nodeName && STREAMING_NODES.has(nodeName)) {
           seenSynthesizerTokens = true;
           const text = extractTextFromContent(messageChunk.content);
@@ -112,6 +146,23 @@ export async function* agentStreamToEvents(
       } else if (mode === "values") {
         // State update after a node completes
         const state = data as Partial<AgentState>;
+
+        // Emit retriever status when retrievedDocuments first appears
+        if (
+          !retrieverStatusEmitted &&
+          !seenSynthesizerTokens &&
+          state.retrievedDocuments &&
+          state.retrievedDocuments.length > 0
+        ) {
+          retrieverStatusEmitted = true;
+          if (lastStatusNode !== "retriever") {
+            lastStatusNode = "retriever";
+            yield {
+              type: "status",
+              status: NODE_STATUS_LABELS["retriever"]!,
+            };
+          }
+        }
 
         // When quality check fails after synthesizer has streamed tokens,
         // emit answer-reset so the frontend knows to clear the old answer

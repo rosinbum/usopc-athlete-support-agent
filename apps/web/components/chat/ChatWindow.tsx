@@ -9,6 +9,7 @@ interface ChatWindowProps {
   messages: Message[];
   input: string;
   isLoading: boolean;
+  statusText?: string | undefined;
   onInputChange: (
     e: ChangeEvent<HTMLInputElement> | ChangeEvent<HTMLTextAreaElement>,
   ) => void;
@@ -19,6 +20,7 @@ export function ChatWindow({
   messages,
   input,
   isLoading,
+  statusText,
   onInputChange,
   onSubmit,
 }: ChatWindowProps) {
@@ -45,7 +47,7 @@ export function ChatWindow({
         ))}
         {isLoading && (
           <div className="flex items-center gap-2 text-gray-400">
-            <div className="animate-pulse">Thinking...</div>
+            <div className="animate-pulse">{statusText ?? "Thinking..."}</div>
           </div>
         )}
         <div ref={messagesEndRef} />

@@ -517,6 +517,134 @@ describe("agentStreamToEvents (dual-mode)", () => {
     expect(types).not.toContain("answer-reset");
   });
 
+  // ---------------------------------------------------------------------------
+  // Status event tests
+  // ---------------------------------------------------------------------------
+
+  it("emits status event when first messages chunk arrives from classifier", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        [
+          "messages",
+          [
+            { content: '{"topicDomain":"safesport"}' },
+            { langgraph_node: "classifier" },
+          ],
+        ],
+      ]),
+    );
+
+    const statusEvents = events.filter((e) => e.type === "status");
+    expect(statusEvents).toHaveLength(1);
+    expect(statusEvents[0]!.status).toBe("Understanding your question...");
+  });
+
+  it("emits new status when node changes (classifier → synthesizer)", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        [
+          "messages",
+          [
+            { content: '{"topicDomain":"safesport"}' },
+            { langgraph_node: "classifier" },
+          ],
+        ],
+        [
+          "messages",
+          [{ content: "Answer" }, { langgraph_node: "synthesizer" }],
+        ],
+      ]),
+    );
+
+    const statusEvents = events.filter((e) => e.type === "status");
+    expect(statusEvents).toHaveLength(2);
+    expect(statusEvents[0]!.status).toBe("Understanding your question...");
+    expect(statusEvents[1]!.status).toBe("Preparing your answer...");
+  });
+
+  it("does not emit duplicate status for same node", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        ["messages", [{ content: "chunk1" }, { langgraph_node: "classifier" }]],
+        ["messages", [{ content: "chunk2" }, { langgraph_node: "classifier" }]],
+      ]),
+    );
+
+    const statusEvents = events.filter((e) => e.type === "status");
+    expect(statusEvents).toHaveLength(1);
+  });
+
+  it("does not emit status for nodes without labels (emotionalSupport)", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        [
+          "messages",
+          [{ content: "support" }, { langgraph_node: "emotionalSupport" }],
+        ],
+      ]),
+    );
+
+    const statusEvents = events.filter((e) => e.type === "status");
+    expect(statusEvents).toHaveLength(0);
+  });
+
+  it("does not emit status for nodes without labels (citationBuilder)", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        [
+          "messages",
+          [{ content: "cite" }, { langgraph_node: "citationBuilder" }],
+        ],
+      ]),
+    );
+
+    const statusEvents = events.filter((e) => e.type === "status");
+    expect(statusEvents).toHaveLength(0);
+  });
+
+  it("emits retriever status from values mode when retrievedDocuments first appears", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        ["messages", [{ content: "{}" }, { langgraph_node: "classifier" }]],
+        [
+          "values",
+          {
+            retrievedDocuments: [
+              { content: "doc content", metadata: {}, score: 0.9 },
+            ],
+          },
+        ],
+      ]),
+    );
+
+    const statusEvents = events.filter((e) => e.type === "status");
+    expect(statusEvents).toHaveLength(2);
+    expect(statusEvents[0]!.status).toBe("Understanding your question...");
+    expect(statusEvents[1]!.status).toBe("Searching governance documents...");
+  });
+
+  it("does not emit status after synthesizer tokens have started", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        // Synthesizer starts streaming
+        [
+          "messages",
+          [{ content: "Answer" }, { langgraph_node: "synthesizer" }],
+        ],
+        // Quality checker runs (should NOT emit status since text-delta is flowing)
+        [
+          "messages",
+          [{ content: "check" }, { langgraph_node: "qualityChecker" }],
+        ],
+      ]),
+    );
+
+    const statusEvents = events.filter((e) => e.type === "status");
+    // Only the initial synthesizer status should appear
+    expect(statusEvents).toHaveLength(1);
+    expect(statusEvents[0]!.status).toBe("Preparing your answer...");
+  });
+
   it("emits text deltas before error event when stream partially succeeds", async () => {
     async function* partialStream(): AsyncGenerator<StreamChunk> {
       yield [

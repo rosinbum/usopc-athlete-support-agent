@@ -162,6 +162,12 @@ export async function POST(req: Request) {
                 { type: "citations", citations: event.citations },
               ] as unknown as JSONValue[]),
             );
+          } else if (event.type === "status" && event.status) {
+            writer.write(
+              formatDataStreamPart("data", [
+                { type: "status", status: event.status },
+              ]),
+            );
           } else if (event.type === "discovered-urls" && event.discoveredUrls) {
             // Captured server-side only for fire-and-forget persistence.
             // Not forwarded to the client — no UX signal for discovery.

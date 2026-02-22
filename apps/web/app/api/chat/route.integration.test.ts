@@ -416,7 +416,45 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
   });
 
   // -------------------------------------------------------------------
-  // 9. No discovered URLs
+  // 9. Status events
+  // -------------------------------------------------------------------
+  describe("status events", () => {
+    it("emits SSE data part for status events with correct wire format", async () => {
+      const chunks: StreamChunk[] = [
+        [
+          "messages",
+          [
+            { content: '{"topicDomain":"safesport"}' },
+            { langgraph_node: "classifier" },
+          ],
+        ],
+        [
+          "messages",
+          [{ content: "Answer" }, { langgraph_node: "synthesizer" }],
+        ],
+      ];
+      mockRunnerStream.mockReturnValue(fakeStream(chunks));
+
+      const { POST } = await importRoute();
+      await POST(makePOSTRequest(simpleBody));
+      await waitForStream();
+
+      // Wire format: 2:[{"type":"status","status":"..."}]\n
+      const statusWrites = capturedWrites.filter(
+        (w) => w.startsWith("2:") && w.includes('"status"'),
+      );
+      expect(statusWrites.length).toBeGreaterThanOrEqual(1);
+
+      // First status should be classifier
+      const firstStatus = JSON.parse(statusWrites[0]!.slice(2).trimEnd());
+      expect(firstStatus).toEqual([
+        { type: "status", status: "Understanding your question..." },
+      ]);
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // 10. No discovered URLs
   // -------------------------------------------------------------------
   describe("no discovered URLs", () => {
     it("does not call publishDiscoveredUrls for empty stream", async () => {
