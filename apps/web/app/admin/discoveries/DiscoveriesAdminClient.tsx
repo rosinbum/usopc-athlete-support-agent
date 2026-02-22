@@ -14,7 +14,7 @@ import type { DiscoveryStatus } from "@usopc/shared";
 import { SlidePanel } from "../components/SlidePanel.js";
 import { SortIcon } from "../components/SortIcon.js";
 import { Pagination } from "../components/Pagination.js";
-import { formatDate } from "../components/formatDate.js";
+import { formatDate } from "../../../lib/format-date.js";
 import { DiscoveryDetailPanel } from "./components/DiscoveryDetailPanel.js";
 import {
   useDiscoveries,

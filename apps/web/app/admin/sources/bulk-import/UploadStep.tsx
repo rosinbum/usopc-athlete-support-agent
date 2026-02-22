@@ -8,10 +8,7 @@ import {
   DOCUMENT_TYPES,
   AUTHORITY_LEVELS,
 } from "../../../../lib/source-constants.js";
-
-function formatLabel(value: string): string {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
+import { snakeToLabel } from "../../../../lib/format-label.js";
 
 interface UploadStepProps {
   onFileSelected: (csvText: string) => void;
@@ -146,15 +143,15 @@ export function UploadStep({ onFileSelected }: UploadStepProps) {
             <ul className="space-y-1 text-xs">
               <li>
                 <span className="font-medium">documentType:</span>{" "}
-                {DOCUMENT_TYPES.map(formatLabel).join(", ")}
+                {DOCUMENT_TYPES.map(snakeToLabel).join(", ")}
               </li>
               <li>
                 <span className="font-medium">topicDomains:</span>{" "}
-                {TOPIC_DOMAINS.map(formatLabel).join(", ")}
+                {TOPIC_DOMAINS.map(snakeToLabel).join(", ")}
               </li>
               <li>
                 <span className="font-medium">authorityLevel:</span>{" "}
-                {AUTHORITY_LEVELS.map(formatLabel).join(", ")}
+                {AUTHORITY_LEVELS.map(snakeToLabel).join(", ")}
               </li>
             </ul>
           </div>

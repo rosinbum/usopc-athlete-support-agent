@@ -2,19 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { SourceConfig } from "@usopc/shared";
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "Never";
-  try {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return dateString;
-  }
-}
+import { formatDate } from "../../lib/format-date.js";
 
 export function AdminDashboardStats() {
   const [sources, setSources] = useState<SourceConfig[] | null>(null);

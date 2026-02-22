@@ -7,6 +7,7 @@ import {
   AUTHORITY_LEVELS,
   DOCUMENT_TYPES,
 } from "../../../../lib/source-constants.js";
+import { snakeToLabel } from "../../../../lib/format-label.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,10 +49,6 @@ function toSlug(text: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-}
-
-function formatLabel(value: string): string {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 // ---------------------------------------------------------------------------
@@ -331,7 +328,7 @@ export function SourceForm({
             >
               {DOCUMENT_TYPES.map((dt) => (
                 <option key={dt} value={dt}>
-                  {formatLabel(dt)}
+                  {snakeToLabel(dt)}
                 </option>
               ))}
             </select>
@@ -359,7 +356,7 @@ export function SourceForm({
                   onChange={() => toggleDomain(domain)}
                   className="sr-only"
                 />
-                {formatLabel(domain)}
+                {snakeToLabel(domain)}
               </label>
             ))}
           </div>
@@ -389,7 +386,7 @@ export function SourceForm({
             >
               {AUTHORITY_LEVELS.map((level) => (
                 <option key={level} value={level}>
-                  {formatLabel(level)}
+                  {snakeToLabel(level)}
                 </option>
               ))}
             </select>
