@@ -28,4 +28,13 @@ describe("isRateLimited", () => {
     // Original IP should be limited
     expect(isRateLimited("1.2.3.4")).toBe(true);
   });
+
+  it("enforces global limit across all IPs", () => {
+    // Spread 500 requests across different IPs (each under per-IP limit)
+    for (let i = 0; i < 500; i++) {
+      isRateLimited(`10.0.${Math.floor(i / 50)}.${i % 50}`);
+    }
+    // 501st request from a fresh IP should still be blocked by global limit
+    expect(isRateLimited("192.168.1.1")).toBe(true);
+  });
 });

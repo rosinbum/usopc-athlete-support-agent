@@ -1,13 +1,13 @@
 /**
- * Simple in-memory fixed-window rate limiter.
+ * Simple in-memory fixed-window rate limiter with per-IP and global caps.
  *
- * Tracks request counts per IP within a sliding window. Each Lambda instance
- * maintains its own state, so the effective limit scales with concurrency.
- * For stronger protection, add an AWS WAF rate rule in front of the ALB/API GW.
+ * Each Lambda instance maintains its own state, so effective limits scale
+ * with concurrency. For stronger protection, add an AWS WAF rate rule.
  */
 
 const WINDOW_MS = 5 * 60 * 1000; // 5 minutes
-const MAX_REQUESTS = 100;
+const MAX_REQUESTS_PER_IP = 100;
+const MAX_REQUESTS_GLOBAL = 500;
 const CLEANUP_INTERVAL_MS = 60_000; // 1 minute
 
 interface RateLimitEntry {
@@ -16,6 +16,7 @@ interface RateLimitEntry {
 }
 
 const ipCounts = new Map<string, RateLimitEntry>();
+let globalEntry: RateLimitEntry = { count: 0, resetAt: Date.now() + WINDOW_MS };
 let lastCleanup = Date.now();
 
 /** Remove expired entries to prevent unbounded Map growth. */
@@ -30,12 +31,27 @@ function cleanup() {
   }
 }
 
+function incrementGlobal(): boolean {
+  const now = Date.now();
+  if (now >= globalEntry.resetAt) {
+    globalEntry = { count: 1, resetAt: now + WINDOW_MS };
+    return false;
+  }
+  globalEntry.count++;
+  return globalEntry.count > MAX_REQUESTS_GLOBAL;
+}
+
 /**
- * Returns `true` if the given IP has exceeded the rate limit.
- * Call once per request; increments the counter as a side effect.
+ * Returns `true` if the request should be rejected.
+ * Checks both per-IP limit (100 req/5min) and global limit (500 req/5min).
  */
 export function isRateLimited(ip: string): boolean {
   cleanup();
+
+  // Check global limit first
+  if (incrementGlobal()) return true;
+
+  // Then check per-IP limit
   const now = Date.now();
   const entry = ipCounts.get(ip);
 
@@ -45,11 +61,12 @@ export function isRateLimited(ip: string): boolean {
   }
 
   entry.count++;
-  return entry.count > MAX_REQUESTS;
+  return entry.count > MAX_REQUESTS_PER_IP;
 }
 
 /** Reset all state — test helper only. */
 export function _resetForTesting() {
   ipCounts.clear();
+  globalEntry = { count: 0, resetAt: Date.now() + WINDOW_MS };
   lastCleanup = Date.now();
 }
