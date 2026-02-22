@@ -174,17 +174,15 @@ async function handleList(url: URL) {
     [...values, limit, offset],
   );
 
+  // Strip internal fields (s3Key, ngbId, chunkCount) from unauthenticated response
   const documents = dataResult.rows.map((row) => ({
     sourceUrl: row.source_url,
     documentTitle: row.document_title,
     documentType: row.document_type,
-    ngbId: row.ngb_id,
     topicDomain: row.topic_domain,
     authorityLevel: row.authority_level,
     effectiveDate: row.effective_date,
     ingestedAt: row.ingested_at.toISOString(),
-    chunkCount: parseInt(row.chunk_count, 10),
-    s3Key: row.s3_key,
   }));
 
   return NextResponse.json({

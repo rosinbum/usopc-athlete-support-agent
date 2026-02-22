@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getResource, logger } from "@usopc/shared";
-import { auth } from "../../../../../auth.js";
+import { requireAdmin } from "../../../../../lib/admin-api.js";
 
 const log = logger.child({ service: "documents-url" });
 
@@ -11,15 +11,14 @@ const log = logger.child({ service: "documents-url" });
  *
  * Returns a presigned S3 URL for viewing an archived document.
  * The key is URL-encoded in the path parameter.
+ * Restricted to admin users — S3 keys are internal implementation details.
  */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ key: string }> },
 ) {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   try {
     const { key } = await params;

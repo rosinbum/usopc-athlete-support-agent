@@ -63,4 +63,42 @@ describe("GET /api/sources", () => {
     const countSql = mockQuery.mock.calls[0]![0] as string;
     expect(countSql).toContain("ESCAPE");
   });
+
+  it("does not expose s3Key, ngbId, or chunkCount in response", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ total: "1" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            source_url: "https://example.com/doc.pdf",
+            document_title: "Test Doc",
+            document_type: "policy",
+            ngb_id: "usa-swimming",
+            topic_domain: "governance",
+            authority_level: "usopc_governance",
+            effective_date: "2024-01-01",
+            ingested_at: new Date("2024-06-15T00:00:00Z"),
+            chunk_count: "42",
+            s3_key: "sources/test/abc123.pdf",
+          },
+        ],
+      });
+
+    const { GET } = await import("./route.js");
+    const request = new Request("http://localhost/api/sources");
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.documents).toHaveLength(1);
+
+    const doc = body.documents[0];
+    expect(doc.sourceUrl).toBe("https://example.com/doc.pdf");
+    expect(doc.documentTitle).toBe("Test Doc");
+    expect(doc.ingestedAt).toBeDefined();
+    // Internal fields must not be exposed
+    expect(doc.s3Key).toBeUndefined();
+    expect(doc.ngbId).toBeUndefined();
+    expect(doc.chunkCount).toBeUndefined();
+  });
 });
