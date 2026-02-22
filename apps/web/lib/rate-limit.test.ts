@@ -6,21 +6,21 @@ describe("isRateLimited", () => {
     _resetForTesting();
   });
 
-  it("allows requests under the limit", () => {
-    for (let i = 0; i < 100; i++) {
+  it("allows requests under the per-IP limit", () => {
+    for (let i = 0; i < 20; i++) {
       expect(isRateLimited("1.2.3.4")).toBe(false);
     }
   });
 
-  it("blocks requests over the limit", () => {
-    for (let i = 0; i < 100; i++) {
+  it("blocks requests over the per-IP limit", () => {
+    for (let i = 0; i < 20; i++) {
       isRateLimited("1.2.3.4");
     }
     expect(isRateLimited("1.2.3.4")).toBe(true);
   });
 
   it("tracks IPs independently", () => {
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 20; i++) {
       isRateLimited("1.2.3.4");
     }
     // Different IP should not be limited
@@ -30,11 +30,11 @@ describe("isRateLimited", () => {
   });
 
   it("enforces global limit across all IPs", () => {
-    // Spread 500 requests across different IPs (each under per-IP limit)
-    for (let i = 0; i < 500; i++) {
-      isRateLimited(`10.0.${Math.floor(i / 50)}.${i % 50}`);
+    // Spread 100 requests across different IPs (each under per-IP limit of 20)
+    for (let i = 0; i < 100; i++) {
+      isRateLimited(`10.0.${Math.floor(i / 10)}.${i % 10}`);
     }
-    // 501st request from a fresh IP should still be blocked by global limit
+    // 101st request from a fresh IP should still be blocked by global limit
     expect(isRateLimited("192.168.1.1")).toBe(true);
   });
 });

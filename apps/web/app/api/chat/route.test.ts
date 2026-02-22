@@ -280,8 +280,8 @@ describe("rate limiting", () => {
   it("returns 429 when rate limit exceeded", async () => {
     const { POST } = await importRoute();
 
-    // Exhaust the rate limit (100 requests)
-    for (let i = 0; i < 100; i++) {
+    // Exhaust the per-IP rate limit (20 requests)
+    for (let i = 0; i < 20; i++) {
       const req = new Request("http://localhost/api/chat", {
         method: "POST",
         body: JSON.stringify({
@@ -295,7 +295,7 @@ describe("rate limiting", () => {
       await POST(req);
     }
 
-    // 101st request should be rate limited
+    // 21st request should be rate limited
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
@@ -316,8 +316,8 @@ describe("rate limiting", () => {
   it("tracks IPs independently for rate limiting", async () => {
     const { POST } = await importRoute();
 
-    // Exhaust limit for one IP
-    for (let i = 0; i < 100; i++) {
+    // Exhaust per-IP limit for one IP
+    for (let i = 0; i < 20; i++) {
       const req = new Request("http://localhost/api/chat", {
         method: "POST",
         body: JSON.stringify({

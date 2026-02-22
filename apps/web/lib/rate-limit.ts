@@ -6,8 +6,8 @@
  */
 
 const WINDOW_MS = 5 * 60 * 1000; // 5 minutes
-const MAX_REQUESTS_PER_IP = 100;
-const MAX_REQUESTS_GLOBAL = 500;
+const MAX_REQUESTS_PER_IP = 20; // ~1 message every 15 seconds
+const MAX_REQUESTS_GLOBAL = 100;
 const CLEANUP_INTERVAL_MS = 60_000; // 1 minute
 
 interface RateLimitEntry {
@@ -43,7 +43,7 @@ function incrementGlobal(): boolean {
 
 /**
  * Returns `true` if the request should be rejected.
- * Checks both per-IP limit (100 req/5min) and global limit (500 req/5min).
+ * Checks both per-IP limit (20 req/5min) and global limit (100 req/5min).
  */
 export function isRateLimited(ip: string): boolean {
   cleanup();
