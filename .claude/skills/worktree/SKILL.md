@@ -3,7 +3,7 @@ name: worktree
 description: Smart worktree management — create, list, and clean up git worktrees with automatic gotcha handling (pnpm install, hook script copy, issue validation).
 argument-hint: <create|list|cleanup> [issue-number]
 disable-model-invocation: true
-allowed-tools: Bash(git *), Bash(pnpm install), Bash(cp *), Bash(gh issue view *), Bash(gh repo view *), Bash(ls *), Glob, Read
+allowed-tools: Bash(git *), Bash(cd *), Bash(pnpm *), Bash(cp *), Bash(gh issue view *), Bash(gh repo view *), Bash(ls *), Glob, Read
 ---
 
 # Smart Worktree Management
