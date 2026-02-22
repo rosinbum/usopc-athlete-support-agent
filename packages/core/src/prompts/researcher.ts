@@ -38,8 +38,8 @@ The current year is ${currentYear}.
 
 Generate web search queries as a JSON array of strings.
 
-1. **First query**: Answer the user's current question with relevant policy/governance terms.
-2. **Additional queries** (if the conversation references specific current events): Generate event-specific queries that include named organizations, concrete actions, and approximate timeframes (e.g., "${currentYear}").
+1. **First query**: Answer the user's current question with relevant terms. For policy/governance questions, use governance terminology. For performance questions (qualifying times, competitive benchmarks, standards), target the specific sport's published qualifying standards or recent results (e.g., "USA Swimming Olympic Trials qualifying times ${currentYear}").
+2. **Additional queries** (if the conversation references specific current events or performance data): Generate event-specific queries that include named organizations, concrete actions, and approximate timeframes (e.g., "${currentYear}").
 
 Current event indicators: named NGBs/organizations taking specific actions (removing board members, changing policies, filing grievances), references to recent news, or time-sensitive situations.
 

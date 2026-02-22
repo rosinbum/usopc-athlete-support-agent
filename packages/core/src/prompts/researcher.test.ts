@@ -61,4 +61,15 @@ describe("buildResearcherPrompt", () => {
     expect(prompt).toContain("JSON array of strings");
     expect(prompt).toContain('["query 1"]');
   });
+
+  it("includes guidance for performance and qualifying standards queries", () => {
+    const prompt = buildResearcherPrompt(
+      "What are the qualifying times for Olympic swimming?",
+      "some context",
+      "team_selection",
+    );
+
+    expect(prompt).toContain("qualifying times");
+    expect(prompt).toContain("qualifying standards");
+  });
 });

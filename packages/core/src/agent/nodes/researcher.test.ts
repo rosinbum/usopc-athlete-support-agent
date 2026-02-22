@@ -241,6 +241,8 @@ describe("createResearcherNode", () => {
       { domain: "eligibility", keyword: "eligibility" },
       { domain: "governance", keyword: "governance" },
       { domain: "athlete_rights", keyword: "athlete rights" },
+      { domain: "athlete_safety", keyword: "athlete safety" },
+      { domain: "financial_assistance", keyword: "financial assistance" },
     ];
 
     for (const { domain, keyword } of domains) {
@@ -253,6 +255,17 @@ describe("createResearcherNode", () => {
         .calls[0]![0] as { query: string };
       expect(invokeArg.query.toLowerCase()).toContain(keyword.toLowerCase());
     }
+  });
+
+  it("includes qualifying standards in team_selection domain label", async () => {
+    const tavily = makeMockTavily("result");
+    const node = createResearcherNode(tavily, mockModel);
+    const state = makeState({ topicDomain: "team_selection" });
+
+    await node(state);
+    const invokeArg = (tavily.invoke as ReturnType<typeof vi.fn>).mock
+      .calls[0]![0] as { query: string };
+    expect(invokeArg.query).toContain("qualifying standards");
   });
 });
 
