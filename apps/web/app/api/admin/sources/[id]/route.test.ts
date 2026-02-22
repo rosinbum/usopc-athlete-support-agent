@@ -94,6 +94,21 @@ describe("GET /api/admin/sources/[id]", () => {
     expect(res.status).toBe(401);
   });
 
+  it("returns 403 for non-admin authenticated user", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "user@example.com" },
+    } as never);
+
+    const res = await GET(
+      new Request("http://localhost/api/admin/sources/test"),
+      { params: Promise.resolve({ id: "test" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+  });
+
   it("returns 404 for missing source", async () => {
     authedAdmin();
     mockCreateEntity.mockReturnValueOnce({
@@ -150,6 +165,24 @@ describe("PATCH /api/admin/sources/[id]", () => {
     );
 
     expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for non-admin authenticated user", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "user@example.com" },
+    } as never);
+
+    const res = await PATCH(
+      new Request("http://localhost/api/admin/sources/test", {
+        method: "PATCH",
+        body: JSON.stringify({ enabled: false }),
+      }),
+      { params: Promise.resolve({ id: "test" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
   });
 
   it("rejects unknown fields", async () => {
@@ -367,6 +400,23 @@ describe("DELETE /api/admin/sources/[id]", () => {
     );
 
     expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for non-admin authenticated user", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "user@example.com" },
+    } as never);
+
+    const res = await DELETE(
+      new Request("http://localhost/api/admin/sources/test", {
+        method: "DELETE",
+      }),
+      { params: Promise.resolve({ id: "test" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
   });
 
   it("returns 404 for missing source", async () => {

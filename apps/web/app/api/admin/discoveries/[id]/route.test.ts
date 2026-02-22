@@ -78,6 +78,18 @@ describe("GET /api/admin/discoveries/[id]", () => {
     expect(body.error).toBe("Unauthorized");
   });
 
+  it("returns 403 for non-admin authenticated user", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "user@example.com" },
+    } as never);
+
+    const res = await GET(new Request("http://localhost"), makeParams("d1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+  });
+
   it("returns discovery detail", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },
@@ -135,6 +147,21 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
 
     expect(res.status).toBe(401);
     expect(body.error).toBe("Unauthorized");
+  });
+
+  it("returns 403 for non-admin authenticated user", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "user@example.com" },
+    } as never);
+
+    const res = await PATCH(
+      jsonRequest({ action: "approve" }),
+      makeParams("d1"),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
   });
 
   it("approves a discovery", async () => {

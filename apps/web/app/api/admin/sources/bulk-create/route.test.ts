@@ -66,6 +66,18 @@ describe("POST /api/admin/sources/bulk-create", () => {
     expect(body.error).toBe("Unauthorized");
   });
 
+  it("returns 403 for non-admin authenticated user", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "user@example.com" },
+    } as never);
+
+    const res = await POST(jsonRequest({ sources: [VALID_SOURCE] }) as never);
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+  });
+
   it("returns 400 when sources array is empty", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },

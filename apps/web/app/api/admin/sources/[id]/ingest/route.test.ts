@@ -66,6 +66,23 @@ describe("POST /api/admin/sources/[id]/ingest", () => {
     expect(res.status).toBe(401);
   });
 
+  it("returns 403 for non-admin authenticated user", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "user@example.com" },
+    } as never);
+
+    const res = await POST(
+      new Request("http://localhost/api/admin/sources/test/ingest", {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ id: "test" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+  });
+
   it("returns 404 when source not found", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },
