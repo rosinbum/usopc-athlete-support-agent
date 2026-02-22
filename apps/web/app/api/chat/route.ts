@@ -5,6 +5,7 @@ import {
 } from "ai";
 import { getResource, logger } from "@usopc/shared";
 import { z } from "zod";
+import { isRateLimited } from "../../../lib/rate-limit.js";
 
 const log = logger.child({ service: "chat-route" });
 
@@ -98,6 +99,13 @@ async function getRunner() {
 }
 
 export async function POST(req: Request) {
+  // Rate limit by client IP (per Lambda instance — add AWS WAF for cross-instance limiting)
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (isRateLimited(ip)) {
+    return Response.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     log.info("POST /api/chat called");
     const body = await req.json();

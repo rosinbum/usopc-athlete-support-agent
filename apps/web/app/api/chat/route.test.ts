@@ -269,6 +269,85 @@ describe("input validation", () => {
   });
 });
 
+describe("rate limiting", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    shouldFailInit = false;
+    initCallCount = 0;
+    vi.resetModules();
+  });
+
+  it("returns 429 when rate limit exceeded", async () => {
+    const { POST } = await importRoute();
+
+    // Exhaust the per-IP rate limit (20 requests)
+    for (let i = 0; i < 20; i++) {
+      const req = new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Hello" }],
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "1.2.3.4",
+        },
+      });
+      await POST(req);
+    }
+
+    // 21st request should be rate limited
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "Hello" }],
+      }),
+      headers: {
+        "Content-Type": "application/json",
+        "x-forwarded-for": "1.2.3.4",
+      },
+    });
+    const response = await POST(req);
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(body.error).toBe("Too many requests");
+  });
+
+  it("tracks IPs independently for rate limiting", async () => {
+    const { POST } = await importRoute();
+
+    // Exhaust per-IP limit for one IP
+    for (let i = 0; i < 20; i++) {
+      const req = new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Hello" }],
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "1.2.3.4",
+        },
+      });
+      await POST(req);
+    }
+
+    // Different IP should still work
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "Hello" }],
+      }),
+      headers: {
+        "Content-Type": "application/json",
+        "x-forwarded-for": "5.6.7.8",
+      },
+    });
+    const response = await POST(req);
+
+    expect(response.status).toBe(200);
+  });
+});
+
 describe("concurrent runner initialization", () => {
   beforeEach(async () => {
     vi.clearAllMocks();

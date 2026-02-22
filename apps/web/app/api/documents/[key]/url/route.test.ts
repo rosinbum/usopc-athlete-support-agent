@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../../../../../auth.js", () => ({
   auth: vi.fn(),
 }));
+vi.mock("../../../../../lib/auth-env.js", () => ({
+  getAdminEmails: vi.fn(() => ["admin@test.com"]),
+}));
 
 vi.mock("sst", () => ({
   Resource: {
@@ -25,8 +28,7 @@ vi.mock("@aws-sdk/client-s3", () => ({
 import { GET } from "./route.js";
 import { auth } from "../../../../../auth.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockAuth = vi.mocked(auth) as any;
+const mockAuth = vi.mocked(auth);
 
 function makeRequest(key: string): Request {
   return new Request(
@@ -38,16 +40,16 @@ describe("GET /api/documents/[key]/url", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({
-      user: { email: "test@example.com" },
+      user: { email: "admin@test.com" },
       expires: "",
-    });
+    } as never);
     mockGetSignedUrl.mockResolvedValue(
       "https://s3.amazonaws.com/presigned-url",
     );
   });
 
   it("returns 401 when not authenticated", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuth.mockResolvedValue(null as never);
 
     const params = Promise.resolve({
       key: encodeURIComponent("sources/src-1/abc123.pdf"),
@@ -59,6 +61,25 @@ describe("GET /api/documents/[key]/url", () => {
 
     expect(response.status).toBe(401);
     expect(body.error).toBe("Unauthorized");
+    expect(mockGetSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for non-admin authenticated user", async () => {
+    mockAuth.mockResolvedValue({
+      user: { email: "user@example.com" },
+      expires: "",
+    } as never);
+
+    const params = Promise.resolve({
+      key: encodeURIComponent("sources/src-1/abc123.pdf"),
+    });
+    const response = await GET(makeRequest("sources/src-1/abc123.pdf"), {
+      params,
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
     expect(mockGetSignedUrl).not.toHaveBeenCalled();
   });
 
