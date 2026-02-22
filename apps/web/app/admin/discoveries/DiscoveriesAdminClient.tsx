@@ -247,6 +247,13 @@ export function DiscoveriesAdminClient() {
     page * ITEMS_PER_PAGE,
   );
 
+  const detailNav = useMemo(() => {
+    const idx = openDiscoveryId
+      ? sorted.findIndex((d) => d.id === openDiscoveryId)
+      : -1;
+    return { idx, hasPrev: idx > 0, hasNext: idx < sorted.length - 1 };
+  }, [sorted, openDiscoveryId]);
+
   // -------------------------------------------------------------------------
   // Selection
   // -------------------------------------------------------------------------
@@ -740,19 +747,15 @@ export function DiscoveriesAdminClient() {
             id={openDiscoveryId}
             onClose={() => setOpenDiscoveryId(null)}
             onMutate={() => mutate()}
-            hasPrev={sorted.findIndex((d) => d.id === openDiscoveryId) > 0}
-            hasNext={
-              sorted.findIndex((d) => d.id === openDiscoveryId) <
-              sorted.length - 1
-            }
+            hasPrev={detailNav.hasPrev}
+            hasNext={detailNav.hasNext}
             onPrev={() => {
-              const idx = sorted.findIndex((d) => d.id === openDiscoveryId);
-              if (idx > 0) setOpenDiscoveryId(sorted[idx - 1]!.id);
+              if (detailNav.idx > 0)
+                setOpenDiscoveryId(sorted[detailNav.idx - 1]!.id);
             }}
             onNext={() => {
-              const idx = sorted.findIndex((d) => d.id === openDiscoveryId);
-              if (idx < sorted.length - 1)
-                setOpenDiscoveryId(sorted[idx + 1]!.id);
+              if (detailNav.idx < sorted.length - 1)
+                setOpenDiscoveryId(sorted[detailNav.idx + 1]!.id);
             }}
           />
         )}

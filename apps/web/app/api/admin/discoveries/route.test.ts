@@ -72,7 +72,7 @@ describe("GET /api/admin/discoveries", () => {
     expect(body.error).toBe("Forbidden");
   });
 
-  it("returns all discoveries when no status filter", async () => {
+  it("returns all discoveries with hasMore false", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },
     } as never);
@@ -85,6 +85,22 @@ describe("GET /api/admin/discoveries", () => {
 
     expect(res.status).toBe(200);
     expect(body.discoveries).toHaveLength(2);
+    expect(body.hasMore).toBe(false);
+  });
+
+  it("passes limit to entity getAll", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+    const mockGetAll = vi.fn().mockResolvedValueOnce(SAMPLE_DISCOVERIES);
+    mockCreateEntity.mockReturnValueOnce({
+      getAll: mockGetAll,
+    } as never);
+
+    await GET(buildRequest());
+
+    // Default limit=1000, so fetches 1001
+    expect(mockGetAll).toHaveBeenCalledWith({ limit: 1001 });
   });
 
   it("returns filtered discoveries by status", async () => {
@@ -92,8 +108,9 @@ describe("GET /api/admin/discoveries", () => {
       user: { email: "admin@test.com" },
     } as never);
     const pending = [SAMPLE_DISCOVERIES[0]];
+    const mockGetByStatus = vi.fn().mockResolvedValueOnce(pending);
     mockCreateEntity.mockReturnValueOnce({
-      getByStatus: vi.fn().mockResolvedValueOnce(pending),
+      getByStatus: mockGetByStatus,
     } as never);
 
     const res = await GET(buildRequest({ status: "pending_content" }));
@@ -102,6 +119,46 @@ describe("GET /api/admin/discoveries", () => {
     expect(res.status).toBe(200);
     expect(body.discoveries).toHaveLength(1);
     expect(body.discoveries[0].id).toBe("d1");
+    expect(mockGetByStatus).toHaveBeenCalledWith("pending_content", {
+      limit: 1001,
+    });
+  });
+
+  it("returns hasMore true when dataset exceeds limit", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+    const manyDiscoveries = Array.from({ length: 3 }, (_, i) => ({
+      id: `d${i}`,
+      title: `Discovery ${i}`,
+      status: "approved",
+    }));
+    mockCreateEntity.mockReturnValueOnce({
+      getAll: vi.fn().mockResolvedValueOnce(manyDiscoveries),
+    } as never);
+
+    const res = await GET(buildRequest({ limit: "2" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.discoveries).toHaveLength(2);
+    expect(body.hasMore).toBe(true);
+  });
+
+  it("respects custom limit query param", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getAll: vi.fn().mockResolvedValueOnce(SAMPLE_DISCOVERIES),
+    } as never);
+
+    const res = await GET(buildRequest({ limit: "1" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.discoveries).toHaveLength(1);
+    expect(body.hasMore).toBe(true);
   });
 
   it("returns 400 for invalid status", async () => {

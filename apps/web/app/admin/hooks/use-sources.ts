@@ -9,6 +9,7 @@ import { fetcher, mutationFetcher } from "./fetcher.js";
 
 interface SourcesResponse {
   sources: SourceConfig[];
+  hasMore?: boolean;
 }
 
 export function useSources() {
@@ -19,6 +20,7 @@ export function useSources() {
 
   return {
     sources: data?.sources ?? [],
+    hasMore: data?.hasMore ?? false,
     isLoading,
     error,
     mutate,
