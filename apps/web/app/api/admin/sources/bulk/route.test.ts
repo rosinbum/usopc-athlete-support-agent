@@ -83,6 +83,18 @@ describe("POST /api/admin/sources/bulk", () => {
     expect(res.status).toBe(401);
   });
 
+  it("returns 403 for non-admin authenticated user", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "user@example.com" },
+    } as never);
+
+    const res = await POST(makeRequest({ action: "enable", ids: ["src1"] }));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+  });
+
   it("returns 400 when action is missing", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },

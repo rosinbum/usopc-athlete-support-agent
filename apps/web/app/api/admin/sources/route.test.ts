@@ -71,6 +71,18 @@ describe("GET /api/admin/sources", () => {
     expect(body.error).toBe("Unauthorized");
   });
 
+  it("returns 403 for non-admin authenticated user", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "user@example.com" },
+    } as never);
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+  });
+
   it("returns sources list", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },
@@ -120,6 +132,18 @@ describe("POST /api/admin/sources", () => {
 
     expect(res.status).toBe(401);
     expect(body.error).toBe("Unauthorized");
+  });
+
+  it("returns 403 for non-admin authenticated user", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "user@example.com" },
+    } as never);
+
+    const res = await POST(jsonRequest(VALID_CREATE_BODY) as never);
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
   });
 
   it("returns 400 when required fields are missing", async () => {
