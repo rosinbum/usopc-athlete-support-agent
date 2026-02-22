@@ -46,13 +46,15 @@ function buildSearchQuery(state: AgentState, userMessage: string): string {
   // Add domain context
   if (state.topicDomain) {
     const domainLabels: Record<string, string> = {
-      team_selection: "USOPC team selection procedures",
+      team_selection: "USOPC team selection qualifying standards procedures",
       dispute_resolution: "USOPC athlete dispute resolution arbitration",
       safesport: "SafeSport policy reporting",
       anti_doping: "USADA anti-doping testing",
       eligibility: "athlete eligibility requirements",
       governance: "USOPC NGB governance",
       athlete_rights: "athlete rights representation USOPC",
+      athlete_safety: "athlete safety wellness protections",
+      financial_assistance: "athlete financial assistance grants funding",
     };
     const label = domainLabels[state.topicDomain];
     if (label) {

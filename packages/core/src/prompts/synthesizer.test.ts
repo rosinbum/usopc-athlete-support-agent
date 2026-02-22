@@ -105,6 +105,8 @@ describe("buildSynthesizerPrompt", () => {
       "Never fabricate",
       "Use clear, accessible language",
       "Include contact details with referrals",
+      "web search results",
+      "publicly available",
     ];
 
     for (const instruction of baseInstructions) {
@@ -131,6 +133,16 @@ describe("buildSynthesizerPrompt", () => {
     const prompt = buildSynthesizerPrompt(context, userQuestion, "general");
 
     expect(prompt).toContain("who to contact");
+  });
+
+  it("includes performance data instruction in all prompt variants", () => {
+    const intents = ["factual", "procedural", "deadline", "general"] as const;
+
+    for (const intent of intents) {
+      const prompt = buildSynthesizerPrompt(context, userQuestion, intent);
+      expect(prompt).toContain("qualifying times");
+      expect(prompt).toContain("coach-style tone");
+    }
   });
 
   it("includes the system role description in all prompts", () => {
