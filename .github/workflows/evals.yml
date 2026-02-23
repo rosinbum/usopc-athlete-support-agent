@@ -3,16 +3,13 @@ name: Evaluations
 on:
   pull_request:
     branches: [main]
-    paths:
-      - "packages/core/src/agent/**"
-      - "packages/core/src/prompts/**"
-      - "packages/core/src/rag/**"
-      - "packages/evals/**"
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
   deterministic-evals:
     name: Deterministic Evaluations
     runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'run-evals')
     env:
       LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
       LANGSMITH_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
