@@ -30,7 +30,7 @@ vi.mock("../db/client.js", () => ({
 }));
 
 vi.mock("@usopc/core", () => ({
-  getAnthropicCircuitMetrics: vi.fn(() => closedMetrics),
+  getLlmCircuitMetrics: vi.fn(() => closedMetrics),
   getEmbeddingsCircuitMetrics: vi.fn(() => closedMetrics),
   getTavilyCircuitMetrics: vi.fn(() => closedMetrics),
   getVectorStoreReadCircuitMetrics: vi.fn(() => closedMetrics),
@@ -39,10 +39,7 @@ vi.mock("@usopc/core", () => ({
 
 import { healthRouter } from "./health.js";
 import { createContext } from "../trpc.js";
-import {
-  getAnthropicCircuitMetrics,
-  getTavilyCircuitMetrics,
-} from "@usopc/core";
+import { getLlmCircuitMetrics, getTavilyCircuitMetrics } from "@usopc/core";
 
 const createCaller = () => {
   const ctx = createContext();
@@ -66,20 +63,20 @@ describe("healthRouter", () => {
       idleConnections: 2,
       waitingRequests: 0,
     });
-    expect(result.circuits.anthropic.state).toBe("closed");
+    expect(result.circuits.llm.state).toBe("closed");
   });
 
   it("returns degraded when any circuit is open", async () => {
-    vi.mocked(getAnthropicCircuitMetrics).mockReturnValueOnce(openMetrics);
+    vi.mocked(getLlmCircuitMetrics).mockReturnValueOnce(openMetrics);
 
     const caller = createCaller();
     const result = await caller.check();
 
     expect(result.status).toBe("degraded");
-    expect(result.circuits.anthropic.state).toBe("open");
+    expect(result.circuits.llm.state).toBe("open");
   });
 
-  it("returns degraded when a non-anthropic circuit is open", async () => {
+  it("returns degraded when a non-llm circuit is open", async () => {
     vi.mocked(getTavilyCircuitMetrics).mockReturnValueOnce(openMetrics);
 
     const caller = createCaller();

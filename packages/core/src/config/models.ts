@@ -5,15 +5,18 @@ export const MODEL_CONFIG = {
     model: "claude-sonnet-4-20250514",
     temperature: 0.1,
     maxTokens: 4096,
+    provider: "anthropic" as const,
   },
   classifier: {
     model: "claude-haiku-4-5-20251001",
     temperature: 0,
     maxTokens: 1024,
+    provider: "anthropic" as const,
   },
   embeddings: {
     model: "text-embedding-3-small",
     dimensions: 1536,
+    provider: "openai" as const,
   },
 } as const;
 
@@ -56,17 +59,20 @@ export async function getModelConfig(): Promise<ModelConfig> {
         model: agent?.model ?? MODEL_CONFIG.agent.model,
         temperature: agent?.temperature ?? MODEL_CONFIG.agent.temperature,
         maxTokens: agent?.maxTokens ?? MODEL_CONFIG.agent.maxTokens,
+        provider: agent?.provider ?? MODEL_CONFIG.agent.provider,
       },
       classifier: {
         model: classifier?.model ?? MODEL_CONFIG.classifier.model,
         temperature:
           classifier?.temperature ?? MODEL_CONFIG.classifier.temperature,
         maxTokens: classifier?.maxTokens ?? MODEL_CONFIG.classifier.maxTokens,
+        provider: classifier?.provider ?? MODEL_CONFIG.classifier.provider,
       },
       embeddings: {
         model: embeddings?.model ?? MODEL_CONFIG.embeddings.model,
         dimensions:
           embeddings?.dimensions ?? MODEL_CONFIG.embeddings.dimensions,
+        provider: embeddings?.provider ?? MODEL_CONFIG.embeddings.provider,
       },
     } as unknown as ModelConfig;
 

@@ -15,21 +15,21 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-vi.mock("../../services/anthropicService.js", () => ({
-  invokeAnthropic: vi.fn(),
+vi.mock("../../services/llmService.js", () => ({
+  invokeLlm: vi.fn(),
   extractTextFromResponse: vi.fn(),
 }));
 
 import { createResearcherNode, type TavilySearchLike } from "./researcher.js";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { AgentState } from "../state.js";
 import {
-  invokeAnthropic,
+  invokeLlm,
   extractTextFromResponse,
-} from "../../services/anthropicService.js";
+} from "../../services/llmService.js";
 
-const mockInvokeAnthropic = vi.mocked(invokeAnthropic);
+const mockInvokeLlm = vi.mocked(invokeLlm);
 const mockExtractText = vi.mocked(extractTextFromResponse);
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ function makeMockTavily(result: unknown = ""): TavilySearchLike {
   return { invoke: vi.fn().mockResolvedValue(result) };
 }
 
-const mockModel = {} as ChatAnthropic;
+const mockModel = {} as BaseChatModel;
 
 // ---------------------------------------------------------------------------
 // Tests — existing behavior (single message, no conversation context)
@@ -306,7 +306,7 @@ describe("createResearcherNode — context-aware queries", () => {
 
     // Mock LLM to return context-aware queries
     const mockResponse = new AIMessage("mock");
-    mockInvokeAnthropic.mockResolvedValue(mockResponse);
+    mockInvokeLlm.mockResolvedValue(mockResponse);
     mockExtractText.mockReturnValue(
       '["USA Judo board athlete representative replacement deadline", "USA Judo removes AC alternate representative 2026"]',
     );
@@ -314,7 +314,7 @@ describe("createResearcherNode — context-aware queries", () => {
     const result = await node(state);
 
     // LLM should have been called
-    expect(mockInvokeAnthropic).toHaveBeenCalledOnce();
+    expect(mockInvokeLlm).toHaveBeenCalledOnce();
 
     // Should have made 2 Tavily calls (one per query)
     expect(tavily.invoke).toHaveBeenCalledTimes(2);
@@ -330,7 +330,7 @@ describe("createResearcherNode — context-aware queries", () => {
     await node(state);
 
     // No LLM call — single message means no conversation context
-    expect(mockInvokeAnthropic).not.toHaveBeenCalled();
+    expect(mockInvokeLlm).not.toHaveBeenCalled();
 
     // Still makes one Tavily call with the simple query
     expect(tavily.invoke).toHaveBeenCalledOnce();
@@ -385,7 +385,7 @@ describe("createResearcherNode — context-aware queries", () => {
       topicDomain: "governance",
     });
 
-    mockInvokeAnthropic.mockResolvedValue(new AIMessage("mock"));
+    mockInvokeLlm.mockResolvedValue(new AIMessage("mock"));
     mockExtractText.mockReturnValue('["query 1", "query 2"]');
 
     const result = await node(state);
@@ -433,7 +433,7 @@ describe("createResearcherNode — context-aware queries", () => {
       ],
     });
 
-    mockInvokeAnthropic.mockResolvedValue(new AIMessage("mock"));
+    mockInvokeLlm.mockResolvedValue(new AIMessage("mock"));
     mockExtractText.mockReturnValue('["query 1", "query 2"]');
 
     const result = await node(state);
@@ -457,7 +457,7 @@ describe("createResearcherNode — context-aware queries", () => {
     });
 
     // LLM throws an error
-    mockInvokeAnthropic.mockRejectedValue(new Error("LLM timeout"));
+    mockInvokeLlm.mockRejectedValue(new Error("LLM timeout"));
 
     const result = await node(state);
 
@@ -479,7 +479,7 @@ describe("createResearcherNode — context-aware queries", () => {
       topicDomain: "governance",
     });
 
-    mockInvokeAnthropic.mockResolvedValue(new AIMessage("mock"));
+    mockInvokeLlm.mockResolvedValue(new AIMessage("mock"));
     mockExtractText.mockReturnValue("This is not valid JSON at all");
 
     const result = await node(state);
@@ -522,7 +522,7 @@ describe("createResearcherNode — context-aware queries", () => {
       topicDomain: "governance",
     });
 
-    mockInvokeAnthropic.mockResolvedValue(new AIMessage("mock"));
+    mockInvokeLlm.mockResolvedValue(new AIMessage("mock"));
     mockExtractText.mockReturnValue('["query 1", "query 2"]');
 
     const result = await node(state);
@@ -557,7 +557,7 @@ describe("createResearcherNode — context-aware queries", () => {
       ],
     });
 
-    mockInvokeAnthropic.mockResolvedValue(new AIMessage("mock"));
+    mockInvokeLlm.mockResolvedValue(new AIMessage("mock"));
     // LLM wraps response in markdown code fences (common behavior)
     mockExtractText.mockReturnValue('```json\n["fenced query"]\n```');
 

@@ -1,4 +1,4 @@
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { AIMessage, BaseMessage } from "@langchain/core/messages";
 import {
   CircuitBreaker,
@@ -7,21 +7,21 @@ import {
   type CircuitBreakerMetrics,
 } from "@usopc/shared";
 
-const log = logger.child({ service: "anthropic-circuit" });
+const log = logger.child({ service: "llm-circuit" });
 
 /** Delay between retry attempts (ms). */
 const RETRY_DELAY_MS = 1_000;
 
 /**
- * Circuit breaker for Anthropic LLM calls.
+ * Circuit breaker for LLM calls.
  *
  * Configuration:
  * - failureThreshold: 3 (opens after 3 consecutive failures)
  * - resetTimeout: 60s (longer because LLM calls are critical)
  * - requestTimeout: 30s (LLM calls can be slow)
  */
-const anthropicCircuit = new CircuitBreaker({
-  name: "anthropic",
+const llmCircuit = new CircuitBreaker({
+  name: "llm",
   failureThreshold: 3,
   resetTimeout: 60_000,
   requestTimeout: 30_000,
@@ -113,51 +113,58 @@ export function extractTextFromResponse(response: AIMessage): string {
 }
 
 /**
- * Invokes an Anthropic model through the circuit breaker with a single
- * retry for transient errors. The retry happens *inside* the circuit
- * breaker so the breaker only sees the final outcome.
+ * Invokes an LLM through the circuit breaker with a single retry for
+ * transient errors. The retry happens *inside* the circuit breaker so the
+ * breaker only sees the final outcome.
  *
  * @throws {CircuitBreakerError} When the circuit is open
  * @throws The underlying error if the model invocation fails
  */
-export async function invokeAnthropic(
-  model: ChatAnthropic,
+export async function invokeLlm(
+  model: BaseChatModel,
   messages: BaseMessage[],
 ): Promise<AIMessage> {
-  return anthropicCircuit.execute(() =>
-    withSingleRetry(() => model.invoke(messages), "invokeAnthropic"),
+  return llmCircuit.execute(() =>
+    withSingleRetry(
+      () => model.invoke(messages) as Promise<AIMessage>,
+      "invokeLlm",
+    ),
   );
 }
 
 /**
- * Invokes an Anthropic model with a fallback response when the circuit is open.
+ * Invokes an LLM with a fallback response when the circuit is open.
  *
- * @param model The ChatAnthropic instance
+ * @param model The BaseChatModel instance
  * @param messages The messages to send
  * @param fallback A fallback AIMessage or function to produce one
  */
-export async function invokeAnthropicWithFallback(
-  model: ChatAnthropic,
+export async function invokeLlmWithFallback(
+  model: BaseChatModel,
   messages: BaseMessage[],
   fallback: AIMessage | (() => AIMessage | Promise<AIMessage>),
 ): Promise<AIMessage> {
-  return anthropicCircuit.executeWithFallback(
-    () => withSingleRetry(() => model.invoke(messages), "invokeAnthropic"),
+  return llmCircuit.executeWithFallback(
+    () =>
+      withSingleRetry(
+        () => model.invoke(messages) as Promise<AIMessage>,
+        "invokeLlm",
+      ),
     fallback,
   );
 }
 
 /**
- * Returns current metrics for the Anthropic circuit breaker.
+ * Returns current metrics for the LLM circuit breaker.
  */
-export function getAnthropicCircuitMetrics(): CircuitBreakerMetrics {
-  return anthropicCircuit.getMetrics();
+export function getLlmCircuitMetrics(): CircuitBreakerMetrics {
+  return llmCircuit.getMetrics();
 }
 
 /**
- * Resets the Anthropic circuit breaker to closed state.
+ * Resets the LLM circuit breaker to closed state.
  * Useful for testing or manual recovery.
  */
-export function resetAnthropicCircuit(): void {
-  anthropicCircuit.reset();
+export function resetLlmCircuit(): void {
+  llmCircuit.reset();
 }

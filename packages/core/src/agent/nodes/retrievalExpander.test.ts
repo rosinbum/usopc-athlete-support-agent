@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@langchain/anthropic", () => ({
-  ChatAnthropic: vi.fn().mockImplementation(() => ({
-    invoke: vi.fn(),
-  })),
-}));
-
 vi.mock("@usopc/shared", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@usopc/shared")>();
   return {
@@ -21,7 +15,7 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
-import { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { createRetrievalExpanderNode } from "./retrievalExpander.js";
 import type { VectorStoreLike } from "./retriever.js";
@@ -106,24 +100,18 @@ function makeMockVectorStore(
   return mock;
 }
 
+let mockModel: BaseChatModel;
+
 function setupMockModel(responseText: string): void {
-  const MockChatAnthropic = vi.mocked(ChatAnthropic);
-  MockChatAnthropic.mockImplementation(
-    () =>
-      ({
-        invoke: vi.fn().mockResolvedValue(new AIMessage(responseText)),
-      }) as unknown as ChatAnthropic,
-  );
+  mockModel = {
+    invoke: vi.fn().mockResolvedValue(new AIMessage(responseText)),
+  } as unknown as BaseChatModel;
 }
 
 function setupFailingModel(error: Error): void {
-  const MockChatAnthropic = vi.mocked(ChatAnthropic);
-  MockChatAnthropic.mockImplementation(
-    () =>
-      ({
-        invoke: vi.fn().mockRejectedValue(error),
-      }) as unknown as ChatAnthropic,
-  );
+  mockModel = {
+    invoke: vi.fn().mockRejectedValue(error),
+  } as unknown as BaseChatModel;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +148,7 @@ describe("createRetrievalExpanderNode", () => {
       [makeSearchResult("new doc 3", 0.25, { documentTitle: "Team Choosing" })],
     ]);
 
-    const node = createRetrievalExpanderNode(store, new ChatAnthropic());
+    const node = createRetrievalExpanderNode(store, mockModel);
     const result = await node(makeState());
 
     expect(result.expansionAttempted).toBe(true);
@@ -183,7 +171,7 @@ describe("createRetrievalExpanderNode", () => {
       [makeSearchResult("unique new content", 0.22)],
     ]);
 
-    const node = createRetrievalExpanderNode(store, new ChatAnthropic());
+    const node = createRetrievalExpanderNode(store, mockModel);
     const result = await node(makeState());
 
     // 1 existing + 1 unique new = 2 (duplicates removed)
@@ -206,7 +194,7 @@ describe("createRetrievalExpanderNode", () => {
     ]);
 
     const state = makeState({ retrievalConfidence: 0.3 });
-    const node = createRetrievalExpanderNode(store, new ChatAnthropic());
+    const node = createRetrievalExpanderNode(store, mockModel);
     const result = await node(state);
 
     // New confidence should reflect the improved results
@@ -218,7 +206,7 @@ describe("createRetrievalExpanderNode", () => {
     setupMockModel(JSON.stringify(["q1", "q2", "q3"]));
     const store = makeMockVectorStore([[], [], []]);
 
-    const node = createRetrievalExpanderNode(store, new ChatAnthropic());
+    const node = createRetrievalExpanderNode(store, mockModel);
     const result = await node(makeState());
 
     expect(result.expansionAttempted).toBe(true);
@@ -228,7 +216,7 @@ describe("createRetrievalExpanderNode", () => {
     setupFailingModel(new Error("Anthropic API error"));
     const store = makeMockVectorStore();
 
-    const node = createRetrievalExpanderNode(store, new ChatAnthropic());
+    const node = createRetrievalExpanderNode(store, mockModel);
     const result = await node(makeState());
 
     expect(result.expansionAttempted).toBe(true);
@@ -245,7 +233,7 @@ describe("createRetrievalExpanderNode", () => {
         .mockRejectedValue(new Error("DB connection failed")),
     };
 
-    const node = createRetrievalExpanderNode(store, new ChatAnthropic());
+    const node = createRetrievalExpanderNode(store, mockModel);
     const result = await node(makeState());
 
     // vectorStoreSearch uses circuit breaker fallback, returns []
@@ -255,7 +243,7 @@ describe("createRetrievalExpanderNode", () => {
 
   it("handles empty state gracefully (no user message)", async () => {
     const store = makeMockVectorStore();
-    const node = createRetrievalExpanderNode(store, new ChatAnthropic());
+    const node = createRetrievalExpanderNode(store, mockModel);
     const state = makeState({ messages: [] });
 
     const result = await node(state);
@@ -268,7 +256,7 @@ describe("createRetrievalExpanderNode", () => {
     setupMockModel("This is not valid JSON");
     const store = makeMockVectorStore();
 
-    const node = createRetrievalExpanderNode(store, new ChatAnthropic());
+    const node = createRetrievalExpanderNode(store, mockModel);
     const result = await node(makeState());
 
     expect(result.expansionAttempted).toBe(true);
@@ -280,7 +268,7 @@ describe("createRetrievalExpanderNode", () => {
     setupMockModel(JSON.stringify(["q1", "q2", "q3"]));
     const store = makeMockVectorStore([[], [], []]);
 
-    const node = createRetrievalExpanderNode(store, new ChatAnthropic());
+    const node = createRetrievalExpanderNode(store, mockModel);
     const state = makeState({
       topicDomain: "governance",
       detectedNgbIds: ["usa-swimming"],
@@ -314,7 +302,7 @@ describe("createRetrievalExpanderNode", () => {
       [],
     ]);
 
-    const node = createRetrievalExpanderNode(store, new ChatAnthropic());
+    const node = createRetrievalExpanderNode(store, mockModel);
     const result = await node(makeState());
 
     const newDoc = result.retrievedDocuments!.find(

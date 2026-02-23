@@ -11,4 +11,8 @@ export {
   TRUSTED_DOMAINS,
   QUALITY_CHECKER_CONFIG,
 } from "./settings.js";
-export { createAgentModels, type AgentModels } from "./modelFactory.js";
+export {
+  createAgentModels,
+  createChatModel,
+  type AgentModels,
+} from "./modelFactory.js";

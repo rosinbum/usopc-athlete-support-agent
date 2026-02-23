@@ -1,7 +1,7 @@
 import { router, publicProcedure } from "../trpc.js";
 import { getPoolStatus } from "../db/client.js";
 import {
-  getAnthropicCircuitMetrics,
+  getLlmCircuitMetrics,
   getEmbeddingsCircuitMetrics,
   getTavilyCircuitMetrics,
   getVectorStoreReadCircuitMetrics,
@@ -11,7 +11,7 @@ import {
 export const healthRouter = router({
   check: publicProcedure.query(async () => {
     const circuits = {
-      anthropic: getAnthropicCircuitMetrics(),
+      llm: getLlmCircuitMetrics(),
       embeddings: getEmbeddingsCircuitMetrics(),
       tavily: getTavilyCircuitMetrics(),
       vectorStoreRead: getVectorStoreReadCircuitMetrics(),

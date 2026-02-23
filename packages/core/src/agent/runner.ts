@@ -1,4 +1,4 @@
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { createEmbeddings } from "../rag/embeddings.js";
@@ -77,12 +77,12 @@ export function convertMessages(
 export class AgentRunner {
   private graph: ReturnType<typeof createAgentGraph>;
   private vectorStore: PGVectorStore;
-  private _classifierModel: ChatAnthropic;
+  private _classifierModel: BaseChatModel;
 
   private constructor(
     graph: ReturnType<typeof createAgentGraph>,
     vectorStore: PGVectorStore,
-    classifierModel: ChatAnthropic,
+    classifierModel: BaseChatModel,
   ) {
     this.graph = graph;
     this.vectorStore = vectorStore;
@@ -93,7 +93,7 @@ export class AgentRunner {
    * The shared Haiku model instance. Exposed so callers (e.g., route handlers)
    * can pass it to `generateSummary()` without a module-level singleton.
    */
-  get classifierModel(): ChatAnthropic {
+  get classifierModel(): BaseChatModel {
     return this._classifierModel;
   }
 
@@ -104,7 +104,7 @@ export class AgentRunner {
    * Model instances (`agentModel` for Sonnet, `classifierModel` for Haiku) are
    * constructed once here and injected into every graph node via factory closures.
    * In a Lambda warm container these instances persist across sequential requests,
-   * avoiding 3-5 redundant `ChatAnthropic` allocations per invocation.
+   * avoiding 3-5 redundant model allocations per invocation.
    *
    * Config changes (model name, temperature, maxTokens) take effect only on
    * cold start, when a new `AgentRunner` is created.
