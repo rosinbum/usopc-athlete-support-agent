@@ -84,6 +84,7 @@ In the Slack App dashboard:
 2. The **Request URL** should show a green **✅ Verified** badge
 
 If it shows an error:
+
 - Confirm the URL in the manifest matches the SST `slackUrl` output exactly (no trailing slash)
 - Check CloudWatch logs for the `SlackApi` Lambda for error details
 - Run a health check: `curl https://{slackUrl}/health` → should return `{"status":"ok"}`
@@ -101,6 +102,7 @@ What are the team selection criteria for track cycling?
 ```
 
 The bot should:
+
 1. React with 👀 (eyes emoji) to acknowledge
 2. Post a formatted answer with citations and feedback buttons
 
@@ -139,6 +141,30 @@ sst deploy --stage production
 The production `slackUrl` will be different from staging. Update the Event Subscriptions and Interactivity URLs in the Slack App dashboard to point to the production URL, or create a separate Slack App for production.
 
 If you update `apps/slack/slack-app-manifest.yml` with the real URL, also update the manifest in the Slack App dashboard (**App Manifest** tab) to keep them in sync.
+
+---
+
+## Local Development
+
+### Running the dev server
+
+The dev server (`src/dev.ts`) calls `getAppRunner()`, `postMessage`, and `addReaction`, which all require secrets. Run with `sst shell` to inject them:
+
+```bash
+sst shell -- pnpm --filter @usopc/slack dev
+```
+
+### Receiving real Slack events with ngrok
+
+The dev server runs on `localhost:3002`. Slack requires a public HTTPS URL for event delivery. Use ngrok to create a tunnel:
+
+```bash
+ngrok http 3002
+```
+
+Use the generated URL (e.g. `https://abc123.ngrok.io`) as the temporary **Request URL** in the Slack App dashboard under **Event Subscriptions** and **Interactivity & Shortcuts**.
+
+> **Note:** The ngrok URL changes on every restart. Update the Slack dashboard each time, or use a paid ngrok static domain to keep it stable.
 
 ---
 
