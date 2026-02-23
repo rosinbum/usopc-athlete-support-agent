@@ -1,12 +1,12 @@
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { TavilySearch } from "@langchain/tavily";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import { TRUSTED_DOMAINS } from "../../config/index.js";
 import {
-  invokeAnthropic,
+  invokeLlm,
   extractTextFromResponse,
-} from "../../services/anthropicService.js";
+} from "../../services/llmService.js";
 import { searchWithTavily } from "../../services/tavilyService.js";
 import {
   buildContextualQuery,
@@ -101,7 +101,7 @@ function parseSearchQueries(text: string): string[] {
  * - The response cannot be parsed as a JSON array
  */
 async function generateSearchQueries(
-  model: ChatAnthropic,
+  model: BaseChatModel,
   state: AgentState,
 ): Promise<string[]> {
   const { currentMessage, conversationContext } = buildContextualQuery(
@@ -125,7 +125,7 @@ async function generateSearchQueries(
       state.topicDomain,
     );
 
-    const response = await invokeAnthropic(model, [
+    const response = await invokeLlm(model, [
       new SystemMessage(
         "You are a web search query generator. Respond with only a JSON array of strings.",
       ),
@@ -205,7 +205,7 @@ function extractStructuredResults(rawResult: unknown): WebSearchResult[] {
  */
 export function createResearcherNode(
   tavilySearch: TavilySearchLike,
-  model: ChatAnthropic,
+  model: BaseChatModel,
 ) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const userMessage = getLastUserMessage(state.messages);

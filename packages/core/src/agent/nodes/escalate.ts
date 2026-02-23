@@ -1,4 +1,4 @@
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import {
@@ -10,9 +10,9 @@ import {
   type EscalationTarget,
 } from "../../prompts/index.js";
 import {
-  invokeAnthropic,
+  invokeLlm,
   extractTextFromResponse,
-} from "../../services/anthropicService.js";
+} from "../../services/llmService.js";
 import { getLastUserMessage, stateContext } from "../../utils/index.js";
 import type { AgentState } from "../state.js";
 import type { TopicDomain, EscalationInfo } from "../../types/index.js";
@@ -86,7 +86,7 @@ function buildFallbackMessage(targets: EscalationTarget[]): string {
  * Falls back to a deterministic message if the LLM is unavailable.
  */
 async function generateEscalationResponse(
-  model: ChatAnthropic,
+  model: BaseChatModel,
   userMessage: string,
   domain: TopicDomain,
   urgency: "immediate" | "standard",
@@ -102,7 +102,7 @@ async function generateEscalationResponse(
   );
 
   try {
-    const response = await invokeAnthropic(model, [
+    const response = await invokeLlm(model, [
       new SystemMessage(SYSTEM_PROMPT),
       new HumanMessage(prompt),
     ]);
@@ -140,7 +140,7 @@ async function generateEscalationResponse(
  * unavailable, a deterministic fallback provides contact info without
  * the blanket 911 preamble.
  */
-export function createEscalateNode(model: ChatAnthropic) {
+export function createEscalateNode(model: BaseChatModel) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const userMessage = getLastUserMessage(state.messages);
     const domain = state.topicDomain ?? "dispute_resolution";

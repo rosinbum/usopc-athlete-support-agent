@@ -1,12 +1,12 @@
 export {
-  invokeAnthropic,
-  invokeAnthropicWithFallback,
+  invokeLlm,
+  invokeLlmWithFallback,
   extractTextFromResponse,
   isTransientError,
   withSingleRetry,
-  getAnthropicCircuitMetrics,
-  resetAnthropicCircuit,
-} from "./anthropicService.js";
+  getLlmCircuitMetrics,
+  resetLlmCircuit,
+} from "./llmService.js";
 
 export {
   ProtectedOpenAIEmbeddings,

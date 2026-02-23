@@ -1,12 +1,12 @@
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import { QUALITY_CHECKER_CONFIG } from "../../config/index.js";
 import { buildQualityCheckerPrompt } from "../../prompts/index.js";
 import {
-  invokeAnthropic,
+  invokeLlm,
   extractTextFromResponse,
-} from "../../services/anthropicService.js";
+} from "../../services/llmService.js";
 import {
   buildContextualQuery,
   stateContext,
@@ -60,7 +60,7 @@ function evaluateResult(result: QualityCheckResult): boolean {
  * completeness using Haiku (fast, cheap). Fail-open on all errors —
  * if anything goes wrong, the answer passes through unchanged.
  */
-export function createQualityCheckerNode(model: ChatAnthropic) {
+export function createQualityCheckerNode(model: BaseChatModel) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     // Fail-open: skip if no answer or answer is a known error message
     if (!state.answer) {
@@ -90,7 +90,7 @@ export function createQualityCheckerNode(model: ChatAnthropic) {
         ...stateContext(state),
       });
 
-      const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
+      const response = await invokeLlm(model, [new HumanMessage(prompt)]);
       const text = extractTextFromResponse(response);
       const parsed = parseLlmJson<QualityCheckResult>(text);
 

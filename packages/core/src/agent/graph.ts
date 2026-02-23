@@ -1,4 +1,4 @@
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { StateGraph } from "@langchain/langgraph";
 import { AgentStateAnnotation } from "./state.js";
 import {
@@ -27,7 +27,7 @@ import { withMetrics } from "./nodeMetrics.js";
  *
  * Model instances are created once by {@link AgentRunner.create} and shared
  * across all graph nodes via closure injection (factory functions). This
- * eliminates redundant `ChatAnthropic` allocations per request — in a Lambda
+ * eliminates redundant model allocations per request — in a Lambda
  * warm container the same instances are reused for the lifetime of the process.
  *
  * Changing model configuration (model name, temperature, maxTokens) requires
@@ -37,9 +37,9 @@ export interface GraphDependencies {
   vectorStore: VectorStoreLike;
   tavilySearch: TavilySearchLike;
   /** Sonnet instance used by synthesizer, escalate, and other heavy-reasoning nodes. */
-  agentModel: ChatAnthropic;
+  agentModel: BaseChatModel;
   /** Haiku instance used by classifier, qualityChecker, queryPlanner, and retrievalExpander. */
-  classifierModel: ChatAnthropic;
+  classifierModel: BaseChatModel;
 }
 
 /**

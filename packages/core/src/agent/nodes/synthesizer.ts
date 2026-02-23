@@ -1,4 +1,4 @@
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import {
@@ -8,9 +8,9 @@ import {
   getEmotionalToneGuidance,
 } from "../../prompts/index.js";
 import {
-  invokeAnthropic,
+  invokeLlm,
   extractTextFromResponse,
-} from "../../services/anthropicService.js";
+} from "../../services/llmService.js";
 import {
   buildContextualQuery,
   stateContext,
@@ -35,7 +35,7 @@ const log = logger.child({ service: "synthesizer-node" });
  * When retrying after a quality check failure, appends the critique as
  * feedback to guide the model toward a more specific response.
  */
-export function createSynthesizerNode(model: ChatAnthropic) {
+export function createSynthesizerNode(model: BaseChatModel) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     // Build contextual query from conversation history
     const { currentMessage, conversationContext } = buildContextualQuery(
@@ -107,7 +107,7 @@ export function createSynthesizerNode(model: ChatAnthropic) {
         ...stateContext(state),
       });
 
-      const response = await invokeAnthropic(model, [
+      const response = await invokeLlm(model, [
         new SystemMessage(SYSTEM_PROMPT),
         new HumanMessage(prompt),
       ]);

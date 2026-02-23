@@ -1,12 +1,9 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { logger, parseEnvInt } from "@usopc/shared";
-import { getModelConfig } from "../config/index.js";
-import {
-  invokeAnthropic,
-  extractTextFromResponse,
-} from "./anthropicService.js";
+import { getModelConfig, createChatModel } from "../config/index.js";
+import { invokeLlm, extractTextFromResponse } from "./llmService.js";
 import { buildSummaryPrompt } from "../prompts/conversationMemory.js";
 
 const log = logger.child({ service: "conversation-memory" });
@@ -121,12 +118,12 @@ export async function saveSummary(
 }
 
 /**
- * Generates a rolling summary of conversation messages using Haiku.
+ * Generates a rolling summary of conversation messages using the classifier model.
  * If an existing summary is provided, it's incorporated into the new one.
  *
  * @param messages - The conversation messages to summarize.
  * @param existingSummary - An existing summary to incorporate (rolling summary).
- * @param model - A shared ChatAnthropic instance. When omitted, a transient
+ * @param model - A shared BaseChatModel instance. When omitted, a transient
  *   instance is created from config (backward compat for tests/dev tools).
  *   Callers with a long-lived model (e.g., AgentRunner) should pass it
  *   explicitly to avoid redundant allocations.
@@ -134,30 +131,24 @@ export async function saveSummary(
 export async function generateSummary(
   messages: BaseMessage[],
   existingSummary?: string,
-  model?: ChatAnthropic,
+  model?: BaseChatModel,
 ): Promise<string> {
-  let resolvedModel: ChatAnthropic;
+  let resolvedModel: BaseChatModel;
   if (model) {
     resolvedModel = model;
   } else {
     log.warn(
-      "No model passed to generateSummary — creating transient ChatAnthropic instance. " +
+      "No model passed to generateSummary — creating transient instance. " +
         "Pass the classifierModel explicitly to eliminate this allocation.",
     );
     const config = await getModelConfig();
-    resolvedModel = new ChatAnthropic({
-      model: config.classifier.model,
-      temperature: config.classifier.temperature,
-      maxTokens: config.classifier.maxTokens,
-    });
+    resolvedModel = createChatModel(config.classifier);
   }
 
   const prompt = buildSummaryPrompt(messages, existingSummary);
 
   try {
-    const response = await invokeAnthropic(resolvedModel, [
-      new HumanMessage(prompt),
-    ]);
+    const response = await invokeLlm(resolvedModel, [new HumanMessage(prompt)]);
     return extractTextFromResponse(response);
   } catch (error) {
     log.error("Failed to generate conversation summary", {

@@ -4,13 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockInvoke } = vi.hoisted(() => ({ mockInvoke: vi.fn() }));
-
-vi.mock("@langchain/anthropic", () => ({
-  ChatAnthropic: vi.fn().mockImplementation(() => ({
-    invoke: mockInvoke,
-  })),
-}));
+const mockInvoke = vi.fn();
 
 vi.mock("@usopc/shared", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@usopc/shared")>();
@@ -29,13 +23,12 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 });
 
 import { createSynthesizerNode } from "./synthesizer.js";
-import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 
-const synthesizerNode = createSynthesizerNode(new ChatAnthropic());
+const synthesizerNode = createSynthesizerNode({ invoke: mockInvoke } as any);
 
 // ---------------------------------------------------------------------------
 // Helpers

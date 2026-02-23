@@ -18,6 +18,7 @@ export default $config({
     // Secrets
     const anthropicKey = new sst.Secret("AnthropicApiKey");
     const openaiKey = new sst.Secret("OpenaiApiKey");
+    const googleKey = new sst.Secret("GoogleApiKey");
     const tavilyKey = new sst.Secret("TavilyApiKey");
     const langchainKey = new sst.Secret("LangchainApiKey");
     const slackBotToken = new sst.Secret("SlackBotToken");
@@ -47,6 +48,7 @@ export default $config({
     const linkables: sst.Linkable<any>[] = [
       anthropicKey,
       openaiKey,
+      googleKey,
       tavilyKey,
       langchainKey,
       databaseUrlSecret,

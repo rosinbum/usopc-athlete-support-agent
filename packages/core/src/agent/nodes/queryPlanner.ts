@@ -1,11 +1,11 @@
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import { buildQueryPlannerPrompt } from "../../prompts/index.js";
 import {
-  invokeAnthropic,
+  invokeLlm,
   extractTextFromResponse,
-} from "../../services/anthropicService.js";
+} from "../../services/llmService.js";
 import {
   getLastUserMessage,
   stateContext,
@@ -120,7 +120,7 @@ export function parseQueryPlannerResponse(raw: string): ParseResult {
  * Simple queries pass through unchanged (isComplexQuery: false).
  * Errors fail open — the pipeline continues with normal single-domain retrieval.
  */
-export function createQueryPlannerNode(model: ChatAnthropic) {
+export function createQueryPlannerNode(model: BaseChatModel) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const userMessage = getLastUserMessage(state.messages);
 
@@ -136,7 +136,7 @@ export function createQueryPlannerNode(model: ChatAnthropic) {
     );
 
     try {
-      const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
+      const response = await invokeLlm(model, [new HumanMessage(prompt)]);
       const responseText = extractTextFromResponse(response);
       const { output: result, warnings } =
         parseQueryPlannerResponse(responseText);

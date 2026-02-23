@@ -49,6 +49,19 @@ export function resolveEnv(): void {
     }
   }
 
+  // GOOGLE_API_KEY — used by ChatGoogleGenerativeAI when provider is "google"
+  if (!process.env.GOOGLE_API_KEY) {
+    try {
+      process.env.GOOGLE_API_KEY = getOptionalSecretValue(
+        "GOOGLE_API_KEY",
+        "GoogleApiKey",
+        "",
+      );
+    } catch {
+      // Optional — not required unless Google provider is configured
+    }
+  }
+
   // TAVILY_API_KEY — optional, used by web search fallback
   if (!process.env.TAVILY_API_KEY) {
     try {

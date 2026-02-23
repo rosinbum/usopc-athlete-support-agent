@@ -10,6 +10,7 @@ export interface AgentModelConfig {
   model: string; // model name (e.g., "claude-sonnet-4-20250514")
   temperature?: number | undefined;
   maxTokens?: number | undefined;
+  provider?: string | undefined; // "anthropic" | "openai" | "google"
   dimensions?: number | undefined; // for embeddings only
   createdAt?: string | undefined;
   updatedAt?: string | undefined;
@@ -31,6 +32,7 @@ export class AgentModelEntity {
       model: item.model as string,
       temperature: item.temperature as number | undefined,
       maxTokens: item.maxTokens as number | undefined,
+      provider: item.provider as string | undefined,
       dimensions: item.dimensions as number | undefined,
       createdAt: item.createdAt as string | undefined,
       updatedAt: item.updatedAt as string | undefined,
@@ -53,6 +55,7 @@ export class AgentModelEntity {
     };
     if (config.temperature !== undefined) item.temperature = config.temperature;
     if (config.maxTokens !== undefined) item.maxTokens = config.maxTokens;
+    if (config.provider !== undefined) item.provider = config.provider;
     if (config.dimensions !== undefined) item.dimensions = config.dimensions;
     if (!config.createdAt) item.createdAt = now;
     else item.createdAt = config.createdAt;

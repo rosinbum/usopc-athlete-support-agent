@@ -16,6 +16,8 @@ vi.mock("@usopc/shared", async (importOriginal) => {
   };
 });
 
+const mockCreateChatModel = vi.fn().mockReturnValue({ invoke: vi.fn() });
+
 vi.mock("../config/index.js", () => ({
   getModelConfig: () =>
     Promise.resolve({
@@ -23,17 +25,15 @@ vi.mock("../config/index.js", () => ({
         model: "claude-haiku-4-5-20251001",
         temperature: 0,
         maxTokens: 1024,
+        provider: "anthropic",
       },
     }),
+  createChatModel: (...args: unknown[]) => mockCreateChatModel(...args),
 }));
 
-vi.mock("./anthropicService.js", () => ({
-  invokeAnthropic: vi.fn(),
+vi.mock("./llmService.js", () => ({
+  invokeLlm: vi.fn(),
   extractTextFromResponse: vi.fn(),
-}));
-
-vi.mock("@langchain/anthropic", () => ({
-  ChatAnthropic: vi.fn(),
 }));
 
 import {
@@ -43,13 +43,9 @@ import {
   generateSummary,
   setSummaryStore,
 } from "./conversationMemory.js";
-import { ChatAnthropic } from "@langchain/anthropic";
-import {
-  invokeAnthropic,
-  extractTextFromResponse,
-} from "./anthropicService.js";
+import { invokeLlm, extractTextFromResponse } from "./llmService.js";
 
-const mockInvokeAnthropic = vi.mocked(invokeAnthropic);
+const mockInvokeLlm = vi.mocked(invokeLlm);
 const mockExtractText = vi.mocked(extractTextFromResponse);
 
 describe("conversationMemory", () => {
@@ -163,44 +159,39 @@ describe("conversationMemory", () => {
 
   describe("generateSummary model injection", () => {
     it("uses explicitly passed model", async () => {
-      const fakeModel = new ChatAnthropic();
+      const fakeModel = { invoke: vi.fn() } as any;
 
-      mockInvokeAnthropic.mockResolvedValue({} as never);
+      mockInvokeLlm.mockResolvedValue({} as never);
       mockExtractText.mockReturnValue("summary");
 
       await generateSummary([new HumanMessage("hello")], undefined, fakeModel);
 
-      // invokeAnthropic should receive the explicitly passed model instance
-      expect(mockInvokeAnthropic).toHaveBeenCalledWith(
-        fakeModel,
-        expect.any(Array),
-      );
+      // invokeLlm should receive the explicitly passed model instance
+      expect(mockInvokeLlm).toHaveBeenCalledWith(fakeModel, expect.any(Array));
     });
 
     it("falls back to transient instance when no model passed", async () => {
-      const { ChatAnthropic: MockChatAnthropic } =
-        await import("@langchain/anthropic");
-      const mockCtor = vi.mocked(MockChatAnthropic);
-      mockCtor.mockClear();
+      mockCreateChatModel.mockClear();
 
-      mockInvokeAnthropic.mockResolvedValue({} as never);
+      mockInvokeLlm.mockResolvedValue({} as never);
       mockExtractText.mockReturnValue("summary");
 
       await generateSummary([new HumanMessage("hello")]);
 
-      expect(mockCtor).toHaveBeenCalledWith({
+      expect(mockCreateChatModel).toHaveBeenCalledWith({
         model: "claude-haiku-4-5-20251001",
         temperature: 0,
         maxTokens: 1024,
+        provider: "anthropic",
       });
     });
   });
 
   describe("generateSummary", () => {
-    it("calls Haiku with correct prompt and returns text", async () => {
+    it("calls model with correct prompt and returns text", async () => {
       const summaryText =
         "The user is a swimmer asking about selection criteria.";
-      mockInvokeAnthropic.mockResolvedValue({} as never);
+      mockInvokeLlm.mockResolvedValue({} as never);
       mockExtractText.mockReturnValue(summaryText);
 
       const messages = [
@@ -210,11 +201,11 @@ describe("conversationMemory", () => {
 
       const result = await generateSummary(messages);
 
-      expect(mockInvokeAnthropic).toHaveBeenCalledOnce();
+      expect(mockInvokeLlm).toHaveBeenCalledOnce();
       expect(result).toBe(summaryText);
 
       // Verify the prompt includes conversation content
-      const promptArg = mockInvokeAnthropic.mock.calls[0]![1];
+      const promptArg = mockInvokeLlm.mock.calls[0]![1];
       const promptContent =
         typeof promptArg[0]!.content === "string"
           ? promptArg[0]!.content
@@ -224,14 +215,14 @@ describe("conversationMemory", () => {
 
     it("includes existing summary when provided", async () => {
       const existingSummary = "Previous context about the user.";
-      mockInvokeAnthropic.mockResolvedValue({} as never);
+      mockInvokeLlm.mockResolvedValue({} as never);
       mockExtractText.mockReturnValue("Updated summary");
 
       const messages = [new HumanMessage("Follow-up question")];
 
       await generateSummary(messages, existingSummary);
 
-      const promptArg = mockInvokeAnthropic.mock.calls[0]![1];
+      const promptArg = mockInvokeLlm.mock.calls[0]![1];
       const promptContent =
         typeof promptArg[0]!.content === "string"
           ? promptArg[0]!.content
@@ -241,7 +232,7 @@ describe("conversationMemory", () => {
 
     it("returns existing summary on failure", async () => {
       const existingSummary = "Previous context";
-      mockInvokeAnthropic.mockRejectedValue(new Error("API error"));
+      mockInvokeLlm.mockRejectedValue(new Error("API error"));
 
       const messages = [new HumanMessage("Question")];
       const result = await generateSummary(messages, existingSummary);
@@ -250,7 +241,7 @@ describe("conversationMemory", () => {
     });
 
     it("returns empty string on failure with no existing summary", async () => {
-      mockInvokeAnthropic.mockRejectedValue(new Error("API error"));
+      mockInvokeLlm.mockRejectedValue(new Error("API error"));
 
       const messages = [new HumanMessage("Question")];
       const result = await generateSummary(messages);
