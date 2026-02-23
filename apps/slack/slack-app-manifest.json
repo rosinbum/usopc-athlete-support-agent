@@ -5,10 +5,15 @@
   },
   "display_information": {
     "name": "Athlete Support",
-    "description": "AI-powered governance and compliance assistant for U.S. Olympic and Paralympic athletes. Ask about selection criteria, appeals, anti-doping, funding, and more.",
+    "description": "AI-powered governance and compliance assistant for U.S. Olympic and Paralympic athletes. Ask about anti-doping, appeals, and more.",
     "background_color": "#0033A0"
   },
   "features": {
+    "app_home": {
+      "home_tab_enabled": false,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    },
     "bot_user": {
       "display_name": "Athlete Support",
       "always_online": true
@@ -16,6 +21,7 @@
     "slash_commands": [
       {
         "command": "/ask-athlete-support",
+        "url": "https://REPLACE_WITH_SLACK_URL/slack/commands",
         "description": "Ask the Athlete Support AI a governance or compliance question",
         "usage_hint": "[your question here]",
         "should_escape": false
@@ -26,6 +32,7 @@
     "scopes": {
       "bot": [
         "chat:write",
+        "commands",
         "reactions:write",
         "im:history",
         "im:read",

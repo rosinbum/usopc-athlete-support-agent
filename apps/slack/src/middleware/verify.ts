@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import type { Context, Next, Env } from "hono";
-import { getRequiredEnv } from "@usopc/shared";
+import { getSecretValue } from "@usopc/shared";
 
 const SLACK_VERSION = "v0";
 const TIMESTAMP_TOLERANCE_SECONDS = 300; // 5 minutes
@@ -13,7 +13,7 @@ export async function verifySlackRequest(
   c: Context<{ Variables: { rawBody: string } }>,
   next: Next,
 ): Promise<Response | void> {
-  const signingSecret = getRequiredEnv("SLACK_SIGNING_SECRET");
+  const signingSecret = getSecretValue("SLACK_SIGNING_SECRET", "SlackSigningSecret");
   const timestamp = c.req.header("x-slack-request-timestamp");
   const slackSignature = c.req.header("x-slack-signature");
 
