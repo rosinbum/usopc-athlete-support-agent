@@ -8,8 +8,8 @@ You are an expert on the AWS SST v3 infrastructure in this project. You have dee
 
 ### Database
 
-- **Production:** Aurora Serverless v2 with pgvector (0.5–4 ACU), database `usopc_athlete_support`
-- **Dev/Staging:** Local Docker PostgreSQL (`pgvector/pgvector:pg16`) via `DATABASE_URL` env var
+- **Deployed stages (staging, production):** Neon Postgres with pgvector via `DatabaseUrl` SST secret
+- **Local dev:** Docker PostgreSQL (`pgvector/pgvector:pg16`) via `DATABASE_URL` env var or fallback
 
 ### DynamoDB (Single Table — OneTable Pattern)
 
@@ -53,7 +53,7 @@ You are an expert on the AWS SST v3 infrastructure in this project. You have dee
 
 ---
 
-## Secrets (11)
+## Secrets (12)
 
 PascalCase for SST binding, SCREAMING_SNAKE_CASE for env vars.
 
@@ -70,6 +70,7 @@ PascalCase for SST binding, SCREAMING_SNAKE_CASE for env vars.
 | GitHubClientSecret   | —                    | GitHub OAuth                         |
 | AdminEmails          | —                    | Email allowlist for admin access     |
 | ConversationMaxTurns | —                    | Max conversation turns (default "5") |
+| DatabaseUrl          | DATABASE_URL         | Neon Postgres connection URL         |
 
 ---
 
@@ -84,7 +85,7 @@ PascalCase for SST binding, SCREAMING_SNAKE_CASE for env vars.
 **`getDatabaseUrl()`** — cascade:
 
 1. `DATABASE_URL` env var
-2. SST `Resource.Database` fields → construct URL
+2. SST `Resource.DatabaseUrl.value` (SST Secret)
 3. Local Docker fallback: `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`
 4. Throws error
 
@@ -121,14 +122,14 @@ FEATURE_QUERY_PLANNER
 
 ## Stage-Aware Behavior
 
-| Component            | Production           | Dev/Staging             |
-| -------------------- | -------------------- | ----------------------- |
-| Database             | Aurora Serverless v2 | Local Docker PostgreSQL |
-| Ingestion Queue      | FIFO, enabled        | Not created             |
-| Discovery Cron       | Monday 2 AM UTC      | Not created             |
-| Ingestion Cron       | Weekly               | Not created             |
-| Discovery Feed Queue | Enabled              | Enabled                 |
-| Removal Policy       | Retain               | Remove                  |
+| Component            | Production                     | Dev/Staging             |
+| -------------------- | ------------------------------ | ----------------------- |
+| Database             | Neon Postgres (via SST Secret) | Local Docker PostgreSQL |
+| Ingestion Queue      | FIFO, enabled                  | Not created             |
+| Discovery Cron       | Monday 2 AM UTC                | Not created             |
+| Ingestion Cron       | Weekly                         | Not created             |
+| Discovery Feed Queue | Enabled                        | Enabled                 |
+| Removal Policy       | Retain                         | Remove                  |
 
 ---
 
@@ -147,7 +148,7 @@ FEATURE_QUERY_PLANNER
 
 1. **Never hardcode resource names** — always use `Resource.X.name` for DynamoDB tables, S3 buckets, queue URLs
 2. **Always link secrets to Lambdas** — if a Lambda needs a secret, it must be in the `link` array in sst.config.ts
-3. **Respect two-tier DB strategy** — Aurora for production, Docker for dev. Use `getDatabaseUrl()` cascade.
+3. **Respect two-tier DB strategy** — Neon Postgres for deployed stages, Docker for local dev. Use `getDatabaseUrl()` cascade.
 4. **Don't create production-only resources unconditionally** — check stage before creating FIFO queues and crons
 5. **PascalCase for SST secrets** — `AnthropicApiKey` not `ANTHROPIC_API_KEY`. The env var mapping happens in `getSecretValue()`.
 6. **OneTable conventions** — timestamps disabled (manual createdAt/updatedAt), nulls=false (omit absent fields), isoDates=false (string dates)

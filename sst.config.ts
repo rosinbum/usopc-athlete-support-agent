@@ -34,31 +34,23 @@ export default $config({
     const trpcApiKey = new sst.Secret("TrpcApiKey", "");
 
     // Database
-    // Production: Aurora Serverless v2 with pgvector
-    // Dev stages: Use local Docker postgres via DATABASE_URL env var
+    // Deployed stages (staging, production): Neon Postgres via SST secret
+    // Local dev: Docker Postgres container via DATABASE_URL env var or fallback
+    const isLocal = !isProd && stage !== "staging";
+    const databaseUrlSecret = new sst.Secret(
+      "DatabaseUrl",
+      isLocal
+        ? "postgresql://postgres:postgres@localhost:5432/usopc_athlete_support"
+        : undefined,
+    );
+
     const linkables: sst.Linkable<any>[] = [
       anthropicKey,
       openaiKey,
       tavilyKey,
       langchainKey,
+      databaseUrlSecret,
     ];
-
-    let databaseUrl: string | undefined;
-    let database: sst.aws.Postgres | undefined;
-
-    if (isProd) {
-      database = new sst.aws.Postgres("Database", {
-        scaling: {
-          min: "0.5 ACU",
-          max: "4 ACU",
-        },
-      });
-      linkables.push(database);
-    } else {
-      // Dev stages use local Docker postgres (docker-compose.yml)
-      databaseUrl =
-        "postgresql://postgres:postgres@localhost:5432/usopc_athlete_support";
-    }
 
     // DynamoDB single-table for all app entities (OneTable pattern)
     const appTable = new sst.aws.Dynamo("AppTable", {
@@ -100,9 +92,6 @@ export default $config({
       link: [...linkables, slackBotToken, slackSigningSecret],
       timeout: "120 seconds",
       memory: "512 MB",
-      environment: {
-        ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
-      },
     });
 
     // Discovery feed queue — processes discovered URLs through the evaluation
@@ -135,7 +124,7 @@ export default $config({
         schedule: "cron(0 2 ? * MON *)", // Every Monday at 2 AM UTC
         job: {
           handler: "packages/ingestion/src/functions/discovery.handler",
-          link: [...linkables, database!, appTable, discoveryFeedQueue],
+          link: [...linkables, appTable, discoveryFeedQueue],
           timeout: "15 minutes",
           memory: "1024 MB",
           permissions: [
@@ -182,7 +171,7 @@ export default $config({
       ingestionQueue.subscribe(
         {
           handler: "packages/ingestion/src/worker.handler",
-          link: [...linkables, database!, appTable, documentsBucket],
+          link: [...linkables, appTable, documentsBucket],
           timeout: "15 minutes",
           memory: "1024 MB",
         },
@@ -196,13 +185,7 @@ export default $config({
         schedule: "rate(7 days)",
         job: {
           handler: "packages/ingestion/src/cron.handler",
-          link: [
-            ...linkables,
-            database!,
-            ingestionQueue,
-            appTable,
-            documentsBucket,
-          ],
+          link: [...linkables, ingestionQueue, appTable, documentsBucket],
           timeout: "5 minutes",
           memory: "512 MB",
         },
@@ -227,7 +210,6 @@ export default $config({
       ],
       environment: {
         NEXT_PUBLIC_API_URL: api.url,
-        ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
       },
     });
 
@@ -241,7 +223,6 @@ export default $config({
       memory: "512 MB",
       environment: {
         ALLOWED_ORIGIN: web.url,
-        ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
       },
     });
 

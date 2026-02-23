@@ -111,43 +111,24 @@ describe("getDatabaseUrl", () => {
     expect(getDatabaseUrl()).toBe("postgresql://localhost:5432/test");
   });
 
-  it("returns SST Resource URL when DATABASE_URL is not set", () => {
+  it("returns SST Secret value when DATABASE_URL is not set", () => {
     delete process.env.DATABASE_URL;
-    mockResource.Database = {
-      host: "db.example.com",
-      port: "5432",
-      username: "user",
-      password: "pass",
-      database: "mydb",
+    mockResource.DatabaseUrl = {
+      value:
+        "postgresql://user:pass@ep-cool-morning-123456.us-east-1.aws.neon.tech/mydb?sslmode=require",
     };
 
     expect(getDatabaseUrl()).toBe(
-      "postgresql://user:pass@db.example.com:5432/mydb",
+      "postgresql://user:pass@ep-cool-morning-123456.us-east-1.aws.neon.tech/mydb?sslmode=require",
     );
   });
 
-  it("URL-encodes special characters in username and password", () => {
-    delete process.env.DATABASE_URL;
-    mockResource.Database = {
-      host: "db.example.com",
-      port: "5432",
-      username: "user@domain",
-      password: "p@ss:word/123",
-      database: "mydb",
-    };
-
-    const url = getDatabaseUrl();
-    expect(url).toContain("user%40domain");
-    expect(url).toContain("p%40ss%3Aword%2F123");
-  });
-
-  it("throws when neither DATABASE_URL nor SST Resource is available in production", () => {
+  it("throws when neither DATABASE_URL nor SST Secret is available in production", () => {
     delete process.env.DATABASE_URL;
     process.env.NODE_ENV = "production";
-    // mockResource.Database is not set, so accessing it will throw
 
     expect(() => getDatabaseUrl()).toThrow(
-      "DATABASE_URL is not set and SST Database resource is not available",
+      "DATABASE_URL is not set and SST DatabaseUrl secret is not available",
     );
   });
 
@@ -176,15 +157,9 @@ describe("getDatabaseUrl", () => {
     expect(getDatabaseUrl()).toBe("postgresql://custom:5433/other");
   });
 
-  it("prefers DATABASE_URL over SST Resource", () => {
+  it("prefers DATABASE_URL over SST Secret", () => {
     process.env.DATABASE_URL = "postgresql://env-url/db";
-    mockResource.Database = {
-      host: "sst-host",
-      port: "5432",
-      username: "sst-user",
-      password: "sst-pass",
-      database: "sst-db",
-    };
+    mockResource.DatabaseUrl = { value: "postgresql://sst-secret-url/db" };
 
     expect(getDatabaseUrl()).toBe("postgresql://env-url/db");
   });
