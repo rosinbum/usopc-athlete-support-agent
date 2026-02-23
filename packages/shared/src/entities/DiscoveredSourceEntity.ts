@@ -71,6 +71,13 @@ export interface CreateDiscoveredSourceInput {
  * GSIs:
  * - gsi1: Query discoveries by status and date (gsi1pk: Discovery#{status}, gsi1sk: ${discoveredAt})
  */
+const ALL_STATUSES: DiscoveryStatus[] = [
+  "pending_metadata",
+  "pending_content",
+  "approved",
+  "rejected",
+];
+
 export class DiscoveredSourceEntity {
   private model;
 
@@ -189,20 +196,29 @@ export class DiscoveredSourceEntity {
   }
 
   /**
-   * Get all discovered sources (all statuses).
+   * Get all discovered sources (all statuses) via parallel GSI queries.
    */
-  async getAll(): Promise<DiscoveredSource[]> {
-    const items = await this.model.scan({} as never);
-    return items.map((item) =>
-      this.toExternal(item as unknown as Record<string, unknown>),
+  async getAll(options?: { limit?: number }): Promise<DiscoveredSource[]> {
+    const perStatus = options?.limit
+      ? Math.ceil(options.limit / ALL_STATUSES.length)
+      : undefined;
+    const results = await Promise.all(
+      ALL_STATUSES.map((s) =>
+        this.getByStatus(s, perStatus ? { limit: perStatus } : undefined),
+      ),
     );
+    const merged = results.flat();
+    return options?.limit ? merged.slice(0, options.limit) : merged;
   }
 
   /**
    * Get discovered sources by status via gsi1.
    * Results are ordered by discoveredAt (newest first).
    */
-  async getByStatus(status: DiscoveryStatus): Promise<DiscoveredSource[]> {
+  async getByStatus(
+    status: DiscoveryStatus,
+    options?: { limit?: number },
+  ): Promise<DiscoveredSource[]> {
     const items = await this.model.find(
       {
         gsi1pk: `Discovery#${status}`,
@@ -210,6 +226,7 @@ export class DiscoveredSourceEntity {
       {
         index: "gsi1",
         reverse: true, // newest first
+        ...(options?.limit ? { limit: options.limit } : {}),
       },
     );
     return items.map((item) =>

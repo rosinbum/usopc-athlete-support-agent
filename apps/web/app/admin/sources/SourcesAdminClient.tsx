@@ -190,6 +190,13 @@ export function SourcesAdminClient() {
     page * ITEMS_PER_PAGE,
   );
 
+  const detailNav = useMemo(() => {
+    const idx = openSourceId
+      ? sorted.findIndex((s) => s.id === openSourceId)
+      : -1;
+    return { idx, hasPrev: idx > 0, hasNext: idx < sorted.length - 1 };
+  }, [sorted, openSourceId]);
+
   // -------------------------------------------------------------------------
   // Selection
   // -------------------------------------------------------------------------
@@ -669,17 +676,15 @@ export function SourcesAdminClient() {
             id={openSourceId}
             onClose={() => setOpenSourceId(null)}
             onMutate={() => mutate()}
-            hasPrev={sorted.findIndex((s) => s.id === openSourceId) > 0}
-            hasNext={
-              sorted.findIndex((s) => s.id === openSourceId) < sorted.length - 1
-            }
+            hasPrev={detailNav.hasPrev}
+            hasNext={detailNav.hasNext}
             onPrev={() => {
-              const idx = sorted.findIndex((s) => s.id === openSourceId);
-              if (idx > 0) setOpenSourceId(sorted[idx - 1]!.id);
+              if (detailNav.idx > 0)
+                setOpenSourceId(sorted[detailNav.idx - 1]!.id);
             }}
             onNext={() => {
-              const idx = sorted.findIndex((s) => s.id === openSourceId);
-              if (idx < sorted.length - 1) setOpenSourceId(sorted[idx + 1]!.id);
+              if (detailNav.idx < sorted.length - 1)
+                setOpenSourceId(sorted[detailNav.idx + 1]!.id);
             }}
           />
         )}

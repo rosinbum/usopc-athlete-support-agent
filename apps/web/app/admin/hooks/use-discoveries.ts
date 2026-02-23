@@ -9,6 +9,7 @@ import { fetcher, mutationFetcher } from "./fetcher.js";
 
 interface DiscoveriesResponse {
   discoveries: DiscoveredSource[];
+  hasMore?: boolean;
 }
 
 export function useDiscoveries(status?: DiscoveryStatus | "") {
@@ -24,6 +25,7 @@ export function useDiscoveries(status?: DiscoveryStatus | "") {
 
   return {
     discoveries: data?.discoveries ?? [],
+    hasMore: data?.hasMore ?? false,
     isLoading,
     error,
     mutate,

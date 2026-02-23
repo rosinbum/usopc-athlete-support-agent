@@ -29,12 +29,24 @@ export async function GET(request: NextRequest) {
       return apiError("Invalid status filter", 400);
     }
 
-    const entity = createDiscoveredSourceEntity();
-    const discoveries = status
-      ? await entity.getByStatus(status as DiscoveryStatus)
-      : await entity.getAll();
+    const limitParam = request.nextUrl.searchParams.get("limit");
+    const limit = limitParam
+      ? Math.max(1, Math.min(5000, Number(limitParam) || 1000))
+      : 1000;
 
-    return NextResponse.json({ discoveries });
+    const entity = createDiscoveredSourceEntity();
+    const fetchLimit = limit + 1; // fetch N+1 to detect hasMore
+    const discoveries = status
+      ? await entity.getByStatus(status as DiscoveryStatus, {
+          limit: fetchLimit,
+        })
+      : await entity.getAll({ limit: fetchLimit });
+
+    const hasMore = discoveries.length > limit;
+    return NextResponse.json({
+      discoveries: hasMore ? discoveries.slice(0, limit) : discoveries,
+      hasMore,
+    });
   } catch (error) {
     log.error("Admin discoveries list error", { error: String(error) });
     return apiError("Failed to fetch discoveries", 500);

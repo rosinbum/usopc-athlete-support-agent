@@ -38,14 +38,23 @@ const createSourceSchema = z.object({
 // GET — list all sources
 // ---------------------------------------------------------------------------
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
   try {
+    const limitParam = request.nextUrl.searchParams.get("limit");
+    const limit = limitParam
+      ? Math.max(1, Math.min(5000, Number(limitParam) || 1000))
+      : 1000;
+
     const entity = createSourceConfigEntity();
     const sources = await entity.getAll();
-    return NextResponse.json({ sources });
+    const hasMore = sources.length > limit;
+    return NextResponse.json({
+      sources: hasMore ? sources.slice(0, limit) : sources,
+      hasMore,
+    });
   } catch (error) {
     log.error("Admin sources list error", { error: String(error) });
     return apiError("Failed to fetch sources", 500);

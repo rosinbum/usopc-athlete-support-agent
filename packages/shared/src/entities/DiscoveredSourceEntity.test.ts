@@ -153,26 +153,60 @@ describe("DiscoveredSourceEntity", () => {
   });
 
   describe("getAll", () => {
-    it("should return all discovered sources", async () => {
-      mockScan.mockResolvedValue([
-        internalItem(),
-        internalItem({ id: "xyz789", url: "https://example.com" }),
-      ]);
+    it("should query all 4 statuses via parallel GSI queries", async () => {
+      mockFind
+        .mockResolvedValueOnce([internalItem({ status: "pending_metadata" })])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          internalItem({
+            id: "xyz789",
+            url: "https://example.com",
+            status: "approved",
+          }),
+        ])
+        .mockResolvedValueOnce([]);
 
       const results = await entity.getAll();
 
       expect(results).toHaveLength(2);
-      expect(results[0]!.id).toBe("abc123");
-      expect(results[1]!.id).toBe("xyz789");
-      expect(mockScan).toHaveBeenCalledWith({});
+      expect(mockFind).toHaveBeenCalledTimes(4);
+      expect(mockFind).toHaveBeenCalledWith(
+        { gsi1pk: "Discovery#pending_metadata" },
+        expect.objectContaining({ index: "gsi1" }),
+      );
+      expect(mockFind).toHaveBeenCalledWith(
+        { gsi1pk: "Discovery#approved" },
+        expect.objectContaining({ index: "gsi1" }),
+      );
     });
 
-    it("should return empty array if no sources", async () => {
-      mockScan.mockResolvedValue([]);
+    it("should return empty array if no sources in any status", async () => {
+      mockFind.mockResolvedValue([]);
 
       const results = await entity.getAll();
 
       expect(results).toEqual([]);
+    });
+
+    it("should split limit across statuses and trim result", async () => {
+      // With limit=2, each status gets ceil(2/4)=1
+      mockFind
+        .mockResolvedValueOnce([
+          internalItem({ id: "a", status: "pending_metadata" }),
+        ])
+        .mockResolvedValueOnce([
+          internalItem({ id: "b", status: "pending_content" }),
+        ])
+        .mockResolvedValueOnce([internalItem({ id: "c", status: "approved" })])
+        .mockResolvedValueOnce([]);
+
+      const results = await entity.getAll({ limit: 2 });
+
+      expect(results).toHaveLength(2);
+      // Each status query should receive limit=1 (ceil(2/4))
+      for (const call of mockFind.mock.calls) {
+        expect(call[1]).toEqual(expect.objectContaining({ limit: 1 }));
+      }
     });
   });
 
@@ -196,6 +230,17 @@ describe("DiscoveredSourceEntity", () => {
       const results = await entity.getByStatus("rejected");
 
       expect(results).toEqual([]);
+    });
+
+    it("should pass limit option to model.find", async () => {
+      mockFind.mockResolvedValue([internalItem({ status: "approved" })]);
+
+      await entity.getByStatus("approved", { limit: 10 });
+
+      expect(mockFind).toHaveBeenCalledWith(
+        { gsi1pk: "Discovery#approved" },
+        { index: "gsi1", reverse: true, limit: 10 },
+      );
     });
   });
 

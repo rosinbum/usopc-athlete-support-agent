@@ -41,8 +41,18 @@ const VALID_CREATE_BODY = {
 };
 
 // ---------------------------------------------------------------------------
-// Helper to build a Request with JSON body
+// Helpers
 // ---------------------------------------------------------------------------
+
+function buildRequest(params?: Record<string, string>) {
+  const url = new URL("http://localhost/api/admin/sources");
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      url.searchParams.set(k, v);
+    }
+  }
+  return { nextUrl: url } as unknown as import("next/server").NextRequest;
+}
 
 function jsonRequest(body: unknown): Request {
   return new Request("http://localhost/api/admin/sources", {
@@ -64,7 +74,7 @@ describe("GET /api/admin/sources", () => {
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValueOnce(null as never);
 
-    const res = await GET();
+    const res = await GET(buildRequest());
     const body = await res.json();
 
     expect(res.status).toBe(401);
@@ -76,14 +86,14 @@ describe("GET /api/admin/sources", () => {
       user: { email: "user@example.com" },
     } as never);
 
-    const res = await GET();
+    const res = await GET(buildRequest());
     const body = await res.json();
 
     expect(res.status).toBe(403);
     expect(body.error).toBe("Forbidden");
   });
 
-  it("returns sources list", async () => {
+  it("returns sources list with hasMore false", async () => {
     mockAuth.mockResolvedValueOnce({
       user: { email: "admin@test.com" },
     } as never);
@@ -91,12 +101,49 @@ describe("GET /api/admin/sources", () => {
       getAll: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCES),
     } as never);
 
-    const res = await GET();
+    const res = await GET(buildRequest());
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body.sources).toHaveLength(2);
     expect(body.sources[0].id).toBe("src1");
+    expect(body.hasMore).toBe(false);
+  });
+
+  it("returns hasMore true when dataset exceeds limit", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+    const manySources = Array.from({ length: 3 }, (_, i) => ({
+      id: `src${i}`,
+      title: `Source ${i}`,
+    }));
+    mockCreateEntity.mockReturnValueOnce({
+      getAll: vi.fn().mockResolvedValueOnce(manySources),
+    } as never);
+
+    const res = await GET(buildRequest({ limit: "2" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.sources).toHaveLength(2);
+    expect(body.hasMore).toBe(true);
+  });
+
+  it("respects custom limit query param", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com" },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getAll: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCES),
+    } as never);
+
+    const res = await GET(buildRequest({ limit: "1" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.sources).toHaveLength(1);
+    expect(body.hasMore).toBe(true);
   });
 
   it("returns 500 on error", async () => {
@@ -107,7 +154,7 @@ describe("GET /api/admin/sources", () => {
       getAll: vi.fn().mockRejectedValueOnce(new Error("DynamoDB error")),
     } as never);
 
-    const res = await GET();
+    const res = await GET(buildRequest());
     const body = await res.json();
 
     expect(res.status).toBe(500);
