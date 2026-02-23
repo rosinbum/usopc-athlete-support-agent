@@ -352,6 +352,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
         [
           "values",
           {
+            answer: "Generic answer",
             qualityCheckResult: {
               passed: false,
               score: 0.3,
@@ -391,6 +392,70 @@ describe("agentStreamToEvents (dual-mode)", () => {
       .filter((e) => e.type === "text-delta");
     expect(textDeltasBefore.length).toBeGreaterThan(0);
     expect(textDeltasAfter.length).toBeGreaterThan(0);
+  });
+
+  it("does not re-emit old answer after answer-reset when values chunk includes answer", async () => {
+    // Simulates real LangGraph behavior: "values" chunks always include the full
+    // cumulative state, so state.answer still holds the old synthesizer answer
+    // when qualityCheckResult fails. The old answer must not be re-emitted.
+    const events = await collectEvents(
+      mockDualStream([
+        [
+          "messages",
+          [{ content: "Generic " }, { langgraph_node: "synthesizer" }],
+        ],
+        [
+          "messages",
+          [{ content: "answer" }, { langgraph_node: "synthesizer" }],
+        ],
+        [
+          "values",
+          {
+            answer: "Generic answer",
+            qualityCheckResult: {
+              passed: false,
+              score: 0.3,
+              issues: [
+                {
+                  type: "generic_response",
+                  description: "Too generic",
+                  severity: "major",
+                },
+              ],
+              critique: "Be more specific.",
+            },
+          },
+        ],
+        // Retry synthesizer tokens
+        [
+          "messages",
+          [{ content: "Specific " }, { langgraph_node: "synthesizer" }],
+        ],
+        [
+          "messages",
+          [{ content: "answer" }, { langgraph_node: "synthesizer" }],
+        ],
+      ]),
+    );
+
+    const resetIndex = events.findIndex((e) => e.type === "answer-reset");
+    expect(resetIndex).toBeGreaterThan(-1);
+
+    // New synthesizer tokens should arrive after the reset
+    const textDeltasAfter = events
+      .slice(resetIndex + 1)
+      .filter((e) => e.type === "text-delta");
+    expect(textDeltasAfter.length).toBeGreaterThan(0);
+
+    // The old answer must NOT be re-emitted after the reset.
+    // Without the fix, the values chunk re-emits "Generic answer" as a delta
+    // before the new synthesizer tokens, so the combined text would start with
+    // "Generic answer" again. With the fix it should only contain the retry tokens.
+    const combinedAfter = textDeltasAfter
+      .map((e) => (e as { type: "text-delta"; textDelta: string }).textDelta)
+      .join("");
+    expect(combinedAfter).toBe("Specific answer");
+    expect(combinedAfter).not.toContain("Generic answer");
   });
 
   it("does not emit answer-reset when quality check passes", async () => {
