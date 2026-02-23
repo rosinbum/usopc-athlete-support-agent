@@ -8,7 +8,6 @@ import {
   type SlackSlashCommand,
 } from "./handlers/slashCommand.js";
 import { postMessage } from "./slack/client.js";
-import { buildErrorBlocks } from "./slack/blocks.js";
 
 const logger = createLogger({ service: "slack-bot" });
 
@@ -109,13 +108,18 @@ app.post("/slack/interactions", async (c) => {
           action.action_id === "feedback_not_helpful"
         ) {
           const isHelpful = action.action_id === "feedback_helpful";
+          const messageTs = payload.message?.ts as string | undefined;
+          const threadTs = payload.message?.thread_ts as string | undefined;
           logger.info("Feedback received", {
             helpful: isHelpful,
             user: payload.user?.id,
             channel: payload.channel?.id,
+            messageTs,
+            threadTs,
           });
 
-          // TODO: Store feedback via tRPC API
+          // TODO: Store feedback via tRPC API once the feedback endpoint
+          // supports Slack message timestamps (currently expects UUID messageId).
 
           // Acknowledge with ephemeral-style update
           try {

@@ -11,6 +11,10 @@ import { createAgentGraph } from "./graph.js";
 import { GRAPH_CONFIG, createAgentModels } from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
 import { nodeMetrics } from "./nodeMetrics.js";
+import {
+  generateSummary,
+  saveSummary,
+} from "../services/conversationMemory.js";
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
 
@@ -157,11 +161,28 @@ export class AgentRunner {
       "graph.invoke",
     );
 
-    return {
+    const output: AgentOutput = {
       answer: finalState.answer ?? "",
       citations: finalState.citations ?? [],
       escalation: finalState.escalation,
     };
+
+    // Fire-and-forget: save conversation summary for multi-turn context
+    if (input.conversationId && initialState.conversationId) {
+      generateSummary(
+        input.messages,
+        input.conversationSummary,
+        this._classifierModel,
+      )
+        .then((s) => saveSummary(input.conversationId!, s))
+        .catch((e) =>
+          log.error("Failed to save conversation summary", {
+            error: String(e),
+          }),
+        );
+    }
+
+    return output;
   }
 
   /**
@@ -199,6 +220,21 @@ export class AgentRunner {
       // LangGraph emits [mode, data] tuples when using array streamMode
       yield chunk as StreamChunk;
     }
+
+    // Runs after consumer finishes iterating the generator
+    if (input.conversationId && initialState.conversationId) {
+      generateSummary(
+        input.messages,
+        input.conversationSummary,
+        this._classifierModel,
+      )
+        .then((s) => saveSummary(input.conversationId!, s))
+        .catch((e) =>
+          log.error("Failed to save conversation summary", {
+            error: String(e),
+          }),
+        );
+    }
   }
 
   /**
@@ -208,10 +244,11 @@ export class AgentRunner {
 
   /**
    * Validates a conversationId for safe use in LangSmith metadata.
-   * Accepts UUIDs and alphanumeric strings with hyphens/underscores (max 128 chars).
+   * Accepts UUIDs, alphanumeric strings with hyphens/underscores, and dots
+   * (needed for Slack timestamps like "1234567890.123456").
    */
   private static isValidConversationId(id: string): boolean {
-    return /^[a-zA-Z0-9_-]{1,128}$/.test(id);
+    return /^[a-zA-Z0-9._-]{1,128}$/.test(id);
   }
 
   private buildInitialState(input: AgentInput): Record<string, unknown> {

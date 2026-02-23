@@ -93,11 +93,12 @@ export default $config({
         rate: 60,
       },
     });
-    // Slack bot webhook
+    // Slack bot webhook — $default catches /slack/events, /slack/commands,
+    // and /slack/interactions so all Slack endpoints route to one Lambda.
     const slackApi = new sst.aws.ApiGatewayV2("SlackApi");
-    slackApi.route("POST /slack/events", {
+    slackApi.route("$default", {
       handler: "apps/slack/src/index.handler",
-      link: [...linkables, slackBotToken, slackSigningSecret],
+      link: [...linkables, slackBotToken, slackSigningSecret, appTable],
       timeout: "120 seconds",
       memory: "512 MB",
       environment: {

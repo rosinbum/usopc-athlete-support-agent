@@ -1,7 +1,7 @@
 import { createLogger } from "@usopc/shared";
+import { getAppRunner, convertMessages, getDisclaimer } from "@usopc/core";
 import { postMessage } from "../slack/client.js";
 import { buildAnswerBlocks, buildErrorBlocks } from "../slack/blocks.js";
-import { getDisclaimer } from "@usopc/core";
 
 const logger = createLogger({ service: "slack-slash-command" });
 
@@ -49,7 +49,7 @@ export async function handleSlashCommand(
   // Immediate acknowledgement (shown only to the user)
   return {
     response_type: "ephemeral",
-    text: "⏳ Looking into that for you...",
+    text: "\u23f3 Looking into that for you...",
   };
 }
 
@@ -59,16 +59,22 @@ async function processSlashCommandAsync(
   userId: string,
 ): Promise<void> {
   try {
-    // TODO: Invoke the LangGraph agent once wired up.
-    const answer =
-      `<@${userId}> asked: _${query}_\n\n` +
-      "The USOPC Athlete Support Agent is being set up. " +
-      "Once fully connected, I'll be able to help with team selection, dispute resolution, " +
-      "SafeSport, anti-doping, eligibility, governance, and athlete rights questions.";
+    const runner = await getAppRunner();
+    const messages = convertMessages([{ role: "user", content: query }]);
 
+    // Slash commands are stateless — no conversationId or summary
+    const { answer, citations, escalation } = await runner.invoke({ messages });
+
+    const preamble = `<@${userId}> asked: _${query}_\n\n`;
+    const fullAnswer = preamble + answer;
     const disclaimer = getDisclaimer();
-    const blocks = buildAnswerBlocks(answer, [], disclaimer);
-    await postMessage(channel, answer, blocks);
+    const blocks = buildAnswerBlocks(
+      fullAnswer,
+      citations,
+      disclaimer,
+      escalation,
+    );
+    await postMessage(channel, fullAnswer, blocks);
   } catch (error) {
     logger.error("Failed to process slash command", {
       error: error instanceof Error ? error.message : String(error),

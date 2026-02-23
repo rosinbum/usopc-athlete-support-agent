@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Track calls to initRunner logic via the mocked @usopc/shared
+// Track calls to getAppRunner via the mocked @usopc/core
 let shouldFailInit = false;
 let initCallCount = 0;
+
+const mockRunner = {
+  stream: vi.fn(),
+  classifierModel: {},
+};
 
 vi.mock("@usopc/shared", () => ({
   logger: {
@@ -16,22 +21,15 @@ vi.mock("@usopc/shared", () => ({
       return { url: "https://sqs.us-east-1.amazonaws.com/test-queue" };
     throw new Error(`SST Resource '${key}' not available`);
   }),
-  getDatabaseUrl: vi.fn(() => {
-    initCallCount++;
-    if (shouldFailInit) throw new Error("Missing DATABASE_URL");
-    return "postgres://localhost/test";
-  }),
-  getSecretValue: vi.fn(() => "test-key"),
-  getOptionalEnv: vi.fn(() => undefined),
-  createConversationSummaryEntity: vi.fn(() => ({})),
 }));
 
 vi.mock("@usopc/core", () => ({
+  getAppRunner: vi.fn(async () => {
+    initCallCount++;
+    if (shouldFailInit) throw new Error("Missing DATABASE_URL");
+    return mockRunner;
+  }),
   AgentRunner: {
-    create: vi.fn(async () => ({
-      stream: vi.fn(),
-      classifierModel: {},
-    })),
     convertMessages: vi.fn(() => []),
   },
   agentStreamToEvents: vi.fn(() => ({
@@ -40,11 +38,7 @@ vi.mock("@usopc/core", () => ({
     }),
   })),
   loadSummary: vi.fn(),
-  saveSummary: vi.fn(),
-  generateSummary: vi.fn(async () => ""),
   publishDiscoveredUrls: vi.fn(),
-  setSummaryStore: vi.fn(),
-  DynamoSummaryStore: vi.fn(() => ({})),
 }));
 
 vi.mock("sst", () => ({
@@ -100,31 +94,6 @@ describe("POST /api/chat", () => {
     expect(body.error).toBe("Something went wrong. Please try again.");
     // Should not leak stack traces
     expect(body.stack).toBeUndefined();
-  });
-
-  it("clears cached runner after failure so next call retries", async () => {
-    shouldFailInit = true;
-
-    const { POST } = await importRoute();
-
-    // First request fails
-    const req1 = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({ messages: [{ role: "user", content: "Hello" }] }),
-      headers: { "Content-Type": "application/json" },
-    });
-    await POST(req1);
-    const countAfterFirst = initCallCount;
-
-    // Second request should retry (not serve cached rejection)
-    const req2 = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({ messages: [{ role: "user", content: "Hello" }] }),
-      headers: { "Content-Type": "application/json" },
-    });
-    await POST(req2);
-
-    expect(initCallCount).toBeGreaterThan(countAfterFirst);
   });
 
   it("returns 500 on malformed request body", async () => {
@@ -356,7 +325,7 @@ describe("concurrent runner initialization", () => {
     vi.resetModules();
   });
 
-  it("shares runner promise across concurrent requests", async () => {
+  it("calls getAppRunner for each request (caching is in the factory)", async () => {
     const { POST } = await importRoute();
 
     const makeReq = () =>
@@ -368,14 +337,15 @@ describe("concurrent runner initialization", () => {
         headers: { "Content-Type": "application/json" },
       });
 
-    // First request warms the runner singleton
+    // First request
     const res1 = await POST(makeReq());
     expect(res1.status).toBe(200);
-    expect(initCallCount).toBe(1);
 
-    // Second request reuses the cached runner — no additional init
+    // Second request
     const res2 = await POST(makeReq());
     expect(res2.status).toBe(200);
-    expect(initCallCount).toBe(1);
+
+    // getAppRunner is called for each request; caching happens inside the factory
+    expect(initCallCount).toBe(2);
   });
 });
