@@ -1,7 +1,7 @@
 import { WebClient } from "@slack/web-api";
 import {
   CircuitBreaker,
-  getRequiredEnv,
+  getSecretValue,
   logger,
   type CircuitBreakerMetrics,
 } from "@usopc/shared";
@@ -29,7 +29,7 @@ let client: WebClient | undefined;
 
 export function getSlackClient(): WebClient {
   if (!client) {
-    client = new WebClient(getRequiredEnv("SLACK_BOT_TOKEN"));
+    client = new WebClient(getSecretValue("SLACK_BOT_TOKEN", "SlackBotToken"));
   }
   return client;
 }
