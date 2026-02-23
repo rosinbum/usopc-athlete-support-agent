@@ -36,8 +36,7 @@ const LOCAL_DEV_DATABASE_URL =
  *
  * Resolution order:
  *   1. `DATABASE_URL` environment variable (set directly or via .env)
- *   2. SST Resource binding (`Resource.Database` with `host`, `port`,
- *      `username`, `password`, `database` fields).
+ *   2. SST Secret binding (`Resource.DatabaseUrl.value`)
  *   3. In development mode, falls back to the standard local Docker URL.
  *   4. Throws if neither source is available.
  */
@@ -47,17 +46,16 @@ export function getDatabaseUrl(): string {
     return directUrl;
   }
 
-  // Attempt to use SST Resource binding (Database only exists in production stage)
   try {
-    const db = (Resource as unknown as Record<string, Record<string, string>>)
-      .Database!;
-    return `postgresql://${encodeURIComponent(db["username"]!)}:${encodeURIComponent(db["password"]!)}@${db["host"]!}:${db["port"]!}/${db["database"]!}`;
+    const secret = (Resource as unknown as { DatabaseUrl: { value: string } })
+      .DatabaseUrl;
+    return secret.value;
   } catch {
     if (isDevelopment()) {
       return LOCAL_DEV_DATABASE_URL;
     }
     throw new Error(
-      "DATABASE_URL is not set and SST Database resource is not available. " +
+      "DATABASE_URL is not set and SST DatabaseUrl secret is not available. " +
         "Provide DATABASE_URL or deploy with SST resource bindings.",
     );
   }

@@ -201,18 +201,18 @@ The discovery pipeline runs automatically via EventBridge cron:
 
 ## Infrastructure (SST)
 
-Defined in `sst.config.ts`. Production uses Aurora Serverless v2 with pgvector; dev stages use local Docker Postgres at `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`.
+Defined in `sst.config.ts`. Deployed stages (staging, production) use Neon Postgres with pgvector via the `DatabaseUrl` SST secret; dev stages use local Docker Postgres at `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`.
 
-| Component | Development                         | Production               |
-| --------- | ----------------------------------- | ------------------------ |
-| Database  | Local Docker Postgres with pgvector | Aurora Serverless v2     |
-| API       | Local Lambda emulation via SST      | API Gateway + Lambda     |
-| Web       | Next.js dev server                  | CloudFront + Lambda@Edge |
-| Secrets   | SST dev secrets                     | SST encrypted secrets    |
+| Component | Development                         | Production                     |
+| --------- | ----------------------------------- | ------------------------------ |
+| Database  | Local Docker Postgres with pgvector | Neon Postgres (via SST Secret) |
+| API       | Local Lambda emulation via SST      | API Gateway + Lambda           |
+| Web       | Next.js dev server                  | CloudFront + Lambda@Edge       |
+| Secrets   | SST dev secrets                     | SST encrypted secrets          |
 
 **SST Resources:**
 
-- **Secrets**: `AnthropicApiKey`, `OpenaiApiKey`, `TavilyApiKey`, `LangchainApiKey`, `SlackBotToken`, `SlackSigningSecret`, `AuthSecret`, `GitHubClientId`, `GitHubClientSecret`, `AdminEmails`, `ConversationMaxTurns`
+- **Secrets**: `AnthropicApiKey`, `OpenaiApiKey`, `TavilyApiKey`, `LangchainApiKey`, `SlackBotToken`, `SlackSigningSecret`, `AuthSecret`, `GitHubClientId`, `GitHubClientSecret`, `AdminEmails`, `ConversationMaxTurns`, `DatabaseUrl`
 - **DynamoDB**: `AppTable` (single-table design for SourceConfigs, DiscoveredSources, UsageMetrics, and other entities with GSIs for querying by status, date, etc.)
 - **S3**: `DocumentsBucket` (cached documents with versioning)
 - **APIs**: `Api` (main tRPC), `SlackApi` (Slack events)
@@ -232,11 +232,16 @@ let pool: Pool | null = null;
 
 export function getPool(): Pool {
   if (!pool) {
+    const connectionString = getDatabaseUrl();
+    const needsSsl =
+      connectionString.includes("neon.tech") ||
+      connectionString.includes("sslmode=require");
     pool = new Pool({
-      connectionString: getDatabaseUrl(),
+      connectionString,
       max: 5,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
+      ...(needsSsl ? { ssl: { rejectUnauthorized: false } } : {}),
     });
   }
   return pool;
@@ -254,7 +259,7 @@ export function getPool(): Pool {
 **Connection string resolution** (`getDatabaseUrl()` in `packages/shared/src/env.ts`):
 
 1. `DATABASE_URL` environment variable (highest priority)
-2. SST Resource binding (`Resource.Database` — host, port, username, password, database fields)
+2. SST Secret binding (`Resource.DatabaseUrl.value`)
 3. Development fallback: `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`
 4. Throws if none available
 
@@ -266,10 +271,10 @@ export function getPool(): Pool {
 
 **Exhaustion behavior:** When all 5 connections are in use, `pg.Pool` queues additional requests internally. If a connection isn't released within `connectionTimeoutMillis` (5s), the queued request rejects with a timeout error.
 
-| Environment | Database                            | Pool behavior                                   |
-| ----------- | ----------------------------------- | ----------------------------------------------- |
-| Development | Local Docker Postgres with pgvector | Single pool, 5 connections to localhost         |
-| Production  | Aurora Serverless v2                | 5 connections per Lambda instance, auto-scaling |
+| Environment | Database                            | Pool behavior                                            |
+| ----------- | ----------------------------------- | -------------------------------------------------------- |
+| Development | Local Docker Postgres with pgvector | Single pool, 5 connections to localhost                  |
+| Production  | Neon Postgres (SSL)                 | 5 connections per Lambda instance, Neon built-in pooling |
 
 ## LangGraph State Management
 
