@@ -94,19 +94,17 @@ vi.mock("@usopc/core", async () => {
     await import("../../../../../packages/core/src/agent/streamAdapter.js");
   return {
     agentStreamToEvents,
+    getAppRunner: vi.fn(async () => ({
+      stream: mockRunnerStream,
+      classifierModel: {},
+    })),
     AgentRunner: {
-      create: vi.fn(async () => ({
-        stream: mockRunnerStream,
-        classifierModel: {},
-      })),
       convertMessages: vi.fn((msgs: unknown[]) => msgs),
     },
     loadSummary: mockLoadSummary,
     saveSummary: mockSaveSummary,
     generateSummary: mockGenerateSummary,
     publishDiscoveredUrls: mockPublishDiscoveredUrls,
-    setSummaryStore: vi.fn(),
-    DynamoSummaryStore: vi.fn(() => ({})),
   };
 });
 
@@ -382,13 +380,12 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
   });
 
   // -------------------------------------------------------------------
-  // 8. Summary save fire-and-forget
+  // 8. Summary save (now automatic inside runner.stream())
   // -------------------------------------------------------------------
-  describe("summary save fire-and-forget", () => {
-    it("generates and saves summary when conversationId present", async () => {
+  describe("summary save", () => {
+    it("does not call generateSummary/saveSummary from the route (handled by runner)", async () => {
       const convId = "123e4567-e89b-12d3-a456-426614174000";
       mockRunnerStream.mockReturnValue(fakeStream([]));
-      mockGenerateSummary.mockResolvedValue("new summary");
 
       const { POST } = await importRoute();
       await POST(
@@ -399,17 +396,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       );
       await waitForFireAndForget();
 
-      expect(mockGenerateSummary).toHaveBeenCalled();
-      expect(mockSaveSummary).toHaveBeenCalledWith(convId, "new summary");
-    });
-
-    it("does not save summary when no conversationId", async () => {
-      mockRunnerStream.mockReturnValue(fakeStream([]));
-
-      const { POST } = await importRoute();
-      await POST(makePOSTRequest(simpleBody));
-      await waitForFireAndForget();
-
+      // Summary save moved into AgentRunner.stream() — route no longer calls these
       expect(mockGenerateSummary).not.toHaveBeenCalled();
       expect(mockSaveSummary).not.toHaveBeenCalled();
     });

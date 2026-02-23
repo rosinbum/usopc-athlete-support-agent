@@ -1,7 +1,12 @@
 import { createLogger } from "@usopc/shared";
+import {
+  getAppRunner,
+  loadSummary,
+  convertMessages,
+  getDisclaimer,
+} from "@usopc/core";
 import { postMessage, addReaction } from "../slack/client.js";
 import { buildAnswerBlocks, buildErrorBlocks } from "../slack/blocks.js";
-import { getDisclaimer } from "@usopc/core";
 
 const logger = createLogger({ service: "slack-mention" });
 
@@ -38,14 +43,19 @@ export async function handleMention(event: SlackMentionEvent): Promise<void> {
   await addReaction(channel, ts, "eyes");
 
   try {
-    // TODO: Invoke the LangGraph agent once wired up.
-    const answer =
-      "Thank you for your question. The USOPC Athlete Support Agent is being set up. " +
-      "Once fully connected, I'll be able to help with team selection, dispute resolution, " +
-      "SafeSport, anti-doping, eligibility, governance, and athlete rights questions.";
+    const runner = await getAppRunner();
+    const conversationId = thread_ts ?? ts;
+    const conversationSummary = await loadSummary(conversationId);
+    const messages = convertMessages([{ role: "user", content: cleanedText }]);
+
+    const { answer, citations, escalation } = await runner.invoke({
+      messages,
+      conversationId,
+      conversationSummary,
+    });
 
     const disclaimer = getDisclaimer();
-    const blocks = buildAnswerBlocks(answer, [], disclaimer);
+    const blocks = buildAnswerBlocks(answer, citations, disclaimer, escalation);
     await postMessage(channel, answer, blocks, thread_ts ?? ts);
   } catch (error) {
     logger.error("Failed to handle mention", {

@@ -1,7 +1,12 @@
 import { createLogger } from "@usopc/shared";
+import {
+  getAppRunner,
+  loadSummary,
+  convertMessages,
+  getDisclaimer,
+} from "@usopc/core";
 import { postMessage, addReaction } from "../slack/client.js";
 import { buildAnswerBlocks, buildErrorBlocks } from "../slack/blocks.js";
-import { getDisclaimer } from "@usopc/core";
 
 const logger = createLogger({ service: "slack-message" });
 
@@ -23,7 +28,7 @@ export async function handleMessage(event: SlackMessageEvent): Promise<void> {
   // Only handle DMs
   if (event.channel_type !== "im") return;
 
-  const { channel, text, ts, user } = event;
+  const { channel, text, ts, user, thread_ts } = event;
   if (!text || !text.trim()) return;
 
   logger.info("Handling DM", { user, channel });
@@ -32,17 +37,20 @@ export async function handleMessage(event: SlackMessageEvent): Promise<void> {
   await addReaction(channel, ts, "eyes");
 
   try {
-    // TODO: Invoke the LangGraph agent once wired up.
-    // For now, return a placeholder response demonstrating the block format.
-    const answer =
-      "Thank you for your question. The USOPC Athlete Support Agent is being set up. " +
-      "Once fully connected, I'll be able to help with team selection, dispute resolution, " +
-      "SafeSport, anti-doping, eligibility, governance, and athlete rights questions.";
+    const runner = await getAppRunner();
+    const conversationId = thread_ts ?? ts;
+    const conversationSummary = await loadSummary(conversationId);
+    const messages = convertMessages([{ role: "user", content: text.trim() }]);
+
+    const { answer, citations, escalation } = await runner.invoke({
+      messages,
+      conversationId,
+      conversationSummary,
+    });
 
     const disclaimer = getDisclaimer();
-
-    const blocks = buildAnswerBlocks(answer, [], disclaimer);
-    await postMessage(channel, answer, blocks, ts);
+    const blocks = buildAnswerBlocks(answer, citations, disclaimer, escalation);
+    await postMessage(channel, answer, blocks, thread_ts ?? ts);
   } catch (error) {
     logger.error("Failed to handle message", {
       error: error instanceof Error ? error.message : String(error),
@@ -53,6 +61,11 @@ export async function handleMessage(event: SlackMessageEvent): Promise<void> {
     const blocks = buildErrorBlocks(
       "Sorry, I encountered an error processing your question. Please try again.",
     );
-    await postMessage(channel, "Error processing request", blocks, ts);
+    await postMessage(
+      channel,
+      "Error processing request",
+      blocks,
+      thread_ts ?? ts,
+    );
   }
 }

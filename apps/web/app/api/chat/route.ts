@@ -25,79 +25,6 @@ const ChatRequestSchema = z.object({
 
 const discoveryFeedQueueUrl = getResource("DiscoveryFeedQueue").url;
 
-// Cache a single runner instance per Lambda cold start
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let runnerPromise: Promise<any> | null = null;
-
-async function initRunner() {
-  // Import shared utils first to set env vars
-  const {
-    getDatabaseUrl,
-    getSecretValue,
-    getOptionalEnv,
-    createConversationSummaryEntity,
-  } = await import("@usopc/shared");
-
-  // Set env vars BEFORE importing @usopc/core (which loads LangChain)
-  process.env.ANTHROPIC_API_KEY = getSecretValue(
-    "ANTHROPIC_API_KEY",
-    "AnthropicApiKey",
-  );
-
-  // LangSmith tracing (optional)
-  let langchainApiKey: string | undefined;
-  try {
-    langchainApiKey = getSecretValue("LANGCHAIN_API_KEY", "LangchainApiKey");
-    log.info("Found LangSmith API key from SST secret");
-  } catch (e) {
-    log.info("LangSmith API key not found in SST secrets", {
-      error: String(e),
-    });
-    langchainApiKey = getOptionalEnv("LANGCHAIN_API_KEY");
-    if (langchainApiKey) {
-      log.info("Found LangSmith API key from env var");
-    }
-  }
-
-  if (langchainApiKey) {
-    process.env.LANGCHAIN_TRACING_V2 = "true";
-    process.env.LANGCHAIN_API_KEY = langchainApiKey;
-    process.env.LANGCHAIN_PROJECT =
-      getOptionalEnv("LANGCHAIN_PROJECT") ?? "usopc-athlete-support";
-    log.info("LangSmith tracing ENABLED", {
-      project: process.env.LANGCHAIN_PROJECT,
-    });
-  } else {
-    log.info("LangSmith tracing DISABLED - no API key found");
-  }
-
-  // Now import the agent (which loads LangChain with env vars set)
-  const { AgentRunner, setSummaryStore, DynamoSummaryStore } =
-    await import("@usopc/core");
-
-  // Replace in-memory store with DynamoDB-backed store
-  const summaryEntity = createConversationSummaryEntity();
-  setSummaryStore(new DynamoSummaryStore(summaryEntity));
-
-  return await AgentRunner.create({
-    databaseUrl: getDatabaseUrl(),
-    openaiApiKey: getSecretValue("OPENAI_API_KEY", "OpenaiApiKey"),
-    tavilyApiKey: getSecretValue("TAVILY_API_KEY", "TavilyApiKey"),
-  });
-}
-
-async function getRunner() {
-  if (!runnerPromise) {
-    runnerPromise = initRunner().catch((err) => {
-      // Clear the cache so the next request retries instead of
-      // permanently returning a rejected promise.
-      runnerPromise = null;
-      throw err;
-    });
-  }
-  return runnerPromise;
-}
-
 export async function POST(req: Request) {
   // Rate limit by client IP (per Lambda instance — add AWS WAF for cross-instance limiting)
   const ip =
@@ -114,20 +41,20 @@ export async function POST(req: Request) {
       return Response.json({ error: "Invalid request" }, { status: 400 });
     }
     const { messages, userSport, conversationId } = parsed.data;
-    const runner = await getRunner();
-    log.info("Runner initialized", {
-      tracingEnabled: process.env.LANGCHAIN_TRACING_V2,
-    });
 
     // Dynamic import to ensure env vars are set first
     const {
+      getAppRunner,
       AgentRunner,
       agentStreamToEvents,
       loadSummary,
-      saveSummary,
-      generateSummary,
       publishDiscoveredUrls,
     } = await import("@usopc/core");
+
+    const runner = await getAppRunner();
+    log.info("Runner initialized", {
+      tracingEnabled: process.env.LANGCHAIN_TRACING_V2,
+    });
 
     // Load existing conversation summary
     let conversationSummary: string | undefined;
@@ -183,20 +110,7 @@ export async function POST(req: Request) {
           }
         }
 
-        // Fire-and-forget: generate and save updated summary after stream completes
-        if (conversationId) {
-          generateSummary(
-            langchainMessages,
-            conversationSummary,
-            runner.classifierModel,
-          )
-            .then((summary: string) => saveSummary(conversationId, summary))
-            .catch((err: unknown) =>
-              log.error("Failed to save conversation summary", {
-                error: String(err),
-              }),
-            );
-        }
+        // Summary save is now automatic inside runner.stream()
 
         // Fire-and-forget: publish discovered URLs to SQS for async evaluation
         if (discoveredUrls.length > 0) {
