@@ -34,7 +34,7 @@ slackUrl: https://abc123.execute-api.us-east-1.amazonaws.com
 1. Go to [https://api.slack.com/apps](https://api.slack.com/apps)
 2. Click **Create New App → From Manifest**
 3. Select your workspace and click **Next**
-4. Open `apps/slack/slack-app-manifest.yml` from this repo
+4. Open `apps/slack/slack-app-manifest.json` from this repo
 5. Replace both occurrences of `REPLACE_WITH_SLACK_URL` with the actual `slackUrl` from Step 1
 6. Paste the updated manifest into the text area and click **Next**
 7. Review the summary (scopes, events, slash command) and click **Create**
@@ -140,7 +140,7 @@ sst deploy --stage production
 
 The production `slackUrl` will be different from staging. Update the Event Subscriptions and Interactivity URLs in the Slack App dashboard to point to the production URL, or create a separate Slack App for production.
 
-If you update `apps/slack/slack-app-manifest.yml` with the real URL, also update the manifest in the Slack App dashboard (**App Manifest** tab) to keep them in sync.
+If you update `apps/slack/slack-app-manifest.json` with the real URL, also update the manifest in the Slack App dashboard (**App Manifest** tab) to keep them in sync.
 
 ---
 
