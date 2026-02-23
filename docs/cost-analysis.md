@@ -10,6 +10,8 @@ Projected monthly costs for production deployment. Based on ~5 daily users with 
 | ---------------------------------------------------- | ---------------: |
 | Current (Sonnet synth + Neon)                        |        **~$310** |
 | GPT-4.1 synth + Neon (after #354)                    |        **~$230** |
+| Gemini 2.5 Pro synth + Neon (after #354)             |        **~$210** |
+| Gemini 2.5 Flash synth + Neon (after #354)           |        **~$105** |
 | Haiku synth + Neon                                   |        **~$175** |
 | Intent-routed (Sonnet for complex, Haiku for simple) |        **~$235** |
 
@@ -57,6 +59,11 @@ The synthesizer dominates — its ~7,500 input tokens include up to 10 retrieved
 - GPT-4o: $2.50 input / $10.00 output per M tokens
 - GPT-4.1-mini: $0.40 input / $1.60 output per M tokens
 
+**Google Gemini API pricing:**
+
+- Gemini 2.5 Pro: $1.25 input / $10.00 output per M tokens
+- Gemini 2.5 Flash: $0.15 input / $0.60 output per M tokens
+
 | Configuration                                 | Per message | Monthly (3.75k) |
 | --------------------------------------------- | ----------: | --------------: |
 | Sonnet synth (current)                        |     ~$0.065 |           ~$244 |
@@ -64,9 +71,28 @@ The synthesizer dominates — its ~7,500 input tokens include up to 10 retrieved
 | GPT-4o synth                                  |     ~$0.051 |           ~$191 |
 | Haiku synth                                   |     ~$0.029 |           ~$109 |
 | GPT-4.1-mini synth                            |     ~$0.019 |            ~$71 |
+| Gemini 2.5 Pro synth                          |     ~$0.041 |           ~$154 |
+| Gemini 2.5 Flash synth                        |     ~$0.013 |            ~$49 |
 | Intent-routed (Sonnet complex / Haiku simple) |     ~$0.045 |           ~$169 |
 
 > **Intent-routed** approach: Use Sonnet for `general` and `procedural` queries (~60%) and Haiku for `factual` and `deadline` queries (~40%). Preserves quality where it matters while saving on simple lookups.
+
+### User impact by model tier
+
+The synthesizer performs multi-document synthesis across up to 10 retrieved governance documents, requiring precise section citations, organization disambiguation across 53 NGBs, gap analysis, and format adherence. Model quality directly affects response accuracy and completeness.
+
+| Tier     | Models                            | Quality impact                                                                                      | Best for                        |
+| -------- | --------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------- |
+| Frontier | Sonnet 4, GPT-4.1, Gemini 2.5 Pro | Baseline — full synthesis, precise citations, strong analytical reasoning                           | All query types                 |
+| Mid-tier | GPT-4o, Gemini 2.5 Flash          | ~10-15% degradation — may miss subtle cross-document connections and less precise section citations | Moderate complexity queries     |
+| Budget   | Haiku 4.5, GPT-4.1-mini           | ~20-30% degradation on complex queries — weaker multi-document synthesis and org distinctions       | Simple factual/deadline lookups |
+
+Key quality dimensions affected by model tier:
+
+- **Citation precision**: Budget models more often cite document titles without specific section/article numbers
+- **Cross-document reasoning**: When multiple NGB policies interact (e.g., USOPC eligibility + NGB selection procedures), frontier models connect provisions more reliably
+- **Gap analysis**: The synthesizer instruction to "analyze what documents' silence means" requires strong reasoning — budget models tend to skip this or provide shallow analysis
+- **Format adherence**: All tiers follow the 4 response formats (factual, procedural, deadline, general), but budget models are more likely to exceed word limits or omit sections
 
 ### Tavily web search (runtime)
 
@@ -146,15 +172,15 @@ SHA-256 content hashing skips unchanged sources. Only ~10% change rate per weekl
 
 ## Monthly Total by Configuration
 
-| Category                     | Sonnet (current) | GPT-4.1 (after #354) |        Haiku |
-| ---------------------------- | ---------------: | -------------------: | -----------: |
-| LLM (runtime)                |             $244 |                 $165 |         $109 |
-| Neon Postgres                |            $0-19 |                $0-19 |        $0-19 |
-| AWS infrastructure           |           $10-29 |               $10-29 |       $10-29 |
-| Tavily (runtime + discovery) |           $16-28 |               $16-28 |       $16-28 |
-| LangSmith                    |               $0 |                   $0 |           $0 |
-| Ingestion (embeddings + LLM) |             $3-7 |                 $3-7 |         $3-7 |
-| **Total**                    |     **$273-327** |         **$194-248** | **$138-192** |
+| Category                     | Sonnet (current) | GPT-4.1 (after #354) | Gemini 2.5 Pro (after #354) |        Haiku |
+| ---------------------------- | ---------------: | -------------------: | --------------------------: | -----------: |
+| LLM (runtime)                |             $244 |                 $165 |                        $154 |         $109 |
+| Neon Postgres                |            $0-19 |                $0-19 |                       $0-19 |        $0-19 |
+| AWS infrastructure           |           $10-29 |               $10-29 |                      $10-29 |       $10-29 |
+| Tavily (runtime + discovery) |           $16-28 |               $16-28 |                      $16-28 |       $16-28 |
+| LangSmith                    |               $0 |                   $0 |                          $0 |           $0 |
+| Ingestion (embeddings + LLM) |             $3-7 |                 $3-7 |                        $3-7 |         $3-7 |
+| **Total**                    |     **$273-327** |         **$194-248** |                **$183-237** | **$138-192** |
 
 ## Cost Optimization Levers
 
@@ -163,6 +189,7 @@ Ordered by impact:
 | Lever                                 |          Savings | Tradeoff                                             | Issue |
 | ------------------------------------- | ---------------: | ---------------------------------------------------- | ----- |
 | Switch synthesizer to GPT-4.1         |          ~$79/mo | Requires multi-provider refactor                     | #354  |
+| Switch synthesizer to Gemini 2.5 Pro  |          ~$90/mo | Requires multi-provider refactor                     | #354  |
 | Switch synthesizer to Haiku           |         ~$135/mo | Degraded synthesis quality on complex queries        | —     |
 | Intent-routed model selection         |          ~$75/mo | Haiku for simple queries, Sonnet for complex         | —     |
 | Replace Aurora with Neon              |      ~$88-157/mo | External dependency (Neon)                           | #345  |
