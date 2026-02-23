@@ -1,0 +1,45 @@
+_metadata:
+  major_version: 1
+  minor_version: 1
+
+display_information:
+  name: Athlete Support
+  description: >-
+    AI-powered governance and compliance assistant for U.S. Olympic and
+    Paralympic athletes. Ask about selection criteria, appeals, anti-doping,
+    funding, and more.
+  background_color: "#0033A0"
+
+features:
+  bot_user:
+    display_name: Athlete Support
+    always_online: true
+  slash_commands:
+    - command: /ask-athlete-support
+      description: Ask the Athlete Support AI a governance or compliance question
+      usage_hint: "[your question here]"
+      should_escape: false
+
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - reactions:write
+      - im:history
+      - im:read
+      - im:write
+      - app_mentions:read
+      - channels:history
+
+settings:
+  event_subscriptions:
+    request_url: https://REPLACE_WITH_SLACK_URL/slack/events
+    bot_events:
+      - message.im
+      - app_mention
+  interactivity:
+    is_enabled: true
+    request_url: https://REPLACE_WITH_SLACK_URL/slack/interactions
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
