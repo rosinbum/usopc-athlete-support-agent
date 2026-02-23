@@ -29,7 +29,8 @@ app.post("/slack/events", async (c) => {
     const rawBody = c.get("rawBody") as string | undefined;
     const payload = rawBody ? JSON.parse(rawBody) : await c.req.json();
 
-    const result = await dispatchEvent(payload);
+    const retryNum = parseInt(c.req.header("x-slack-retry-num") ?? "0", 10);
+    const result = await dispatchEvent(payload, retryNum);
     return c.json(JSON.parse(result.body), result.statusCode as 200);
   } catch (error) {
     logger.error("Error handling Slack event", {

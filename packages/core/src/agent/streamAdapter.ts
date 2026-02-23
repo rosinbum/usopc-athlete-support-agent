@@ -174,7 +174,7 @@ export async function* agentStreamToEvents(
         ) {
           yield { type: "answer-reset" };
           seenSynthesizerTokens = false;
-          previousAnswerFromValues = "";
+          previousAnswerFromValues = state.answer ?? "";
         }
 
         // Emit answer changes from nodes that don't use LLM streaming

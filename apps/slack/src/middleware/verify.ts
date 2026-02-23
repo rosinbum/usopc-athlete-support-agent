@@ -13,7 +13,10 @@ export async function verifySlackRequest(
   c: Context<{ Variables: { rawBody: string } }>,
   next: Next,
 ): Promise<Response | void> {
-  const signingSecret = getSecretValue("SLACK_SIGNING_SECRET", "SlackSigningSecret");
+  const signingSecret = getSecretValue(
+    "SLACK_SIGNING_SECRET",
+    "SlackSigningSecret",
+  );
   const timestamp = c.req.header("x-slack-request-timestamp");
   const slackSignature = c.req.header("x-slack-signature");
 

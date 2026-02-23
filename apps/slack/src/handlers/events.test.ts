@@ -137,4 +137,25 @@ describe("dispatchEvent", () => {
     expect(result.statusCode).toBe(200);
     expect(result.body).toBe("ok");
   });
+
+  it("ignores Slack event retries to prevent duplicate agent responses", async () => {
+    const result = await dispatchEvent(
+      {
+        type: "event_callback",
+        event: {
+          type: "message",
+          channel: "D123",
+          user: "U456",
+          text: "Hello",
+          ts: "1234567890.123456",
+        },
+      },
+      1,
+    );
+
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toBe("ok");
+    expect(mockHandleMessage).not.toHaveBeenCalled();
+    expect(mockHandleMention).not.toHaveBeenCalled();
+  });
 });
