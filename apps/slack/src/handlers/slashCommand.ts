@@ -1,5 +1,5 @@
 import { createLogger } from "@usopc/shared";
-import { getAppRunner, convertMessages, getDisclaimer } from "@usopc/core";
+import { getAppRunner, convertMessages } from "@usopc/core";
 import { postMessage } from "../slack/client.js";
 import { buildAnswerBlocks, buildErrorBlocks } from "../slack/blocks.js";
 
@@ -67,11 +67,10 @@ async function processSlashCommandAsync(
 
     const preamble = `<@${userId}> asked: _${query}_\n\n`;
     const fullAnswer = preamble + answer;
-    const disclaimer = getDisclaimer();
     const blocks = buildAnswerBlocks(
       fullAnswer,
       citations,
-      disclaimer,
+      undefined,
       escalation,
     );
     await postMessage(channel, fullAnswer, blocks);

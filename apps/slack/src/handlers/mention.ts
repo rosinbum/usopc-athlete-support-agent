@@ -1,10 +1,5 @@
 import { createLogger } from "@usopc/shared";
-import {
-  getAppRunner,
-  loadSummary,
-  convertMessages,
-  getDisclaimer,
-} from "@usopc/core";
+import { getAppRunner, loadSummary, convertMessages } from "@usopc/core";
 import { postMessage, addReaction } from "../slack/client.js";
 import { buildAnswerBlocks, buildErrorBlocks } from "../slack/blocks.js";
 import { isUserInvited } from "../lib/inviteGuard.js";
@@ -85,8 +80,7 @@ async function processMentionAsync(
       conversationSummary,
     });
 
-    const disclaimer = getDisclaimer();
-    const blocks = buildAnswerBlocks(answer, citations, disclaimer, escalation);
+    const blocks = buildAnswerBlocks(answer, citations, undefined, escalation);
     await postMessage(channel, answer, blocks, replyTs);
   } catch (error) {
     logger.error("Failed to handle mention", {

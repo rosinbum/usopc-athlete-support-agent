@@ -35,7 +35,6 @@ vi.mock("@usopc/core", () => ({
     .mockImplementation((msgs: { role: string; content: string }[]) =>
       msgs.map((m) => ({ content: m.content })),
     ),
-  getDisclaimer: vi.fn().mockReturnValue("This is not legal advice."),
 }));
 
 vi.mock("../slack/client.js", () => ({
