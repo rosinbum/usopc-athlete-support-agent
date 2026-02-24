@@ -1,11 +1,11 @@
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage } from "@langchain/core/messages";
 import { logger, CircuitBreakerError } from "@usopc/shared";
 import { buildClassifierPromptWithHistory } from "../../prompts/index.js";
 import {
-  invokeAnthropic,
+  invokeLlm,
   extractTextFromResponse,
-} from "../../services/anthropicService.js";
+} from "../../services/llmService.js";
 import {
   buildContextualQuery,
   stateContext,
@@ -174,7 +174,7 @@ export function parseClassifierResponse(raw: string): ParseResult {
  * the state as `queryIntent === "escalation"` so downstream conditional
  * edges can route accordingly.
  */
-export function createClassifierNode(model: ChatAnthropic) {
+export function createClassifierNode(model: BaseChatModel) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     // Build contextual query from conversation history
     const { currentMessage, conversationContext } = buildContextualQuery(
@@ -197,7 +197,7 @@ export function createClassifierNode(model: ChatAnthropic) {
     );
 
     try {
-      const response = await invokeAnthropic(model, [new HumanMessage(prompt)]);
+      const response = await invokeLlm(model, [new HumanMessage(prompt)]);
       const responseText = extractTextFromResponse(response);
       const { output: result, warnings } =
         parseClassifierResponse(responseText);

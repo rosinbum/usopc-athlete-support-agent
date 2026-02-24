@@ -18,13 +18,13 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 import {
   isTransientError,
   withSingleRetry,
-  invokeAnthropic,
-  invokeAnthropicWithFallback,
-  getAnthropicCircuitMetrics,
-  resetAnthropicCircuit,
-} from "./anthropicService.js";
+  invokeLlm,
+  invokeLlmWithFallback,
+  getLlmCircuitMetrics,
+  resetLlmCircuit,
+} from "./llmService.js";
 import { CircuitBreakerError } from "@usopc/shared";
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { AIMessage, BaseMessage } from "@langchain/core/messages";
 
 // ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ describe("withSingleRetry", () => {
   });
 
   it("does not retry on CircuitBreakerError", async () => {
-    const fn = vi.fn().mockRejectedValue(new CircuitBreakerError("anthropic"));
+    const fn = vi.fn().mockRejectedValue(new CircuitBreakerError("llm"));
 
     await expect(withSingleRetry(fn, "test-op")).rejects.toThrow(
       CircuitBreakerError,
@@ -145,27 +145,27 @@ describe("withSingleRetry", () => {
 });
 
 // ---------------------------------------------------------------------------
-// invokeAnthropic / invokeAnthropicWithFallback — circuit wrapper
+// invokeLlm / invokeLlmWithFallback — circuit wrapper
 // ---------------------------------------------------------------------------
 
-function makeMockModel(result: AIMessage): ChatAnthropic {
+function makeMockModel(result: AIMessage): BaseChatModel {
   return {
     invoke: vi.fn().mockResolvedValue(result),
-  } as unknown as ChatAnthropic;
+  } as unknown as BaseChatModel;
 }
 
-function makeFailingModel(error = new Error("LLM error")): ChatAnthropic {
+function makeFailingModel(error = new Error("LLM error")): BaseChatModel {
   return {
     invoke: vi.fn().mockRejectedValue(error),
-  } as unknown as ChatAnthropic;
+  } as unknown as BaseChatModel;
 }
 
 const fakeResponse = { content: "Hello" } as AIMessage;
 
-describe("invokeAnthropic", () => {
+describe("invokeLlm", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    resetAnthropicCircuit();
+    resetLlmCircuit();
   });
 
   afterEach(() => {
@@ -174,53 +174,51 @@ describe("invokeAnthropic", () => {
 
   it("returns the model response when the call succeeds", async () => {
     const model = makeMockModel(fakeResponse);
-    const result = await invokeAnthropic(model, []);
+    const result = await invokeLlm(model, []);
     expect(result).toBe(fakeResponse);
   });
 
   it("passes the messages array to the model", async () => {
     const model = makeMockModel(fakeResponse);
     const messages = [] as BaseMessage[];
-    await invokeAnthropic(model, messages);
+    await invokeLlm(model, messages);
     expect(vi.mocked(model.invoke)).toHaveBeenCalledWith(messages);
   });
 
   it("opens the circuit after 3 consecutive failures", async () => {
     const model = makeFailingModel();
     for (let i = 0; i < 3; i++) {
-      await expect(invokeAnthropic(model, [])).rejects.toThrow();
+      await expect(invokeLlm(model, [])).rejects.toThrow();
     }
-    expect(getAnthropicCircuitMetrics().state).toBe("open");
+    expect(getLlmCircuitMetrics().state).toBe("open");
   });
 
   it("throws CircuitBreakerError when circuit is open", async () => {
     const failingModel = makeFailingModel();
     for (let i = 0; i < 3; i++) {
-      await expect(invokeAnthropic(failingModel, [])).rejects.toThrow();
+      await expect(invokeLlm(failingModel, [])).rejects.toThrow();
     }
 
     const goodModel = makeMockModel(fakeResponse);
-    await expect(invokeAnthropic(goodModel, [])).rejects.toThrow(
-      CircuitBreakerError,
-    );
+    await expect(invokeLlm(goodModel, [])).rejects.toThrow(CircuitBreakerError);
   });
 
   it("resets consecutive failure count on success", async () => {
     const failingModel = makeFailingModel();
-    await expect(invokeAnthropic(failingModel, [])).rejects.toThrow();
-    await expect(invokeAnthropic(failingModel, [])).rejects.toThrow();
+    await expect(invokeLlm(failingModel, [])).rejects.toThrow();
+    await expect(invokeLlm(failingModel, [])).rejects.toThrow();
 
     const goodModel = makeMockModel(fakeResponse);
-    await invokeAnthropic(goodModel, []);
+    await invokeLlm(goodModel, []);
 
-    expect(getAnthropicCircuitMetrics().consecutiveFailures).toBe(0);
+    expect(getLlmCircuitMetrics().consecutiveFailures).toBe(0);
   });
 });
 
-describe("invokeAnthropicWithFallback", () => {
+describe("invokeLlmWithFallback", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    resetAnthropicCircuit();
+    resetLlmCircuit();
   });
 
   afterEach(() => {
@@ -230,31 +228,31 @@ describe("invokeAnthropicWithFallback", () => {
   it("returns model response on success", async () => {
     const model = makeMockModel(fakeResponse);
     const fallback = { content: "fallback" } as AIMessage;
-    const result = await invokeAnthropicWithFallback(model, [], fallback);
+    const result = await invokeLlmWithFallback(model, [], fallback);
     expect(result).toBe(fakeResponse);
   });
 
   it("returns static fallback when circuit is open", async () => {
     const failingModel = makeFailingModel();
     for (let i = 0; i < 3; i++) {
-      await expect(invokeAnthropic(failingModel, [])).rejects.toThrow();
+      await expect(invokeLlm(failingModel, [])).rejects.toThrow();
     }
 
     const fallback = { content: "fallback" } as AIMessage;
     const goodModel = makeMockModel(fakeResponse);
-    const result = await invokeAnthropicWithFallback(goodModel, [], fallback);
+    const result = await invokeLlmWithFallback(goodModel, [], fallback);
     expect(result).toBe(fallback);
   });
 
   it("calls fallback function when circuit is open", async () => {
     const failingModel = makeFailingModel();
     for (let i = 0; i < 3; i++) {
-      await expect(invokeAnthropic(failingModel, [])).rejects.toThrow();
+      await expect(invokeLlm(failingModel, [])).rejects.toThrow();
     }
 
     const fallbackFn = vi.fn().mockReturnValue(fakeResponse);
     const goodModel = makeMockModel({ content: "other" } as AIMessage);
-    const result = await invokeAnthropicWithFallback(goodModel, [], fallbackFn);
+    const result = await invokeLlmWithFallback(goodModel, [], fallbackFn);
 
     expect(fallbackFn).toHaveBeenCalled();
     expect(result).toBe(fakeResponse);

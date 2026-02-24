@@ -140,6 +140,7 @@ export const AppTableSchema = {
       model: { type: String, required: true },
       temperature: { type: Number },
       maxTokens: { type: Number },
+      provider: { type: String },
       dimensions: { type: Number },
       createdAt: { type: String },
       updatedAt: { type: String },

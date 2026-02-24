@@ -4,13 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks — must be declared before importing the module under test
 // ---------------------------------------------------------------------------
 
-const { mockInvoke } = vi.hoisted(() => ({ mockInvoke: vi.fn() }));
-
-vi.mock("@langchain/anthropic", () => ({
-  ChatAnthropic: vi.fn().mockImplementation(() => ({
-    invoke: mockInvoke,
-  })),
-}));
+const mockInvoke = vi.fn();
 
 vi.mock("@usopc/shared", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@usopc/shared")>();
@@ -32,12 +26,11 @@ import {
   createQueryPlannerNode,
   parseQueryPlannerResponse,
 } from "./queryPlanner.js";
-import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
 import type { AgentState } from "../state.js";
 
-const queryPlannerNode = createQueryPlannerNode(new ChatAnthropic());
+const queryPlannerNode = createQueryPlannerNode({ invoke: mockInvoke } as any);
 
 // ---------------------------------------------------------------------------
 // Helpers

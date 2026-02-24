@@ -251,17 +251,19 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
   });
 
   // -------------------------------------------------------------------
-  // 4. Answer-reset (quality retry)
+  // 4. Quality retry (buffer-based — no answer-reset)
   // -------------------------------------------------------------------
-  describe("answer-reset on quality retry", () => {
-    it("emits answer-reset data part between text parts", async () => {
+  describe("quality retry with token buffering", () => {
+    it("discards first buffer and only emits retry tokens", async () => {
       const chunks: StreamChunk[] = [
-        // First synthesizer pass
+        // First synthesizer pass (buffered, then discarded)
         ["messages", [{ content: "Draft" }, { langgraph_node: "synthesizer" }]],
-        // Quality check fails
+        // Quality check fails (retryCount=0 < maxRetries=1 → retry coming)
         [
           "values",
           {
+            answer: "Draft",
+            qualityRetryCount: 0,
             qualityCheckResult: {
               passed: false,
               score: 0.3,
@@ -276,7 +278,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
             },
           },
         ],
-        // Retry synthesizer pass
+        // Retry synthesizer pass (buffered, then flushed at stream end)
         [
           "messages",
           [{ content: "Better answer" }, { langgraph_node: "synthesizer" }],
@@ -288,22 +290,15 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       await POST(makePOSTRequest(simpleBody));
       await waitForStream();
 
-      // First text
-      expect(capturedWrites).toContain('0:"Draft"\n');
-      // Answer-reset data part: 2:[{"type":"answer-reset"}]\n
+      // Draft tokens should NOT appear (buffer was discarded)
+      expect(capturedWrites).not.toContain('0:"Draft"\n');
+      // No answer-reset event (buffering eliminates the need)
       const resetWrite = capturedWrites.find(
         (w) => w.startsWith("2:") && w.includes("answer-reset"),
       );
-      expect(resetWrite).toBeDefined();
-      // Retry text
+      expect(resetWrite).toBeUndefined();
+      // Only retry text appears
       expect(capturedWrites).toContain('0:"Better answer"\n');
-
-      // Ordering: text → reset → text
-      const draftIdx = capturedWrites.indexOf('0:"Draft"\n');
-      const resetIdx = capturedWrites.indexOf(resetWrite!);
-      const retryIdx = capturedWrites.indexOf('0:"Better answer"\n');
-      expect(draftIdx).toBeLessThan(resetIdx);
-      expect(resetIdx).toBeLessThan(retryIdx);
     });
   });
 

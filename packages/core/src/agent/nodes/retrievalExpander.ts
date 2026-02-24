@@ -1,10 +1,10 @@
-import type { ChatAnthropic } from "@langchain/anthropic";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger } from "@usopc/shared";
 import {
-  invokeAnthropic,
+  invokeLlm,
   extractTextFromResponse,
-} from "../../services/anthropicService.js";
+} from "../../services/llmService.js";
 import { vectorStoreSearch } from "../../services/vectorStoreService.js";
 import { buildContextualQuery, stateContext } from "../../utils/index.js";
 import { buildRetrievalExpanderPrompt } from "../../prompts/index.js";
@@ -69,7 +69,7 @@ function buildFilter(state: AgentState): Record<string, unknown> | undefined {
  */
 export function createRetrievalExpanderNode(
   vectorStore: VectorStoreLike,
-  model: ChatAnthropic,
+  model: BaseChatModel,
 ) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const { currentMessage } = buildContextualQuery(state.messages);
@@ -90,7 +90,7 @@ export function createRetrievalExpanderNode(
         existingDocTitles,
       );
 
-      const response = await invokeAnthropic(model, [
+      const response = await invokeLlm(model, [
         new SystemMessage(
           "You are a search query reformulation assistant. Respond with only a JSON array.",
         ),
