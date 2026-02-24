@@ -1,9 +1,11 @@
 import crypto from "node:crypto";
-import type { Context, Next, Env } from "hono";
+import type { Context, Next } from "hono";
 import { getSecretValue } from "@usopc/shared";
 
 const SLACK_VERSION = "v0";
 const TIMESTAMP_TOLERANCE_SECONDS = 300; // 5 minutes
+/** Maximum allowed payload size in bytes (100 KB). */
+export const MAX_PAYLOAD_BYTES = 100 * 1024;
 
 /**
  * Hono middleware that verifies incoming Slack request signatures.
@@ -31,6 +33,11 @@ export async function verifySlackRequest(
   }
 
   const body = await c.req.text();
+
+  // Reject oversized payloads to prevent OOM
+  if (Buffer.byteLength(body, "utf-8") > MAX_PAYLOAD_BYTES) {
+    return c.json({ error: "Payload too large" }, 413);
+  }
   // Store raw body for downstream handlers
   c.set("rawBody", body);
 

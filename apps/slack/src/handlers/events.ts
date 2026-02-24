@@ -1,8 +1,32 @@
 import { createLogger } from "@usopc/shared";
+import { z } from "zod";
 import { handleMessage, type SlackMessageEvent } from "./message.js";
 import { handleMention, type SlackMentionEvent } from "./mention.js";
 
 const logger = createLogger({ service: "slack-events" });
+
+// ---------------------------------------------------------------------------
+// Payload validation schemas
+// ---------------------------------------------------------------------------
+
+const slackMessageEventSchema = z.object({
+  type: z.literal("message"),
+  channel: z.string(),
+  user: z.string(),
+  text: z.string(),
+  ts: z.string(),
+  channel_type: z.string(),
+  thread_ts: z.string().optional(),
+});
+
+const slackMentionEventSchema = z.object({
+  type: z.literal("app_mention"),
+  channel: z.string(),
+  user: z.string(),
+  text: z.string(),
+  ts: z.string(),
+  thread_ts: z.string().optional(),
+});
 
 interface SlackEventWrapper {
   type: string;
@@ -62,13 +86,29 @@ export async function dispatchEvent(
   }
 
   switch (event.type) {
-    case "message":
-      await handleMessage(event as unknown as SlackMessageEvent);
+    case "message": {
+      const parsed = slackMessageEventSchema.safeParse(event);
+      if (!parsed.success) {
+        logger.warn("Invalid message event payload", {
+          errors: parsed.error.issues.map((i) => i.message),
+        });
+        return { statusCode: 200, body: "ok" };
+      }
+      await handleMessage(parsed.data as SlackMessageEvent);
       break;
+    }
 
-    case "app_mention":
-      await handleMention(event as unknown as SlackMentionEvent);
+    case "app_mention": {
+      const parsed = slackMentionEventSchema.safeParse(event);
+      if (!parsed.success) {
+        logger.warn("Invalid mention event payload", {
+          errors: parsed.error.issues.map((i) => i.message),
+        });
+        return { statusCode: 200, body: "ok" };
+      }
+      await handleMention(parsed.data as SlackMentionEvent);
       break;
+    }
 
     default:
       logger.debug("Unhandled event type", { eventType: event.type });
