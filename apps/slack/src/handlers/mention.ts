@@ -56,6 +56,23 @@ export async function handleMention(event: SlackMentionEvent): Promise<void> {
 
   await addReaction(channel, ts, "eyes");
 
+  // Process asynchronously — return immediately so Slack gets a fast 200
+  processMentionAsync(event, cleanedText).catch((error) => {
+    logger.error("Async mention processing failed", {
+      error: error instanceof Error ? error.message : String(error),
+      user,
+      channel,
+    });
+  });
+}
+
+async function processMentionAsync(
+  event: SlackMentionEvent,
+  cleanedText: string,
+): Promise<void> {
+  const { channel, ts, user, thread_ts } = event;
+  const replyTs = thread_ts ?? ts;
+
   try {
     const runner = await getAppRunner();
     const conversationId = thread_ts ?? ts;
@@ -70,7 +87,7 @@ export async function handleMention(event: SlackMentionEvent): Promise<void> {
 
     const disclaimer = getDisclaimer();
     const blocks = buildAnswerBlocks(answer, citations, disclaimer, escalation);
-    await postMessage(channel, answer, blocks, thread_ts ?? ts);
+    await postMessage(channel, answer, blocks, replyTs);
   } catch (error) {
     logger.error("Failed to handle mention", {
       error: error instanceof Error ? error.message : String(error),
@@ -81,11 +98,6 @@ export async function handleMention(event: SlackMentionEvent): Promise<void> {
     const blocks = buildErrorBlocks(
       "Sorry, I encountered an error processing your question. Please try again.",
     );
-    await postMessage(
-      channel,
-      "Error processing request",
-      blocks,
-      thread_ts ?? ts,
-    );
+    await postMessage(channel, "Error processing request", blocks, replyTs);
   }
 }
