@@ -40,7 +40,7 @@ describe("GET /api/documents/[key]/url", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
       expires: "",
     } as never);
     mockGetSignedUrl.mockResolvedValue(

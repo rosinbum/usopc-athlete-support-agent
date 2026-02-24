@@ -74,7 +74,7 @@ describe("GET /api/admin/discoveries", () => {
 
   it("returns all discoveries with hasMore false", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getAll: vi.fn().mockResolvedValueOnce(SAMPLE_DISCOVERIES),
@@ -90,7 +90,7 @@ describe("GET /api/admin/discoveries", () => {
 
   it("passes limit to entity getAll", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     const mockGetAll = vi.fn().mockResolvedValueOnce(SAMPLE_DISCOVERIES);
     mockCreateEntity.mockReturnValueOnce({
@@ -105,7 +105,7 @@ describe("GET /api/admin/discoveries", () => {
 
   it("returns filtered discoveries by status", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     const pending = [SAMPLE_DISCOVERIES[0]];
     const mockGetByStatus = vi.fn().mockResolvedValueOnce(pending);
@@ -126,7 +126,7 @@ describe("GET /api/admin/discoveries", () => {
 
   it("returns hasMore true when dataset exceeds limit", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     const manyDiscoveries = Array.from({ length: 3 }, (_, i) => ({
       id: `d${i}`,
@@ -147,7 +147,7 @@ describe("GET /api/admin/discoveries", () => {
 
   it("respects custom limit query param", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getAll: vi.fn().mockResolvedValueOnce(SAMPLE_DISCOVERIES),
@@ -163,7 +163,7 @@ describe("GET /api/admin/discoveries", () => {
 
   it("returns 400 for invalid status", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await GET(buildRequest({ status: "bogus" }));
@@ -175,7 +175,7 @@ describe("GET /api/admin/discoveries", () => {
 
   it("returns 500 on error", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getAll: vi.fn().mockRejectedValueOnce(new Error("DynamoDB error")),

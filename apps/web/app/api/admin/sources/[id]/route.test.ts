@@ -55,7 +55,7 @@ const SAMPLE_SOURCE = {
 
 function authedAdmin() {
   mockAuth.mockResolvedValueOnce({
-    user: { email: "admin@test.com" },
+    user: { email: "admin@test.com", role: "admin" as const },
   } as never);
 }
 

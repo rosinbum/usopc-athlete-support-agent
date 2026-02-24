@@ -87,7 +87,7 @@ describe("POST /api/admin/discoveries/bulk", () => {
 
   it("returns 400 for empty ids", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(jsonRequest({ action: "approve", ids: [] }));
@@ -97,7 +97,7 @@ describe("POST /api/admin/discoveries/bulk", () => {
 
   it("returns 400 when rejecting without reason", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(jsonRequest({ action: "reject", ids: ["d1"] }));
@@ -107,8 +107,12 @@ describe("POST /api/admin/discoveries/bulk", () => {
 
   it("bulk approves discoveries", async () => {
     mockAuth
-      .mockResolvedValueOnce({ user: { email: "admin@test.com" } } as never)
-      .mockResolvedValueOnce({ user: { email: "admin@test.com" } } as never);
+      .mockResolvedValueOnce({
+        user: { email: "admin@test.com", role: "admin" as const },
+      } as never)
+      .mockResolvedValueOnce({
+        user: { email: "admin@test.com", role: "admin" as const },
+      } as never);
     mockCreateEntity.mockReturnValueOnce({
       approve: vi.fn().mockResolvedValue(undefined),
     } as never);
@@ -125,8 +129,12 @@ describe("POST /api/admin/discoveries/bulk", () => {
 
   it("bulk rejects discoveries with reason", async () => {
     mockAuth
-      .mockResolvedValueOnce({ user: { email: "admin@test.com" } } as never)
-      .mockResolvedValueOnce({ user: { email: "admin@test.com" } } as never);
+      .mockResolvedValueOnce({
+        user: { email: "admin@test.com", role: "admin" as const },
+      } as never)
+      .mockResolvedValueOnce({
+        user: { email: "admin@test.com", role: "admin" as const },
+      } as never);
     mockCreateEntity.mockReturnValueOnce({
       reject: vi.fn().mockResolvedValue(undefined),
     } as never);
@@ -147,8 +155,12 @@ describe("POST /api/admin/discoveries/bulk", () => {
 
   it("reports partial failures", async () => {
     mockAuth
-      .mockResolvedValueOnce({ user: { email: "admin@test.com" } } as never)
-      .mockResolvedValueOnce({ user: { email: "admin@test.com" } } as never);
+      .mockResolvedValueOnce({
+        user: { email: "admin@test.com", role: "admin" as const },
+      } as never)
+      .mockResolvedValueOnce({
+        user: { email: "admin@test.com", role: "admin" as const },
+      } as never);
     mockCreateEntity.mockReturnValueOnce({
       approve: vi
         .fn()
@@ -172,7 +184,7 @@ describe("POST /api/admin/discoveries/bulk", () => {
 
   it("sends specific discoveries to sources by IDs", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValue(APPROVED_DISCOVERY),
@@ -202,7 +214,7 @@ describe("POST /api/admin/discoveries/bulk", () => {
 
   it("sends all approved discoveries when no IDs provided", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getByStatus: vi.fn().mockResolvedValue([
@@ -230,7 +242,7 @@ describe("POST /api/admin/discoveries/bulk", () => {
 
   it("reports mixed results for send_to_sources", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi

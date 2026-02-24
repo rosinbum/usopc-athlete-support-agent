@@ -47,7 +47,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     authorized({ auth }) {
       return !!auth;
     },
-    async jwt({ token, profile, user }) {
+    async jwt({ token, profile, user, account }) {
+      if (account) {
+        // First sign-in: stamp role from provider
+        token.role = account.provider === "github" ? "admin" : "athlete";
+      }
       if (profile) {
         token.email = profile.email ?? null;
         token.name = profile.name ?? null;
@@ -65,6 +69,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.email = token.email as string;
         session.user.name = token.name as string;
         session.user.image = token.picture as string;
+        if (token.role) session.user.role = token.role;
       }
       return session;
     },
