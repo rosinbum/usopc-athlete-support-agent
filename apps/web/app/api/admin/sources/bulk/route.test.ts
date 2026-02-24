@@ -90,7 +90,7 @@ describe("POST /api/admin/sources/bulk", () => {
 
   it("returns 400 when action is missing", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(makeRequest({ ids: ["src1"] }));
@@ -100,7 +100,7 @@ describe("POST /api/admin/sources/bulk", () => {
 
   it("returns 400 when ids is empty", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(makeRequest({ action: "enable", ids: [] }));
@@ -112,7 +112,7 @@ describe("POST /api/admin/sources/bulk", () => {
 
   it("returns 400 for invalid action", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(makeRequest({ action: "purge", ids: ["src1"] }));
@@ -122,7 +122,7 @@ describe("POST /api/admin/sources/bulk", () => {
 
   it("returns 400 when ids contain non-string values", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(
@@ -134,7 +134,7 @@ describe("POST /api/admin/sources/bulk", () => {
 
   it("returns 400 when ids exceed max length", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const ids = Array.from({ length: 101 }, (_, i) => `src-${i}`);
@@ -146,7 +146,7 @@ describe("POST /api/admin/sources/bulk", () => {
   it("bulk enables sources", async () => {
     const mockEnable = vi.fn().mockResolvedValue(undefined);
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       enable: mockEnable,
@@ -168,7 +168,7 @@ describe("POST /api/admin/sources/bulk", () => {
   it("bulk disables sources", async () => {
     const mockDisable = vi.fn().mockResolvedValue(undefined);
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       disable: mockDisable,
@@ -188,7 +188,7 @@ describe("POST /api/admin/sources/bulk", () => {
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error("DynamoDB error"));
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       enable: mockEnable,
@@ -206,7 +206,7 @@ describe("POST /api/admin/sources/bulk", () => {
 
   it("bulk ingests sources via triggerIngestion", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCE),
@@ -226,7 +226,7 @@ describe("POST /api/admin/sources/bulk", () => {
 
   it("bulk deletes sources via deleteSource", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce("mock-entity" as never);
     mockDeleteSource.mockResolvedValue({ chunksDeleted: 5 });
@@ -254,7 +254,7 @@ describe("POST /api/admin/sources/bulk", () => {
 
   it("counts failure when source not found for ingest", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(null),

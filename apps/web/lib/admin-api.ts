@@ -1,5 +1,4 @@
 import { auth } from "../auth.js";
-import { getAdminEmails } from "./auth-env.js";
 import { apiError } from "./apiResponse.js";
 
 /**
@@ -12,8 +11,7 @@ export async function requireAdmin() {
     return apiError("Unauthorized", 401);
   }
 
-  const adminEmails = getAdminEmails();
-  if (!adminEmails.includes(session.user.email.toLowerCase())) {
+  if (session.user.role !== "admin") {
     return apiError("Forbidden", 403);
   }
 

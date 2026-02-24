@@ -52,6 +52,11 @@ vi.mock("../slack/blocks.js", () => ({
     .mockReturnValue([{ type: "section", text: { type: "mrkdwn", text: "" } }]),
 }));
 
+// Default: all users are invited (override per-test as needed)
+vi.mock("../lib/inviteGuard.js", () => ({
+  isUserInvited: vi.fn().mockResolvedValue(true),
+}));
+
 import { handleMessage, type SlackMessageEvent } from "./message.js";
 
 // ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@ export {
   createIngestionLogEntity,
   createDiscoveredSourceEntity,
   createConversationSummaryEntity,
+  createInviteEntity,
 } from "./factory.js";
 export {
   SourceConfigEntity,
@@ -28,3 +29,8 @@ export {
   ConversationSummaryEntity,
   type ConversationSummary,
 } from "./ConversationSummaryEntity.js";
+export {
+  InviteEntity,
+  type Invite,
+  type CreateInviteInput,
+} from "./InviteEntity.js";

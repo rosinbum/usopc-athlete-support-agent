@@ -80,7 +80,7 @@ describe("POST /api/admin/sources/bulk-create", () => {
 
   it("returns 400 when sources array is empty", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(jsonRequest({ sources: [] }) as never);
@@ -92,7 +92,7 @@ describe("POST /api/admin/sources/bulk-create", () => {
 
   it("returns 400 when body is missing sources key", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(jsonRequest({}) as never);
@@ -104,7 +104,7 @@ describe("POST /api/admin/sources/bulk-create", () => {
 
   it("returns 201 with all sources created", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const mockCreate = vi.fn().mockResolvedValue({});
@@ -135,7 +135,7 @@ describe("POST /api/admin/sources/bulk-create", () => {
 
   it("handles ConditionalCheckFailedException as duplicate", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const conflictError = new Error("Conditional check failed");
@@ -154,7 +154,7 @@ describe("POST /api/admin/sources/bulk-create", () => {
 
   it("handles unexpected errors as failed", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const mockCreate = vi
@@ -172,7 +172,7 @@ describe("POST /api/admin/sources/bulk-create", () => {
 
   it("handles partial failures (some created, some failed)", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const conflictError = new Error("Conditional check failed");

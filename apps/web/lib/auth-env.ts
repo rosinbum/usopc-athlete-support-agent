@@ -25,3 +25,7 @@ export function getAdminEmails(): string[] {
     .filter(Boolean);
   return emailListSchema.parse(emails);
 }
+
+export function getResendApiKey(): string {
+  return getSecretValue("RESEND_API_KEY", "ResendApiKey");
+}
