@@ -56,12 +56,20 @@ After the first deployment, trigger the ingestion pipeline to populate the knowl
 
 ## Environment Outputs
 
-After deployment, SST outputs the service URLs:
+After deployment, SST outputs the service URLs. With custom domains configured (see [Deployment Procedure — Custom Domains](./deployment-procedure.md#custom-domains)):
+
+```
+apiUrl:   https://api.rosinbum.org
+webUrl:   https://app.rosinbum.org
+slackUrl: https://slack.rosinbum.org
+```
+
+Without custom domains (local dev stages), raw AWS URLs are used:
 
 ```
 apiUrl:   https://xxx.execute-api.us-east-1.amazonaws.com
 webUrl:   https://xxx.cloudfront.net
-slackUrl: https://xxx.execute-api.us-east-1.amazonaws.com/slack/events
+slackUrl: https://xxx.execute-api.us-east-1.amazonaws.com
 ```
 
 ## 4. Configure Automated Source Discovery

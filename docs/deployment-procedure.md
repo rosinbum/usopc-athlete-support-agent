@@ -119,6 +119,36 @@ sst secret set LangchainApiKey <key> --stage staging
 sst secret set ConversationMaxTurns 5 --stage staging
 ```
 
+## Custom Domains
+
+Custom domains are configured in `sst.config.ts` using Route 53 and ACM. SST automatically creates DNS records and provisions TLS certificates.
+
+### Domain Mapping
+
+| Service | Production           | Staging                      |
+| ------- | -------------------- | ---------------------------- |
+| API     | `api.rosinbum.org`   | `api-staging.rosinbum.org`   |
+| Web     | `app.rosinbum.org`   | `staging.rosinbum.org`       |
+| Slack   | `slack.rosinbum.org` | `slack-staging.rosinbum.org` |
+
+Local dev stages use raw AWS URLs (no custom domain).
+
+### Prerequisites
+
+- A Route 53 hosted zone for `rosinbum.org` in the same AWS account
+- The deploy IAM role (`AWS_DEPLOY_ROLE_ARN`) must have these additional permissions:
+  - `route53:ListHostedZones`, `route53:ListHostedZonesByName`
+  - `route53:GetHostedZone`, `route53:ChangeResourceRecordSets`
+  - `route53:ListResourceRecordSets`, `route53:GetChange`
+  - `acm:RequestCertificate`, `acm:DescribeCertificate`
+  - `acm:ListCertificates`, `acm:DeleteCertificate`
+
+### Notes
+
+- **First deploy** with a new domain takes 5-15 minutes for ACM certificate validation via DNS
+- **CORS**: `ALLOWED_ORIGIN` automatically uses the custom domain URL when configured
+- **Slack webhook URL**: After deploying with custom domains, update the Slack app's webhook URL to `https://slack.rosinbum.org/slack/events`
+
 ## Creating a Release
 
 Tag the commit and push to trigger the staging deploy:
@@ -160,9 +190,9 @@ Use [semantic versioning](https://semver.org/):
 
 After a successful production deploy:
 
-1. Verify API health: `curl https://<api-url>/health`
-2. Verify Web health: `curl https://<web-url>/api/health`
-3. Test a sample chat query in the web UI
+1. Verify API health: `curl https://api.rosinbum.org/health`
+2. Verify Web health: `curl https://app.rosinbum.org/api/health`
+3. Test a sample chat query at `https://app.rosinbum.org`
 4. Check CloudWatch logs for errors in the first few minutes
 5. Verify Slack bot responds (if applicable)
 

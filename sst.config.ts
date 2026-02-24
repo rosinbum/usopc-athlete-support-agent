@@ -80,10 +80,21 @@ export default $config({
       versioning: true,
     });
 
+    // Custom domains — only for deployed stages (staging, production).
+    // Local dev stages use raw AWS URLs (no domain config needed).
+    const isDeployed = isProd || stage === "staging";
+    const domainZone = "rosinbum.org";
+
     // tRPC API — throttle at the API Gateway layer so rate limits are enforced
     // across all Lambda instances and survive cold starts.
     // 100 req/s burst, 60 req/s steady state (per stage/account, not per-client).
     const api = new sst.aws.ApiGatewayV2("Api", {
+      domain: isDeployed
+        ? {
+            name: isProd ? `api.${domainZone}` : `api-${stage}.${domainZone}`,
+            dns: sst.aws.dns(),
+          }
+        : undefined,
       throttle: {
         burst: 100,
         rate: 60,
@@ -91,7 +102,16 @@ export default $config({
     });
     // Slack bot webhook — $default catches /slack/events, /slack/commands,
     // and /slack/interactions so all Slack endpoints route to one Lambda.
-    const slackApi = new sst.aws.ApiGatewayV2("SlackApi");
+    const slackApi = new sst.aws.ApiGatewayV2("SlackApi", {
+      domain: isDeployed
+        ? {
+            name: isProd
+              ? `slack.${domainZone}`
+              : `slack-${stage}.${domainZone}`,
+            dns: sst.aws.dns(),
+          }
+        : undefined,
+    });
     slackApi.route("$default", {
       handler: "apps/slack/src/index.handler",
       link: [...linkables, slackBotToken, slackSigningSecret, appTable],
@@ -200,6 +220,12 @@ export default $config({
     // Next.js web app
     const web = new sst.aws.Nextjs("Web", {
       path: "apps/web",
+      domain: isDeployed
+        ? {
+            name: isProd ? `app.${domainZone}` : `${stage}.${domainZone}`,
+            dns: sst.aws.dns(),
+          }
+        : undefined,
       link: [
         ...linkables,
         api,
