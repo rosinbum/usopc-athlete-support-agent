@@ -5,6 +5,7 @@ import { SourceConfigEntity } from "./SourceConfigEntity.js";
 import { IngestionLogEntity } from "./IngestionLogEntity.js";
 import { DiscoveredSourceEntity } from "./DiscoveredSourceEntity.js";
 import { ConversationSummaryEntity } from "./ConversationSummaryEntity.js";
+import { InviteEntity } from "./InviteEntity.js";
 import { getResource } from "../resources.js";
 
 const tableCache = new Map<string, Table<typeof AppTableSchema>>();
@@ -51,4 +52,8 @@ export function createConversationSummaryEntity(
   return new ConversationSummaryEntity(
     getOrCreateAppTable(tableName ?? getAppTableName()),
   );
+}
+
+export function createInviteEntity(tableName?: string): InviteEntity {
+  return new InviteEntity(getOrCreateAppTable(tableName ?? getAppTableName()));
 }

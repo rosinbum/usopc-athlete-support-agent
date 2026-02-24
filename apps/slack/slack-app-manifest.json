@@ -38,7 +38,9 @@
         "im:read",
         "im:write",
         "app_mentions:read",
-        "channels:history"
+        "channels:history",
+        "users:read",
+        "users:read.email"
       ]
     }
   },

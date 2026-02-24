@@ -208,6 +208,13 @@ export const AppTableSchema = {
       createdAt: { type: String },
       updatedAt: { type: String },
     },
+    Invite: {
+      pk: { type: String, value: "Invite#${email}" },
+      sk: { type: String, value: "Invite" },
+      email: { type: String, required: true },
+      invitedBy: { type: String },
+      createdAt: { type: String },
+    },
   },
   params: {
     timestamps: false,
