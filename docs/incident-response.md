@@ -36,7 +36,7 @@ Configure these alarms for early detection:
 - **API latency p99** > 10s over 5 minutes → P1
 - **Lambda errors** > 10 in 5 minutes per function → P1
 - **Lambda throttles** > 0 → P2
-- **Aurora Serverless ACU utilization** > 80% → P2
+- **Neon Postgres connection count / compute usage** elevated → P2
 - **DynamoDB throttled reads/writes** > 0 → P2
 
 ## Triage Decision Tree
@@ -56,8 +56,8 @@ Is the health endpoint responding?
     │
     ├── Is the database unreachable?
     │   ├── Check DATABASE_URL secret
-    │   ├── Check Aurora cluster status
-    │   └── Check VPC security groups
+    │   ├── Check Neon dashboard / project status
+    │   └── Check Neon connection limits
     │
     └── Is ingestion/discovery failing?
         ├── Check SQS DLQ for failed messages
