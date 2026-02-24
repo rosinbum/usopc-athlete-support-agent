@@ -1,5 +1,9 @@
 # Production Deployment
 
+> **See also:** [Deployment Procedure](./deployment-procedure.md) for the CI/CD pipeline
+> (staging → approval gate → production) and [Incident Response](./incident-response.md)
+> for rollback and incident handling.
+
 ## Prerequisites
 
 - AWS account with appropriate permissions

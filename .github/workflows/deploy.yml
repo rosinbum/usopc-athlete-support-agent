@@ -1,0 +1,172 @@
+name: Deploy
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Git tag to deploy (e.g. v1.2.3)"
+        required: true
+      stage:
+        description: "Target stage"
+        type: choice
+        options:
+          - production
+        default: production
+
+concurrency:
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.stage || 'staging' }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Deploy to staging
+        id: deploy
+        run: |
+          npx sst deploy --stage staging 2>&1 | tee deploy-output.txt
+          API_URL=$(grep -oP 'apiUrl:\s+\K\S+' deploy-output.txt || true)
+          WEB_URL=$(grep -oP 'webUrl:\s+\K\S+' deploy-output.txt || true)
+          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test API
+        if: steps.deploy.outputs.api_url != ''
+        run: |
+          curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
+            "${{ steps.deploy.outputs.api_url }}/health"
+
+      - name: Smoke test Web
+        if: steps.deploy.outputs.web_url != ''
+        run: |
+          curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
+            "${{ steps.deploy.outputs.web_url }}/api/health"
+
+  deploy-production:
+    name: Deploy to Production
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Deploy to production
+        id: deploy
+        run: |
+          npx sst deploy --stage production 2>&1 | tee deploy-output.txt
+          API_URL=$(grep -oP 'apiUrl:\s+\K\S+' deploy-output.txt || true)
+          WEB_URL=$(grep -oP 'webUrl:\s+\K\S+' deploy-output.txt || true)
+          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test API
+        if: steps.deploy.outputs.api_url != ''
+        run: |
+          curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
+            "${{ steps.deploy.outputs.api_url }}/health"
+
+      - name: Smoke test Web
+        if: steps.deploy.outputs.web_url != ''
+        run: |
+          curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
+            "${{ steps.deploy.outputs.web_url }}/api/health"
+
+  rollback-production:
+    name: Rollback Production
+    needs: deploy-production
+    if: failure()
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Find previous production tag
+        id: prev-tag
+        run: |
+          CURRENT_TAG="${{ inputs.tag }}"
+          PREV_TAG=$(git tag --sort=-creatordate | grep '^v' | grep -v "^${CURRENT_TAG}$" | head -1)
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found — cannot rollback"
+            exit 1
+          fi
+          echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+          echo "Rolling back from $CURRENT_TAG to $PREV_TAG"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ steps.prev-tag.outputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Redeploy previous tag
+        id: deploy
+        run: |
+          echo "Deploying ${{ steps.prev-tag.outputs.tag }} to production"
+          npx sst deploy --stage production 2>&1 | tee deploy-output.txt
+          API_URL=$(grep -oP 'apiUrl:\s+\K\S+' deploy-output.txt || true)
+          WEB_URL=$(grep -oP 'webUrl:\s+\K\S+' deploy-output.txt || true)
+          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test API
+        if: steps.deploy.outputs.api_url != ''
+        run: |
+          curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
+            "${{ steps.deploy.outputs.api_url }}/health"
