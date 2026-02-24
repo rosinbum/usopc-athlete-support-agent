@@ -32,9 +32,6 @@ export default $config({
     const resendApiKey = new sst.Secret("ResendApiKey");
     // Optional config with default value
     const conversationMaxTurns = new sst.Secret("ConversationMaxTurns", "5");
-    // API key for tRPC protectedProcedure auth — empty default allows unauthenticated
-    // local dev; set a strong value in production via `sst secret set TrpcApiKey`
-    const trpcApiKey = new sst.Secret("TrpcApiKey", "");
 
     // Database
     // Deployed stages (staging, production): Neon Postgres via SST secret
@@ -85,21 +82,6 @@ export default $config({
     const isDeployed = isProd || stage === "staging";
     const domainZone = "rosinbum.org";
 
-    // tRPC API — throttle at the API Gateway layer so rate limits are enforced
-    // across all Lambda instances and survive cold starts.
-    // 100 req/s burst, 60 req/s steady state (per stage/account, not per-client).
-    const api = new sst.aws.ApiGatewayV2("Api", {
-      domain: isDeployed
-        ? {
-            name: isProd ? `api.${domainZone}` : `api-${stage}.${domainZone}`,
-            dns: sst.aws.dns(),
-          }
-        : undefined,
-      throttle: {
-        burst: 100,
-        rate: 60,
-      },
-    });
     // Slack bot webhook — $default catches /slack/events, /slack/commands,
     // and /slack/interactions so all Slack endpoints route to one Lambda.
     const slackApi = new sst.aws.ApiGatewayV2("SlackApi", {
@@ -228,7 +210,6 @@ export default $config({
         : undefined,
       link: [
         ...linkables,
-        api,
         conversationMaxTurns,
         authSecret,
         gitHubClientId,
@@ -240,26 +221,9 @@ export default $config({
         discoveryFeedQueue,
         ...(ingestionQueue ? [ingestionQueue] : []),
       ],
-      environment: {
-        NEXT_PUBLIC_API_URL: api.url,
-      },
-    });
-
-    // Register the tRPC API route after Web is created so we can pass web.url
-    // as ALLOWED_ORIGIN for CORS. Hono's cors middleware reads this env var to
-    // restrict cross-origin requests to the web app's CloudFront origin only.
-    api.route("$default", {
-      handler: "apps/api/src/lambda.handler",
-      link: [...linkables, conversationMaxTurns, appTable, trpcApiKey],
-      timeout: "120 seconds",
-      memory: "512 MB",
-      environment: {
-        ALLOWED_ORIGIN: web.url,
-      },
     });
 
     return {
-      apiUrl: api.url,
       webUrl: web.url,
       slackUrl: slackApi.url,
       sourceConfigTableName: appTable.name,

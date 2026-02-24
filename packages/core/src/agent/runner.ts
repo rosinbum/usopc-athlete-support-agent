@@ -72,7 +72,7 @@ export function convertMessages(
  * High-level wrapper around the LangGraph agent.
  *
  * Encapsulates graph instantiation and provides clean `invoke()` and
- * `stream()` methods. Shared entry point for web, tRPC, and Slack.
+ * `stream()` methods. Shared entry point for web and Slack.
  */
 export class AgentRunner {
   private graph: ReturnType<typeof createAgentGraph>;

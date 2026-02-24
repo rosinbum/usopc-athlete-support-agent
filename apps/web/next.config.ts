@@ -30,7 +30,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'", // Tailwind CSS-in-JS
       "img-src 'self' data: https:", // avatars and remote images
       "font-src 'self'",
-      "connect-src 'self' https:", // tRPC API calls
+      "connect-src 'self' https:", // API calls
       "frame-ancestors 'none'",
     ].join("; "),
   },

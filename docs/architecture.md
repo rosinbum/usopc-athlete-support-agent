@@ -12,7 +12,6 @@ packages/
   shared/      @usopc/shared     — Logger, env helpers, error classes, Zod schemas
 
 apps/
-  api/         @usopc/api        — tRPC + Hono backend (Lambda)
   slack/       @usopc/slack      — Slack Bolt bot (Lambda)
   web/         @usopc/web        — Next.js 15 frontend (React 19, Tailwind 4)
 ```
@@ -206,16 +205,16 @@ Defined in `sst.config.ts`. Deployed stages (staging, production) use Neon Postg
 | Component | Development                         | Production                     |
 | --------- | ----------------------------------- | ------------------------------ |
 | Database  | Local Docker Postgres with pgvector | Neon Postgres (via SST Secret) |
-| API       | Local Lambda emulation via SST      | API Gateway + Lambda           |
+| Slack API | Local Lambda emulation via SST      | API Gateway + Lambda           |
 | Web       | Next.js dev server                  | CloudFront + Lambda@Edge       |
 | Secrets   | SST dev secrets                     | SST encrypted secrets          |
 
 **SST Resources:**
 
-- **Secrets**: `AnthropicApiKey`, `OpenaiApiKey`, `TavilyApiKey`, `LangchainApiKey`, `SlackBotToken`, `SlackSigningSecret`, `AuthSecret`, `GitHubClientId`, `GitHubClientSecret`, `AdminEmails`, `ConversationMaxTurns`, `DatabaseUrl`
+- **Secrets**: `AnthropicApiKey`, `OpenaiApiKey`, `GoogleApiKey`, `TavilyApiKey`, `LangchainApiKey`, `SlackBotToken`, `SlackSigningSecret`, `AuthSecret`, `GitHubClientId`, `GitHubClientSecret`, `AdminEmails`, `ResendApiKey`, `ConversationMaxTurns`, `DatabaseUrl`
 - **DynamoDB**: `AppTable` (single-table design for SourceConfigs, DiscoveredSources, UsageMetrics, and other entities with GSIs for querying by status, date, etc.)
 - **S3**: `DocumentsBucket` (cached documents with versioning)
-- **APIs**: `Api` (main tRPC), `SlackApi` (Slack events)
+- **APIs**: `SlackApi` (Slack events)
 - **Crons**: `DiscoveryCron` (weekly discovery), `IngestionCron` (weekly ingestion)
 
 Use `pnpm dev` (which runs `sst dev`) for local development to inject secrets. For scripts needing SST resources, use `sst shell -- <command>` or the wrapped npm scripts.
@@ -263,7 +262,7 @@ export function getPool(): Pool {
 3. Development fallback: `postgresql://postgres:postgres@localhost:5432/usopc_athlete_support`
 4. Throws if none available
 
-**Consumers:** The vector store (`PGVectorStore`), ingestion pipeline, API tRPC db client, and web admin API routes all call `getPool()` and share the same pool instance.
+**Consumers:** The vector store (`PGVectorStore`), ingestion pipeline, and web admin API routes all call `getPool()` and share the same pool instance.
 
 **Observability:** `getPoolStatus()` returns `{ totalConnections, idleConnections, waitingRequests }` (or `null` if the pool hasn't been created yet). Useful for health checks and debugging connection leaks.
 

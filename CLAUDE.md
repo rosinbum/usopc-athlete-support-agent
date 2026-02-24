@@ -78,7 +78,6 @@ When writing code that is intentionally incomplete or deferred, add a `// TODO:`
 
 ```
 apps/
-  api/          # tRPC API server (Lambda)
   web/          # Next.js chat UI
   slack/        # Slack bot (Lambda)
 packages/
