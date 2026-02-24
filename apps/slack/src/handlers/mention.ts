@@ -7,6 +7,7 @@ import {
 } from "@usopc/core";
 import { postMessage, addReaction } from "../slack/client.js";
 import { buildAnswerBlocks, buildErrorBlocks } from "../slack/blocks.js";
+import { isUserInvited } from "../lib/inviteGuard.js";
 
 const logger = createLogger({ service: "slack-mention" });
 
@@ -39,6 +40,19 @@ export async function handleMention(event: SlackMentionEvent): Promise<void> {
   }
 
   logger.info("Handling mention", { user, channel });
+
+  // Check invite list before processing
+  const invited = await isUserInvited(user);
+  if (!invited) {
+    logger.info("User not on invite list, denying access", { user });
+    await postMessage(
+      channel,
+      "Sorry, you don't have access to this service. Please contact your USOPC representative to request an invite.",
+      undefined,
+      thread_ts ?? ts,
+    );
+    return;
+  }
 
   await addReaction(channel, ts, "eyes");
 

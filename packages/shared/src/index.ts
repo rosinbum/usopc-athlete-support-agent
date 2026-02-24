@@ -96,6 +96,12 @@ export {
   createIngestionLogEntity,
   createDiscoveredSourceEntity,
   createConversationSummaryEntity,
+  createInviteEntity,
+} from "./entities/index.js";
+export {
+  InviteEntity,
+  type Invite,
+  type CreateInviteInput,
 } from "./entities/index.js";
 export type {
   OlympicProgram,

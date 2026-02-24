@@ -95,7 +95,7 @@ describe("GET /api/admin/sources", () => {
 
   it("returns sources list with hasMore false", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getAll: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCES),
@@ -112,7 +112,7 @@ describe("GET /api/admin/sources", () => {
 
   it("returns hasMore true when dataset exceeds limit", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     const manySources = Array.from({ length: 3 }, (_, i) => ({
       id: `src${i}`,
@@ -132,7 +132,7 @@ describe("GET /api/admin/sources", () => {
 
   it("respects custom limit query param", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getAll: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCES),
@@ -148,7 +148,7 @@ describe("GET /api/admin/sources", () => {
 
   it("returns 500 on error", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getAll: vi.fn().mockRejectedValueOnce(new Error("DynamoDB error")),
@@ -195,7 +195,7 @@ describe("POST /api/admin/sources", () => {
 
   it("returns 400 when required fields are missing", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(jsonRequest({}) as never);
@@ -208,7 +208,7 @@ describe("POST /api/admin/sources", () => {
 
   it("returns 400 for invalid URL", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(
@@ -222,7 +222,7 @@ describe("POST /api/admin/sources", () => {
 
   it("returns 400 for empty topicDomains", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(
@@ -236,7 +236,7 @@ describe("POST /api/admin/sources", () => {
 
   it("returns 400 for invalid ID format", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await POST(
@@ -250,7 +250,7 @@ describe("POST /api/admin/sources", () => {
 
   it("returns 201 with created source on success", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const createdSource = {
@@ -280,7 +280,7 @@ describe("POST /api/admin/sources", () => {
 
   it("returns 409 when source ID already exists", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const conflictError = new Error("Conditional check failed");
@@ -299,7 +299,7 @@ describe("POST /api/admin/sources", () => {
 
   it("returns 500 on unexpected error", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     mockCreateEntity.mockReturnValueOnce({

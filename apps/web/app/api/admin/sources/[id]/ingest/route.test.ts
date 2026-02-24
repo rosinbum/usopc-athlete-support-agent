@@ -84,7 +84,7 @@ describe("POST /api/admin/sources/[id]/ingest", () => {
 
   it("returns 404 when source not found", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(null),
@@ -104,7 +104,7 @@ describe("POST /api/admin/sources/[id]/ingest", () => {
 
   it("delegates to triggerIngestion and returns success", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCE),
@@ -127,7 +127,7 @@ describe("POST /api/admin/sources/[id]/ingest", () => {
 
   it("returns 501 when triggerIngestion fails", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(SAMPLE_SOURCE),

@@ -28,6 +28,8 @@ export default $config({
     const gitHubClientId = new sst.Secret("GitHubClientId");
     const gitHubClientSecret = new sst.Secret("GitHubClientSecret");
     const adminEmails = new sst.Secret("AdminEmails");
+    // Email magic-link auth via Resend
+    const resendApiKey = new sst.Secret("ResendApiKey");
     // Optional config with default value
     const conversationMaxTurns = new sst.Secret("ConversationMaxTurns", "5");
     // API key for tRPC protectedProcedure auth — empty default allows unauthenticated
@@ -206,6 +208,7 @@ export default $config({
         gitHubClientId,
         gitHubClientSecret,
         adminEmails,
+        resendApiKey,
         appTable,
         documentsBucket,
         discoveryFeedQueue,

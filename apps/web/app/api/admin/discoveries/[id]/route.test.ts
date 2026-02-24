@@ -92,7 +92,7 @@ describe("GET /api/admin/discoveries/[id]", () => {
 
   it("returns discovery detail", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(SAMPLE_DISCOVERY),
@@ -110,7 +110,7 @@ describe("GET /api/admin/discoveries/[id]", () => {
 
   it("returns 404 for missing discovery", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(null),
@@ -167,7 +167,7 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
   it("approves a discovery", async () => {
     const approved = { ...SAMPLE_DISCOVERY, status: "approved" };
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi
@@ -190,7 +190,7 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
   it("rejects a discovery with reason", async () => {
     const rejected = { ...SAMPLE_DISCOVERY, status: "rejected" };
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi
@@ -212,7 +212,7 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
 
   it("returns 400 when rejecting without reason", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await PATCH(
@@ -225,7 +225,7 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
 
   it("returns 400 for invalid action", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
 
     const res = await PATCH(
@@ -238,7 +238,7 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
 
   it("returns 404 when discovery does not exist", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(null),
@@ -262,7 +262,7 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
     const approved = { ...SAMPLE_DISCOVERY, status: "approved" };
     const linked = { ...approved, sourceConfigId: "disc-1" };
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi
@@ -290,7 +290,7 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
 
   it("returns 400 when sending non-approved discovery to sources", async () => {
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(SAMPLE_DISCOVERY),
@@ -311,7 +311,7 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
   it("returns 500 when send_to_sources fails", async () => {
     const approved = { ...SAMPLE_DISCOVERY, status: "approved" };
     mockAuth.mockResolvedValueOnce({
-      user: { email: "admin@test.com" },
+      user: { email: "admin@test.com", role: "admin" as const },
     } as never);
     mockCreateEntity.mockReturnValueOnce({
       getById: vi.fn().mockResolvedValueOnce(approved),
