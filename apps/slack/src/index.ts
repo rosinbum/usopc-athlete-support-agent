@@ -53,7 +53,9 @@ app.post("/slack/commands", async (c) => {
       formData = Object.fromEntries(new URLSearchParams(rawBody));
     } else {
       const body = await c.req.parseBody();
-      formData = body as Record<string, string>;
+      formData = Object.fromEntries(
+        Object.entries(body).map(([k, v]) => [k, String(v ?? "")]),
+      );
     }
 
     const command: SlackSlashCommand = {
@@ -97,7 +99,7 @@ app.post("/slack/interactions", async (c) => {
       interactionPayload = params.get("payload") ?? "{}";
     } else {
       const body = await c.req.parseBody();
-      interactionPayload = (body.payload as string) ?? "{}";
+      interactionPayload = String(body.payload ?? "{}");
     }
 
     const payload = JSON.parse(interactionPayload);
@@ -119,21 +121,21 @@ app.post("/slack/interactions", async (c) => {
             threadTs,
           });
 
-          // TODO: Store feedback via tRPC API once the feedback endpoint
-          // supports Slack message timestamps (currently expects UUID messageId).
+          // TODO(#29): Store feedback — requires DB schema and API endpoint.
+          // See: https://github.com/rosinbum/usopc-athlete-support-agent/issues/29
 
           // Acknowledge with ephemeral-style update
           try {
             const channel = payload.channel?.id;
-            const messageTs = payload.message?.ts;
-            if (channel && messageTs) {
+            const ts = payload.message?.ts;
+            if (channel && ts) {
               await postMessage(
                 channel,
                 isHelpful
                   ? "Thanks for the feedback! Glad I could help."
                   : "Thanks for the feedback. I'll work on improving.",
                 undefined,
-                messageTs,
+                ts,
               );
             }
           } catch {
@@ -148,7 +150,10 @@ app.post("/slack/interactions", async (c) => {
     logger.error("Error handling interaction", {
       error: error instanceof Error ? error.message : String(error),
     });
-    return c.json({ ok: true });
+    return c.json(
+      { ok: false, error: "Internal error processing interaction" },
+      200,
+    );
   }
 });
 

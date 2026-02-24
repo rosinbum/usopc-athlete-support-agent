@@ -138,6 +138,34 @@ describe("dispatchEvent", () => {
     expect(result.body).toBe("ok");
   });
 
+  it("returns ok and logs warning when message event has invalid payload", async () => {
+    const result = await dispatchEvent({
+      type: "event_callback",
+      event: {
+        type: "message",
+        // Missing required fields: channel, user, text, ts, channel_type
+      },
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toBe("ok");
+    expect(mockHandleMessage).not.toHaveBeenCalled();
+  });
+
+  it("returns ok and logs warning when mention event has invalid payload", async () => {
+    const result = await dispatchEvent({
+      type: "event_callback",
+      event: {
+        type: "app_mention",
+        // Missing required fields: channel, user, text, ts
+      },
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toBe("ok");
+    expect(mockHandleMention).not.toHaveBeenCalled();
+  });
+
   it("ignores Slack event retries to prevent duplicate agent responses", async () => {
     const result = await dispatchEvent(
       {
