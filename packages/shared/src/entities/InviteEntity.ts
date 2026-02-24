@@ -1,4 +1,4 @@
-import { Table } from "dynamodb-onetable";
+import type { Table } from "dynamodb-onetable";
 import { createLogger } from "../index.js";
 import type { AppTableSchema } from "./schema.js";
 
@@ -17,10 +17,8 @@ export interface CreateInviteInput {
 
 export class InviteEntity {
   private model;
-  private table: Table<typeof AppTableSchema>;
 
   constructor(table: Table<typeof AppTableSchema>) {
-    this.table = table;
     this.model = table.getModel("Invite");
   }
 
