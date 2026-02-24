@@ -35,7 +35,6 @@ vi.mock("@usopc/core", () => ({
     .mockImplementation((msgs: { role: string; content: string }[]) =>
       msgs.map((m) => ({ content: m.content })),
     ),
-  getDisclaimer: vi.fn().mockReturnValue("This is not legal advice."),
 }));
 
 vi.mock("../slack/client.js", () => ({
@@ -95,25 +94,33 @@ describe("handleMessage", () => {
     mockGetAppRunner.mockResolvedValue(fakeRunner);
   });
 
-  it("invokes the agent for DMs and posts the answer", async () => {
+  it("acknowledges immediately and invokes the agent asynchronously", async () => {
     await handleMessage(makeEvent());
 
+    // Reaction is added synchronously before returning
     expect(mockAddReaction).toHaveBeenCalledWith(
       "D123",
       "1234567890.123456",
       "eyes",
     );
-    expect(fakeRunner.invoke).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: "1234567890.123456",
-      }),
-    );
-    expect(mockPostMessage).toHaveBeenCalledWith(
-      "D123",
-      "Eligibility is determined by the NGB.",
-      expect.any(Array),
-      "1234567890.123456",
-    );
+
+    // Agent invocation and response happen asynchronously
+    await vi.waitFor(() => {
+      expect(fakeRunner.invoke).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "1234567890.123456",
+        }),
+      );
+    });
+
+    await vi.waitFor(() => {
+      expect(mockPostMessage).toHaveBeenCalledWith(
+        "D123",
+        "Eligibility is determined by the NGB.",
+        expect.any(Array),
+        "1234567890.123456",
+      );
+    });
   });
 
   it("ignores non-DM messages", async () => {
@@ -138,17 +145,22 @@ describe("handleMessage", () => {
   it("uses thread_ts as conversationId and reply target", async () => {
     await handleMessage(makeEvent({ thread_ts: "1111111111.000000" }));
 
-    expect(fakeRunner.invoke).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: "1111111111.000000",
-      }),
-    );
-    expect(mockPostMessage).toHaveBeenCalledWith(
-      "D123",
-      expect.any(String),
-      expect.any(Array),
-      "1111111111.000000",
-    );
+    await vi.waitFor(() => {
+      expect(fakeRunner.invoke).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "1111111111.000000",
+        }),
+      );
+    });
+
+    await vi.waitFor(() => {
+      expect(mockPostMessage).toHaveBeenCalledWith(
+        "D123",
+        expect.any(String),
+        expect.any(Array),
+        "1111111111.000000",
+      );
+    });
   });
 
   it("posts an error block when the agent throws", async () => {
@@ -156,11 +168,13 @@ describe("handleMessage", () => {
 
     await handleMessage(makeEvent());
 
-    expect(mockPostMessage).toHaveBeenCalledWith(
-      "D123",
-      "Error processing request",
-      expect.any(Array),
-      "1234567890.123456",
-    );
+    await vi.waitFor(() => {
+      expect(mockPostMessage).toHaveBeenCalledWith(
+        "D123",
+        "Error processing request",
+        expect.any(Array),
+        "1234567890.123456",
+      );
+    });
   });
 });

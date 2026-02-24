@@ -1,10 +1,5 @@
 import { createLogger } from "@usopc/shared";
-import {
-  getAppRunner,
-  loadSummary,
-  convertMessages,
-  getDisclaimer,
-} from "@usopc/core";
+import { getAppRunner, loadSummary, convertMessages } from "@usopc/core";
 import { postMessage, addReaction } from "../slack/client.js";
 import { buildAnswerBlocks, buildErrorBlocks } from "../slack/blocks.js";
 import { isUserInvited } from "../lib/inviteGuard.js";
@@ -50,6 +45,20 @@ export async function handleMessage(event: SlackMessageEvent): Promise<void> {
   // Add a reaction to acknowledge receipt
   await addReaction(channel, ts, "eyes");
 
+  // Process asynchronously — return immediately so Slack gets a fast 200
+  processMessageAsync(event).catch((error) => {
+    logger.error("Async message processing failed", {
+      error: error instanceof Error ? error.message : String(error),
+      user,
+      channel,
+    });
+  });
+}
+
+async function processMessageAsync(event: SlackMessageEvent): Promise<void> {
+  const { channel, text, ts, user, thread_ts } = event;
+  const replyTs = thread_ts ?? ts;
+
   try {
     const runner = await getAppRunner();
     const conversationId = thread_ts ?? ts;
@@ -62,9 +71,8 @@ export async function handleMessage(event: SlackMessageEvent): Promise<void> {
       conversationSummary,
     });
 
-    const disclaimer = getDisclaimer();
-    const blocks = buildAnswerBlocks(answer, citations, disclaimer, escalation);
-    await postMessage(channel, answer, blocks, thread_ts ?? ts);
+    const blocks = buildAnswerBlocks(answer, citations, undefined, escalation);
+    await postMessage(channel, answer, blocks, replyTs);
   } catch (error) {
     logger.error("Failed to handle message", {
       error: error instanceof Error ? error.message : String(error),
@@ -75,11 +83,6 @@ export async function handleMessage(event: SlackMessageEvent): Promise<void> {
     const blocks = buildErrorBlocks(
       "Sorry, I encountered an error processing your question. Please try again.",
     );
-    await postMessage(
-      channel,
-      "Error processing request",
-      blocks,
-      thread_ts ?? ts,
-    );
+    await postMessage(channel, "Error processing request", blocks, replyTs);
   }
 }

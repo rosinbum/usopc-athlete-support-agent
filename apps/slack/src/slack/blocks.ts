@@ -11,7 +11,7 @@ interface KnownBlock {
 export function buildAnswerBlocks(
   answer: string,
   citations: Citation[],
-  disclaimer: string,
+  disclaimer?: string,
   escalation?: EscalationInfo,
 ): KnownBlock[] {
   const blocks: KnownBlock[] = [];
@@ -40,12 +40,14 @@ export function buildAnswerBlocks(
     }
   }
 
-  // Disclaimer
-  blocks.push({ type: "divider" });
-  blocks.push({
-    type: "context",
-    elements: [{ type: "mrkdwn", text: `⚠️ ${disclaimer}` }],
-  });
+  // Disclaimer (only when explicitly provided — disclaimerGuard embeds it in the answer)
+  if (disclaimer) {
+    blocks.push({ type: "divider" });
+    blocks.push({
+      type: "context",
+      elements: [{ type: "mrkdwn", text: `⚠️ ${disclaimer}` }],
+    });
+  }
 
   // Feedback buttons
   blocks.push(buildFeedbackBlock());
@@ -101,7 +103,7 @@ function buildCitationBlock(citation: Citation): KnownBlock {
 function buildFeedbackBlock(): KnownBlock {
   return {
     type: "actions",
-    block_id: "feedback_actions",
+    block_id: `feedback_actions_${Math.random().toString(36).slice(2, 8)}`,
     elements: [
       {
         type: "button",

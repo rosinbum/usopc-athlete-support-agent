@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import crypto from "node:crypto";
 import type { Context, Next } from "hono";
-import { verifySlackRequest } from "./verify.js";
+import { verifySlackRequest, MAX_PAYLOAD_BYTES } from "./verify.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -104,6 +104,22 @@ describe("verifySlackRequest", () => {
     const result = await verifySlackRequest(ctx, next as unknown as Next);
 
     expect((result as Response).status).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("returns 413 when payload exceeds size limit", async () => {
+    const oversizedBody = "x".repeat(MAX_PAYLOAD_BYTES + 1);
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const { ctx } = makeContext({
+      timestamp,
+      signature: computeSignature(timestamp, oversizedBody),
+      body: oversizedBody,
+    });
+    const next = vi.fn();
+
+    const result = await verifySlackRequest(ctx, next as unknown as Next);
+
+    expect((result as Response).status).toBe(413);
     expect(next).not.toHaveBeenCalled();
   });
 

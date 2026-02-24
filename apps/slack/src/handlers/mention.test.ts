@@ -35,7 +35,6 @@ vi.mock("@usopc/core", () => ({
     .mockImplementation((msgs: { role: string; content: string }[]) =>
       msgs.map((m) => ({ content: m.content })),
     ),
-  getDisclaimer: vi.fn().mockReturnValue("This is not legal advice."),
 }));
 
 vi.mock("../slack/client.js", () => ({
@@ -94,41 +93,54 @@ describe("handleMention", () => {
     mockGetAppRunner.mockResolvedValue(fakeRunner);
   });
 
-  it("invokes the agent and posts the answer", async () => {
+  it("acknowledges immediately and invokes the agent asynchronously", async () => {
     await handleMention(makeEvent());
 
+    // Reaction is added synchronously before returning
     expect(mockAddReaction).toHaveBeenCalledWith(
       "C123",
       "1234567890.123456",
       "eyes",
     );
-    expect(fakeRunner.invoke).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: "1234567890.123456",
-      }),
-    );
-    expect(mockPostMessage).toHaveBeenCalledWith(
-      "C123",
-      "Appeals must be filed within 30 days.",
-      expect.any(Array),
-      "1234567890.123456",
-    );
+
+    // Agent invocation and response happen asynchronously
+    await vi.waitFor(() => {
+      expect(fakeRunner.invoke).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "1234567890.123456",
+        }),
+      );
+    });
+
+    await vi.waitFor(() => {
+      expect(mockPostMessage).toHaveBeenCalledWith(
+        "C123",
+        "Appeals must be filed within 30 days.",
+        expect.any(Array),
+        "1234567890.123456",
+      );
+    });
   });
 
   it("uses thread_ts as conversationId when in a thread", async () => {
     await handleMention(makeEvent({ thread_ts: "1111111111.000000" }));
 
-    expect(fakeRunner.invoke).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: "1111111111.000000",
-      }),
-    );
-    expect(mockPostMessage).toHaveBeenCalledWith(
-      "C123",
-      expect.any(String),
-      expect.any(Array),
-      "1111111111.000000",
-    );
+    await vi.waitFor(() => {
+      expect(fakeRunner.invoke).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "1111111111.000000",
+        }),
+      );
+    });
+
+    await vi.waitFor(() => {
+      expect(mockPostMessage).toHaveBeenCalledWith(
+        "C123",
+        expect.any(String),
+        expect.any(Array),
+        "1111111111.000000",
+      );
+    });
   });
 
   it("asks for a question when text is empty after stripping mention", async () => {
@@ -148,12 +160,14 @@ describe("handleMention", () => {
 
     await handleMention(makeEvent());
 
-    expect(mockPostMessage).toHaveBeenCalledWith(
-      "C123",
-      "Error processing request",
-      expect.any(Array),
-      "1234567890.123456",
-    );
+    await vi.waitFor(() => {
+      expect(mockPostMessage).toHaveBeenCalledWith(
+        "C123",
+        "Error processing request",
+        expect.any(Array),
+        "1234567890.123456",
+      );
+    });
   });
 
   it("loads conversation summary for the thread", async () => {
@@ -161,11 +175,16 @@ describe("handleMention", () => {
 
     await handleMention(makeEvent());
 
-    expect(mockLoadSummary).toHaveBeenCalledWith("1234567890.123456");
-    expect(fakeRunner.invoke).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationSummary: "Previous context about appeals.",
-      }),
-    );
+    await vi.waitFor(() => {
+      expect(mockLoadSummary).toHaveBeenCalledWith("1234567890.123456");
+    });
+
+    await vi.waitFor(() => {
+      expect(fakeRunner.invoke).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationSummary: "Previous context about appeals.",
+        }),
+      );
+    });
   });
 });
