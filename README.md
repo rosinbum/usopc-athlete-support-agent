@@ -29,8 +29,8 @@ An AI-powered governance and compliance assistant for U.S. Olympic and Paralympi
 - [Commands](./docs/commands.md) — Full CLI commands reference
 - [Deployment](./docs/deployment.md) — Production deployment guide
 - [Conventions](./docs/conventions.md) — Formatting, testing, and technical conventions
-- [Quality Review](./docs/quality-review.md) — Round-by-round quality comparison framework
 - [Evaluation Playbook](./docs/evaluation-playbook.md) — Running and interpreting LangSmith evaluations
+- [Security](./docs/security.md) — Authentication, secret management, threat model, and known findings
 
 ## Local Development Setup
 
@@ -131,6 +131,12 @@ pnpm ingest
 
 Slack integration is under development. See [#7](https://github.com/rosinbum/usopc-athlete-support-agent/issues/7) for progress.
 
+## Security
+
+Authentication is handled by Auth.js v5 with GitHub OAuth (admin) and email magic link (athlete). Admin routes are protected by edge middleware and per-handler guards. The chat endpoint is intentionally public with rate limiting.
+
+For the full security architecture, threat model, secret inventory, and known findings, see [docs/security.md](./docs/security.md).
+
 ## Contributing
 
 1. Create a GitHub issue describing the planned work
@@ -147,7 +153,7 @@ See [CLAUDE.md](./CLAUDE.md) for detailed development guidelines.
 **Tracked build time:** 96.9 hours
 
 - Method: terminal-activity-based (idle cutoff: 10 min)
-- Last updated: 2026-02-25T01:07:27.151Z
+- Last updated: 2026-02-25T01:13:05.156Z
 <!-- HOURS:END -->
 
 ## License
