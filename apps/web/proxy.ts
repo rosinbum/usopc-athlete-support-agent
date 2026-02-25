@@ -1,7 +1,7 @@
 import { auth } from "./auth.js";
 import { NextResponse } from "next/server";
 
-export default auth((req) => {
+export const proxy = auth((req) => {
   const { pathname } = req.nextUrl;
   const session = req.auth;
 

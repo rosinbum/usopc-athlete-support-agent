@@ -5,11 +5,11 @@ vi.mock("./auth.js", () => ({
   auth: vi.fn((handler: unknown) => handler),
 }));
 
-import middleware, { config } from "./middleware.js";
+import { proxy, config } from "./proxy.js";
 
-describe("middleware", () => {
-  it("exports a middleware function", () => {
-    expect(typeof middleware).toBe("function");
+describe("proxy", () => {
+  it("exports a proxy function", () => {
+    expect(typeof proxy).toBe("function");
   });
 
   it("matches admin pages", () => {
