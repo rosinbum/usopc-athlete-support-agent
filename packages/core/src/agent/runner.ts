@@ -52,6 +52,7 @@ export interface AgentOutput {
   answer: string;
   citations: Citation[];
   escalation?: EscalationInfo | undefined;
+  disclaimer?: string | undefined;
 }
 
 /**
@@ -165,6 +166,7 @@ export class AgentRunner {
       answer: finalState.answer ?? "",
       citations: finalState.citations ?? [],
       escalation: finalState.escalation,
+      disclaimer: finalState.disclaimer,
     };
 
     // Fire-and-forget: save conversation summary for multi-turn context

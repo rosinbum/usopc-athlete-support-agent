@@ -71,6 +71,7 @@ export async function runMultiTurnPipeline(
         answer: output.answer,
         citations: output.citations,
         escalation: output.escalation,
+        disclaimer: output.disclaimer,
         // These fields aren't directly available from AgentOutput,
         // so we set sensible defaults. Full state is available through
         // the graph's stream mode if needed.

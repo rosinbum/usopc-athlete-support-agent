@@ -120,16 +120,17 @@ export async function postMessage(
   text: string,
   blocks?: unknown[],
   threadTs?: string,
-): Promise<void> {
+): Promise<string | undefined> {
   const slack = getSlackClient();
-  await slackCircuit.execute(() =>
+  return await slackCircuit.execute(() =>
     withRetry(async () => {
-      await slack.chat.postMessage({
+      const res = await slack.chat.postMessage({
         channel,
         text,
         blocks: blocks as never[],
         ...(threadTs !== undefined ? { thread_ts: threadTs } : {}),
       });
+      return res.ts;
     }),
   );
 }
@@ -152,6 +153,70 @@ export async function addReaction(
   await slackCircuit.executeWithFallback(
     async () => {
       await slack.reactions.add({ channel, timestamp, name });
+    },
+    undefined, // Silently succeed on failure
+  );
+}
+
+/**
+ * Cleans up previous bot messages in a thread by stripping feedback buttons
+ * and disclaimer blocks, so only the latest response has them.
+ *
+ * Non-critical — failures are silently ignored via executeWithFallback.
+ */
+export async function cleanUpPreviousBotMessages(
+  channel: string,
+  threadTs: string,
+  latestBotMessageTs?: string,
+): Promise<void> {
+  const slack = getSlackClient();
+
+  // Dynamically import to avoid circular deps
+  const { stripFeedbackAndDisclaimerBlocks } = await import("./blocks.js");
+
+  await slackCircuit.executeWithFallback(
+    async () => {
+      const res = await slack.conversations.replies({
+        channel,
+        ts: threadTs,
+        limit: 100,
+      });
+
+      const messages = res.messages ?? [];
+
+      for (const msg of messages) {
+        // Only process bot messages (not the latest one we just posted)
+        if (!msg.bot_id || !msg.ts || msg.ts === latestBotMessageTs) continue;
+        if (!msg.blocks || !Array.isArray(msg.blocks)) continue;
+
+        // Check if this message has feedback/disclaimer blocks to clean
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const blocks = msg.blocks as any[];
+        const hasCleanableBlocks = blocks.some(
+          (block) =>
+            (block.type === "actions" &&
+              typeof block.block_id === "string" &&
+              block.block_id.startsWith("feedback_actions_")) ||
+            (block.type === "context" &&
+              Array.isArray(block.elements) &&
+              (block.elements as { text?: string }[]).some(
+                (el) => typeof el.text === "string" && el.text.startsWith("⚠️"),
+              )),
+        );
+
+        if (!hasCleanableBlocks) continue;
+
+        const cleaned = stripFeedbackAndDisclaimerBlocks(
+          blocks as Parameters<typeof stripFeedbackAndDisclaimerBlocks>[0],
+        );
+
+        await slack.chat.update({
+          channel,
+          ts: msg.ts,
+          blocks: cleaned as never[],
+          text: msg.text ?? "",
+        });
+      }
     },
     undefined, // Silently succeed on failure
   );

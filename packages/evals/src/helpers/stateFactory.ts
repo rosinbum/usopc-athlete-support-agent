@@ -18,6 +18,7 @@ export function makeTestState(overrides: Partial<AgentState> = {}): AgentState {
     citations: [],
     answer: undefined,
     escalation: undefined,
+    disclaimer: undefined,
     disclaimerRequired: true,
     hasTimeConstraint: false,
     conversationId: undefined,

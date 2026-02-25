@@ -3,6 +3,7 @@ import {
   buildAnswerBlocks,
   buildErrorBlocks,
   buildThinkingBlock,
+  stripFeedbackAndDisclaimerBlocks,
 } from "./blocks.js";
 
 describe("buildAnswerBlocks", () => {
@@ -87,6 +88,71 @@ describe("buildErrorBlocks", () => {
     expect(blocks).toHaveLength(2);
     expect(blocks[0]!.text?.text).toContain("Something went wrong");
     expect(blocks[1]!.type).toBe("context");
+  });
+});
+
+describe("stripFeedbackAndDisclaimerBlocks", () => {
+  it("removes feedback action blocks", () => {
+    const blocks = buildAnswerBlocks("Answer", [], "Not legal advice.");
+    const stripped = stripFeedbackAndDisclaimerBlocks(blocks);
+
+    const actionBlocks = stripped.filter((b) => b.type === "actions");
+    expect(actionBlocks).toHaveLength(0);
+  });
+
+  it("removes disclaimer context blocks", () => {
+    const blocks = buildAnswerBlocks("Answer", [], "Not legal advice.");
+    const stripped = stripFeedbackAndDisclaimerBlocks(blocks);
+
+    const disclaimerBlocks = stripped.filter(
+      (b) =>
+        b.type === "context" &&
+        Array.isArray(b.elements) &&
+        (b.elements as { text?: string }[]).some((e) =>
+          e.text?.startsWith("⚠️"),
+        ),
+    );
+    expect(disclaimerBlocks).toHaveLength(0);
+  });
+
+  it("preserves answer and citation blocks", () => {
+    const blocks = buildAnswerBlocks(
+      "Answer",
+      [{ title: "Doc", documentType: "policy", snippet: "..." }],
+      "Not legal advice.",
+    );
+    const stripped = stripFeedbackAndDisclaimerBlocks(blocks);
+
+    // Should have: answer section, divider, sources header, citation context
+    const sectionBlocks = stripped.filter((b) => b.type === "section");
+    expect(sectionBlocks.length).toBeGreaterThanOrEqual(2); // answer + sources header
+    const citationContexts = stripped.filter(
+      (b) =>
+        b.type === "context" &&
+        Array.isArray(b.elements) &&
+        !(b.elements as { text?: string }[]).some((e) =>
+          e.text?.startsWith("⚠️"),
+        ),
+    );
+    expect(citationContexts.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("trims trailing dividers", () => {
+    const blocks = buildAnswerBlocks("Answer", [], "Not legal advice.");
+    const stripped = stripFeedbackAndDisclaimerBlocks(blocks);
+
+    if (stripped.length > 0) {
+      expect(stripped[stripped.length - 1]!.type).not.toBe("divider");
+    }
+  });
+
+  it("handles blocks without disclaimer or feedback (no-op)", () => {
+    const blocks = [
+      { type: "section", text: { type: "mrkdwn", text: "Just text" } },
+    ];
+    const stripped = stripFeedbackAndDisclaimerBlocks(blocks);
+    expect(stripped).toHaveLength(1);
+    expect(stripped[0]!.type).toBe("section");
   });
 });
 

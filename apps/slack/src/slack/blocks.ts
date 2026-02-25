@@ -40,7 +40,7 @@ export function buildAnswerBlocks(
     }
   }
 
-  // Disclaimer (only when explicitly provided — disclaimerGuard embeds it in the answer)
+  // Disclaimer
   if (disclaimer) {
     blocks.push({ type: "divider" });
     blocks.push({
@@ -140,6 +140,46 @@ export function buildErrorBlocks(message: string): KnownBlock[] {
       ],
     },
   ];
+}
+
+/**
+ * Strips feedback action buttons and disclaimer context blocks from a
+ * set of Slack blocks. Used to clean up previous bot messages in a thread
+ * so only the latest response shows these elements.
+ */
+export function stripFeedbackAndDisclaimerBlocks(
+  blocks: KnownBlock[],
+): KnownBlock[] {
+  const cleaned = blocks.filter((block) => {
+    // Remove feedback action blocks
+    if (
+      block.type === "actions" &&
+      block.block_id &&
+      block.block_id.startsWith("feedback_actions_")
+    ) {
+      return false;
+    }
+
+    // Remove disclaimer context blocks (identified by ⚠️ prefix)
+    if (block.type === "context" && Array.isArray(block.elements)) {
+      const hasDisclaimer = (block.elements as { text?: string }[]).some(
+        (el) => typeof el.text === "string" && el.text.startsWith("⚠️"),
+      );
+      if (hasDisclaimer) return false;
+    }
+
+    return true;
+  });
+
+  // Trim trailing dividers left behind after removal
+  while (
+    cleaned.length > 0 &&
+    cleaned[cleaned.length - 1]!.type === "divider"
+  ) {
+    cleaned.pop();
+  }
+
+  return cleaned;
 }
 
 export function buildThinkingBlock(): KnownBlock {

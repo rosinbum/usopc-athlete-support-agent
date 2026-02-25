@@ -7,9 +7,9 @@ const log = logger.child({ service: "disclaimer-guard-node" });
 /**
  * DISCLAIMER_GUARD node.
  *
- * Appends domain-appropriate disclaimers to the agent's answer.
- * Always includes the "not legal advice" disclaimer, with additional
- * domain-specific disclaimers for SafeSport, anti-doping, disputes, etc.
+ * Sets structured disclaimer text for domain-appropriate disclaimers.
+ * Consumers (web, Slack) render the disclaimer independently rather
+ * than having it embedded in the answer text.
  */
 export async function disclaimerGuardNode(
   state: AgentState,
@@ -20,14 +20,12 @@ export async function disclaimerGuardNode(
 
   const disclaimer = getDisclaimer(state.topicDomain);
 
-  log.info("Appending disclaimer", {
+  log.info("Setting disclaimer", {
     topicDomain: state.topicDomain ?? "none",
   });
 
-  const answer = state.answer + "\n\n---\n\n" + disclaimer;
-
   return {
-    answer,
+    disclaimer,
     disclaimerRequired: true,
   };
 }

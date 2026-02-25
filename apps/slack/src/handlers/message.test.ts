@@ -4,10 +4,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockPostMessage, mockAddReaction } = vi.hoisted(() => ({
-  mockPostMessage: vi.fn().mockResolvedValue(undefined),
-  mockAddReaction: vi.fn().mockResolvedValue(undefined),
-}));
+const { mockPostMessage, mockAddReaction, mockCleanUpPreviousBotMessages } =
+  vi.hoisted(() => ({
+    mockPostMessage: vi.fn().mockResolvedValue("posted.ts"),
+    mockAddReaction: vi.fn().mockResolvedValue(undefined),
+    mockCleanUpPreviousBotMessages: vi.fn().mockResolvedValue(undefined),
+  }));
 
 const { mockGetAppRunner, mockLoadSummary } = vi.hoisted(() => ({
   mockGetAppRunner: vi.fn(),
@@ -40,6 +42,7 @@ vi.mock("@usopc/core", () => ({
 vi.mock("../slack/client.js", () => ({
   postMessage: mockPostMessage,
   addReaction: mockAddReaction,
+  cleanUpPreviousBotMessages: mockCleanUpPreviousBotMessages,
 }));
 
 vi.mock("../slack/blocks.js", () => ({
@@ -159,6 +162,18 @@ describe("handleMessage", () => {
         expect.any(String),
         expect.any(Array),
         "1111111111.000000",
+      );
+    });
+  });
+
+  it("calls cleanUpPreviousBotMessages after posting", async () => {
+    await handleMessage(makeEvent());
+
+    await vi.waitFor(() => {
+      expect(mockCleanUpPreviousBotMessages).toHaveBeenCalledWith(
+        "D123",
+        "1234567890.123456",
+        "posted.ts",
       );
     });
   });

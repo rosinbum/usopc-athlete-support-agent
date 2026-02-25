@@ -1,6 +1,10 @@
 import { createLogger } from "@usopc/shared";
 import { getAppRunner, loadSummary, convertMessages } from "@usopc/core";
-import { postMessage, addReaction } from "../slack/client.js";
+import {
+  postMessage,
+  addReaction,
+  cleanUpPreviousBotMessages,
+} from "../slack/client.js";
 import { buildAnswerBlocks, buildErrorBlocks } from "../slack/blocks.js";
 import { isUserInvited } from "../lib/inviteGuard.js";
 
@@ -74,14 +78,21 @@ async function processMentionAsync(
     const conversationSummary = await loadSummary(conversationId);
     const messages = convertMessages([{ role: "user", content: cleanedText }]);
 
-    const { answer, citations, escalation } = await runner.invoke({
+    const { answer, citations, escalation, disclaimer } = await runner.invoke({
       messages,
       conversationId,
       conversationSummary,
     });
 
-    const blocks = buildAnswerBlocks(answer, citations, undefined, escalation);
-    await postMessage(channel, answer, blocks, replyTs);
+    const blocks = buildAnswerBlocks(answer, citations, disclaimer, escalation);
+    const postedTs = await postMessage(channel, answer, blocks, replyTs);
+
+    // Fire-and-forget: strip disclaimer/buttons from previous bot messages
+    cleanUpPreviousBotMessages(channel, replyTs, postedTs).catch((error) => {
+      logger.error("Failed to clean up previous bot messages", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
   } catch (error) {
     logger.error("Failed to handle mention", {
       error: error instanceof Error ? error.message : String(error),
