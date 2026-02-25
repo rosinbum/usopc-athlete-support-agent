@@ -80,7 +80,7 @@ export default $config({
     // Custom domains — only for deployed stages (staging, production).
     // Local dev stages use raw AWS URLs (no domain config needed).
     const isDeployed = isProd || stage === "staging";
-    const domainZone = "rosinbum.org";
+    const domainZone = "athlete-agent.rosinbum.org";
 
     // Slack bot webhook — $default catches /slack/events, /slack/commands,
     // and /slack/interactions so all Slack endpoints route to one Lambda.
@@ -204,7 +204,7 @@ export default $config({
       path: "apps/web",
       domain: isDeployed
         ? {
-            name: isProd ? `app.${domainZone}` : `${stage}.${domainZone}`,
+            name: isProd ? domainZone : `${stage}.${domainZone}`,
             dns: sst.aws.dns(),
           }
         : undefined,
