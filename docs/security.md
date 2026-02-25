@@ -50,7 +50,7 @@ Changes require redeployment (`sst deploy`) to take effect in Lambda environment
 
 **Revoking access:** Remove the user's email from `AdminEmails` and redeploy. Existing sessions (up to 24 hours) remain valid until they expire.
 
-**Known limitation:** The admin guard checks session role only, not the current email allowlist. A revoked admin retains access until their JWT expires. See [#217](https://github.com/rosinbum/usopc-athlete-support-agent/issues/217) for the planned fix.
+**Role re-evaluation:** The JWT callback re-checks the admin allowlist on every token refresh, so a revoked admin loses access on their next token refresh without waiting for full session expiry.
 
 **Invite management:** The invite endpoints (`/api/admin/invites`) require admin role, consistent with all other `/api/admin/*` routes. See the [API Reference](./api-reference.md#admin--invites) for details.
 
@@ -62,28 +62,29 @@ Changes require redeployment (`sst deploy`) to take effect in Lambda environment
 | `email`           | From OAuth/magic-link, lowercased                                           |
 | `name`, `picture` | From OAuth provider                                                         |
 
-Role is determined at initial sign-in and is not re-evaluated on subsequent requests within the 24-hour session window.
+Role is re-evaluated on every JWT token refresh (via the `jwt` callback). Removing an email from `AdminEmails` and redeploying will demote the user to `"athlete"` on their next token refresh, without waiting for session expiry.
 
 ## API Authentication Requirements
 
 ### Endpoint Inventory
 
-| Route                       | Method | Auth Level | Guard                                                              |
-| --------------------------- | ------ | ---------- | ------------------------------------------------------------------ |
-| `/api/health`               | GET    | Public     | None                                                               |
-| `/api/chat`                 | POST   | Public     | Rate-limited (20/5min per IP, 100/5min global per Lambda instance) |
-| `/api/sources`              | GET    | Public     | None                                                               |
-| `/api/auth/[...nextauth]`   | ALL    | Public     | NextAuth internals                                                 |
-| `/api/documents/[key]/url`  | GET    | Session    | `auth()` session check + S3 path validation                        |
-| `/api/admin/sources/**`     | ALL    | Admin      | Middleware + `requireAdmin()`                                      |
-| `/api/admin/discoveries/**` | ALL    | Admin      | Middleware + `requireAdmin()`                                      |
-| `/api/admin/invites`        | ALL    | Admin      | Middleware + `requireAdmin()`                                      |
+| Route                       | Method | Auth Level | Guard                                                  |
+| --------------------------- | ------ | ---------- | ------------------------------------------------------ |
+| `/api/health`               | GET    | Public     | None                                                   |
+| `/api/chat`                 | POST   | Session    | `auth()` session check + rate limiter (20/5min per IP) |
+| `/api/chat/feedback`        | POST   | Session    | `auth()` session check + Zod validation                |
+| `/api/sources`              | GET    | Public     | None                                                   |
+| `/api/auth/[...nextauth]`   | ALL    | Public     | NextAuth internals                                     |
+| `/api/documents/[key]/url`  | GET    | Session    | `auth()` session check + S3 path validation            |
+| `/api/admin/sources/**`     | ALL    | Admin      | Middleware + `requireAdmin()`                          |
+| `/api/admin/discoveries/**` | ALL    | Admin      | Middleware + `requireAdmin()`                          |
+| `/api/admin/invites`        | ALL    | Admin      | Middleware + `requireAdmin()`                          |
 
 ### Defense in Depth
 
 Admin routes are protected by two layers:
 
-1. **Edge middleware** (`apps/web/middleware.ts`) — intercepts requests matching `/admin/*` and `/api/admin/*`. Redirects unauthenticated users to login and non-admin users to an access-denied page.
+1. **Edge middleware** (`apps/web/proxy.ts`) — intercepts requests matching `/admin/*`, `/api/admin/*`, `/api/chat`, and `/api/documents/*`. Redirects unauthenticated users to login and non-admin users to an access-denied page for admin routes.
 2. **Per-handler guard** (`apps/web/lib/admin-api.ts`) — `requireAdmin()` is called at the start of each admin route handler, returning 401/403 as appropriate.
 
 ### Rate Limiting
@@ -99,9 +100,9 @@ The chat endpoint uses a fixed-window in-memory rate limiter:
 
 **Limitation:** State is not shared across Lambda instances. Effective limits scale with Lambda concurrency. A distributed rate limiter (e.g., DynamoDB or ElastiCache-backed) would be needed for stricter enforcement.
 
-### Chat Endpoint (Public)
+### Chat Endpoint (Authenticated)
 
-The chat endpoint is intentionally unauthenticated to maximize accessibility for athletes. Any visitor can invoke the full LLM pipeline (Claude, OpenAI embeddings, Tavily search). The rate limiter is the primary abuse control.
+The chat endpoint requires a valid session (enforced by both edge middleware and an in-route `auth()` check). Athletes must sign in via email magic link before using the chat. Rate limiting provides a secondary abuse control layer.
 
 ## Secret Management
 
@@ -210,14 +211,14 @@ The following findings are from a comprehensive security audit (`.full-review/02
 
 ### Resolved
 
-| ID     | Severity | Title                                                   | Resolution                                                        |
-| ------ | -------- | ------------------------------------------------------- | ----------------------------------------------------------------- |
-| SEC-C1 | Critical | Middleware not auto-discovered by Next.js               | Fixed — file renamed to `middleware.ts` with correct edge matcher |
-| SEC-C2 | Critical | Missing Zod validation on bulk source endpoints         | Fixed — `bulkSchema` with `.max(100)` added                       |
-| SEC-H2 | High     | Presigned URL used `auth()` instead of `requireAdmin()` | Fixed — now uses `requireAdmin()`                                 |
-| SEC-H3 | High     | `unsafe-eval` in production CSP                         | Fixed — `next.config.ts` conditionalizes on `isDev`               |
-| SEC-H4 | High     | Sources endpoint exposed `s3Key`, `ngbId`, `chunkCount` | Fixed — response mapping strips internal fields                   |
-| SEC-M2 | Medium   | No upper bound on bulk arrays                           | Fixed — `.max(100)` added                                         |
+| ID     | Severity | Title                                                   | Resolution                                                      |
+| ------ | -------- | ------------------------------------------------------- | --------------------------------------------------------------- |
+| SEC-C1 | Critical | Middleware not auto-discovered by Next.js               | Fixed — file renamed to `proxy.ts` for Next.js 16 compatibility |
+| SEC-C2 | Critical | Missing Zod validation on bulk source endpoints         | Fixed — `bulkSchema` with `.max(100)` added                     |
+| SEC-H2 | High     | Presigned URL used `auth()` instead of `requireAdmin()` | Fixed — now uses `requireAdmin()`                               |
+| SEC-H3 | High     | `unsafe-eval` in production CSP                         | Fixed — `next.config.ts` conditionalizes on `isDev`             |
+| SEC-H4 | High     | Sources endpoint exposed `s3Key`, `ngbId`, `chunkCount` | Fixed — response mapping strips internal fields                 |
+| SEC-M2 | Medium   | No upper bound on bulk arrays                           | Fixed — `.max(100)` added                                       |
 
 ### Open / Partially Mitigated
 
@@ -232,11 +233,10 @@ The following findings are from a comprehensive security audit (`.full-review/02
 
 ### Accepted Risks
 
-| ID     | Severity | Title                                                              | Rationale                                         |
-| ------ | -------- | ------------------------------------------------------------------ | ------------------------------------------------- |
-| SEC-L2 | Low      | Chat endpoint unauthenticated — knowledge base extraction possible | By design — prioritizes athlete accessibility     |
-| SEC-L3 | Low      | No explicit CSRF protection                                        | Mitigated by CORS preflight for JSON content type |
-| SEC-L4 | Low      | Secrets persist in `process.env` across warm Lambda invocations    | Standard Lambda behavior                          |
+| ID     | Severity | Title                                                           | Rationale                                         |
+| ------ | -------- | --------------------------------------------------------------- | ------------------------------------------------- |
+| SEC-L3 | Low      | No explicit CSRF protection                                     | Mitigated by CORS preflight for JSON content type |
+| SEC-L4 | Low      | Secrets persist in `process.env` across warm Lambda invocations | Standard Lambda behavior                          |
 
 ## Compliance Posture
 
@@ -249,7 +249,7 @@ The following findings are from a comprehensive security audit (`.full-review/02
 | A03 | Injection                 | Mitigated — parameterized SQL queries; Zod input validation; S3 path checks          |
 | A04 | Insecure Design           | Mitigated — defense in depth for admin routes; structured LLM routing                |
 | A05 | Security Misconfiguration | Partially — `trustHost: true`, permissive CSP `connect-src` remain open              |
-| A06 | Vulnerable Components     | Unknown — dependency audit needed                                                    |
+| A06 | Vulnerable Components     | Partially mitigated — pnpm overrides pin known-vulnerable transitive deps            |
 | A07 | Auth Failures             | Mitigated — allowlist-gated OAuth + invite-gated magic link                          |
 | A08 | Data Integrity Failures   | Mitigated — Slack request signing verification; no deserialization of untrusted data |
 | A09 | Logging & Monitoring      | Mitigated — CloudWatch alarms, structured logging, LangSmith tracing                 |
