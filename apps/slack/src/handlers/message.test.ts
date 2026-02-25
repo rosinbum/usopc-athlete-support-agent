@@ -56,6 +56,7 @@ vi.mock("../lib/inviteGuard.js", () => ({
   isUserInvited: vi.fn().mockResolvedValue(true),
 }));
 
+import { isUserInvited } from "../lib/inviteGuard.js";
 import { handleMessage, type SlackMessageEvent } from "./message.js";
 
 // ---------------------------------------------------------------------------
@@ -161,6 +162,21 @@ describe("handleMessage", () => {
         "1111111111.000000",
       );
     });
+  });
+
+  it("denies access when user is not on the invite list", async () => {
+    vi.mocked(isUserInvited).mockResolvedValueOnce(false);
+
+    await handleMessage(makeEvent());
+
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      "D123",
+      expect.stringContaining("don't have access"),
+      undefined,
+      "1234567890.123456",
+    );
+    expect(mockAddReaction).not.toHaveBeenCalled();
+    expect(fakeRunner.invoke).not.toHaveBeenCalled();
   });
 
   it("posts an error block when the agent throws", async () => {
