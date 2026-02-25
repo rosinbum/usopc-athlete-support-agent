@@ -70,6 +70,11 @@ export default $config({
         gsi1: { hashKey: "gsi1pk", rangeKey: "gsi1sk" },
       },
       ttl: "ttl",
+      transform: {
+        table: (args) => {
+          args.pointInTimeRecovery = { enabled: true };
+        },
+      },
     });
 
     // S3 bucket for document storage (cache/archive)
