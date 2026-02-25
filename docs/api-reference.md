@@ -625,15 +625,13 @@ Bulk operations on discoveries.
 
 ## Admin — Invites
 
-Manage the athlete invite list. Controls who can sign in via email magic link.
-
-**Note:** These endpoints require a valid session but do not enforce admin role — any authenticated user can access them.
+Manage the athlete invite list. Controls who can sign in via email magic link. All endpoints require admin authentication.
 
 ### `GET /api/admin/invites`
 
 List all invited athletes.
 
-**Auth:** Session
+**Auth:** Admin
 
 ```bash
 curl https://athlete-agent.rosinbum.org/api/admin/invites \
@@ -660,7 +658,7 @@ curl https://athlete-agent.rosinbum.org/api/admin/invites \
 
 Invite an athlete by email.
 
-**Auth:** Session
+**Auth:** Admin
 
 **Request body:**
 
@@ -694,7 +692,7 @@ curl -X POST https://athlete-agent.rosinbum.org/api/admin/invites \
 
 Revoke an athlete's invite.
 
-**Auth:** Session
+**Auth:** Admin
 
 **Request body:**
 

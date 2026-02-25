@@ -52,7 +52,7 @@ Changes require redeployment (`sst deploy`) to take effect in Lambda environment
 
 **Known limitation:** The admin guard checks session role only, not the current email allowlist. A revoked admin retains access until their JWT expires. See [#217](https://github.com/rosinbum/usopc-athlete-support-agent/issues/217) for the planned fix.
 
-**Invite management** (non-admin routes): The invite endpoints (`/api/admin/invites`) require a valid session but do not enforce admin role. Any authenticated user can manage invites. See the [API Reference](./api-reference.md#admin--invites) for details.
+**Invite management:** The invite endpoints (`/api/admin/invites`) require admin role, consistent with all other `/api/admin/*` routes. See the [API Reference](./api-reference.md#admin--invites) for details.
 
 ### Session Model
 
@@ -77,7 +77,7 @@ Role is determined at initial sign-in and is not re-evaluated on subsequent requ
 | `/api/documents/[key]/url`  | GET    | Admin      | `requireAdmin()` + S3 path validation                              |
 | `/api/admin/sources/**`     | ALL    | Admin      | Middleware + `requireAdmin()`                                      |
 | `/api/admin/discoveries/**` | ALL    | Admin      | Middleware + `requireAdmin()`                                      |
-| `/api/admin/invites`        | ALL    | Session    | `auth()` session check (role not verified)                         |
+| `/api/admin/invites`        | ALL    | Admin      | Middleware + `requireAdmin()`                                      |
 
 ### Defense in Depth
 
