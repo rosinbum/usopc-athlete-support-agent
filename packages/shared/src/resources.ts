@@ -2,6 +2,7 @@ import { Resource } from "sst";
 
 interface AppResources {
   AppTable: { name: string };
+  AuthTable: { name: string };
   IngestionQueue: { url: string };
   DiscoveryFeedQueue: { url: string };
   DocumentsBucket: { name: string };

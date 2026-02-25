@@ -1,7 +1,10 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import Resend from "next-auth/providers/resend";
-import { createInviteEntity } from "@usopc/shared";
+import { DynamoDBAdapter } from "@auth/dynamodb-adapter";
+import { DynamoDB } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocument } from "@aws-sdk/lib-dynamodb";
+import { createInviteEntity, getResource } from "@usopc/shared";
 import {
   getAuthSecret,
   getGitHubClientId,
@@ -10,7 +13,18 @@ import {
   getResendApiKey,
 } from "./lib/auth-env.js";
 
+const dynamoClient = DynamoDBDocument.from(new DynamoDB(), {
+  marshallOptions: {
+    convertEmptyValues: true,
+    removeUndefinedValues: true,
+    convertClassInstanceToMap: true,
+  },
+});
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: DynamoDBAdapter(dynamoClient, {
+    tableName: getResource("AuthTable").name,
+  }),
   providers: [
     GitHub({
       clientId: getGitHubClientId(),

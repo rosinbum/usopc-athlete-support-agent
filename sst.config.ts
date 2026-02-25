@@ -77,6 +77,21 @@ export default $config({
       },
     });
 
+    // DynamoDB table for NextAuth adapter (users, accounts, verification tokens)
+    const authTable = new sst.aws.Dynamo("AuthTable", {
+      fields: {
+        pk: "string",
+        sk: "string",
+        GSI1PK: "string",
+        GSI1SK: "string",
+      },
+      primaryIndex: { hashKey: "pk", rangeKey: "sk" },
+      globalIndexes: {
+        GSI1: { hashKey: "GSI1PK", rangeKey: "GSI1SK" },
+      },
+      ttl: "expires",
+    });
+
     // S3 bucket for document storage (cache/archive)
     const documentsBucket = new sst.aws.Bucket("DocumentsBucket", {
       versioning: true,
@@ -550,6 +565,7 @@ export default $config({
         adminEmails,
         resendApiKey,
         appTable,
+        authTable,
         documentsBucket,
         discoveryFeedQueue,
         ...(ingestionQueue ? [ingestionQueue] : []),
