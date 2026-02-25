@@ -28,6 +28,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     citations: [],
     answer: undefined,
     escalation: undefined,
+    disclaimer: undefined,
     disclaimerRequired: true,
     hasTimeConstraint: false,
     conversationId: undefined,
@@ -56,56 +57,56 @@ describe("disclaimerGuardNode", () => {
     expect(result).toEqual({});
   });
 
-  it("appends a disclaimer to the answer", async () => {
+  it("sets disclaimer field with general disclaimer text", async () => {
     const state = makeState({ answer: "Here is your answer." });
     const result = await disclaimerGuardNode(state);
-    expect(result.answer).toContain("Here is your answer.");
-    expect(result.answer).toContain("---");
-    expect(result.answer).toContain("does not constitute legal advice");
+    expect(result.disclaimer).toContain("does not constitute legal advice");
+    expect(result.answer).toBeUndefined();
     expect(result.disclaimerRequired).toBe(true);
   });
 
-  it("appends safesport-specific disclaimer for safesport domain", async () => {
+  it("sets safesport-specific disclaimer for safesport domain", async () => {
     const state = makeState({
       answer: "SafeSport answer.",
       topicDomain: "safesport",
     });
     const result = await disclaimerGuardNode(state);
-    expect(result.answer).toContain("call 911");
-    expect(result.answer).toContain("SafeSport answer.");
+    expect(result.disclaimer).toContain("call 911");
+    expect(result.answer).toBeUndefined();
   });
 
-  it("appends anti-doping disclaimer for anti_doping domain", async () => {
+  it("sets anti-doping disclaimer for anti_doping domain", async () => {
     const state = makeState({
       answer: "Anti-doping answer.",
       topicDomain: "anti_doping",
     });
     const result = await disclaimerGuardNode(state);
-    expect(result.answer).toContain("USADA");
-    expect(result.answer).toContain("Anti-doping answer.");
+    expect(result.disclaimer).toContain("USADA");
+    expect(result.answer).toBeUndefined();
   });
 
-  it("appends dispute resolution disclaimer for dispute_resolution domain", async () => {
+  it("sets dispute resolution disclaimer for dispute_resolution domain", async () => {
     const state = makeState({
       answer: "Dispute answer.",
       topicDomain: "dispute_resolution",
     });
     const result = await disclaimerGuardNode(state);
-    expect(result.answer).toContain("Section 9 arbitration");
+    expect(result.disclaimer).toContain("Section 9 arbitration");
   });
 
-  it("appends general disclaimer when topicDomain is undefined", async () => {
+  it("sets general disclaimer when topicDomain is undefined", async () => {
     const state = makeState({
       answer: "General answer.",
       topicDomain: undefined,
     });
     const result = await disclaimerGuardNode(state);
-    expect(result.answer).toContain("does not constitute legal advice");
+    expect(result.disclaimer).toContain("does not constitute legal advice");
   });
 
-  it("separates the answer and disclaimer with ---", async () => {
+  it("does not modify the answer text", async () => {
     const state = makeState({ answer: "Answer text." });
     const result = await disclaimerGuardNode(state);
-    expect(result.answer).toContain("\n\n---\n\n");
+    expect(result.answer).toBeUndefined();
+    expect(result.disclaimer).toBeDefined();
   });
 });

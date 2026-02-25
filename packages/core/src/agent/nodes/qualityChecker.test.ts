@@ -50,6 +50,7 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     citations: [],
     answer: "Here is a detailed answer about Section 9 arbitration...",
     escalation: undefined,
+    disclaimer: undefined,
     disclaimerRequired: true,
     hasTimeConstraint: false,
     conversationId: undefined,

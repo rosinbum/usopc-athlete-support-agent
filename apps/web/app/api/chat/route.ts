@@ -103,6 +103,10 @@ export async function POST(req: Request) {
                 { type: "status", status: event.status },
               ]),
             );
+          } else if (event.type === "disclaimer" && event.disclaimer) {
+            writer.write(
+              formatDataStreamPart("text", "\n\n---\n\n" + event.disclaimer),
+            );
           } else if (event.type === "discovered-urls" && event.discoveredUrls) {
             // Captured server-side only for fire-and-forget persistence.
             // Not forwarded to the client — no UX signal for discovery.

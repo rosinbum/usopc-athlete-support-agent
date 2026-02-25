@@ -14,6 +14,7 @@ export interface AgentStreamEvent {
     | "text-delta"
     | "citations"
     | "escalation"
+    | "disclaimer"
     | "answer-reset"
     | "discovered-urls"
     | "status"
@@ -22,6 +23,7 @@ export interface AgentStreamEvent {
   textDelta?: string;
   citations?: Citation[];
   escalation?: EscalationInfo;
+  disclaimer?: string;
   discoveredUrls?: WebSearchResult[];
   status?: string;
   error?: { message: string; code?: string };
@@ -104,6 +106,7 @@ export async function* agentStreamToEvents(
 ): AsyncGenerator<AgentStreamEvent> {
   let citationsEmitted = false;
   let escalationEmitted = false;
+  let disclaimerEmitted = false;
   let lastDiscoveredUrls: WebSearchResult[] = [];
   let streamErrored = false;
   // Track answer from values mode for nodes that don't use LLM streaming
@@ -235,6 +238,12 @@ export async function* agentStreamToEvents(
         if (!escalationEmitted && state.escalation) {
           escalationEmitted = true;
           yield { type: "escalation", escalation: state.escalation };
+        }
+
+        // Emit disclaimer once when it first appears
+        if (!disclaimerEmitted && state.disclaimer) {
+          disclaimerEmitted = true;
+          yield { type: "disclaimer", disclaimer: state.disclaimer };
         }
 
         // Track discovered URLs from the latest state (researcher node)

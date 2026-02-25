@@ -457,9 +457,7 @@ describe("agentStreamToEvents (dual-mode)", () => {
     expect(textDeltas[1]!.textDelta).toBe("SafeSport");
   });
 
-  it("emits disclaimer delta from values mode after synthesizer buffer is flushed", async () => {
-    // After quality passes and buffer is flushed, the disclaimerGuard
-    // appends text to the answer — this should come through values mode
+  it("emits disclaimer event from values mode when disclaimer field is set", async () => {
     const events = await collectEvents(
       mockDualStream([
         [
@@ -478,25 +476,38 @@ describe("agentStreamToEvents (dual-mode)", () => {
             },
           },
         ],
-        // DisclaimerGuard appends disclaimer
+        // DisclaimerGuard sets structured disclaimer
         [
           "values",
           {
-            answer:
-              "Good answer\n\n*This information is for general guidance only.*",
+            disclaimer: "This information is for general guidance only.",
           },
         ],
       ]),
     );
 
-    const textDeltas = events.filter((e) => e.type === "text-delta");
-    expect(textDeltas).toHaveLength(2);
-    // First: buffered synthesizer token flushed on quality pass
-    expect(textDeltas[0]!.textDelta).toBe("Good answer");
-    // Second: disclaimer delta from values mode
-    expect(textDeltas[1]!.textDelta).toBe(
-      "\n\n*This information is for general guidance only.*",
+    const disclaimerEvents = events.filter((e) => e.type === "disclaimer");
+    expect(disclaimerEvents).toHaveLength(1);
+    expect(disclaimerEvents[0]!.disclaimer).toBe(
+      "This information is for general guidance only.",
     );
+
+    // Answer should not include disclaimer text
+    const textDeltas = events.filter((e) => e.type === "text-delta");
+    expect(textDeltas).toHaveLength(1);
+    expect(textDeltas[0]!.textDelta).toBe("Good answer");
+  });
+
+  it("does not emit duplicate disclaimer events", async () => {
+    const events = await collectEvents(
+      mockDualStream([
+        ["values", { disclaimer: "Not legal advice." }],
+        ["values", { disclaimer: "Not legal advice." }],
+      ]),
+    );
+
+    const disclaimerEvents = events.filter((e) => e.type === "disclaimer");
+    expect(disclaimerEvents).toHaveLength(1);
   });
 
   it("emits error event when stream throws", async () => {

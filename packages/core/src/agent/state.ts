@@ -97,8 +97,7 @@ export const AgentStateAnnotation = Annotation.Root({
   }),
 
   /**
-   * The final synthesized answer text. Set by the synthesizer node,
-   * then potentially modified by the disclaimerGuard node.
+   * The final synthesized answer text. Set by the synthesizer node.
    */
   answer: Annotation<string | undefined>({
     reducer: (_prev, next) => next,
@@ -110,6 +109,16 @@ export const AgentStateAnnotation = Annotation.Root({
    * external authority. Set by the escalate node.
    */
   escalation: Annotation<EscalationInfo | undefined>({
+    reducer: (_prev, next) => next,
+    default: () => undefined,
+  }),
+
+  /**
+   * Structured disclaimer text set by the disclaimerGuard node.
+   * Consumers (web, Slack) render this independently rather than
+   * having it embedded in the answer text.
+   */
+  disclaimer: Annotation<string | undefined>({
     reducer: (_prev, next) => next,
     default: () => undefined,
   }),

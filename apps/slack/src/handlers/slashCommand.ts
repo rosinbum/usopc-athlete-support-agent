@@ -63,14 +63,16 @@ async function processSlashCommandAsync(
     const messages = convertMessages([{ role: "user", content: query }]);
 
     // Slash commands are stateless — no conversationId or summary
-    const { answer, citations, escalation } = await runner.invoke({ messages });
+    const { answer, citations, escalation, disclaimer } = await runner.invoke({
+      messages,
+    });
 
     const preamble = `<@${userId}> asked: _${query}_\n\n`;
     const fullAnswer = preamble + answer;
     const blocks = buildAnswerBlocks(
       fullAnswer,
       citations,
-      undefined,
+      disclaimer,
       escalation,
     );
     await postMessage(channel, fullAnswer, blocks);
