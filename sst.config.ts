@@ -391,9 +391,24 @@ export default $config({
       };
     }
 
+    // Computed web domain and email sender for the Next.js app
+    const webDomain = isDeployed
+      ? `https://${isProd ? domainZone : `${stage}.${domainZone}`}`
+      : "http://localhost:3000";
+
+    const emailFromDomain = isDeployed
+      ? isProd
+        ? domainZone
+        : `${stage}.${domainZone}`
+      : "localhost";
+
     // Next.js web app
     const web = new sst.aws.Nextjs("Web", {
       path: "apps/web",
+      environment: {
+        APP_URL: webDomain,
+        EMAIL_FROM: `Athlete Support <noreply@${emailFromDomain}>`,
+      },
       domain: isDeployed
         ? {
             name: isProd ? domainZone : `${stage}.${domainZone}`,

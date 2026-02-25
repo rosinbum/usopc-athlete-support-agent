@@ -1,6 +1,6 @@
 # USOPC Athlete Support Agent
 
-> **Work in Progress**: This project is under active development and should be treated as a prototype. It represents approximately 100.1 hours of development time and is not yet production-ready. Features may be incomplete, APIs may change, and the knowledge base needs additional content and quality improvements.
+> **Work in Progress**: This project is under active development and should be treated as a prototype. It represents approximately 100.7 hours of development time and is not yet production-ready. Features may be incomplete, APIs may change, and the knowledge base needs additional content and quality improvements.
 
 An AI-powered governance and compliance assistant for U.S. Olympic and Paralympic athletes. Ask questions about anti-doping rules, athlete rights, competition eligibility, and other USOPC policies — get accurate, cited answers with appropriate disclaimers.
 
@@ -20,7 +20,7 @@ An AI-powered governance and compliance assistant for U.S. Olympic and Paralympi
 - **Automatic Disclaimers**: Sensitive topics (medical, legal, financial) include appropriate disclaimers
 - **Multiple Interfaces**:
   - Web chat application
-  - Slack bot (coming soon — see [#7](https://github.com/rosinbum/usopc-athlete-support-agent/issues/7))
+  - Slack bot
 - **Weekly Document Sync**: Automated ingestion pipeline keeps the knowledge base current
 
 ## Documentation
@@ -127,9 +127,7 @@ pnpm ingest
 
 ## Slack Integration
 
-<!-- TODO: Document Slack app setup and configuration once #7 is complete -->
-
-Slack integration is under development. See [#7](https://github.com/rosinbum/usopc-athlete-support-agent/issues/7) for progress.
+The Slack bot runs as a Lambda behind API Gateway. It supports the same Q&A capabilities as the web chat — mention the bot in a channel or send it a direct message to ask questions. See [Architecture](./docs/architecture.md) for details on the Slack app setup.
 
 ## Security
 
@@ -150,10 +148,10 @@ See [CLAUDE.md](./CLAUDE.md) for detailed development guidelines.
 
 <!-- HOURS:START -->
 
-**Tracked build time:** 100.1 hours
+**Tracked build time:** 100.7 hours
 
 - Method: terminal-activity-based (idle cutoff: 10 min)
-- Last updated: 2026-02-25T14:08:47.266Z
+- Last updated: 2026-02-25T15:05:41.393Z
 <!-- HOURS:END -->
 
 ## License

@@ -30,9 +30,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientId: getGitHubClientId(),
       clientSecret: getGitHubClientSecret(),
     }),
+    // TODO: consider a dedicated reply-to domain separate from the webhost (#397)
     Resend({
       apiKey: getResendApiKey(),
-      from: "Athlete Support <noreply@usopc.org>",
+      from: process.env.EMAIL_FROM ?? "Athlete Support <noreply@localhost>",
     }),
   ],
   session: { strategy: "jwt", maxAge: 24 * 60 * 60 },
