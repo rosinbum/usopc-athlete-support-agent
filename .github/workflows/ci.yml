@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  pull-requests: write
+
 jobs:
   test:
     name: Test
@@ -16,7 +19,60 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
+      - run: pnpm --filter @usopc/core test -- --coverage
+      - run: pnpm --filter @usopc/shared test -- --coverage
+      - run: pnpm --filter @usopc/ingestion test -- --coverage
+      - run: pnpm --filter @usopc/evals test -- --coverage
+      - run: pnpm --filter @usopc/slack test -- --coverage
+      - run: pnpm --filter @usopc/web test -- --coverage
+
+      - name: Coverage — core
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          name: core
+          working-directory: packages/core
+          comment-on: pr
+
+      - name: Coverage — shared
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          name: shared
+          working-directory: packages/shared
+          comment-on: pr
+
+      - name: Coverage — ingestion
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          name: ingestion
+          working-directory: packages/ingestion
+          comment-on: pr
+
+      - name: Coverage — evals
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          name: evals
+          working-directory: packages/evals
+          comment-on: pr
+
+      - name: Coverage — slack
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          name: slack
+          working-directory: apps/slack
+          comment-on: pr
+
+      - name: Coverage — web
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          name: web
+          working-directory: apps/web
+          comment-on: pr
 
   typecheck:
     name: Typecheck
