@@ -7,6 +7,7 @@ import { isCitationAnnotation, type Citation } from "../../types/citation.js";
 interface MessageBubbleProps {
   message: Message;
   conversationId?: string | undefined;
+  isStreaming?: boolean;
 }
 
 function extractCitations(annotations: Message["annotations"]): Citation[] {
@@ -20,7 +21,11 @@ function extractCitations(annotations: Message["annotations"]): Citation[] {
   return results;
 }
 
-export function MessageBubble({ message, conversationId }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  conversationId,
+  isStreaming,
+}: MessageBubbleProps) {
   const isUser = message.role === "user";
   const citations = isUser ? [] : extractCitations(message.annotations);
 
@@ -41,7 +46,7 @@ export function MessageBubble({ message, conversationId }: MessageBubbleProps) {
           <>
             <MarkdownMessage content={message.content} />
             <CitationList citations={citations} />
-            {conversationId && (
+            {conversationId && !isStreaming && (
               <FeedbackButtons
                 conversationId={conversationId}
                 messageId={message.id}

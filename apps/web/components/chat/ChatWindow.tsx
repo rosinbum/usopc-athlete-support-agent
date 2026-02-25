@@ -44,11 +44,12 @@ export function ChatWindow({
             </p>
           </div>
         )}
-        {messages.map((message) => (
+        {messages.map((message, index) => (
           <MessageBubble
             key={message.id}
             message={message}
             conversationId={conversationId}
+            isStreaming={isLoading && index === messages.length - 1}
           />
         ))}
         {isLoading && (
