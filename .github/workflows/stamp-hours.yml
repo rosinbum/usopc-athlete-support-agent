@@ -1,0 +1,30 @@
+name: Stamp README hours
+
+on:
+  push:
+    branches: [main]
+    paths: [.hours.json]
+
+permissions:
+  contents: write
+
+jobs:
+  stamp:
+    name: Update README with hours
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Stamp hours into README
+        run: node scripts/stamp-readme-hours.mjs
+
+      - name: Commit if changed
+        run: |
+          git diff --quiet README.md && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "chore: stamp README hours [skip ci]"
+          git push
