@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { handle } from "hono/aws-lambda";
-import { createLogger } from "@usopc/shared";
+import { createLogger, createFeedbackEntity } from "@usopc/shared";
 import { verifySlackRequest } from "./middleware/verify.js";
 import { dispatchEvent } from "./handlers/events.js";
 import {
@@ -121,8 +121,21 @@ app.post("/slack/interactions", async (c) => {
             threadTs,
           });
 
-          // TODO(#29): Store feedback — requires DB schema and API endpoint.
-          // See: https://github.com/rosinbum/usopc-athlete-support-agent/issues/29
+          // Persist feedback to DynamoDB
+          try {
+            const feedbackEntity = createFeedbackEntity();
+            await feedbackEntity.create({
+              conversationId: threadTs ?? messageTs ?? "",
+              channel: "slack",
+              score: isHelpful ? 1 : 0,
+              messageId: messageTs,
+              userId: payload.user?.id as string | undefined,
+            });
+          } catch (err) {
+            logger.error("Failed to persist feedback", {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
 
           // Acknowledge with ephemeral-style update
           try {

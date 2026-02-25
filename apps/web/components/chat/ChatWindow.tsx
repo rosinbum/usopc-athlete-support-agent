@@ -10,6 +10,7 @@ interface ChatWindowProps {
   input: string;
   isLoading: boolean;
   statusText?: string | undefined;
+  conversationId?: string | undefined;
   onInputChange: (
     e: ChangeEvent<HTMLInputElement> | ChangeEvent<HTMLTextAreaElement>,
   ) => void;
@@ -21,6 +22,7 @@ export function ChatWindow({
   input,
   isLoading,
   statusText,
+  conversationId,
   onInputChange,
   onSubmit,
 }: ChatWindowProps) {
@@ -43,7 +45,11 @@ export function ChatWindow({
           </div>
         )}
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+          <MessageBubble
+            key={message.id}
+            message={message}
+            conversationId={conversationId}
+          />
         ))}
         {isLoading && (
           <div className="flex items-center gap-2 text-gray-400">
