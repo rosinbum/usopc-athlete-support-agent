@@ -4,9 +4,6 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  pull-requests: write
-
 jobs:
   test:
     name: Test
@@ -32,6 +29,7 @@ jobs:
         with:
           name: core
           working-directory: packages/core
+          comment-on: none
 
       - name: Coverage — shared
         if: always()
@@ -39,6 +37,7 @@ jobs:
         with:
           name: shared
           working-directory: packages/shared
+          comment-on: none
 
       - name: Coverage — ingestion
         if: always()
@@ -46,6 +45,7 @@ jobs:
         with:
           name: ingestion
           working-directory: packages/ingestion
+          comment-on: none
 
       - name: Coverage — evals
         if: always()
@@ -53,6 +53,7 @@ jobs:
         with:
           name: evals
           working-directory: packages/evals
+          comment-on: none
 
       - name: Coverage — slack
         if: always()
@@ -60,6 +61,7 @@ jobs:
         with:
           name: slack
           working-directory: apps/slack
+          comment-on: none
 
       - name: Coverage — web
         if: always()
@@ -67,6 +69,7 @@ jobs:
         with:
           name: web
           working-directory: apps/web
+          comment-on: none
 
   typecheck:
     name: Typecheck

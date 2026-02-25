@@ -11,7 +11,12 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary", "json"],
       reportOnFailure: true,
-      include: ["src/**/*.ts", "src/**/*.tsx"],
+      include: [
+        "app/**/*.{ts,tsx}",
+        "components/**/*.{ts,tsx}",
+        "hooks/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+      ],
       exclude: ["**/*.test.ts", "**/*.test.tsx", "**/*.d.ts"],
     },
   },
