@@ -111,6 +111,8 @@ vi.mock("@usopc/core", async () => {
     saveSummary: mockSaveSummary,
     generateSummary: mockGenerateSummary,
     publishDiscoveredUrls: mockPublishDiscoveredUrls,
+    detectInjection: vi.fn().mockReturnValue(null),
+    INJECTION_RESPONSE: "Please rephrase your question.",
   };
 });
 
@@ -346,9 +348,14 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       );
       await waitForStream();
 
-      expect(mockLoadSummary).toHaveBeenCalledWith(convId);
+      expect(mockLoadSummary).toHaveBeenCalledWith(
+        `test@example.com:${convId}`,
+      );
       expect(mockRunnerStream).toHaveBeenCalledWith(
-        expect.objectContaining({ conversationSummary: "prior summary" }),
+        expect.objectContaining({
+          conversationSummary: "prior summary",
+          userId: "test@example.com",
+        }),
       );
     });
   });

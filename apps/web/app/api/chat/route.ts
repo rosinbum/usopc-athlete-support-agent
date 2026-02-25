@@ -56,17 +56,27 @@ export async function POST(req: Request) {
       agentStreamToEvents,
       loadSummary,
       publishDiscoveredUrls,
+      detectInjection,
+      INJECTION_RESPONSE,
     } = await import("@usopc/core");
+
+    // SEC-18: Check for prompt injection patterns in the latest user message
+    const lastUserMessage = messages.findLast((m) => m.role === "user");
+    if (lastUserMessage && detectInjection(lastUserMessage.content)) {
+      return Response.json({ error: INJECTION_RESPONSE }, { status: 400 });
+    }
 
     const runner = await getAppRunner();
     log.info("Runner initialized", {
       tracingEnabled: process.env.LANGCHAIN_TRACING_V2,
     });
 
-    // Load existing conversation summary
+    // Load existing conversation summary (scoped by user to prevent cross-user access)
+    const userEmail = session.user.email;
     let conversationSummary: string | undefined;
     if (conversationId) {
-      conversationSummary = await loadSummary(conversationId);
+      const summaryKey = `${userEmail}:${conversationId}`;
+      conversationSummary = await loadSummary(summaryKey);
     }
 
     const langchainMessages = AgentRunner.convertMessages(messages);
@@ -75,6 +85,7 @@ export async function POST(req: Request) {
       userSport,
       conversationId,
       conversationSummary,
+      userId: userEmail,
     });
 
     const events = agentStreamToEvents(stateStream);

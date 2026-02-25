@@ -37,6 +37,8 @@ vi.mock("@usopc/core", () => ({
     .mockImplementation((msgs: { role: string; content: string }[]) =>
       msgs.map((m) => ({ content: m.content })),
     ),
+  detectInjection: vi.fn().mockReturnValue(null),
+  INJECTION_RESPONSE: "Please rephrase your question.",
 }));
 
 vi.mock("../slack/client.js", () => ({
