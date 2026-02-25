@@ -149,6 +149,9 @@ export default $config({
     // Document ingestion (weekly) - production only
     // Declared before Web so the queue can be linked conditionally
     let ingestionQueue: sst.aws.Queue | undefined;
+    let alarmTopic: aws.sns.Topic | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let monitoringRefs: Record<string, any> | undefined;
 
     if (isProd) {
       const discoveryCron = new sst.aws.Cron("DiscoveryCron", {
@@ -218,7 +221,7 @@ export default $config({
 
       // --- Monitoring ---
 
-      const alarmTopic = new aws.sns.Topic("AlarmTopic", {
+      alarmTopic = new aws.sns.Topic("AlarmTopic", {
         displayName: "USOPC Athlete Support - Production Alarms",
       });
 
@@ -375,16 +378,88 @@ export default $config({
         okActions: [alarmTopic.arn],
       });
 
-      // CloudWatch Dashboard
+      // Save references for dashboard (built after web is declared)
+      monitoringRefs = {
+        slackFn: slackRoute.nodes.function.name,
+        discoveryWorkerFn: discoveryFeedWorkerSub.nodes.function.name,
+        discoveryCronFn: discoveryCron.nodes.function.name,
+        ingestionWorkerFn: ingestionWorkerSub.nodes.function.name,
+        ingestionCronFn: ingestionCron.nodes.function.name,
+        discoveryDlqName: discoveryFeedDlq.nodes.queue.name,
+        ingestionDlqName: ingestionDlq.nodes.queue.name,
+        tableName: appTable.name,
+      };
+    }
+
+    // Next.js web app
+    const web = new sst.aws.Nextjs("Web", {
+      path: "apps/web",
+      domain: isDeployed
+        ? {
+            name: isProd ? domainZone : `${stage}.${domainZone}`,
+            dns: sst.aws.dns(),
+          }
+        : undefined,
+      link: [
+        ...linkables,
+        conversationMaxTurns,
+        authSecret,
+        gitHubClientId,
+        gitHubClientSecret,
+        adminEmails,
+        resendApiKey,
+        appTable,
+        authTable,
+        documentsBucket,
+        discoveryFeedQueue,
+        ...(ingestionQueue ? [ingestionQueue] : []),
+      ],
+    });
+
+    // Web Lambda alarms + CloudWatch dashboard (needs web to be declared)
+    if (isProd && alarmTopic && monitoringRefs) {
+      // Web/Next.js server Lambda alarms
+      new aws.cloudwatch.MetricAlarm("WebErrorsAlarm", {
+        alarmDescription: "Web Lambda errors > 5 in 5 minutes",
+        namespace: "AWS/Lambda",
+        metricName: "Errors",
+        dimensions: { FunctionName: web.nodes.server.nodes.function.name },
+        statistic: "Sum",
+        period: 300,
+        evaluationPeriods: 1,
+        threshold: 5,
+        comparisonOperator: "GreaterThanThreshold",
+        treatMissingData: "notBreaching",
+        alarmActions: [alarmTopic.arn],
+        okActions: [alarmTopic.arn],
+      });
+
+      new aws.cloudwatch.MetricAlarm("WebDurationAlarm", {
+        alarmDescription: "Web Lambda p99 duration > 30s",
+        namespace: "AWS/Lambda",
+        metricName: "Duration",
+        dimensions: { FunctionName: web.nodes.server.nodes.function.name },
+        extendedStatistic: "p99",
+        period: 300,
+        evaluationPeriods: 2,
+        threshold: 30_000, // milliseconds
+        comparisonOperator: "GreaterThanThreshold",
+        treatMissingData: "notBreaching",
+        alarmActions: [alarmTopic.arn],
+        okActions: [alarmTopic.arn],
+      });
+
+      // CloudWatch Dashboard (includes all lambdas + web)
       const dashboardBody = $resolve([
-        slackRoute.nodes.function.name,
-        discoveryFeedWorkerSub.nodes.function.name,
-        discoveryCron.nodes.function.name,
-        ingestionWorkerSub.nodes.function.name,
-        ingestionCron.nodes.function.name,
-        discoveryFeedDlq.nodes.queue.name,
-        ingestionDlq.nodes.queue.name,
-        appTable.name,
+        monitoringRefs.slackFn,
+        monitoringRefs.discoveryWorkerFn,
+        monitoringRefs.discoveryCronFn,
+        monitoringRefs.ingestionWorkerFn,
+        monitoringRefs.ingestionCronFn,
+        monitoringRefs.discoveryDlqName,
+        monitoringRefs.ingestionDlqName,
+        monitoringRefs.tableName,
+        web.nodes.server.nodes.function.name,
       ]).apply(
         ([
           slackFn,
@@ -395,6 +470,7 @@ export default $config({
           discoveryDlqName,
           ingestionDlqName,
           tableName,
+          webFn,
         ]) =>
           JSON.stringify({
             widgets: [
@@ -408,7 +484,8 @@ export default $config({
                 properties: {
                   title: "Lambda Invocations",
                   metrics: [
-                    ["AWS/Lambda", "Invocations", "FunctionName", slackFn],
+                    ["AWS/Lambda", "Invocations", "FunctionName", webFn],
+                    ["...", slackFn],
                     ["...", discoveryWorkerFn],
                     ["...", discoveryCronFn],
                     ["...", ingestionWorkerFn],
@@ -429,7 +506,8 @@ export default $config({
                 properties: {
                   title: "Lambda Errors",
                   metrics: [
-                    ["AWS/Lambda", "Errors", "FunctionName", slackFn],
+                    ["AWS/Lambda", "Errors", "FunctionName", webFn],
+                    ["...", slackFn],
                     ["...", discoveryWorkerFn],
                     ["...", discoveryCronFn],
                     ["...", ingestionWorkerFn],
@@ -451,7 +529,8 @@ export default $config({
                 properties: {
                   title: "Lambda Duration p99",
                   metrics: [
-                    ["AWS/Lambda", "Duration", "FunctionName", slackFn],
+                    ["AWS/Lambda", "Duration", "FunctionName", webFn],
+                    ["...", slackFn],
                     ["...", discoveryWorkerFn],
                     ["...", discoveryCronFn],
                     ["...", ingestionWorkerFn],
@@ -546,31 +625,6 @@ export default $config({
         dashboardBody: dashboardBody,
       });
     }
-
-    // Next.js web app
-    const web = new sst.aws.Nextjs("Web", {
-      path: "apps/web",
-      domain: isDeployed
-        ? {
-            name: isProd ? domainZone : `${stage}.${domainZone}`,
-            dns: sst.aws.dns(),
-          }
-        : undefined,
-      link: [
-        ...linkables,
-        conversationMaxTurns,
-        authSecret,
-        gitHubClientId,
-        gitHubClientSecret,
-        adminEmails,
-        resendApiKey,
-        appTable,
-        authTable,
-        documentsBucket,
-        discoveryFeedQueue,
-        ...(ingestionQueue ? [ingestionQueue] : []),
-      ],
-    });
 
     return {
       webUrl: web.url,
