@@ -2,6 +2,7 @@ import { createLogger } from "@usopc/shared";
 import { getAppRunner, convertMessages } from "@usopc/core";
 import { postMessage } from "../slack/client.js";
 import { buildAnswerBlocks, buildErrorBlocks } from "../slack/blocks.js";
+import { isUserInvited } from "../lib/inviteGuard.js";
 
 const logger = createLogger({ service: "slack-slash-command" });
 
@@ -29,6 +30,15 @@ export async function handleSlashCommand(
     return {
       response_type: "ephemeral",
       text: "Please include a question. Usage: `/ask-athlete-support What are the team selection appeal deadlines?`",
+    };
+  }
+
+  // Check invite list before processing (matches DM and mention handlers)
+  const invited = await isUserInvited(user_id);
+  if (!invited) {
+    return {
+      response_type: "ephemeral",
+      text: "Sorry, you don't have access to this service. Please contact your USOPC representative to request an invite.",
     };
   }
 

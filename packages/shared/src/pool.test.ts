@@ -14,7 +14,12 @@ vi.mock("./env.js", () => ({
   getDatabaseUrl: vi.fn(() => "postgres://localhost/test"),
 }));
 
+import { Pool } from "pg";
 import { getPool, closePool, getPoolStatus } from "./pool.js";
+import { getDatabaseUrl } from "./env.js";
+
+const MockPool = vi.mocked(Pool);
+const mockGetDatabaseUrl = vi.mocked(getDatabaseUrl);
 
 describe("pool", () => {
   beforeEach(async () => {
@@ -35,6 +40,37 @@ describe("pool", () => {
         idleConnections: 2,
         waitingRequests: 0,
       });
+    });
+  });
+
+  describe("SSL configuration (SEC-01)", () => {
+    it("enables SSL with default CA validation for Neon connections", () => {
+      mockGetDatabaseUrl.mockReturnValue(
+        "postgres://user:pass@ep-example.us-east-1.aws.neon.tech/db",
+      );
+      getPool();
+      expect(MockPool).toHaveBeenCalledWith(
+        expect.objectContaining({ ssl: true }),
+      );
+    });
+
+    it("does not set rejectUnauthorized: false", () => {
+      mockGetDatabaseUrl.mockReturnValue(
+        "postgres://user:pass@ep-example.us-east-1.aws.neon.tech/db",
+      );
+      getPool();
+      const poolConfig = MockPool.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(poolConfig.ssl).toBe(true);
+      expect(poolConfig.ssl).not.toEqual(
+        expect.objectContaining({ rejectUnauthorized: false }),
+      );
+    });
+
+    it("skips SSL for non-Neon local connections", () => {
+      mockGetDatabaseUrl.mockReturnValue("postgres://localhost/test");
+      getPool();
+      const poolConfig = MockPool.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(poolConfig.ssl).toBeUndefined();
     });
   });
 });

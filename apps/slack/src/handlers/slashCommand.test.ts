@@ -12,6 +12,10 @@ const { mockGetAppRunner } = vi.hoisted(() => ({
   mockGetAppRunner: vi.fn(),
 }));
 
+const { mockIsUserInvited } = vi.hoisted(() => ({
+  mockIsUserInvited: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("@usopc/shared", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@usopc/shared")>();
   return {
@@ -45,6 +49,10 @@ vi.mock("../slack/blocks.js", () => ({
   buildErrorBlocks: vi
     .fn()
     .mockReturnValue([{ type: "section", text: { type: "mrkdwn", text: "" } }]),
+}));
+
+vi.mock("../lib/inviteGuard.js", () => ({
+  isUserInvited: mockIsUserInvited,
 }));
 
 import { handleSlashCommand, type SlackSlashCommand } from "./slashCommand.js";
@@ -142,6 +150,31 @@ describe("handleSlashCommand", () => {
         "Error processing request",
         expect.any(Array),
       );
+    });
+  });
+
+  describe("invite guard (SEC-03)", () => {
+    it("denies access when user is not on the invite list", async () => {
+      mockIsUserInvited.mockResolvedValueOnce(false);
+
+      const response = await handleSlashCommand(makeCommand());
+
+      expect(response.response_type).toBe("ephemeral");
+      expect(response.text).toContain("don't have access");
+      expect(fakeRunner.invoke).not.toHaveBeenCalled();
+    });
+
+    it("calls isUserInvited with the user_id", async () => {
+      await handleSlashCommand(makeCommand({ user_id: "U999" }));
+
+      expect(mockIsUserInvited).toHaveBeenCalledWith("U999");
+    });
+
+    it("skips invite check for empty text (returns usage help first)", async () => {
+      const response = await handleSlashCommand(makeCommand({ text: "" }));
+
+      expect(response.text).toContain("Please include a question");
+      expect(mockIsUserInvited).not.toHaveBeenCalled();
     });
   });
 });

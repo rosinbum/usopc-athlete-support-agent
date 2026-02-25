@@ -6,6 +6,7 @@ import {
 import { getResource, logger } from "@usopc/shared";
 import { z } from "zod";
 import { isRateLimited } from "../../../lib/rate-limit.js";
+import { auth } from "../../../auth.js";
 
 const log = logger.child({ service: "chat-route" });
 
@@ -26,6 +27,12 @@ const ChatRequestSchema = z.object({
 const discoveryFeedQueueUrl = getResource("DiscoveryFeedQueue").url;
 
 export async function POST(req: Request) {
+  // Defense-in-depth: verify auth at the route level (middleware also checks)
+  const session = await auth();
+  if (!session?.user?.email) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   // Rate limit by client IP (per Lambda instance — add AWS WAF for cross-instance limiting)
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";

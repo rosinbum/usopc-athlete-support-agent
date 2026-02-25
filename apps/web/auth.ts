@@ -49,8 +49,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async jwt({ token, profile, user, account }) {
       if (account) {
-        // First sign-in: stamp role from provider
-        token.role = account.provider === "github" ? "admin" : "athlete";
+        token.provider = account.provider;
       }
       if (profile) {
         token.email = profile.email ?? null;
@@ -62,6 +61,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.email = user.email;
         token.name = user.name ?? user.email;
       }
+
+      // Re-evaluate role on every token refresh (not just first sign-in).
+      // This ensures removed admins lose access promptly instead of retaining
+      // a stale role for the full 24-hour JWT lifetime.
+      const email = ((token.email as string) ?? "").toLowerCase();
+      if (token.provider === "github" && email) {
+        const adminEmails = getAdminEmails();
+        token.role = adminEmails.includes(email) ? "admin" : "athlete";
+      } else if (token.provider === "resend") {
+        token.role = "athlete";
+      }
+
       return token;
     },
     async session({ session, token }) {

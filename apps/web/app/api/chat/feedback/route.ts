@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { createFeedbackEntity } from "@usopc/shared";
+import { createFeedbackEntity, logger } from "@usopc/shared";
 import { z } from "zod";
+import { auth } from "../../../../auth.js";
+
+const log = logger.child({ service: "feedback-route" });
 
 const feedbackSchema = z.object({
   conversationId: z.string().uuid(),
@@ -10,6 +13,12 @@ const feedbackSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  // Defense-in-depth: verify auth at the route level (middleware also checks)
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -35,14 +44,15 @@ export async function POST(req: Request) {
       score,
       messageId,
       comment,
+      userId: session.user.email,
     });
     return NextResponse.json({ feedback }, { status: 201 });
   } catch (error) {
+    log.error("Failed to create feedback", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      {
-        error: "Failed to create feedback",
-        detail: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Failed to create feedback" },
       { status: 500 },
     );
   }
