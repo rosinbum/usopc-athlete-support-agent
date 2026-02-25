@@ -1,11 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockAuth } = vi.hoisted(() => ({
-  mockAuth: vi
-    .fn()
-    .mockResolvedValue({
-      user: { email: "test@example.com", role: "athlete" },
-    }),
+  mockAuth: vi.fn().mockResolvedValue({
+    user: { email: "test@example.com", role: "athlete" },
+  }),
 }));
 
 // Track calls to getAppRunner via the mocked @usopc/core

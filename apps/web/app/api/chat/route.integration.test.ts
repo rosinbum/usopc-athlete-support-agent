@@ -80,11 +80,9 @@ vi.mock("@usopc/shared", () => {
 });
 
 vi.mock("../../../auth.js", () => ({
-  auth: vi
-    .fn()
-    .mockResolvedValue({
-      user: { email: "test@example.com", role: "athlete" },
-    }),
+  auth: vi.fn().mockResolvedValue({
+    user: { email: "test@example.com", role: "athlete" },
+  }),
 }));
 
 vi.mock("sst", () => ({
