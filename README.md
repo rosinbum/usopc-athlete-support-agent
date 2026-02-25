@@ -1,6 +1,6 @@
 # USOPC Athlete Support Agent
 
-> **Work in Progress**: This project is under active development and should be treated as a prototype. It represents approximately 96.8 hours of development time and is not yet production-ready. Features may be incomplete, APIs may change, and the knowledge base needs additional content and quality improvements.
+> **Work in Progress**: This project is under active development and should be treated as a prototype. It represents approximately 96.9 hours of development time and is not yet production-ready. Features may be incomplete, APIs may change, and the knowledge base needs additional content and quality improvements.
 
 An AI-powered governance and compliance assistant for U.S. Olympic and Paralympic athletes. Ask questions about anti-doping rules, athlete rights, competition eligibility, and other USOPC policies — get accurate, cited answers with appropriate disclaimers.
 
@@ -29,8 +29,8 @@ An AI-powered governance and compliance assistant for U.S. Olympic and Paralympi
 - [Commands](./docs/commands.md) — Full CLI commands reference
 - [Deployment](./docs/deployment.md) — Production deployment guide
 - [Conventions](./docs/conventions.md) — Formatting, testing, and technical conventions
-- [Quality Review](./docs/quality-review.md) — Round-by-round quality comparison framework
 - [Evaluation Playbook](./docs/evaluation-playbook.md) — Running and interpreting LangSmith evaluations
+- [Security](./docs/security.md) — Authentication, secret management, threat model, and known findings
 
 ## Local Development Setup
 
@@ -131,6 +131,12 @@ pnpm ingest
 
 Slack integration is under development. See [#7](https://github.com/rosinbum/usopc-athlete-support-agent/issues/7) for progress.
 
+## Security
+
+Authentication is handled by Auth.js v5 with GitHub OAuth (admin) and email magic link (athlete). Admin routes are protected by edge middleware and per-handler guards. The chat endpoint is intentionally public with rate limiting.
+
+For the full security architecture, threat model, secret inventory, and known findings, see [docs/security.md](./docs/security.md).
+
 ## Contributing
 
 1. Create a GitHub issue describing the planned work
@@ -144,10 +150,10 @@ See [CLAUDE.md](./CLAUDE.md) for detailed development guidelines.
 
 <!-- HOURS:START -->
 
-**Tracked build time:** 96.8 hours
+**Tracked build time:** 96.9 hours
 
 - Method: terminal-activity-based (idle cutoff: 10 min)
-- Last updated: 2026-02-25T00:59:21.193Z
+- Last updated: 2026-02-25T01:13:05.156Z
 <!-- HOURS:END -->
 
 ## License
