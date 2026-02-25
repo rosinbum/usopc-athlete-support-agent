@@ -20,7 +20,7 @@ function gitCommonDir(root) {
 
 const commonDir = gitCommonDir(repoRoot);
 const eventsPath = path.join(commonDir, "time-tracker", "events.jsonl");
-const readmePath = path.join(repoRoot, "README.md");
+const hoursJsonPath = path.join(repoRoot, ".hours.json");
 
 function parseEvents(jsonl) {
   return jsonl
@@ -48,23 +48,6 @@ function computeActiveMs(events) {
   return active;
 }
 
-function updateReadme(readme, replacement) {
-  const start = "<!-- HOURS:START -->";
-  const end = "<!-- HOURS:END -->";
-  const startIdx = readme.indexOf(start);
-  const endIdx = readme.indexOf(end);
-
-  if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) {
-    return (
-      readme.trimEnd() + "\n\n" + start + "\n" + replacement + "\n" + end + "\n"
-    );
-  }
-
-  const before = readme.slice(0, startIdx + start.length);
-  const after = readme.slice(endIdx);
-  return `${before}\n\n${replacement}\n${after}`;
-}
-
 function main() {
   const eventsJsonl = fs.existsSync(eventsPath)
     ? fs.readFileSync(eventsPath, "utf8")
@@ -76,24 +59,14 @@ function main() {
   const pretty = hours.toFixed(1);
 
   const now = new Date().toISOString().replace(".000Z", "Z");
-  const snippet = [
-    `**Tracked build time:** ${pretty} hours`,
-    ``,
-    `- Method: terminal-activity-based (idle cutoff: ${IDLE_CUTOFF_MIN} min)`,
-    `- Last updated: ${now}`,
-  ].join("\n");
+  const data = {
+    hours: Number(pretty),
+    idleCutoffMin: IDLE_CUTOFF_MIN,
+    updatedAt: now,
+  };
 
-  let readme = fs.existsSync(readmePath)
-    ? fs.readFileSync(readmePath, "utf8")
-    : "";
-  readme = updateReadme(readme, snippet);
-  readme = readme.replace(
-    /approximately \d+(\.\d+)? hours/,
-    `approximately ${pretty} hours`,
-  );
-  fs.writeFileSync(readmePath, readme, "utf8");
-
-  console.log(`Updated README with ${pretty} hours.`);
+  fs.writeFileSync(hoursJsonPath, JSON.stringify(data) + "\n", "utf8");
+  console.log(`Updated .hours.json with ${pretty} hours.`);
 }
 
 main();

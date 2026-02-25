@@ -37,8 +37,6 @@ Worktree naming convention: `../usopc-issue-<number>` (e.g., `../usopc-issue-23`
 
 ### Worktree Gotchas
 
-- **Copy `update-hours.mjs`**: The main repo has an untracked `scripts/update-hours.mjs` used by a pre-commit hook. Copy it to new worktrees or commits will fail: `cp /path/to/main/scripts/update-hours.mjs /path/to/worktree/scripts/`
-- **README merge conflicts**: The hours timestamp in README.md causes merge conflicts on nearly every PR. Resolve by keeping the later timestamp (from `origin/main`).
 - **`gh pr merge` from worktrees**: Fails with "main is already used by worktree". Use `--repo owner/repo` flag or run from the main repo directory.
 
 ### Implementation Steps
@@ -153,7 +151,6 @@ Custom Claude Code skills that automate the development workflow. Use these inst
 | `/eval-check`                       | Run agent evals after core code changes (fast + optional LLM evals)                              |
 | `/implement <issue>`                | Full issue-to-code workflow — worktree setup, code exploration, test scaffolding, implementation |
 | `/address-pr-comments`              | Address review comments on the current PR — fetches comments, applies fixes, updates PR          |
-| `/resolve-readme`                   | Resolve the recurring README.md merge conflict caused by the hours timestamp pre-commit hook     |
 | `/resolve-review <finding-id>`      | Resolve a code review finding — validates, creates issue, sets up worktree, implements fix       |
 | `/dev-workflow <issue>`             | Shared implementation workflow (explore → plan → scaffold → implement → quality → stage)         |
 | `/fix-bugs [--limit N] [--dry-run]` | Autonomous bug-fixing — fetches open bug issues and spawns parallel bug-fixer agents             |

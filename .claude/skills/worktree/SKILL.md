@@ -3,7 +3,7 @@ name: worktree
 description: Smart worktree management — create, list, and clean up git worktrees with automatic gotcha handling (pnpm install, hook script copy, issue validation).
 argument-hint: <create|list|cleanup> [issue-number]
 disable-model-invocation: true
-allowed-tools: Bash(git *), Bash(cd *), Bash(pnpm *), Bash(cp *), Bash(gh issue view *), Bash(gh repo view *), Bash(ls *), Glob, Read
+allowed-tools: Bash(git *), Bash(cd *), Bash(pnpm *), Bash(gh issue view *), Bash(gh repo view *), Bash(ls *), Glob, Read
 ---
 
 # Smart Worktree Management
@@ -55,17 +55,7 @@ If the worktree path already exists, warn and stop.
 cd <worktree-path> && pnpm install
 ```
 
-### Step 6: Copy hook script
-
-The main repo has an untracked `scripts/update-hours.mjs` needed by a pre-commit hook. Copy it:
-
-```bash
-cp <main-repo>/scripts/update-hours.mjs <worktree-path>/scripts/update-hours.mjs
-```
-
-Create the `scripts/` directory in the worktree first if needed (it should already exist from the repo, but be safe).
-
-### Step 7: Print summary
+### Step 6: Print summary
 
 ```
 Worktree created:
@@ -73,7 +63,7 @@ Worktree created:
   Branch: <branch-name>
   Issue:  #<number> — <title>
 
-Dependencies installed. Hook script copied.
+Dependencies installed.
 Navigate with: cd <worktree-path>
 ```
 
@@ -143,4 +133,4 @@ If no worktrees were eligible for cleanup, say so.
 
 - Always use absolute paths when running git commands to avoid confusion between worktree and main repo.
 - The main repo root can be found via `git worktree list` — it's the first entry (the one without `[branch]` or with `[main]`).
-- If `scripts/update-hours.mjs` doesn't exist in the main repo, skip the copy step and warn the user.
+- `scripts/update-hours.mjs` and `scripts/stamp-readme-hours.mjs` are tracked in git, so they'll be available in worktrees automatically — no copying needed.

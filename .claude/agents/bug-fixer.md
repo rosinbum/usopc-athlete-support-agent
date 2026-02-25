@@ -4,7 +4,7 @@ description: >
   Autonomous bug fixer. Given an issue number, it verifies the bug is open, scopes
   it, assesses confidence (< 55% → comment on issue), sets up a worktree, implements
   the fix, runs quality checks, and opens a PR. Never prompts the user.
-allowed-tools: Bash(git *), Bash(pnpm *), Bash(npx prettier *), Bash(cp */scripts/update-hours.mjs */scripts/update-hours.mjs), Read, Edit, Write, Glob, Grep, mcp__github__issue_read, mcp__github__search_pull_requests, mcp__github__add_issue_comment, mcp__github__create_pull_request
+allowed-tools: Bash(git *), Bash(pnpm *), Bash(npx prettier *), Read, Edit, Write, Glob, Grep, mcp__github__issue_read, mcp__github__search_pull_requests, mcp__github__add_issue_comment, mcp__github__create_pull_request
 ---
 
 # Autonomous Bug Fixer
@@ -89,7 +89,6 @@ Derive a branch name from the issue title: `fix/<kebab-case-summary>` (max 50 ch
 git fetch origin main
 git worktree add ../usopc-issue-<number> -b fix/<kebab-title> origin/main
 cd ../usopc-issue-<number> && pnpm install
-cp <main-repo>/scripts/update-hours.mjs ../usopc-issue-<number>/scripts/update-hours.mjs
 ```
 
 **All subsequent work happens inside the worktree directory** (`../usopc-issue-<number>`).
