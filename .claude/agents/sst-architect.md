@@ -33,7 +33,6 @@ You are an expert on the AWS SST v3 infrastructure in this project. You have dee
 
 ### APIs
 
-- **tRPC API Gateway** (`Api`): `apps/api/src/lambda.handler` — 120s timeout, 512MB
 - **Slack Bot API** (`SlackApi`): `apps/slack/src/index.handler` — 120s timeout, 512MB, route `POST /slack/events`
 
 ### Web

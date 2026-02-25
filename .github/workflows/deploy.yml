@@ -52,21 +52,13 @@ jobs:
         id: deploy
         run: |
           npx sst deploy --stage staging 2>&1 | tee deploy-output.txt
-          API_URL=$(grep -oP 'apiUrl:\s+\K\S+' deploy-output.txt || true)
           WEB_URL=$(grep -oP 'webUrl:\s+\K\S+' deploy-output.txt || true)
-          if [ -z "$API_URL" ] || [ -z "$WEB_URL" ]; then
+          if [ -z "$WEB_URL" ]; then
             echo "::warning::Could not extract URLs from SST output. Smoke tests will be skipped."
             echo "SST output:"
             cat deploy-output.txt
           fi
-          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
           echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
-
-      - name: Smoke test API
-        if: steps.deploy.outputs.api_url != ''
-        run: |
-          curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
-            "${{ steps.deploy.outputs.api_url }}/health"
 
       - name: Smoke test Web
         if: steps.deploy.outputs.web_url != ''
@@ -102,21 +94,13 @@ jobs:
         id: deploy
         run: |
           npx sst deploy --stage production 2>&1 | tee deploy-output.txt
-          API_URL=$(grep -oP 'apiUrl:\s+\K\S+' deploy-output.txt || true)
           WEB_URL=$(grep -oP 'webUrl:\s+\K\S+' deploy-output.txt || true)
-          if [ -z "$API_URL" ] || [ -z "$WEB_URL" ]; then
+          if [ -z "$WEB_URL" ]; then
             echo "::warning::Could not extract URLs from SST output. Smoke tests will be skipped."
             echo "SST output:"
             cat deploy-output.txt
           fi
-          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
           echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
-
-      - name: Smoke test API
-        if: steps.deploy.outputs.api_url != ''
-        run: |
-          curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
-            "${{ steps.deploy.outputs.api_url }}/health"
 
       - name: Smoke test Web
         if: steps.deploy.outputs.web_url != ''
@@ -170,21 +154,13 @@ jobs:
         run: |
           echo "Deploying ${{ steps.prev-tag.outputs.tag }} to production"
           npx sst deploy --stage production 2>&1 | tee deploy-output.txt
-          API_URL=$(grep -oP 'apiUrl:\s+\K\S+' deploy-output.txt || true)
           WEB_URL=$(grep -oP 'webUrl:\s+\K\S+' deploy-output.txt || true)
-          if [ -z "$API_URL" ] || [ -z "$WEB_URL" ]; then
+          if [ -z "$WEB_URL" ]; then
             echo "::warning::Could not extract URLs from SST output. Smoke tests will be skipped."
             echo "SST output:"
             cat deploy-output.txt
           fi
-          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
           echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
-
-      - name: Smoke test API
-        if: steps.deploy.outputs.api_url != ''
-        run: |
-          curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
-            "${{ steps.deploy.outputs.api_url }}/health"
 
       - name: Smoke test Web
         if: steps.deploy.outputs.web_url != ''

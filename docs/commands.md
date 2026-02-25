@@ -15,13 +15,9 @@ pnpm typecheck      # Type-check all packages
 # Testing a specific package
 pnpm --filter @usopc/core test
 pnpm --filter @usopc/ingestion test
-pnpm --filter @usopc/api test
 
 # Single test file (vitest pattern)
 pnpm --filter @usopc/ingestion test -- src/db.test.ts
-
-# Type-check a specific package
-pnpm --filter @usopc/api typecheck
 ```
 
 ## Database (Local Docker Postgres with pgvector)

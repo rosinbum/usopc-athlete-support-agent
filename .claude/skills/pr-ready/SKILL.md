@@ -35,7 +35,6 @@ Combine all changed files (deduplicate).
 
 Map changed files to packages by path prefix:
 
-- `apps/api/` → `@usopc/api`
 - `apps/web/` → `@usopc/web`
 - `apps/slack/` → `@usopc/slack`
 - `packages/core/` → `@usopc/core`

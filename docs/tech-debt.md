@@ -26,32 +26,29 @@ Assessed 2026-02-17. Items marked ~~strikethrough~~ have been resolved.
 
 ## Incomplete Integrations (HIGH)
 
-The AI agent is wired into the web UI but not into the API or Slack surfaces.
+The AI agent is wired into the web UI but not into the Slack surface.
 
 | Location                                     | Issue                              | Tracked |
 | -------------------------------------------- | ---------------------------------- | ------- |
 | `apps/slack/src/handlers/slashCommand.ts:62` | TODO: Invoke LangGraph agent       | #7      |
 | `apps/slack/src/handlers/mention.ts:41`      | TODO: Invoke LangGraph agent       | #7      |
 | `apps/slack/src/handlers/message.ts:35`      | Returns placeholder block response | #7      |
-| `apps/api/src/routers/chat.ts:14`            | TODO: Wire to agent graph          | #5      |
-| `apps/slack/src/index.ts:118`                | TODO: Store feedback via tRPC API  | —       |
+| `apps/slack/src/index.ts:118`                | TODO: Store feedback               | —       |
 
 ## Test Coverage Gaps (HIGH)
 
 | Package      | Test Files | Source Files | Priority |
 | ------------ | ---------- | ------------ | -------- |
 | `apps/slack` | 0          | 10           | Critical |
-| `apps/api`   | 3          | 11           | High     |
 
 Key untested files:
 
 - `apps/slack/src/handlers/*` — all event handlers
-- `apps/api/src/routers/chat.ts` — core chat endpoint
 
 ## Dependency Issues (LOW)
 
 - **Vitest version drift**: `apps/web` on `^2.1.9` while everything else is `^2.1.8`
-- **`@types/pg` version inconsistency**: `shared`/`api` on `^8.11.11`, `core`/`ingestion` on `^8.11.10`
+- **`@types/pg` version inconsistency**: `shared` on `^8.11.11`, `core`/`ingestion` on `^8.11.10`
 
 ## Architecture TODOs (MEDIUM)
 
@@ -62,6 +59,5 @@ Key untested files:
 
 ## Critical Open Issues
 
-- **#5**: Wire LangGraph agent into tRPC API endpoints
 - **#7**: Wire LangGraph agent into Slack bot handlers
 - **#31**: Error handling missing from critical API paths

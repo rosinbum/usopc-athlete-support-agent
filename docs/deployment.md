@@ -40,7 +40,6 @@ sst deploy --stage production
 This provisions:
 
 - Aurora Serverless v2 PostgreSQL cluster with pgvector
-- API Gateway + Lambda for the tRPC API
 - API Gateway + Lambda for Slack webhooks
 - CloudFront distribution + Lambda@Edge for the Next.js app
 - EventBridge + SQS + Lambda for the weekly ingestion pipeline
@@ -59,7 +58,6 @@ After the first deployment, trigger the ingestion pipeline to populate the knowl
 After deployment, SST outputs the service URLs. With custom domains configured (see [Deployment Procedure — Custom Domains](./deployment-procedure.md#custom-domains)):
 
 ```
-apiUrl:   https://api.rosinbum.org
 webUrl:   https://app.rosinbum.org
 slackUrl: https://slack.rosinbum.org
 ```
@@ -67,7 +65,6 @@ slackUrl: https://slack.rosinbum.org
 Without custom domains (local dev stages), raw AWS URLs are used:
 
 ```
-apiUrl:   https://xxx.execute-api.us-east-1.amazonaws.com
 webUrl:   https://xxx.cloudfront.net
 slackUrl: https://xxx.execute-api.us-east-1.amazonaws.com
 ```
