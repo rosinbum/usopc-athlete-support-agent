@@ -37,6 +37,8 @@ vi.mock("@usopc/core", () => ({
     .mockImplementation((msgs: { role: string; content: string }[]) =>
       msgs.map((m) => ({ content: m.content })),
     ),
+  detectInjection: vi.fn().mockReturnValue(null),
+  INJECTION_RESPONSE: "Please rephrase your question.",
 }));
 
 vi.mock("../slack/client.js", () => ({
@@ -207,7 +209,9 @@ describe("handleMention", () => {
     await handleMention(makeEvent());
 
     await vi.waitFor(() => {
-      expect(mockLoadSummary).toHaveBeenCalledWith("1234567890.123456");
+      expect(mockLoadSummary).toHaveBeenCalledWith(
+        "slack:U456:1234567890.123456",
+      );
     });
 
     await vi.waitFor(() => {

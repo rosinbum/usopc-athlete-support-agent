@@ -130,7 +130,7 @@ curl "https://athlete-agent.rosinbum.org/api/sources?action=stats"
 
 Stream an AI-generated response. Uses Server-Sent Events (SSE).
 
-**Auth:** None (rate-limited)
+**Auth:** Session (requires authenticated user)
 
 **Rate limits:**
 
@@ -169,7 +169,53 @@ The stream emits events via the Vercel AI SDK `createDataStreamResponse()`:
 | `message_annotations` | Citations: `[{ type: "citations", citations: [...] }]` |
 | `error`               | Error message                                          |
 
-**Error responses:** `400` (validation), `429` (rate limited), `500` (server error).
+**Error responses:** `400` (validation), `401` (unauthorized), `429` (rate limited), `500` (server error).
+
+---
+
+### `POST /api/chat/feedback`
+
+Submit feedback (thumbs up/down) for a chat message.
+
+**Auth:** Session (requires authenticated user)
+
+**Request body:**
+
+| Field            | Type    | Required | Description                             |
+| ---------------- | ------- | -------- | --------------------------------------- |
+| `conversationId` | string  | Yes      | UUID of the conversation                |
+| `messageId`      | string  | Yes      | ID of the message being rated           |
+| `score`          | integer | Yes      | `1` (helpful) or `0` (not helpful)      |
+| `comment`        | string  | No       | Optional feedback text (max 2000 chars) |
+
+```bash
+curl -X POST https://athlete-agent.rosinbum.org/api/chat/feedback \
+  -H "Content-Type: application/json" \
+  -H "Cookie: next-auth.session-token=<token>" \
+  -d '{
+    "conversationId": "123e4567-e89b-12d3-a456-426614174000",
+    "messageId": "msg-abc123",
+    "score": 1,
+    "comment": "Very helpful answer!"
+  }'
+```
+
+**Response** `201`:
+
+```json
+{
+  "feedback": {
+    "conversationId": "123e4567-e89b-12d3-a456-426614174000",
+    "messageId": "msg-abc123",
+    "channel": "web",
+    "score": 1,
+    "comment": "Very helpful answer!",
+    "userId": "athlete@example.com"
+  }
+}
+```
+
+**Error responses:** `400` (validation), `401` (unauthorized), `500` (server error).
 
 ---
 

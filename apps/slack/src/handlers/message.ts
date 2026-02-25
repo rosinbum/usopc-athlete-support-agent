@@ -1,5 +1,11 @@
 import { createLogger } from "@usopc/shared";
-import { getAppRunner, loadSummary, convertMessages } from "@usopc/core";
+import {
+  getAppRunner,
+  loadSummary,
+  convertMessages,
+  detectInjection,
+  INJECTION_RESPONSE,
+} from "@usopc/core";
 import {
   postMessage,
   addReaction,
@@ -46,6 +52,12 @@ export async function handleMessage(event: SlackMessageEvent): Promise<void> {
     return;
   }
 
+  // SEC-18: Check for prompt injection patterns
+  if (detectInjection(text)) {
+    await postMessage(channel, INJECTION_RESPONSE, undefined, thread_ts ?? ts);
+    return;
+  }
+
   // Add a reaction to acknowledge receipt
   await addReaction(channel, ts, "eyes");
 
@@ -66,13 +78,15 @@ async function processMessageAsync(event: SlackMessageEvent): Promise<void> {
   try {
     const runner = await getAppRunner();
     const conversationId = thread_ts ?? ts;
-    const conversationSummary = await loadSummary(conversationId);
+    const summaryKey = `slack:${user}:${conversationId}`;
+    const conversationSummary = await loadSummary(summaryKey);
     const messages = convertMessages([{ role: "user", content: text.trim() }]);
 
     const { answer, citations, escalation, disclaimer } = await runner.invoke({
       messages,
       conversationId,
       conversationSummary,
+      userId: `slack:${user}`,
     });
 
     const blocks = buildAnswerBlocks(answer, citations, disclaimer, escalation);

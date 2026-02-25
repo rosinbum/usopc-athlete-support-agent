@@ -45,6 +45,8 @@ vi.mock("@usopc/core", () => ({
   })),
   loadSummary: vi.fn(),
   publishDiscoveredUrls: vi.fn(),
+  detectInjection: vi.fn().mockReturnValue(null),
+  INJECTION_RESPONSE: "Please rephrase your question.",
 }));
 
 vi.mock("../../../auth.js", () => ({
@@ -415,5 +417,77 @@ describe("authentication (SEC-04)", () => {
 
     const response = await POST(request);
     expect(response.status).toBe(200);
+  });
+});
+
+describe("conversation summary loading (TEST-02)", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    shouldFailInit = false;
+    initCallCount = 0;
+    vi.resetModules();
+  });
+
+  function makeReq(body: Record<string, unknown>) {
+    return new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const validUuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+  const otherUuid = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
+
+  it("calls loadSummary with conversationId when provided", async () => {
+    const { POST } = await importRoute();
+    const { loadSummary } = await import("@usopc/core");
+
+    await POST(
+      makeReq({
+        messages: [{ role: "user", content: "Hello" }],
+        conversationId: validUuid,
+      }),
+    );
+
+    expect(loadSummary).toHaveBeenCalledWith(validUuid);
+  });
+
+  it("does not call loadSummary when conversationId is absent", async () => {
+    const { POST } = await importRoute();
+    const { loadSummary } = await import("@usopc/core");
+
+    await POST(
+      makeReq({
+        messages: [{ role: "user", content: "Hello" }],
+      }),
+    );
+
+    expect(loadSummary).not.toHaveBeenCalled();
+  });
+
+  it("passes loaded summary to the agent runner stream", async () => {
+    const coreMod = await import("@usopc/core");
+    vi.mocked(coreMod.loadSummary).mockResolvedValueOnce(
+      "Previous conversation context",
+    );
+
+    const { POST } = await importRoute();
+
+    await POST(
+      makeReq({
+        messages: [{ role: "user", content: "Continue" }],
+        conversationId: otherUuid,
+        userSport: "swimming",
+      }),
+    );
+
+    expect(mockRunner.stream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationSummary: "Previous conversation context",
+        conversationId: otherUuid,
+        userSport: "swimming",
+      }),
+    );
   });
 });
