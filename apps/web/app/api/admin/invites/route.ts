@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "../../../../lib/admin-api.js";
+import { sendInviteEmail } from "../../../../lib/send-invite-email.js";
 import { createInviteEntity, logger } from "@usopc/shared";
 import { z } from "zod";
 
@@ -11,6 +12,10 @@ const createInviteSchema = z.object({
 });
 
 const deleteInviteSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+const resendInviteSchema = z.object({
   email: z.string().email("Invalid email address"),
 });
 
@@ -58,11 +63,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const inviteEntity = createInviteEntity();
+    const normalizedEmail = email.toLowerCase().trim();
     const invite = await inviteEntity.create({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       invitedBy,
     });
-    return NextResponse.json({ invite }, { status: 201 });
+    const emailSent = await sendInviteEmail(normalizedEmail, invitedBy);
+    if (!emailSent) {
+      log.warn("Invite created but email notification failed", {
+        email: normalizedEmail,
+      });
+    }
+    return NextResponse.json({ invite, emailSent }, { status: 201 });
   } catch (error) {
     log.error("Failed to create invite", {
       error: error instanceof Error ? error.message : String(error),
@@ -108,4 +120,29 @@ export async function DELETE(req: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+export async function PATCH(req: NextRequest) {
+  const result = await requireAdmin({ returnSession: true });
+  if (result.denied) return result.denied;
+  const { session } = result;
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const parsed = resendInviteSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+
+  const invitedBy = session.user?.name ?? session.user?.email ?? undefined;
+  const emailSent = await sendInviteEmail(parsed.data.email, invitedBy);
+  return NextResponse.json({ emailSent });
 }

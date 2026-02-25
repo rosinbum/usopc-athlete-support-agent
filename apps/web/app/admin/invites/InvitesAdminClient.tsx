@@ -23,7 +23,12 @@ export function InvitesAdminClient() {
   const [newEmail, setNewEmail] = useState("");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [addEmailStatus, setAddEmailStatus] = useState<string | null>(null);
   const [deletingEmail, setDeletingEmail] = useState<string | null>(null);
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
+  const [resendStatus, setResendStatus] = useState<
+    Record<string, "sent" | "failed">
+  >({});
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +36,7 @@ export function InvitesAdminClient() {
     if (!email) return;
     setAdding(true);
     setAddError(null);
+    setAddEmailStatus(null);
     try {
       const res = await fetch("/api/admin/invites", {
         method: "POST",
@@ -41,7 +47,13 @@ export function InvitesAdminClient() {
         const body = await res.json();
         setAddError(body.error ?? "Failed to add invite");
       } else {
+        const body = await res.json();
         setNewEmail("");
+        setAddEmailStatus(
+          body.emailSent
+            ? "Invite added and email sent!"
+            : "Invite added but email could not be sent.",
+        );
         await mutate();
       }
     } catch {
@@ -63,6 +75,38 @@ export function InvitesAdminClient() {
       await mutate();
     } finally {
       setDeletingEmail(null);
+    }
+  };
+
+  const handleResend = async (email: string) => {
+    setResendingEmail(email);
+    setResendStatus((prev) => {
+      const next = { ...prev };
+      delete next[email];
+      return next;
+    });
+    try {
+      const res = await fetch("/api/admin/invites", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const body = await res.json();
+      setResendStatus((prev) => ({
+        ...prev,
+        [email]: body.emailSent ? "sent" : "failed",
+      }));
+      setTimeout(() => {
+        setResendStatus((prev) => {
+          const next = { ...prev };
+          delete next[email];
+          return next;
+        });
+      }, 3000);
+    } catch {
+      setResendStatus((prev) => ({ ...prev, [email]: "failed" }));
+    } finally {
+      setResendingEmail(null);
     }
   };
 
@@ -91,6 +135,9 @@ export function InvitesAdminClient() {
           </button>
         </form>
         {addError && <p className="text-red-600 text-sm mt-2">{addError}</p>}
+        {addEmailStatus && (
+          <p className="text-green-600 text-sm mt-2">{addEmailStatus}</p>
+        )}
       </div>
 
       {/* Invite list */}
@@ -137,14 +184,27 @@ export function InvitesAdminClient() {
                 >
                   <td className="px-4 py-3 font-mono">{invite.email}</td>
                   <td className="px-4 py-3 text-gray-500">
-                    {invite.invitedBy ?? "—"}
+                    {invite.invitedBy ?? "\u2014"}
                   </td>
                   <td className="px-4 py-3 text-gray-500">
                     {invite.createdAt
                       ? new Date(invite.createdAt).toLocaleDateString()
-                      : "—"}
+                      : "\u2014"}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right space-x-3">
+                    <button
+                      onClick={() => handleResend(invite.email)}
+                      disabled={resendingEmail === invite.email}
+                      className="text-blue-600 hover:text-blue-800 text-xs font-medium disabled:opacity-50 transition-colors"
+                    >
+                      {resendingEmail === invite.email
+                        ? "Sending..."
+                        : resendStatus[invite.email] === "sent"
+                          ? "Sent!"
+                          : resendStatus[invite.email] === "failed"
+                            ? "Failed"
+                            : "Resend"}
+                    </button>
                     <button
                       onClick={() => handleDelete(invite.email)}
                       disabled={deletingEmail === invite.email}
