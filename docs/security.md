@@ -74,7 +74,7 @@ Role is determined at initial sign-in and is not re-evaluated on subsequent requ
 | `/api/chat`                 | POST   | Public     | Rate-limited (20/5min per IP, 100/5min global per Lambda instance) |
 | `/api/sources`              | GET    | Public     | None                                                               |
 | `/api/auth/[...nextauth]`   | ALL    | Public     | NextAuth internals                                                 |
-| `/api/documents/[key]/url`  | GET    | Admin      | `requireAdmin()` + S3 path validation                              |
+| `/api/documents/[key]/url`  | GET    | Session    | `auth()` session check + S3 path validation                        |
 | `/api/admin/sources/**`     | ALL    | Admin      | Middleware + `requireAdmin()`                                      |
 | `/api/admin/discoveries/**` | ALL    | Admin      | Middleware + `requireAdmin()`                                      |
 | `/api/admin/invites`        | ALL    | Admin      | Middleware + `requireAdmin()`                                      |

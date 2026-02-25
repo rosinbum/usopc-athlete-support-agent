@@ -721,7 +721,7 @@ curl -X DELETE https://athlete-agent.rosinbum.org/api/admin/invites \
 
 Generate a presigned S3 URL for viewing an archived document.
 
-**Auth:** Admin
+**Auth:** Session (any authenticated user)
 
 **Path parameter:** `key` — URL-encoded S3 object key (must start with `sources/`, no `..` traversal).
 

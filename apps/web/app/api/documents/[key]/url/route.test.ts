@@ -3,10 +3,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../../../../../auth.js", () => ({
   auth: vi.fn(),
 }));
-vi.mock("../../../../../lib/auth-env.js", () => ({
-  getAdminEmails: vi.fn(() => ["admin@test.com"]),
-}));
-
 vi.mock("sst", () => ({
   Resource: {
     DocumentsBucket: {
@@ -64,9 +60,9 @@ describe("GET /api/documents/[key]/url", () => {
     expect(mockGetSignedUrl).not.toHaveBeenCalled();
   });
 
-  it("returns 403 for non-admin authenticated user", async () => {
+  it("allows non-admin authenticated user (athlete)", async () => {
     mockAuth.mockResolvedValue({
-      user: { email: "user@example.com" },
+      user: { email: "athlete@example.com", role: "athlete" as const },
       expires: "",
     } as never);
 
@@ -78,9 +74,8 @@ describe("GET /api/documents/[key]/url", () => {
     });
     const body = await response.json();
 
-    expect(response.status).toBe(403);
-    expect(body.error).toBe("Forbidden");
-    expect(mockGetSignedUrl).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(body.url).toBe("https://s3.amazonaws.com/presigned-url");
   });
 
   it("returns a presigned URL for a valid S3 key", async () => {
