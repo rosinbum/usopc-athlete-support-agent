@@ -64,6 +64,32 @@ describe("MessageBubble", () => {
     expect(screen.getByText("USOPC Bylaws")).toBeInTheDocument();
   });
 
+  it("hides feedback buttons while streaming", () => {
+    const message = makeMessage({ role: "assistant", content: "Partial..." });
+    render(
+      <MessageBubble
+        message={message}
+        conversationId="conv-1"
+        isStreaming={true}
+      />,
+    );
+    expect(screen.queryByLabelText("Helpful")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Not helpful")).not.toBeInTheDocument();
+  });
+
+  it("shows feedback buttons after streaming completes", () => {
+    const message = makeMessage({ role: "assistant", content: "Done." });
+    render(
+      <MessageBubble
+        message={message}
+        conversationId="conv-1"
+        isStreaming={false}
+      />,
+    );
+    expect(screen.getByLabelText("Helpful")).toBeInTheDocument();
+    expect(screen.getByLabelText("Not helpful")).toBeInTheDocument();
+  });
+
   it("ignores non-citation annotations", () => {
     const message = makeMessage({
       role: "assistant",
