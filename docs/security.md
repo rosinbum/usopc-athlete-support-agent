@@ -20,6 +20,40 @@ Athletes sign in via email magic link (Resend provider). The sign-in callback ch
 
 Any sign-in attempt that doesn't match a GitHub admin email or an invited athlete email is rejected (`signIn` returns `false`).
 
+### Admin Access Control Model
+
+**Determining admin status:**
+
+Admin users are determined by the `AdminEmails` SST secret — a comma-separated list of email addresses. When a user signs in via GitHub OAuth, the callback checks their email against this allowlist. Matching emails receive `role: "admin"` in the JWT.
+
+**Configuring admins:**
+
+```bash
+# Set admin emails (comma-separated, no spaces)
+sst secret set AdminEmails "admin1@example.com,admin2@example.com" --stage production
+
+# Verify current value
+sst secret list --stage production
+```
+
+Changes require redeployment (`sst deploy`) to take effect in Lambda environments.
+
+**Admin capabilities:**
+
+- **Source management:** Create, read, update, delete, enable/disable knowledge base source configurations
+- **Ingestion control:** Trigger ingestion pipeline for individual sources or in bulk
+- **Discovery review:** Approve, reject, or promote auto-discovered source candidates into the knowledge base
+- **Document access:** Generate presigned S3 URLs for viewing archived documents
+- **Bulk operations:** Bulk enable/disable/delete sources, bulk approve/reject discoveries (max 100 per request)
+
+**Granting access:** Add the user's email to `AdminEmails` and redeploy.
+
+**Revoking access:** Remove the user's email from `AdminEmails` and redeploy. Existing sessions (up to 24 hours) remain valid until they expire.
+
+**Known limitation:** The admin guard checks session role only, not the current email allowlist. A revoked admin retains access until their JWT expires. See [#217](https://github.com/rosinbum/usopc-athlete-support-agent/issues/217) for the planned fix.
+
+**Invite management:** The invite endpoints (`/api/admin/invites`) require admin role, consistent with all other `/api/admin/*` routes. See the [API Reference](./api-reference.md#admin--invites) for details.
+
 ### Session Model
 
 | Field             | Source                                                                      |
@@ -40,10 +74,10 @@ Role is determined at initial sign-in and is not re-evaluated on subsequent requ
 | `/api/chat`                 | POST   | Public     | Rate-limited (20/5min per IP, 100/5min global per Lambda instance) |
 | `/api/sources`              | GET    | Public     | None                                                               |
 | `/api/auth/[...nextauth]`   | ALL    | Public     | NextAuth internals                                                 |
-| `/api/documents/[key]/url`  | GET    | Admin      | `requireAdmin()` + S3 path validation                              |
+| `/api/documents/[key]/url`  | GET    | Session    | `auth()` session check + S3 path validation                        |
 | `/api/admin/sources/**`     | ALL    | Admin      | Middleware + `requireAdmin()`                                      |
 | `/api/admin/discoveries/**` | ALL    | Admin      | Middleware + `requireAdmin()`                                      |
-| `/api/admin/invites`        | ALL    | Session    | `auth()` session check (role not verified)                         |
+| `/api/admin/invites`        | ALL    | Admin      | Middleware + `requireAdmin()`                                      |
 
 ### Defense in Depth
 

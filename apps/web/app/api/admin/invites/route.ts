@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "../../../../auth.js";
+import { requireAdmin } from "../../../../lib/admin-api.js";
 import { createInviteEntity } from "@usopc/shared";
 import { z } from "zod";
 
@@ -13,10 +13,8 @@ const deleteInviteSchema = z.object({
 });
 
 export async function GET(_req: NextRequest) {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   try {
     const inviteEntity = createInviteEntity();
@@ -34,10 +32,8 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   let body: unknown;
   try {
@@ -60,7 +56,7 @@ export async function POST(req: NextRequest) {
     const inviteEntity = createInviteEntity();
     const invite = await inviteEntity.create({
       email: email.toLowerCase().trim(),
-      invitedBy: invitedBy ?? session.user?.email ?? undefined,
+      invitedBy,
     });
     return NextResponse.json({ invite }, { status: 201 });
   } catch (error) {
@@ -75,10 +71,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   let body: unknown;
   try {
