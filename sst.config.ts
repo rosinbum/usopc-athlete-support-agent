@@ -94,7 +94,7 @@ export default $config({
           }
         : undefined,
     });
-    slackApi.route("$default", {
+    const slackRoute = slackApi.route("$default", {
       handler: "apps/slack/src/index.handler",
       link: [...linkables, slackBotToken, slackSigningSecret, appTable],
       timeout: "120 seconds",
@@ -113,7 +113,7 @@ export default $config({
       },
     });
 
-    discoveryFeedQueue.subscribe(
+    const discoveryFeedWorkerSub = discoveryFeedQueue.subscribe(
       {
         handler: "packages/ingestion/src/discoveryFeedWorker.handler",
         link: [...linkables, appTable],
@@ -126,8 +126,12 @@ export default $config({
     );
 
     // Source discovery (weekly) - production only
+    // Document ingestion (weekly) - production only
+    // Declared before Web so the queue can be linked conditionally
+    let ingestionQueue: sst.aws.Queue | undefined;
+
     if (isProd) {
-      new sst.aws.Cron("DiscoveryCron", {
+      const discoveryCron = new sst.aws.Cron("DiscoveryCron", {
         schedule: "cron(0 2 ? * MON *)", // Every Monday at 2 AM UTC
         job: {
           handler: "packages/ingestion/src/functions/discovery.handler",
@@ -150,13 +154,7 @@ export default $config({
           },
         },
       });
-    }
 
-    // Document ingestion (weekly) - production only
-    // Declared before Web so the queue can be linked conditionally
-    let ingestionQueue: sst.aws.Queue | undefined;
-
-    if (isProd) {
       // Dead-letter queue (must also be FIFO to match main queue)
       const ingestionDlq = new sst.aws.Queue("IngestionDLQ", {
         fifo: true,
@@ -175,7 +173,7 @@ export default $config({
       });
 
       // Worker: processes one source per SQS message
-      ingestionQueue.subscribe(
+      const ingestionWorkerSub = ingestionQueue.subscribe(
         {
           handler: "packages/ingestion/src/worker.handler",
           link: [...linkables, appTable, documentsBucket],
@@ -188,7 +186,7 @@ export default $config({
       );
 
       // Coordinator: cron checks for changes, enqueues to SQS
-      new sst.aws.Cron("IngestionCron", {
+      const ingestionCron = new sst.aws.Cron("IngestionCron", {
         schedule: "rate(7 days)",
         job: {
           handler: "packages/ingestion/src/cron.handler",
@@ -196,6 +194,336 @@ export default $config({
           timeout: "5 minutes",
           memory: "512 MB",
         },
+      });
+
+      // --- Monitoring ---
+
+      const alarmTopic = new aws.sns.Topic("AlarmTopic", {
+        displayName: "USOPC Athlete Support - Production Alarms",
+      });
+
+      const notificationEmail = process.env.NOTIFICATION_EMAIL;
+      if (notificationEmail) {
+        new aws.sns.TopicSubscription("AlarmEmailSub", {
+          topic: alarmTopic.arn,
+          protocol: "email",
+          endpoint: notificationEmail,
+        });
+      }
+
+      // Slack Lambda alarms
+      new aws.cloudwatch.MetricAlarm("SlackErrorsAlarm", {
+        alarmDescription: "Slack Lambda errors > 5 in 5 minutes",
+        namespace: "AWS/Lambda",
+        metricName: "Errors",
+        dimensions: { FunctionName: slackRoute.nodes.function.name },
+        statistic: "Sum",
+        period: 300,
+        evaluationPeriods: 1,
+        threshold: 5,
+        comparisonOperator: "GreaterThanThreshold",
+        treatMissingData: "notBreaching",
+        alarmActions: [alarmTopic.arn],
+        okActions: [alarmTopic.arn],
+      });
+
+      new aws.cloudwatch.MetricAlarm("SlackDurationAlarm", {
+        alarmDescription: "Slack Lambda p99 duration > 100s",
+        namespace: "AWS/Lambda",
+        metricName: "Duration",
+        dimensions: { FunctionName: slackRoute.nodes.function.name },
+        extendedStatistic: "p99",
+        period: 300,
+        evaluationPeriods: 2,
+        threshold: 100_000, // milliseconds
+        comparisonOperator: "GreaterThanThreshold",
+        treatMissingData: "notBreaching",
+        alarmActions: [alarmTopic.arn],
+        okActions: [alarmTopic.arn],
+      });
+
+      // Discovery feed worker alarm
+      new aws.cloudwatch.MetricAlarm("DiscoveryWorkerErrorsAlarm", {
+        alarmDescription: "Discovery feed worker errors > 3 in 5 minutes",
+        namespace: "AWS/Lambda",
+        metricName: "Errors",
+        dimensions: {
+          FunctionName: discoveryFeedWorkerSub.nodes.function.name,
+        },
+        statistic: "Sum",
+        period: 300,
+        evaluationPeriods: 1,
+        threshold: 3,
+        comparisonOperator: "GreaterThanThreshold",
+        treatMissingData: "notBreaching",
+        alarmActions: [alarmTopic.arn],
+        okActions: [alarmTopic.arn],
+      });
+
+      // Discovery cron alarm
+      new aws.cloudwatch.MetricAlarm("DiscoveryCronErrorsAlarm", {
+        alarmDescription: "Discovery cron Lambda errors > 0",
+        namespace: "AWS/Lambda",
+        metricName: "Errors",
+        dimensions: { FunctionName: discoveryCron.nodes.function.name },
+        statistic: "Sum",
+        period: 300,
+        evaluationPeriods: 1,
+        threshold: 0,
+        comparisonOperator: "GreaterThanThreshold",
+        treatMissingData: "notBreaching",
+        alarmActions: [alarmTopic.arn],
+        okActions: [alarmTopic.arn],
+      });
+
+      // Ingestion worker alarm
+      new aws.cloudwatch.MetricAlarm("IngestionWorkerErrorsAlarm", {
+        alarmDescription: "Ingestion worker errors > 3 in 5 minutes",
+        namespace: "AWS/Lambda",
+        metricName: "Errors",
+        dimensions: { FunctionName: ingestionWorkerSub.nodes.function.name },
+        statistic: "Sum",
+        period: 300,
+        evaluationPeriods: 1,
+        threshold: 3,
+        comparisonOperator: "GreaterThanThreshold",
+        treatMissingData: "notBreaching",
+        alarmActions: [alarmTopic.arn],
+        okActions: [alarmTopic.arn],
+      });
+
+      // Ingestion cron alarm
+      new aws.cloudwatch.MetricAlarm("IngestionCronErrorsAlarm", {
+        alarmDescription: "Ingestion cron Lambda errors > 0",
+        namespace: "AWS/Lambda",
+        metricName: "Errors",
+        dimensions: { FunctionName: ingestionCron.nodes.function.name },
+        statistic: "Sum",
+        period: 300,
+        evaluationPeriods: 1,
+        threshold: 0,
+        comparisonOperator: "GreaterThanThreshold",
+        treatMissingData: "notBreaching",
+        alarmActions: [alarmTopic.arn],
+        okActions: [alarmTopic.arn],
+      });
+
+      // DLQ depth alarms
+      new aws.cloudwatch.MetricAlarm("DiscoveryDlqDepthAlarm", {
+        alarmDescription: "Discovery feed DLQ has messages",
+        namespace: "AWS/SQS",
+        metricName: "ApproximateNumberOfMessagesVisible",
+        dimensions: { QueueName: discoveryFeedDlq.nodes.queue.name },
+        statistic: "Sum",
+        period: 300,
+        evaluationPeriods: 1,
+        threshold: 0,
+        comparisonOperator: "GreaterThanThreshold",
+        treatMissingData: "notBreaching",
+        alarmActions: [alarmTopic.arn],
+        okActions: [alarmTopic.arn],
+      });
+
+      new aws.cloudwatch.MetricAlarm("IngestionDlqDepthAlarm", {
+        alarmDescription: "Ingestion DLQ has messages",
+        namespace: "AWS/SQS",
+        metricName: "ApproximateNumberOfMessagesVisible",
+        dimensions: { QueueName: ingestionDlq.nodes.queue.name },
+        statistic: "Sum",
+        period: 300,
+        evaluationPeriods: 1,
+        threshold: 0,
+        comparisonOperator: "GreaterThanThreshold",
+        treatMissingData: "notBreaching",
+        alarmActions: [alarmTopic.arn],
+        okActions: [alarmTopic.arn],
+      });
+
+      // DynamoDB throttling alarm
+      new aws.cloudwatch.MetricAlarm("DynamoThrottlingAlarm", {
+        alarmDescription: "DynamoDB throttled requests > 0",
+        namespace: "AWS/DynamoDB",
+        metricName: "ThrottledRequests",
+        dimensions: { TableName: appTable.name },
+        statistic: "Sum",
+        period: 300,
+        evaluationPeriods: 1,
+        threshold: 0,
+        comparisonOperator: "GreaterThanThreshold",
+        treatMissingData: "notBreaching",
+        alarmActions: [alarmTopic.arn],
+        okActions: [alarmTopic.arn],
+      });
+
+      // CloudWatch Dashboard
+      const dashboardBody = $resolve([
+        slackRoute.nodes.function.name,
+        discoveryFeedWorkerSub.nodes.function.name,
+        discoveryCron.nodes.function.name,
+        ingestionWorkerSub.nodes.function.name,
+        ingestionCron.nodes.function.name,
+        discoveryFeedDlq.nodes.queue.name,
+        ingestionDlq.nodes.queue.name,
+        appTable.name,
+      ]).apply(
+        ([
+          slackFn,
+          discoveryWorkerFn,
+          discoveryCronFn,
+          ingestionWorkerFn,
+          ingestionCronFn,
+          discoveryDlqName,
+          ingestionDlqName,
+          tableName,
+        ]) =>
+          JSON.stringify({
+            widgets: [
+              // Row 1: Lambda Invocations + Lambda Errors
+              {
+                type: "metric",
+                x: 0,
+                y: 0,
+                width: 12,
+                height: 6,
+                properties: {
+                  title: "Lambda Invocations",
+                  metrics: [
+                    ["AWS/Lambda", "Invocations", "FunctionName", slackFn],
+                    ["...", discoveryWorkerFn],
+                    ["...", discoveryCronFn],
+                    ["...", ingestionWorkerFn],
+                    ["...", ingestionCronFn],
+                  ],
+                  period: 300,
+                  stat: "Sum",
+                  region: "us-east-1",
+                  view: "timeSeries",
+                },
+              },
+              {
+                type: "metric",
+                x: 12,
+                y: 0,
+                width: 12,
+                height: 6,
+                properties: {
+                  title: "Lambda Errors",
+                  metrics: [
+                    ["AWS/Lambda", "Errors", "FunctionName", slackFn],
+                    ["...", discoveryWorkerFn],
+                    ["...", discoveryCronFn],
+                    ["...", ingestionWorkerFn],
+                    ["...", ingestionCronFn],
+                  ],
+                  period: 300,
+                  stat: "Sum",
+                  region: "us-east-1",
+                  view: "timeSeries",
+                },
+              },
+              // Row 2: Lambda Duration p99 + DLQ Depth
+              {
+                type: "metric",
+                x: 0,
+                y: 6,
+                width: 12,
+                height: 6,
+                properties: {
+                  title: "Lambda Duration p99",
+                  metrics: [
+                    ["AWS/Lambda", "Duration", "FunctionName", slackFn],
+                    ["...", discoveryWorkerFn],
+                    ["...", discoveryCronFn],
+                    ["...", ingestionWorkerFn],
+                    ["...", ingestionCronFn],
+                  ],
+                  period: 300,
+                  stat: "p99",
+                  region: "us-east-1",
+                  view: "timeSeries",
+                },
+              },
+              {
+                type: "metric",
+                x: 12,
+                y: 6,
+                width: 12,
+                height: 6,
+                properties: {
+                  title: "DLQ Message Depth",
+                  metrics: [
+                    [
+                      "AWS/SQS",
+                      "ApproximateNumberOfMessagesVisible",
+                      "QueueName",
+                      discoveryDlqName,
+                    ],
+                    ["...", ingestionDlqName],
+                  ],
+                  period: 300,
+                  stat: "Sum",
+                  region: "us-east-1",
+                  view: "timeSeries",
+                },
+              },
+              // Row 3: DynamoDB Capacity + Throttling
+              {
+                type: "metric",
+                x: 0,
+                y: 12,
+                width: 12,
+                height: 6,
+                properties: {
+                  title: "DynamoDB Read/Write Capacity",
+                  metrics: [
+                    [
+                      "AWS/DynamoDB",
+                      "ConsumedReadCapacityUnits",
+                      "TableName",
+                      tableName,
+                    ],
+                    [
+                      "AWS/DynamoDB",
+                      "ConsumedWriteCapacityUnits",
+                      "TableName",
+                      tableName,
+                    ],
+                  ],
+                  period: 300,
+                  stat: "Sum",
+                  region: "us-east-1",
+                  view: "timeSeries",
+                },
+              },
+              {
+                type: "metric",
+                x: 12,
+                y: 12,
+                width: 12,
+                height: 6,
+                properties: {
+                  title: "DynamoDB Throttled Requests",
+                  metrics: [
+                    [
+                      "AWS/DynamoDB",
+                      "ThrottledRequests",
+                      "TableName",
+                      tableName,
+                    ],
+                  ],
+                  period: 300,
+                  stat: "Sum",
+                  region: "us-east-1",
+                  view: "timeSeries",
+                },
+              },
+            ],
+          }),
+      );
+
+      new aws.cloudwatch.Dashboard("MonitoringDashboard", {
+        dashboardName: "usopc-athlete-support-production",
+        dashboardBody: dashboardBody,
       });
     }
 
