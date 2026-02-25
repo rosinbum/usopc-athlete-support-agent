@@ -6,9 +6,9 @@ import { apiError } from "./apiResponse.js";
  * Guard that checks admin authentication for API routes.
  * Returns null if authenticated and authorized, or a 401/403 NextResponse if not.
  */
-export async function requireAdmin(): Promise<
-  ReturnType<typeof apiError> | null
->;
+export async function requireAdmin(): Promise<ReturnType<
+  typeof apiError
+> | null>;
 /**
  * Guard that checks admin authentication and returns the session.
  * Returns { session } if authorized, or { denied } with a 401/403 NextResponse.
