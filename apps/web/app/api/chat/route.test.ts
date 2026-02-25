@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const { mockAuth } = vi.hoisted(() => ({
+  mockAuth: vi
+    .fn()
+    .mockResolvedValue({
+      user: { email: "test@example.com", role: "athlete" },
+    }),
+}));
+
 // Track calls to getAppRunner via the mocked @usopc/core
 let shouldFailInit = false;
 let initCallCount = 0;
@@ -39,6 +47,10 @@ vi.mock("@usopc/core", () => ({
   })),
   loadSummary: vi.fn(),
   publishDiscoveredUrls: vi.fn(),
+}));
+
+vi.mock("../../../auth.js", () => ({
+  auth: mockAuth,
 }));
 
 vi.mock("sst", () => ({
@@ -347,5 +359,63 @@ describe("concurrent runner initialization", () => {
 
     // getAppRunner is called for each request; caching happens inside the factory
     expect(initCallCount).toBe(2);
+  });
+});
+
+describe("authentication (SEC-04)", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    shouldFailInit = false;
+    initCallCount = 0;
+    vi.resetModules();
+  });
+
+  it("returns 401 when no session exists", async () => {
+    mockAuth.mockResolvedValueOnce(null);
+
+    const { POST } = await importRoute();
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "Hello" }],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe("Unauthorized");
+  });
+
+  it("returns 401 when session has no email", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { role: "athlete" } });
+
+    const { POST } = await importRoute();
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "Hello" }],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(401);
+  });
+
+  it("proceeds when session is valid", async () => {
+    const { POST } = await importRoute();
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "Hello" }],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
   });
 });
