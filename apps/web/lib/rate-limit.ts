@@ -3,6 +3,9 @@
  *
  * Each Lambda instance maintains its own state, so effective limits scale
  * with concurrency. For stronger protection, add an AWS WAF rate rule.
+ *
+ * TODO: Replace with AWS WAF rate-based rules for production-grade
+ * protection that works across all Lambda instances (#393).
  */
 
 const WINDOW_MS = 5 * 60 * 1000; // 5 minutes

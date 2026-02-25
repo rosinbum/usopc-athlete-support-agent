@@ -107,7 +107,7 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}) {
         log.error("Web search failed", {
           error: error instanceof Error ? error.message : String(error),
         });
-        return `Web search encountered an error: ${error instanceof Error ? error.message : String(error)}. The knowledge base may still have the information you need.`;
+        return "Web search encountered a temporary error. The knowledge base may still have the information you need.";
       }
     },
     {

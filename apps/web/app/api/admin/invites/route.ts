@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "../../../../lib/admin-api.js";
-import { createInviteEntity } from "@usopc/shared";
+import { createInviteEntity, logger } from "@usopc/shared";
 import { z } from "zod";
+
+const log = logger.child({ route: "admin/invites" });
 
 const createInviteSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -21,11 +23,11 @@ export async function GET(_req: NextRequest) {
     const invites = await inviteEntity.getAll();
     return NextResponse.json({ invites });
   } catch (error) {
+    log.error("Failed to fetch invites", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      {
-        error: "Failed to fetch invites",
-        detail: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Failed to fetch invites" },
       { status: 500 },
     );
   }
@@ -60,11 +62,11 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ invite }, { status: 201 });
   } catch (error) {
+    log.error("Failed to create invite", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      {
-        error: "Failed to create invite",
-        detail: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Failed to create invite" },
       { status: 500 },
     );
   }
@@ -96,11 +98,11 @@ export async function DELETE(req: NextRequest) {
     await inviteEntity.delete(email.toLowerCase().trim());
     return NextResponse.json({ success: true });
   } catch (error) {
+    log.error("Failed to delete invite", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      {
-        error: "Failed to delete invite",
-        detail: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Failed to delete invite" },
       { status: 500 },
     );
   }
