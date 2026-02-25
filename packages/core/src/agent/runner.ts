@@ -46,6 +46,8 @@ export interface AgentInput {
   userSport?: string | undefined;
   conversationId?: string | undefined;
   conversationSummary?: string | undefined;
+  /** User identity for scoping summaries. Prevents cross-user summary access. */
+  userId?: string | undefined;
 }
 
 export interface AgentOutput {
@@ -171,12 +173,15 @@ export class AgentRunner {
 
     // Fire-and-forget: save conversation summary for multi-turn context
     if (input.conversationId && initialState.conversationId) {
+      const summaryKey = input.userId
+        ? `${input.userId}:${input.conversationId}`
+        : input.conversationId;
       generateSummary(
         input.messages,
         input.conversationSummary,
         this._classifierModel,
       )
-        .then((s) => saveSummary(input.conversationId!, s))
+        .then((s) => saveSummary(summaryKey, s))
         .catch((e) =>
           log.error("Failed to save conversation summary", {
             error: String(e),
@@ -225,12 +230,15 @@ export class AgentRunner {
 
     // Runs after consumer finishes iterating the generator
     if (input.conversationId && initialState.conversationId) {
+      const summaryKey = input.userId
+        ? `${input.userId}:${input.conversationId}`
+        : input.conversationId;
       generateSummary(
         input.messages,
         input.conversationSummary,
         this._classifierModel,
       )
-        .then((s) => saveSummary(input.conversationId!, s))
+        .then((s) => saveSummary(summaryKey, s))
         .catch((e) =>
           log.error("Failed to save conversation summary", {
             error: String(e),

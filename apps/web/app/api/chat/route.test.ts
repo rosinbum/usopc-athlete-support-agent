@@ -45,6 +45,8 @@ vi.mock("@usopc/core", () => ({
   })),
   loadSummary: vi.fn(),
   publishDiscoveredUrls: vi.fn(),
+  detectInjection: vi.fn().mockReturnValue(null),
+  INJECTION_RESPONSE: "Please rephrase your question.",
 }));
 
 vi.mock("../../../auth.js", () => ({
