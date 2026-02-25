@@ -7,6 +7,7 @@ export {
   createDiscoveredSourceEntity,
   createConversationSummaryEntity,
   createInviteEntity,
+  createFeedbackEntity,
 } from "./factory.js";
 export {
   SourceConfigEntity,
@@ -34,3 +35,8 @@ export {
   type Invite,
   type CreateInviteInput,
 } from "./InviteEntity.js";
+export {
+  FeedbackEntity,
+  type Feedback,
+  type CreateFeedbackInput,
+} from "./FeedbackEntity.js";

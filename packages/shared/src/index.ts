@@ -97,11 +97,17 @@ export {
   createDiscoveredSourceEntity,
   createConversationSummaryEntity,
   createInviteEntity,
+  createFeedbackEntity,
 } from "./entities/index.js";
 export {
   InviteEntity,
   type Invite,
   type CreateInviteInput,
+} from "./entities/index.js";
+export {
+  FeedbackEntity,
+  type Feedback,
+  type CreateFeedbackInput,
 } from "./entities/index.js";
 export type {
   OlympicProgram,

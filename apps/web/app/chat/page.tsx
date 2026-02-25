@@ -37,6 +37,7 @@ export default function ChatPage() {
         input={input}
         isLoading={isLoading}
         statusText={currentStatus}
+        conversationId={conversationId}
         onInputChange={handleInputChange}
         onSubmit={handleSubmit}
       />

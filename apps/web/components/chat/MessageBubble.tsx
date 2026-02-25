@@ -1,10 +1,12 @@
 import type { Message } from "ai";
 import { MarkdownMessage } from "./MarkdownMessage.js";
 import { CitationList } from "./CitationList.js";
+import { FeedbackButtons } from "./FeedbackButtons.js";
 import { isCitationAnnotation, type Citation } from "../../types/citation.js";
 
 interface MessageBubbleProps {
   message: Message;
+  conversationId?: string | undefined;
 }
 
 function extractCitations(annotations: Message["annotations"]): Citation[] {
@@ -18,7 +20,7 @@ function extractCitations(annotations: Message["annotations"]): Citation[] {
   return results;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, conversationId }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const citations = isUser ? [] : extractCitations(message.annotations);
 
@@ -39,6 +41,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <>
             <MarkdownMessage content={message.content} />
             <CitationList citations={citations} />
+            {conversationId && (
+              <FeedbackButtons
+                conversationId={conversationId}
+                messageId={message.id}
+              />
+            )}
           </>
         )}
       </div>
