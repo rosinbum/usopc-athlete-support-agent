@@ -167,7 +167,7 @@ describe("POST /api/admin/sources/bulk-create", () => {
 
     expect(res.status).toBe(201);
     expect(body.results[0].status).toBe("failed");
-    expect(body.results[0].error).toBe("DynamoDB timeout");
+    expect(body.results[0].error).toBe("Internal error");
   });
 
   it("handles partial failures (some created, some failed)", async () => {

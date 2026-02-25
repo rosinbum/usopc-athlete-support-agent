@@ -256,25 +256,28 @@ describe("createWebSearchTool", () => {
   });
 
   describe("error handling", () => {
-    it("should handle Tavily errors gracefully", async () => {
+    it("should handle Tavily errors gracefully with sanitized message", async () => {
       mockInvoke.mockRejectedValue(new Error("API rate limit exceeded"));
       const tool = createWebSearchTool();
 
       const result = await tool.invoke({ query: "test" });
 
-      expect(result).toContain("Web search encountered an error");
-      expect(result).toContain("API rate limit exceeded");
-      expect(result).toContain("knowledge base may still have the information");
+      expect(result).toBe(
+        "Web search encountered a temporary error. The knowledge base may still have the information you need.",
+      );
+      expect(result).not.toContain("API rate limit exceeded");
     });
 
-    it("should handle non-Error exceptions", async () => {
+    it("should handle non-Error exceptions with sanitized message", async () => {
       mockInvoke.mockRejectedValue("Network timeout");
       const tool = createWebSearchTool();
 
       const result = await tool.invoke({ query: "test" });
 
-      expect(result).toContain("Web search encountered an error");
-      expect(result).toContain("Network timeout");
+      expect(result).toBe(
+        "Web search encountered a temporary error. The knowledge base may still have the information you need.",
+      );
+      expect(result).not.toContain("Network timeout");
     });
   });
 

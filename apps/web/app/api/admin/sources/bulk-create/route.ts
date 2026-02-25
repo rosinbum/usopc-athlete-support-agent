@@ -88,11 +88,15 @@ export async function POST(request: NextRequest) {
             error: "Source already exists",
           });
         } else {
+          log.error("Failed to create source", {
+            sourceId: source.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
           results.push({
             id: source.id,
             title: source.title,
             status: "failed",
-            error: err instanceof Error ? err.message : "Unknown error",
+            error: "Internal error",
           });
         }
       }

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { handle } from "hono/aws-lambda";
+import { z } from "zod";
 import { createLogger, createFeedbackEntity } from "@usopc/shared";
 import { verifySlackRequest } from "./middleware/verify.js";
 import { dispatchEvent } from "./handlers/events.js";
@@ -8,6 +9,27 @@ import {
   type SlackSlashCommand,
 } from "./handlers/slashCommand.js";
 import { postMessage } from "./slack/client.js";
+
+// SEC-08: Zod schema for Slack interaction payloads
+const interactionPayloadSchema = z.object({
+  type: z.string(),
+  user: z.object({ id: z.string() }).optional(),
+  channel: z.object({ id: z.string() }).optional(),
+  message: z
+    .object({
+      ts: z.string().optional(),
+      thread_ts: z.string().optional(),
+    })
+    .optional(),
+  actions: z
+    .array(
+      z.object({
+        action_id: z.string(),
+        value: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
 
 const logger = createLogger({ service: "slack-bot" });
 
@@ -102,7 +124,22 @@ app.post("/slack/interactions", async (c) => {
       interactionPayload = String(body.payload ?? "{}");
     }
 
-    const payload = JSON.parse(interactionPayload);
+    let rawPayload: unknown;
+    try {
+      rawPayload = JSON.parse(interactionPayload);
+    } catch {
+      return c.json({ ok: false }, 200);
+    }
+
+    const parsed = interactionPayloadSchema.safeParse(rawPayload);
+    if (!parsed.success) {
+      logger.warn("Invalid interaction payload", {
+        errors: parsed.error.flatten().fieldErrors,
+      });
+      return c.json({ ok: false }, 200);
+    }
+
+    const payload = parsed.data;
 
     if (payload.type === "block_actions") {
       for (const action of payload.actions ?? []) {
@@ -111,8 +148,8 @@ app.post("/slack/interactions", async (c) => {
           action.action_id === "feedback_not_helpful"
         ) {
           const isHelpful = action.action_id === "feedback_helpful";
-          const messageTs = payload.message?.ts as string | undefined;
-          const threadTs = payload.message?.thread_ts as string | undefined;
+          const messageTs = payload.message?.ts;
+          const threadTs = payload.message?.thread_ts;
           logger.info("Feedback received", {
             helpful: isHelpful,
             user: payload.user?.id,
@@ -129,7 +166,7 @@ app.post("/slack/interactions", async (c) => {
               channel: "slack",
               score: isHelpful ? 1 : 0,
               messageId: messageTs,
-              userId: payload.user?.id as string | undefined,
+              userId: payload.user?.id,
             });
           } catch (err) {
             logger.error("Failed to persist feedback", {
@@ -170,4 +207,5 @@ app.post("/slack/interactions", async (c) => {
   }
 });
 
+export { app };
 export const handler = handle(app);
