@@ -34,8 +34,9 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
+  const result = await requireAdmin({ returnSession: true });
+  if (result.denied) return result.denied;
+  const { session } = result;
 
   let body: unknown;
   try {
@@ -52,7 +53,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { email, invitedBy } = parsed.data;
+  const { email } = parsed.data;
+  const invitedBy = session.user?.name ?? session.user?.email ?? undefined;
 
   try {
     const inviteEntity = createInviteEntity();
