@@ -27,8 +27,8 @@ importers:
         specifier: ^3.4.2
         version: 3.8.1
       sst:
-        specifier: 3.18.10
-        version: 3.18.10(@cfworker/json-schema@4.1.1)
+        specifier: 4.0.6
+        version: 4.0.6(@cfworker/json-schema@4.1.1)
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -61,8 +61,8 @@ importers:
         version: 3.25.76
     devDependencies:
       sst:
-        specifier: 3.18.10
-        version: 3.18.10(@cfworker/json-schema@4.1.1)
+        specifier: 4.0.6
+        version: 4.0.6(@cfworker/json-schema@4.1.1)
       tsx:
         specifier: ^4.19.2
         version: 4.21.0
@@ -173,8 +173,8 @@ importers:
         specifier: ^8.4.49
         version: 8.5.6
       sst:
-        specifier: 3.18.10
-        version: 3.18.10(@cfworker/json-schema@4.1.1)
+        specifier: 4.0.6
+        version: 4.0.6(@cfworker/json-schema@4.1.1)
       tailwindcss:
         specifier: ^4.2.1
         version: 4.2.1
@@ -228,8 +228,8 @@ importers:
         specifier: ^8.11.10
         version: 8.16.0
       sst:
-        specifier: 3.18.10
-        version: 3.18.10(@cfworker/json-schema@4.1.1)
+        specifier: 4.0.6
+        version: 4.0.6(@cfworker/json-schema@4.1.1)
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -259,8 +259,8 @@ importers:
         version: 0.1.4(@langchain/anthropic@1.3.20(@langchain/core@1.1.28(@opentelemetry/api@1.9.0)(openai@6.25.0(ws@8.19.0)(zod@3.25.76))))(@langchain/core@1.1.28(@opentelemetry/api@1.9.0)(openai@6.25.0(ws@8.19.0)(zod@3.25.76)))(@langchain/google-genai@2.1.20(@langchain/core@1.1.28(@opentelemetry/api@1.9.0)(openai@6.25.0(ws@8.19.0)(zod@3.25.76))))(@opentelemetry/api@1.9.0)(axios@1.13.5)(cheerio@1.2.0)(handlebars@4.7.8)(openai@6.25.0(ws@8.19.0)(zod@3.25.76))(typescript@5.9.3)(ws@8.19.0)(zod@3.25.76)
     devDependencies:
       sst:
-        specifier: 3.18.10
-        version: 3.18.10(@cfworker/json-schema@4.1.1)
+        specifier: 4.0.6
+        version: 4.0.6(@cfworker/json-schema@4.1.1)
       tsx:
         specifier: ^4.19.0
         version: 4.21.0
@@ -332,8 +332,8 @@ importers:
         specifier: ^8.11.10
         version: 8.16.0
       sst:
-        specifier: 3.18.10
-        version: 3.18.10(@cfworker/json-schema@4.1.1)
+        specifier: 4.0.6
+        version: 4.0.6(@cfworker/json-schema@4.1.1)
       tsx:
         specifier: ^4.19.2
         version: 4.21.0
@@ -363,8 +363,8 @@ importers:
         specifier: ^8.11.11
         version: 8.16.0
       sst:
-        specifier: 3.18.10
-        version: 3.18.10(@cfworker/json-schema@4.1.1)
+        specifier: 4.0.6
+        version: 4.0.6(@cfworker/json-schema@4.1.1)
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -1772,8 +1772,8 @@ packages:
     peerDependencies:
       '@langchain/core': ^1.0.0
 
-  '@modelcontextprotocol/sdk@1.26.0':
-    resolution: {integrity: sha512-Y5RmPncpiDtTXDbLKswIJzTqu2hyBKxTNsgKqKclDbhIgg1wgtf1fRuvxgTnRfcnxtvvgbIEcqUOzZrJ6iSReg==}
+  '@modelcontextprotocol/sdk@1.27.1':
+    resolution: {integrity: sha512-sr6GbP+4edBwFndLbM60gf07z0FQ79gaExpnsjMGePXqFcSSb7t6iscpjk9DhFhwd+mTEQrzNafGP8/iGGFYaA==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -4531,48 +4531,48 @@ packages:
     resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
     engines: {node: '>= 10.x'}
 
-  sst-darwin-arm64@3.18.10:
-    resolution: {integrity: sha512-N3MwIpMZhhdZKDqLp9ZQNlwkWix5+q+N0PWstuTomYwgZOxCCe6u9IIsoIszSk+GAJJN/jvGZyLiXKeV4iiQvw==}
+  sst-darwin-arm64@4.0.6:
+    resolution: {integrity: sha512-o5mXFBlDEcvjvhyY92vSHI1CK3kIlUdqgVMLIOqRV+oXqt8U+UpgbZ10ORkpjJrJxRkqRZ5M5FhWVFwf5kG6kA==}
     cpu: [arm64]
     os: [darwin]
 
-  sst-darwin-x64@3.18.10:
-    resolution: {integrity: sha512-nQ0jMKkPOa+kj6Ygz8+kYhBua/vgNTLkd+4r8NSmk7v+Zs78lKnx3T//kEzS0yik6Q6QwGfokwrTcA1Jii2xSw==}
+  sst-darwin-x64@4.0.6:
+    resolution: {integrity: sha512-gCJUltofSWgOVeQgcuu2zU+jubZu9fwGNuOgkZqDSUd/rnL+HlyvBTV+lk6roRhg70C2eU6T0v6uhkRDXTaa5g==}
     cpu: [x64]
     os: [darwin]
 
-  sst-linux-arm64@3.18.10:
-    resolution: {integrity: sha512-mj9VNj3SvLS+HaXx2PhCX0aTA7CwJNoM6JhRc0s/zCilqchcvqDjbhpYBJO4brEPv6aOaaa7T3WvIQqtYauK4Q==}
+  sst-linux-arm64@4.0.6:
+    resolution: {integrity: sha512-rJYYF/6lgsfP61dxUzQ+cqBUfrxQrjd1zHkuHLzcdc/9tXVcLp4e7z3WerzELFnu+5IdRzwWw57Qb7Cj5SHt9Q==}
     cpu: [arm64]
     os: [linux]
 
-  sst-linux-x64@3.18.10:
-    resolution: {integrity: sha512-7iy1Eq2eqnT9Ag/8OVgC04vRjV7AAQyf/BvzLc+6Sz+GvRiKA8VEuPnbXNYQF+NIvEqsawfcd7MknSTtImpsvQ==}
+  sst-linux-x64@4.0.6:
+    resolution: {integrity: sha512-SWo1d6DoYk8H2KlvDYgfUkEwfMFtpG0I7QHyNFPzIGNTgivVKLrPKmCpX5w+vdMQ0G7+Ti73Y+2yzFfthrZVlQ==}
     cpu: [x64]
     os: [linux]
 
-  sst-linux-x86@3.18.10:
-    resolution: {integrity: sha512-77qZSuPZeQ5bdRCiq1pQEdY8EcGNHboKrx4P2yFid2FBDKJsXxOXtIxJdloyx+ljBn0+nxl/g040QBmXxdc9tA==}
+  sst-linux-x86@4.0.6:
+    resolution: {integrity: sha512-iITS4Mr5nsCLOw+WqPdDuMKForRoL0I2Yb3VW4vn0rp/PCf6396Tle5m1wPHBS85EPX0vXEW/cwzHY8ZY6EOZw==}
     cpu: [x86]
     os: [linux]
 
-  sst-win32-arm64@3.18.10:
-    resolution: {integrity: sha512-aY+FhMxvYs8crlrKALpLn/kKmud8YQj6LkMHsrOAAIJhfNyxhCja2vrYQaY+bcqdsS5W2LMVcS2hyaMqKXZKcg==}
+  sst-win32-arm64@4.0.6:
+    resolution: {integrity: sha512-SCMRWLDW77iuASHKDXRKufbD4F66RgHY2BqANmC7fDDnUbc9hqfd18nTW9exHqhzBrDX+uFbBpGBiBbqsOal3Q==}
     cpu: [arm64]
     os: [win32]
 
-  sst-win32-x64@3.18.10:
-    resolution: {integrity: sha512-rY+yJXOpG+P5xXnaQRpCvBK2zwwLhjzpYidGkp6F+cGgiVdh2Wre/CIQNRaVHr20ncj8lLe/RsHWa9QCNM48jg==}
+  sst-win32-x64@4.0.6:
+    resolution: {integrity: sha512-knVQplY6hSd7o8VI3CRFgdSQ26MOs3bFv5yAx6g39mCKCeMZUGcCKFhMxD2SVqrWkRFXyQj9WeDMAd4guhFvhg==}
     cpu: [x64]
     os: [win32]
 
-  sst-win32-x86@3.18.10:
-    resolution: {integrity: sha512-pq8SmV0pIjBFMY6DraUZ4akyTxHnfjIKCRbBLdMxFUZK8TzA1NK2YdjRt1AwrgXRYGRyctrz/mt4WyO0SMOVQQ==}
+  sst-win32-x86@4.0.6:
+    resolution: {integrity: sha512-Ub+0ttkbV5qCd+bwjm5PBE+uDeHh3zqHbopcIe1hq8p4W/uRlSKq2qorjAwZJW2o7HDJkgUiR2mcuA4ww3tKTQ==}
     cpu: [x86]
     os: [win32]
 
-  sst@3.18.10:
-    resolution: {integrity: sha512-SY+ldeJ9K5E9q+DhjXA3e2W3BEOzBwkE3IyLSD71uA3/5nRhUAST31iOWEpW36LbIvSQ9uOVDFcebztoLJ8s7w==}
+  sst@4.0.6:
+    resolution: {integrity: sha512-Z+uLx15cnVSlhT/bplXPS3PHgzPUuUGXOl1Y3XbEyovW7LpE9lGbAnf0W3o8kLQ6g6jFXdYAlQYMgMXX2+NQSw==}
     hasBin: true
 
   stackback@0.0.2:
@@ -6411,7 +6411,7 @@ snapshots:
       '@langchain/core': 1.1.28(@opentelemetry/api@1.9.0)(openai@6.25.0(ws@8.19.0)(zod@3.25.76))
       js-tiktoken: 1.0.21
 
-  '@modelcontextprotocol/sdk@1.26.0(@cfworker/json-schema@4.1.1)(zod@3.24.2)':
+  '@modelcontextprotocol/sdk@1.27.1(@cfworker/json-schema@4.1.1)(zod@3.24.2)':
     dependencies:
       '@hono/node-server': 1.19.9(hono@4.12.2)
       ajv: 8.18.0
@@ -9120,7 +9120,7 @@ snapshots:
 
   opencontrol@0.0.6(@cfworker/json-schema@4.1.1):
     dependencies:
-      '@modelcontextprotocol/sdk': 1.26.0(@cfworker/json-schema@4.1.1)(zod@3.24.2)
+      '@modelcontextprotocol/sdk': 1.27.1(@cfworker/json-schema@4.1.1)(zod@3.24.2)
       '@tsconfig/bun': 1.0.7
       hono: 4.12.2
       zod: 3.24.2
@@ -9691,31 +9691,31 @@ snapshots:
 
   split2@4.2.0: {}
 
-  sst-darwin-arm64@3.18.10:
+  sst-darwin-arm64@4.0.6:
     optional: true
 
-  sst-darwin-x64@3.18.10:
+  sst-darwin-x64@4.0.6:
     optional: true
 
-  sst-linux-arm64@3.18.10:
+  sst-linux-arm64@4.0.6:
     optional: true
 
-  sst-linux-x64@3.18.10:
+  sst-linux-x64@4.0.6:
     optional: true
 
-  sst-linux-x86@3.18.10:
+  sst-linux-x86@4.0.6:
     optional: true
 
-  sst-win32-arm64@3.18.10:
+  sst-win32-arm64@4.0.6:
     optional: true
 
-  sst-win32-x64@3.18.10:
+  sst-win32-x64@4.0.6:
     optional: true
 
-  sst-win32-x86@3.18.10:
+  sst-win32-x86@4.0.6:
     optional: true
 
-  sst@3.18.10(@cfworker/json-schema@4.1.1):
+  sst@4.0.6(@cfworker/json-schema@4.1.1):
     dependencies:
       aws-sdk: 2.1692.0
       aws4fetch: 1.0.18
@@ -9723,14 +9723,14 @@ snapshots:
       opencontrol: 0.0.6(@cfworker/json-schema@4.1.1)
       openid-client: 5.6.4
     optionalDependencies:
-      sst-darwin-arm64: 3.18.10
-      sst-darwin-x64: 3.18.10
-      sst-linux-arm64: 3.18.10
-      sst-linux-x64: 3.18.10
-      sst-linux-x86: 3.18.10
-      sst-win32-arm64: 3.18.10
-      sst-win32-x64: 3.18.10
-      sst-win32-x86: 3.18.10
+      sst-darwin-arm64: 4.0.6
+      sst-darwin-x64: 4.0.6
+      sst-linux-arm64: 4.0.6
+      sst-linux-x64: 4.0.6
+      sst-linux-x86: 4.0.6
+      sst-win32-arm64: 4.0.6
+      sst-win32-x64: 4.0.6
+      sst-win32-x86: 4.0.6
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - supports-color
