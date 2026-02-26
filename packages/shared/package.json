@@ -12,14 +12,14 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.993.0",
+    "@aws-sdk/client-dynamodb": "^3.998.0",
     "dynamodb-onetable": "^2.7",
-    "pg": "^8.14.1",
+    "pg": "^8.19.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/pg": "^8.11.11",
-    "sst": "3.18.10",
+    "sst": "4.0.6",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   }

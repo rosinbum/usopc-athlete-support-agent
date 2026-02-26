@@ -29,7 +29,7 @@
     "@vitest/coverage-v8": "^2.1.9",
     "node-pg-migrate": "^8.0.4",
     "prettier": "^3.4.2",
-    "sst": "3.18.10",
+    "sst": "4.0.6",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   },
@@ -40,7 +40,8 @@
       "hono": ">=4.11.4",
       "@modelcontextprotocol/sdk": ">=1.25.2",
       "h3": ">=1.15.5",
-      "axios": ">=1.13.5"
+      "axios": ">=1.13.5",
+      "rollup": ">=4.59.0"
     }
   }
 }

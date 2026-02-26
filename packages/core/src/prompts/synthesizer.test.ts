@@ -115,6 +115,39 @@ describe("buildSynthesizerPrompt", () => {
     }
   });
 
+  it("includes enhanced staleness warning with 2-year threshold", () => {
+    const prompt = buildSynthesizerPrompt(context, userQuestion, "general");
+
+    expect(prompt).toContain("more than 2 years old");
+    expect(prompt).toContain("verifying with your NGB or the USOPC");
+    // Still has the 12-month soft flag
+    expect(prompt).toContain("more than 12 months old");
+  });
+
+  it("includes conflict detection language in base instructions", () => {
+    const prompt = buildSynthesizerPrompt(context, userQuestion, "general");
+
+    expect(prompt).toContain("same authority level");
+    expect(prompt).toContain("contradict");
+    expect(prompt).toContain("seek clarification");
+    expect(prompt).toContain("recency or specificity");
+  });
+
+  it("includes cross-domain awareness instruction", () => {
+    const prompt = buildSynthesizerPrompt(context, userQuestion, "general");
+
+    expect(prompt).toContain("Cross-domain awareness");
+    expect(prompt).toContain("multiple governance domains");
+    expect(prompt).toContain("how the domains interact");
+  });
+
+  it("includes procedural ordering guidance in procedural format", () => {
+    const prompt = buildSynthesizerPrompt(context, userQuestion, "procedural");
+
+    expect(prompt).toContain("chronological/logical order");
+    expect(prompt).toContain("confirm the sequence");
+  });
+
   it("includes analytical reasoning permission in base instructions", () => {
     const prompt = buildSynthesizerPrompt(context, userQuestion, "general");
 

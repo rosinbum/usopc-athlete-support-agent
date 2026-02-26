@@ -450,7 +450,7 @@ describe("conversation summary loading (TEST-02)", () => {
       }),
     );
 
-    expect(loadSummary).toHaveBeenCalledWith(validUuid);
+    expect(loadSummary).toHaveBeenCalledWith(`test@example.com:${validUuid}`);
   });
 
   it("does not call loadSummary when conversationId is absent", async () => {
