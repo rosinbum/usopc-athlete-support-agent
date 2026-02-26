@@ -56,6 +56,21 @@ const INTENT_VECTOR_WEIGHTS: Record<QueryIntent, number> = {
 const DEFAULT_VECTOR_WEIGHT = 0.5;
 
 /**
+ * Maps queryIntent to an authority boost multiplier.
+ * Legal/rights queries heavily favor authoritative sources;
+ * general/operational queries favor semantic relevance instead.
+ */
+const INTENT_AUTHORITY_MULTIPLIERS: Record<QueryIntent, number> = {
+  factual: 0.7,
+  procedural: 0.7,
+  deadline: 0.5,
+  escalation: 1.0,
+  general: 0.3,
+};
+
+const DEFAULT_AUTHORITY_MULTIPLIER = 0.5;
+
+/**
  * Extracts key terms from conversation context for query enrichment.
  * Keeps it concise to avoid diluting the search query.
  */
@@ -202,7 +217,10 @@ function buildSubQueryFilter(
  * (higher = better). Scaled to 0.003 max to be meaningful relative to
  * RRF scores (~0.008-0.016 range).
  */
-function computeAuthorityBoost(authorityLevel: string | undefined): number {
+function computeAuthorityBoost(
+  authorityLevel: string | undefined,
+  queryIntent: QueryIntent | undefined,
+): number {
   if (!authorityLevel) return 0;
 
   const index = AUTHORITY_LEVELS.indexOf(authorityLevel as AuthorityLevel);
@@ -211,7 +229,12 @@ function computeAuthorityBoost(authorityLevel: string | undefined): number {
   // Higher index = lower authority = less boost
   // Range: 0.003 (law, index 0) to 0 (educational_guidance, index 8)
   const maxBoost = 0.003;
-  return maxBoost * (1 - index / (AUTHORITY_LEVELS.length - 1));
+  const baseBoost = maxBoost * (1 - index / (AUTHORITY_LEVELS.length - 1));
+  const multiplier = queryIntent
+    ? (INTENT_AUTHORITY_MULTIPLIERS[queryIntent] ??
+      DEFAULT_AUTHORITY_MULTIPLIER)
+    : DEFAULT_AUTHORITY_MULTIPLIER;
+  return baseBoost * multiplier;
 }
 
 /**
@@ -425,7 +448,10 @@ export function createRetrieverNode(vectorStore: VectorStoreLike, pool: Pool) {
   /**
    * Applies authority boost and computes confidence from RRF candidates.
    */
-  function scoreAndRank(candidates: RrfCandidate[]): {
+  function scoreAndRank(
+    candidates: RrfCandidate[],
+    queryIntent: QueryIntent | undefined,
+  ): {
     topResults: RrfCandidate[];
     confidence: number;
   } {
@@ -434,7 +460,10 @@ export function createRetrieverNode(vectorStore: VectorStoreLike, pool: Pool) {
       ...c,
       score:
         c.score +
-        computeAuthorityBoost(c.metadata.authorityLevel as string | undefined),
+        computeAuthorityBoost(
+          c.metadata.authorityLevel as string | undefined,
+          queryIntent,
+        ),
     }));
 
     // Re-sort by boosted score descending
@@ -520,7 +549,10 @@ export function createRetrieverNode(vectorStore: VectorStoreLike, pool: Pool) {
           }
         }
 
-        const { topResults, confidence } = scoreAndRank(mergedResults);
+        const { topResults, confidence } = scoreAndRank(
+          mergedResults,
+          state.queryIntent,
+        );
         const retrievedDocuments = mapToRetrievedDocuments(topResults);
 
         log.info("Sub-query hybrid retrieval complete", {
@@ -569,7 +601,10 @@ export function createRetrieverNode(vectorStore: VectorStoreLike, pool: Pool) {
         config,
       );
 
-      const { topResults, confidence } = scoreAndRank(results);
+      const { topResults, confidence } = scoreAndRank(
+        results,
+        state.queryIntent,
+      );
       const retrievedDocuments = mapToRetrievedDocuments(topResults);
 
       log.info("Hybrid retrieval complete", {

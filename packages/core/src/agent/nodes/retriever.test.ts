@@ -392,6 +392,152 @@ describe("createRetrieverNode", () => {
       );
     });
 
+    it("escalation intent gives higher authority boost than general intent", async () => {
+      // Compare the score gap between law and no-authority docs for each intent.
+      // A larger gap means the authority boost is stronger.
+      const makeStore = () =>
+        makeMockVectorStore([
+          [
+            makeSearchResult("no-authority doc", 0.1, {}),
+            makeSearchResult("high-authority doc", 0.12, {
+              authorityLevel: "law",
+            }),
+          ],
+        ]);
+
+      const escalationStore = makeStore();
+      const escalationNode = createRetrieverNode(escalationStore, pool);
+      const escalationState = makeState({
+        topicDomain: "governance",
+        queryIntent: "escalation",
+      });
+      const escalationResult = await escalationNode(escalationState);
+
+      const generalStore = makeStore();
+      const generalNode = createRetrieverNode(generalStore, pool);
+      const generalState = makeState({
+        topicDomain: "governance",
+        queryIntent: "general",
+      });
+      const generalResult = await generalNode(generalState);
+
+      // Compute score gap (law score - no-authority score) for each intent
+      const escalationLaw = escalationResult.retrievedDocuments!.find(
+        (d) => d.metadata.authorityLevel === "law",
+      )!;
+      const escalationPlain = escalationResult.retrievedDocuments!.find(
+        (d) => !d.metadata.authorityLevel,
+      )!;
+      const escalationGap = escalationLaw.score - escalationPlain.score;
+
+      const generalLaw = generalResult.retrievedDocuments!.find(
+        (d) => d.metadata.authorityLevel === "law",
+      )!;
+      const generalPlain = generalResult.retrievedDocuments!.find(
+        (d) => !d.metadata.authorityLevel,
+      )!;
+      const generalGap = generalLaw.score - generalPlain.score;
+
+      // Escalation (1.0 multiplier) should produce a larger authority gap than general (0.3)
+      expect(escalationGap).toBeGreaterThan(generalGap);
+    });
+
+    it("general intent produces minimal authority boost", async () => {
+      // Compare score gap between law and no-authority doc for general vs escalation
+      const makeStore = () =>
+        makeMockVectorStore([
+          [
+            makeSearchResult("high-authority doc", 0.1, {
+              authorityLevel: "law",
+            }),
+            makeSearchResult("no-authority doc", 0.12, {}),
+          ],
+        ]);
+
+      const generalStore = makeStore();
+      const generalNode = createRetrieverNode(generalStore, pool);
+      const generalState = makeState({
+        topicDomain: "governance",
+        queryIntent: "general",
+      });
+      const generalResult = await generalNode(generalState);
+
+      const escalationStore = makeStore();
+      const escalationNode = createRetrieverNode(escalationStore, pool);
+      const escalationState = makeState({
+        topicDomain: "governance",
+        queryIntent: "escalation",
+      });
+      const escalationResult = await escalationNode(escalationState);
+
+      const generalLaw = generalResult.retrievedDocuments!.find(
+        (d) => d.metadata.authorityLevel === "law",
+      )!;
+      const generalPlain = generalResult.retrievedDocuments!.find(
+        (d) => !d.metadata.authorityLevel,
+      )!;
+      const generalGap = generalLaw.score - generalPlain.score;
+
+      const escalationLaw = escalationResult.retrievedDocuments!.find(
+        (d) => d.metadata.authorityLevel === "law",
+      )!;
+      const escalationPlain = escalationResult.retrievedDocuments!.find(
+        (d) => !d.metadata.authorityLevel,
+      )!;
+      const escalationGap = escalationLaw.score - escalationPlain.score;
+
+      // General gap should be less than 1/3 of escalation gap (0.3 vs 1.0 multiplier)
+      expect(generalGap).toBeLessThan(escalationGap * 0.4);
+    });
+
+    it("undefined intent uses default multiplier (0.5)", async () => {
+      // Compare authority gap for undefined vs escalation intent
+      const makeStore = () =>
+        makeMockVectorStore([
+          [
+            makeSearchResult("law doc", 0.1, {
+              authorityLevel: "law",
+            }),
+            makeSearchResult("plain doc", 0.12, {}),
+          ],
+        ]);
+
+      const undefinedStore = makeStore();
+      const undefinedNode = createRetrieverNode(undefinedStore, pool);
+      const undefinedState = makeState({
+        topicDomain: "governance",
+        queryIntent: undefined,
+      });
+      const undefinedResult = await undefinedNode(undefinedState);
+
+      const escalationStore = makeStore();
+      const escalationNode = createRetrieverNode(escalationStore, pool);
+      const escalationState = makeState({
+        topicDomain: "governance",
+        queryIntent: "escalation",
+      });
+      const escalationResult = await escalationNode(escalationState);
+
+      const undefinedLaw = undefinedResult.retrievedDocuments!.find(
+        (d) => d.metadata.authorityLevel === "law",
+      )!;
+      const undefinedPlain = undefinedResult.retrievedDocuments!.find(
+        (d) => !d.metadata.authorityLevel,
+      )!;
+      const undefinedGap = undefinedLaw.score - undefinedPlain.score;
+
+      const escalationLaw = escalationResult.retrievedDocuments!.find(
+        (d) => d.metadata.authorityLevel === "law",
+      )!;
+      const escalationPlain = escalationResult.retrievedDocuments!.find(
+        (d) => !d.metadata.authorityLevel,
+      )!;
+      const escalationGap = escalationLaw.score - escalationPlain.score;
+
+      // Default (0.5) should produce exactly half the gap of escalation (1.0)
+      expect(undefinedGap / escalationGap).toBeCloseTo(0.5, 1);
+    });
+
     it("handles documents without authority level gracefully", async () => {
       const store = makeMockVectorStore([
         [
