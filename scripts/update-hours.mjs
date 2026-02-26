@@ -65,7 +65,7 @@ function main() {
     updatedAt: now,
   };
 
-  fs.writeFileSync(hoursJsonPath, JSON.stringify(data) + "\n", "utf8");
+  fs.writeFileSync(hoursJsonPath, JSON.stringify(data, null, 2) + "\n", "utf8");
   console.log(`Updated .hours.json with ${pretty} hours.`);
 }
 
