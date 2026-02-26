@@ -6,6 +6,7 @@ export type {
   EscalationInfo,
   RetrievedDocument,
   DocumentMetadata,
+  AlternativeSource,
   QualityIssueType,
   QualityIssue,
   QualityCheckResult,

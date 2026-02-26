@@ -3,7 +3,11 @@ import { logger, AUTHORITY_LEVELS, type AuthorityLevel } from "@usopc/shared";
 import { RunnableLambda, type RunnableConfig } from "@langchain/core/runnables";
 import { RETRIEVAL_CONFIG } from "../../config/index.js";
 import { vectorStoreSearch } from "../../services/vectorStoreService.js";
-import { buildContextualQuery, stateContext } from "../../utils/index.js";
+import {
+  buildContextualQuery,
+  stateContext,
+  deduplicateChunks,
+} from "../../utils/index.js";
 import { bm25Search } from "../../rag/bm25Search.js";
 import { rrfFuse } from "../../rag/rrfFuse.js";
 import type { RrfCandidate } from "../../rag/rrfFuse.js";
@@ -553,7 +557,15 @@ export function createRetrieverNode(vectorStore: VectorStoreLike, pool: Pool) {
           mergedResults,
           state.queryIntent,
         );
-        const retrievedDocuments = mapToRetrievedDocuments(topResults);
+        const mapped = mapToRetrievedDocuments(topResults);
+        const retrievedDocuments = deduplicateChunks(mapped);
+        if (mapped.length !== retrievedDocuments.length) {
+          log.info("Near-duplicate chunks deduplicated", {
+            before: mapped.length,
+            after: retrievedDocuments.length,
+            removed: mapped.length - retrievedDocuments.length,
+          });
+        }
 
         log.info("Sub-query hybrid retrieval complete", {
           documentCount: retrievedDocuments.length,
@@ -605,7 +617,15 @@ export function createRetrieverNode(vectorStore: VectorStoreLike, pool: Pool) {
         results,
         state.queryIntent,
       );
-      const retrievedDocuments = mapToRetrievedDocuments(topResults);
+      const mapped = mapToRetrievedDocuments(topResults);
+      const retrievedDocuments = deduplicateChunks(mapped);
+      if (mapped.length !== retrievedDocuments.length) {
+        log.info("Near-duplicate chunks deduplicated", {
+          before: mapped.length,
+          after: retrievedDocuments.length,
+          removed: mapped.length - retrievedDocuments.length,
+        });
+      }
 
       log.info("Hybrid retrieval complete", {
         documentCount: retrievedDocuments.length,
