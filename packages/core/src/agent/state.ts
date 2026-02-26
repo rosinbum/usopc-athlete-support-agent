@@ -18,6 +18,15 @@ import type {
  * Extends the built-in MessagesAnnotation (which provides the `messages`
  * array with its standard reducer) and adds all domain-specific fields
  * needed by the classifier, retriever, synthesizer, and guard nodes.
+ *
+ * ### Reducer convention for list fields
+ * All list fields use a **replace** reducer: `(_prev, next) => next`.
+ * This is intentional — nodes produce complete, self-contained arrays
+ * (e.g. a full set of retrieved documents) rather than incremental
+ * deltas. Using a replace reducer keeps state transitions predictable:
+ * every write is atomic and the previous value is always discarded.
+ * The `messages` field is the sole exception; it uses LangChain's
+ * built-in add-messages reducer so individual turns accumulate correctly.
  */
 export const AgentStateAnnotation = Annotation.Root({
   // Inherit the messages channel with its built-in add-messages reducer
