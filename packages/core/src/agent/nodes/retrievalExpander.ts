@@ -7,7 +7,11 @@ import {
   extractTextFromResponse,
 } from "../../services/llmService.js";
 import { vectorStoreSearch } from "../../services/vectorStoreService.js";
-import { buildContextualQuery, stateContext } from "../../utils/index.js";
+import {
+  buildContextualQuery,
+  stateContext,
+  parseLlmJson,
+} from "../../utils/index.js";
 import { buildRetrievalExpanderPrompt } from "../../prompts/index.js";
 import { bm25Search } from "../../rag/bm25Search.js";
 import { rrfFuse } from "../../rag/rrfFuse.js";
@@ -27,7 +31,7 @@ const RRF_K = 60;
  */
 function parseReformulatedQueries(text: string): string[] {
   try {
-    const parsed = JSON.parse(text.trim());
+    const parsed = parseLlmJson<unknown>(text);
     if (
       Array.isArray(parsed) &&
       parsed.every((item) => typeof item === "string")
