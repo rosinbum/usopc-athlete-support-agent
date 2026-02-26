@@ -7,9 +7,29 @@ const log = logger.child({ service: "checkpoint-cleanup" });
 const RETENTION_DAYS = 7;
 
 /**
+ * Ensures a `created_at` column exists on the `checkpoints` table.
+ *
+ * PostgresSaver's DDL does not include a timestamp column. We add one
+ * ourselves (idempotent) so the cleanup handler can delete old rows.
+ * New rows auto-populate via DEFAULT; existing rows get the migration
+ * timestamp (conservative — they'll be cleaned up after RETENTION_DAYS).
+ *
+ * Verified against @langchain/langgraph-checkpoint-postgres@1.0.1 schema.
+ */
+async function ensureCreatedAtColumn(pool: pg.Pool): Promise<void> {
+  await pool.query(`
+    ALTER TABLE checkpoints
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `);
+}
+
+/**
  * Lambda handler that deletes checkpoint rows older than the retention period.
  * Runs on a daily cron schedule. Creates its own pool to avoid contention
  * with the shared singleton pool.
+ *
+ * PostgresSaver schema (v1.0.1) has no foreign keys between tables, so
+ * cleanup deletes by thread_id across all three tables in a single pass.
  */
 export async function handler(): Promise<void> {
   const pool = new pg.Pool({
@@ -19,43 +39,50 @@ export async function handler(): Promise<void> {
   });
 
   try {
+    await ensureCreatedAtColumn(pool);
+
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
 
-    // PostgresSaver creates tables: checkpoints, checkpoint_writes, checkpoint_blobs
-    // All have a thread_id column; checkpoints has a created_at timestamp
-    const result = await pool.query(
-      `DELETE FROM checkpoints WHERE created_at < $1`,
+    // Find threads with all checkpoints older than the cutoff
+    const staleThreads = await pool.query<{ thread_id: string }>(
+      `SELECT DISTINCT thread_id FROM checkpoints
+       WHERE thread_id NOT IN (
+         SELECT DISTINCT thread_id FROM checkpoints WHERE created_at >= $1
+       )`,
       [cutoff.toISOString()],
     );
 
-    log.info("Checkpoint cleanup complete", {
-      deletedRows: result.rowCount,
-      cutoffDate: cutoff.toISOString(),
+    if (staleThreads.rows.length === 0) {
+      log.info("No stale checkpoint threads to clean up");
+      return;
+    }
+
+    const threadIds = staleThreads.rows.map((r) => r.thread_id);
+    log.info("Cleaning up stale checkpoint threads", {
+      count: threadIds.length,
     });
 
-    // Clean up orphaned writes and blobs that reference deleted checkpoints
-    const writesResult = await pool.query(
-      `DELETE FROM checkpoint_writes
-       WHERE (thread_id, checkpoint_id) NOT IN (
-         SELECT thread_id, checkpoint_id FROM checkpoints
-       )`,
-    );
-
-    log.info("Orphaned checkpoint_writes cleaned", {
-      deletedRows: writesResult.rowCount,
-    });
-
+    // Delete from all three tables by thread_id (no FK cascade available)
     const blobsResult = await pool.query(
-      `DELETE FROM checkpoint_blobs
-       WHERE (thread_id, checkpoint_ns, channel, version) NOT IN (
-         SELECT DISTINCT thread_id, checkpoint_ns, channel, version
-         FROM checkpoint_writes
-       )`,
+      `DELETE FROM checkpoint_blobs WHERE thread_id = ANY($1)`,
+      [threadIds],
+    );
+    const writesResult = await pool.query(
+      `DELETE FROM checkpoint_writes WHERE thread_id = ANY($1)`,
+      [threadIds],
+    );
+    const checkpointsResult = await pool.query(
+      `DELETE FROM checkpoints WHERE thread_id = ANY($1)`,
+      [threadIds],
     );
 
-    log.info("Orphaned checkpoint_blobs cleaned", {
-      deletedRows: blobsResult.rowCount,
+    log.info("Checkpoint cleanup complete", {
+      threads: threadIds.length,
+      deletedCheckpoints: checkpointsResult.rowCount,
+      deletedWrites: writesResult.rowCount,
+      deletedBlobs: blobsResult.rowCount,
+      cutoffDate: cutoff.toISOString(),
     });
   } catch (error) {
     log.error("Checkpoint cleanup failed", { error: String(error) });

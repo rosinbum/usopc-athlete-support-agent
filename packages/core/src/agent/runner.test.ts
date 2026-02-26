@@ -551,6 +551,18 @@ describe("AgentRunner", () => {
 
       expect(mockEnd).toHaveBeenCalledOnce();
     });
+
+    it("closes checkpointer pool when it has an end() method", async () => {
+      const mockCheckpointerEnd = vi.fn().mockResolvedValue(undefined);
+      mockCreatePostgresCheckpointer.mockResolvedValue({
+        end: mockCheckpointerEnd,
+      });
+
+      const runner = await AgentRunner.create(defaultConfig);
+      await runner.close();
+
+      expect(mockCheckpointerEnd).toHaveBeenCalledOnce();
+    });
   });
 
   describe("invoke() timeout", () => {

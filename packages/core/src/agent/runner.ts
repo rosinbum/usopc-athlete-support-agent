@@ -155,11 +155,14 @@ export class AgentRunner {
   }
 
   /**
-   * Close the underlying vector store connection pool.
+   * Close the underlying connection pools (vector store + checkpointer).
    * Call this when the runner is no longer needed to prevent connection leaks.
    */
   async close(): Promise<void> {
     await this.vectorStore.end();
+    if (this.checkpointer && "end" in this.checkpointer) {
+      await (this.checkpointer as { end: () => Promise<void> }).end();
+    }
   }
 
   /**
