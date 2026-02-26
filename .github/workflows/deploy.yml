@@ -85,6 +85,9 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
+      - name: Run database migrations
+        run: npx sst shell --stage staging -- npx tsx scripts/run-migrations.ts
+
       - name: Deploy to staging
         id: deploy
         run: |
@@ -126,6 +129,9 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
+
+      - name: Run database migrations
+        run: npx sst shell --stage production -- npx tsx scripts/run-migrations.ts
 
       - name: Deploy to production
         id: deploy

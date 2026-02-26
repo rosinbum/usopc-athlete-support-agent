@@ -15,6 +15,7 @@
     "clean": "pnpm -r clean",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
+    "db:migrate": "sst shell -- npx tsx scripts/run-migrations.ts",
     "ingest": "pnpm --filter @usopc/ingestion ingest",
     "seed": "pnpm --filter @usopc/ingestion seed",
     "seed:pg": "pnpm --filter @usopc/ingestion seed:pg",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@vitest/coverage-v8": "^2.1.9",
+    "node-pg-migrate": "^8.0.4",
     "prettier": "^3.4.2",
     "sst": "3.18.10",
     "typescript": "^5.7.3",

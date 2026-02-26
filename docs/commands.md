@@ -25,10 +25,25 @@ pnpm --filter @usopc/ingestion test -- src/db.test.ts
 ```bash
 pnpm db:up          # Start Postgres container
 pnpm db:down        # Stop container
+pnpm db:migrate     # Apply pending database migrations
 
 # Local development database URL
 export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/usopc_athlete_support
 ```
+
+### Migrations
+
+Schema changes are managed by `node-pg-migrate`. Migration files live in `scripts/migrations/` and are applied in order.
+
+```bash
+pnpm db:migrate                     # Apply pending migrations (local dev via sst shell)
+```
+
+In CI, migrations run automatically before `sst deploy` in both staging and production.
+
+**Adding a new migration:** Create a numbered SQL file in `scripts/migrations/` (e.g., `001_add-tsvector.sql`). Each migration runs in a PostgreSQL transaction — if any statement fails, the entire migration is rolled back.
+
+**Do not** edit `scripts/init-db.sql` for schema changes. That file bootstraps fresh databases only.
 
 ## Ingestion Scripts
 

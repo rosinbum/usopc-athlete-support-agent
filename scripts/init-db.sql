@@ -1,3 +1,8 @@
+-- Bootstrap schema for fresh databases.
+-- For additive schema changes (new columns, indexes, triggers), create a
+-- migration file in scripts/migrations/ instead of editing this file.
+-- See: pnpm db:migrate
+
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
