@@ -28,16 +28,12 @@ const csvSourceSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "ID must be lowercase alphanumeric with hyphens"),
   title: z.string().min(1, "Title is required"),
   documentType: z.enum(DOCUMENT_TYPES, {
-    errorMap: () => ({
-      message: `Must be one of: ${DOCUMENT_TYPES.join(", ")}`,
-    }),
+    error: `Must be one of: ${DOCUMENT_TYPES.join(", ")}`,
   }),
   topicDomains: z
     .array(
       z.enum(TOPIC_DOMAINS, {
-        errorMap: () => ({
-          message: `Must be one of: ${TOPIC_DOMAINS.join(", ")}`,
-        }),
+        error: `Must be one of: ${TOPIC_DOMAINS.join(", ")}`,
       }),
     )
     .min(1, "At least one topic domain is required"),
@@ -46,9 +42,7 @@ const csvSourceSchema = z.object({
   format: z.enum(["pdf", "html", "text"]),
   priority: z.enum(["high", "medium", "low"]),
   authorityLevel: z.enum(AUTHORITY_LEVELS, {
-    errorMap: () => ({
-      message: `Must be one of: ${AUTHORITY_LEVELS.join(", ")}`,
-    }),
+    error: `Must be one of: ${AUTHORITY_LEVELS.join(", ")}`,
   }),
   ngbId: z.string().nullable(),
 });

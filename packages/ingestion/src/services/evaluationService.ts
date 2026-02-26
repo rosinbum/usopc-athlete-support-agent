@@ -213,7 +213,7 @@ export class EvaluationService {
     } catch (error) {
       if (error instanceof z.ZodError) {
         logger.warn("Metadata evaluation failed Zod validation", {
-          errors: error.errors,
+          errors: error.issues,
         });
         // Graceful degradation: return safe default
         return {
@@ -250,7 +250,7 @@ export class EvaluationService {
     } catch (error) {
       if (error instanceof z.ZodError) {
         logger.warn("Content evaluation failed Zod validation", {
-          errors: error.errors,
+          errors: error.issues,
         });
         // Graceful degradation: return safe default
         return {
