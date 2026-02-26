@@ -273,6 +273,18 @@ describe("createRetrievalExpanderNode", () => {
     expect(store.similaritySearchWithScore).not.toHaveBeenCalled();
   });
 
+  it("strips markdown code fences from model response", async () => {
+    const queries = ["query one", "query two", "query three"];
+    setupMockModel("```json\n" + JSON.stringify(queries) + "\n```");
+    const store = makeMockVectorStore([[], [], []]);
+
+    const node = createRetrievalExpanderNode(store, mockModel, mockPool);
+    const result = await node(makeState());
+
+    expect(result.reformulatedQueries).toEqual(queries);
+    expect(store.similaritySearchWithScore).toHaveBeenCalledTimes(3);
+  });
+
   it("passes correct filter to vector store searches", async () => {
     setupMockModel(JSON.stringify(["q1", "q2", "q3"]));
     const store = makeMockVectorStore([[], [], []]);
