@@ -85,7 +85,7 @@ export async function PATCH(
     const result = patchSourceSchema.safeParse(body);
 
     if (!result.success) {
-      const firstError = result.error.errors[0]?.message ?? "Invalid input";
+      const firstError = result.error.issues[0]?.message ?? "Invalid input";
       return apiError(firstError, 400);
     }
 
