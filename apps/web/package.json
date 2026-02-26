@@ -46,7 +46,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "jsdom": "^28.1.0",
     "postcss": "^8.4.49",
-    "sst": "3.18.10",
+    "sst": "4.0.6",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.7.3",
     "vitest": "^2.1.9"

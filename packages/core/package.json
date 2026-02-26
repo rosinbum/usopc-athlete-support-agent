@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@types/pg": "^8.11.10",
-    "sst": "3.18.10",
+    "sst": "4.0.6",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   }
