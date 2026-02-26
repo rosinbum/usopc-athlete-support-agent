@@ -164,7 +164,7 @@ async function waitForFireAndForget() {
 }
 
 const simpleBody = {
-  messages: [{ role: "user", content: "Hello" }],
+  messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
 };
 
 // ---------------------------------------------------------------------------
@@ -367,7 +367,9 @@ describe("Chat route integration (real stream adapter + UI message stream)", () 
       const { POST } = await importRoute();
       await POST(
         makePOSTRequest({
-          messages: [{ role: "user", content: "Hello" }],
+          messages: [
+            { role: "user", parts: [{ type: "text", text: "Hello" }] },
+          ],
           conversationId: convId,
         }),
       );
@@ -423,7 +425,9 @@ describe("Chat route integration (real stream adapter + UI message stream)", () 
       const { POST } = await importRoute();
       await POST(
         makePOSTRequest({
-          messages: [{ role: "user", content: "Hello" }],
+          messages: [
+            { role: "user", parts: [{ type: "text", text: "Hello" }] },
+          ],
           conversationId: convId,
         }),
       );

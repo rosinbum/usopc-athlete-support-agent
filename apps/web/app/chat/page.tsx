@@ -42,6 +42,7 @@ export default function ChatPage() {
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
+    setCurrentStatus(undefined);
     sendMessage({ text: input });
     setInput("");
   };

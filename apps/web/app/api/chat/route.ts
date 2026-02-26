@@ -6,19 +6,37 @@ import { auth } from "../../../auth.js";
 
 const log = logger.child({ service: "chat-route" });
 
-const ChatRequestSchema = z.object({
-  messages: z
-    .array(
-      z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string().max(10_000, "Message too long"),
-      }),
-    )
-    .min(1, "At least one message is required")
-    .max(50, "Too many messages"),
-  userSport: z.string().optional(),
-  conversationId: z.string().uuid().optional(),
-});
+/** Extract concatenated text from UIMessage parts. */
+function getTextFromParts(
+  parts: Array<{ type: string; [key: string]: unknown }>,
+): string {
+  return parts
+    .filter((p) => p.type === "text" && typeof p.text === "string")
+    .map((p) => p.text as string)
+    .join("");
+}
+
+const ChatRequestSchema = z
+  .object({
+    messages: z
+      .array(
+        z
+          .object({
+            role: z.enum(["user", "assistant"]),
+            parts: z.array(z.object({ type: z.string() }).passthrough()).min(1),
+          })
+          .passthrough(),
+      )
+      .min(1, "At least one message is required")
+      .max(50, "Too many messages")
+      .refine(
+        (msgs) => msgs.every((m) => getTextFromParts(m.parts).length <= 10_000),
+        { message: "Message too long" },
+      ),
+    userSport: z.string().optional(),
+    conversationId: z.string().uuid().optional(),
+  })
+  .passthrough();
 
 const discoveryFeedQueueUrl = getResource("DiscoveryFeedQueue").url;
 
@@ -58,7 +76,10 @@ export async function POST(req: Request) {
 
     // SEC-18: Check for prompt injection patterns in the latest user message
     const lastUserMessage = messages.findLast((m) => m.role === "user");
-    if (lastUserMessage && detectInjection(lastUserMessage.content)) {
+    if (
+      lastUserMessage &&
+      detectInjection(getTextFromParts(lastUserMessage.parts))
+    ) {
       return Response.json({ error: INJECTION_RESPONSE }, { status: 400 });
     }
 
@@ -72,10 +93,17 @@ export async function POST(req: Request) {
     let conversationSummary: string | undefined;
     if (conversationId) {
       const summaryKey = `${userEmail}:${conversationId}`;
-      conversationSummary = await loadSummary(summaryKey);
+      conversationSummary = (await loadSummary(summaryKey)) as
+        | string
+        | undefined;
     }
 
-    const langchainMessages = AgentRunner.convertMessages(messages);
+    // Convert UIMessage parts format to {role, content} for LangChain
+    const plainMessages = messages.map((m) => ({
+      role: m.role,
+      content: getTextFromParts(m.parts),
+    }));
+    const langchainMessages = AgentRunner.convertMessages(plainMessages);
     const stateStream = runner.stream({
       messages: langchainMessages,
       userSport,
