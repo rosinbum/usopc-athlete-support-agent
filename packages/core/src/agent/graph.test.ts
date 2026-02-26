@@ -95,6 +95,16 @@ describe("createAgentGraph", () => {
     expect(typeof graph.stream).toBe("function");
   });
 
+  it("compiles with a checkpointer option", () => {
+    const fakeCheckpointer =
+      {} as import("@langchain/langgraph-checkpoint").BaseCheckpointSaver;
+    const graph = createAgentGraph(makeDeps(), {
+      checkpointer: fakeCheckpointer,
+    });
+    expect(graph).toBeDefined();
+    expect(typeof graph.invoke).toBe("function");
+  });
+
   it("registers all expected nodes", () => {
     const graph = createAgentGraph(makeDeps());
     const nodes = getNodeNames(graph);

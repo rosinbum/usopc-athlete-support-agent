@@ -18,6 +18,8 @@ export const GRAPH_CONFIG = {
   invokeTimeoutMs: 90_000,
   /** Maximum time (ms) for streaming graph execution. */
   streamTimeoutMs: 120_000,
+  /** Maximum graph recursion depth. 12-node graph with quality-check retry loop; 50 provides headroom. */
+  recursionLimit: 50,
 } as const;
 
 export const TRUSTED_DOMAINS = [

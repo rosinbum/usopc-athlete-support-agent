@@ -219,6 +219,17 @@ export default $config({
         },
       });
 
+      // Checkpoint cleanup — prunes old LangGraph checkpoint rows daily
+      const checkpointCleanupCron = new sst.aws.Cron("CheckpointCleanupCron", {
+        schedule: "rate(1 day)",
+        job: {
+          handler: "packages/core/src/functions/checkpointCleanup.handler",
+          link: [databaseUrlSecret],
+          timeout: "2 minutes",
+          memory: "256 MB",
+        },
+      });
+
       // --- Monitoring ---
 
       alarmTopic = new aws.sns.Topic("AlarmTopic", {

@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
 import { StateGraph } from "@langchain/langgraph";
 import { AgentStateAnnotation } from "./state.js";
 import {
@@ -59,7 +60,14 @@ export interface GraphDependencies {
  *     citationBuilder -> disclaimerGuard -> END
  *     escalate -> citationBuilder -> disclaimerGuard -> END
  */
-export function createAgentGraph(deps: GraphDependencies) {
+export interface GraphOptions {
+  checkpointer?: BaseCheckpointSaver;
+}
+
+export function createAgentGraph(
+  deps: GraphDependencies,
+  options?: GraphOptions,
+) {
   // All nodes registered unconditionally for TypeScript generic tracking.
   const builder = new StateGraph(AgentStateAnnotation)
     .addNode(
@@ -163,7 +171,9 @@ export function createAgentGraph(deps: GraphDependencies) {
   builder.addEdge("citationBuilder", "disclaimerGuard");
   builder.addEdge("disclaimerGuard", "__end__");
 
-  const compiled = builder.compile();
+  const compiled = builder.compile(
+    options?.checkpointer ? { checkpointer: options.checkpointer } : undefined,
+  );
 
   return compiled;
 }
