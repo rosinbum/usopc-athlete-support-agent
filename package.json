@@ -25,7 +25,7 @@
     "seed-langsmith": "pnpm --filter @usopc/evals seed-langsmith"
   },
   "devDependencies": {
-    "@types/node": "^22.10.5",
+    "@types/node": "^25.3.0",
     "@vitest/coverage-v8": "^2.1.9",
     "node-pg-migrate": "^8.0.4",
     "prettier": "^3.4.2",
