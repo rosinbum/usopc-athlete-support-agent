@@ -387,6 +387,20 @@ export function createRetrieverNode(vectorStore: VectorStoreLike, pool: Pool) {
           RETRIEVAL_CONFIG.topK,
         );
       }
+      if (
+        results.length === 0 &&
+        input.sqlFilter.ngbIds &&
+        input.sqlFilter.ngbIds.length > 0
+      ) {
+        log.warn(
+          "Narrow NGB-filtered search returned 0 results — possible no ingested docs for this NGB",
+          {
+            ngbIds: input.sqlFilter.ngbIds,
+            topicDomain: input.sqlFilter.topicDomain,
+          },
+        );
+      }
+
       return {
         results,
         resultCount: results.length,

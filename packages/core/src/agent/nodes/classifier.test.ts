@@ -93,7 +93,7 @@ describe("classifierNode", () => {
     mockInvoke.mockResolvedValueOnce(
       classifierResponse({
         topicDomain: "team_selection",
-        detectedNgbIds: ["usa_swimming"],
+        detectedNgbIds: ["usa-swimming"],
         queryIntent: "procedural",
         hasTimeConstraint: false,
         shouldEscalate: false,
@@ -104,7 +104,7 @@ describe("classifierNode", () => {
     const result = await classifierNode(state);
 
     expect(result.topicDomain).toBe("team_selection");
-    expect(result.detectedNgbIds).toEqual(["usa_swimming"]);
+    expect(result.detectedNgbIds).toEqual(["usa-swimming"]);
     expect(result.queryIntent).toBe("procedural");
     expect(result.hasTimeConstraint).toBe(false);
   });
@@ -159,7 +159,7 @@ describe("classifierNode", () => {
     mockInvoke.mockResolvedValueOnce(
       classifierResponse({
         topicDomain: "team_selection",
-        detectedNgbIds: ["usa_swimming"],
+        detectedNgbIds: ["usa-swimming"],
         queryIntent: "procedural",
         hasTimeConstraint: false,
         shouldEscalate: false,
@@ -255,7 +255,7 @@ describe("classifierNode", () => {
     mockInvoke.mockResolvedValueOnce(
       classifierResponse({
         topicDomain: "team_selection",
-        detectedNgbIds: ["usa_swimming", "", 123, null, "usa_track_field"],
+        detectedNgbIds: ["usa-swimming", "", 123, null, "usa-track-field"],
         queryIntent: "factual",
         hasTimeConstraint: false,
         shouldEscalate: false,
@@ -264,7 +264,7 @@ describe("classifierNode", () => {
 
     const state = makeState();
     const result = await classifierNode(state);
-    expect(result.detectedNgbIds).toEqual(["usa_swimming", "usa_track_field"]);
+    expect(result.detectedNgbIds).toEqual(["usa-swimming", "usa-track-field"]);
   });
 
   it("handles array content from Claude response", async () => {
@@ -348,7 +348,7 @@ describe("classifierNode", () => {
     mockInvoke.mockResolvedValueOnce(
       classifierResponse({
         topicDomain: "team_selection",
-        detectedNgbIds: ["usa_triathlon"],
+        detectedNgbIds: ["usa-triathlon"],
         queryIntent: "procedural",
         hasTimeConstraint: false,
         shouldEscalate: false,
@@ -367,7 +367,7 @@ describe("classifierNode", () => {
 
     expect(result.needsClarification).toBe(false);
     expect(result.topicDomain).toBe("team_selection");
-    expect(result.detectedNgbIds).toEqual(["usa_triathlon"]);
+    expect(result.detectedNgbIds).toEqual(["usa-triathlon"]);
   });
 
   describe("conversation context", () => {
@@ -377,7 +377,7 @@ describe("classifierNode", () => {
       mockInvoke.mockResolvedValueOnce(
         classifierResponse({
           topicDomain: "team_selection",
-          detectedNgbIds: ["usa_swimming"],
+          detectedNgbIds: ["usa-swimming"],
           queryIntent: "factual",
           hasTimeConstraint: false,
           shouldEscalate: false,
@@ -401,14 +401,14 @@ describe("classifierNode", () => {
 
       // The classifier should understand "alternates" refers to swimming team selection
       expect(result.topicDomain).toBe("team_selection");
-      expect(result.detectedNgbIds).toEqual(["usa_swimming"]);
+      expect(result.detectedNgbIds).toEqual(["usa-swimming"]);
     });
 
     it("carries forward sport context for pronoun resolution", async () => {
       mockInvoke.mockResolvedValueOnce(
         classifierResponse({
           topicDomain: "dispute_resolution",
-          detectedNgbIds: ["usa_swimming"],
+          detectedNgbIds: ["usa-swimming"],
           queryIntent: "procedural",
           hasTimeConstraint: false,
           shouldEscalate: false,
@@ -427,7 +427,7 @@ describe("classifierNode", () => {
       const result = await classifierNode(state);
 
       // Should carry forward the swimming context
-      expect(result.detectedNgbIds).toEqual(["usa_swimming"]);
+      expect(result.detectedNgbIds).toEqual(["usa-swimming"]);
     });
 
     it("works correctly with single message (no prior context)", async () => {
@@ -830,6 +830,72 @@ describe("classifierNode", () => {
     });
   });
 
+  describe("NGB ID canonicalization", () => {
+    it("filters out non-canonical NGB IDs and returns only canonical ones", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "team_selection",
+          detectedNgbIds: ["usa-swimming", "not-a-real-ngb", "usa_track_field"],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+        }),
+      );
+
+      const state = makeState();
+      const result = await classifierNode(state);
+      expect(result.detectedNgbIds).toEqual(["usa-swimming"]);
+    });
+
+    it("emits only the new sport NGB when user switches sports", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "team_selection",
+          detectedNgbIds: ["usa-gymnastics"],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage("How does USA Swimming select athletes?"),
+          new AIMessage(
+            "USA Swimming uses time standards at Olympic Trials...",
+          ),
+          new HumanMessage("What about gymnastics selection?"),
+        ],
+      });
+      const result = await classifierNode(state);
+      expect(result.detectedNgbIds).toEqual(["usa-gymnastics"]);
+    });
+
+    it("emits two NGBs when user explicitly asks to compare", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "team_selection",
+          detectedNgbIds: ["usa-swimming", "usa-gymnastics"],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage(
+            "Compare the selection procedures for USA Swimming versus USA Gymnastics",
+          ),
+        ],
+      });
+      const result = await classifierNode(state);
+      expect(result.detectedNgbIds).toHaveLength(2);
+      expect(result.detectedNgbIds).toContain("usa-swimming");
+      expect(result.detectedNgbIds).toContain("usa-gymnastics");
+    });
+  });
+
   describe("CircuitBreakerError handling", () => {
     it("falls back to defaults when circuit breaker is open", async () => {
       mockInvoke.mockRejectedValueOnce(new CircuitBreakerError("anthropic"));
@@ -855,7 +921,7 @@ describe("parseClassifierResponse", () => {
     const { output, warnings } = parseClassifierResponse(
       JSON.stringify({
         topicDomain: "safesport",
-        detectedNgbIds: ["usa_swimming"],
+        detectedNgbIds: ["usa-swimming"],
         queryIntent: "factual",
         hasTimeConstraint: true,
         shouldEscalate: false,
@@ -863,10 +929,25 @@ describe("parseClassifierResponse", () => {
     );
 
     expect(output.topicDomain).toBe("safesport");
-    expect(output.detectedNgbIds).toEqual(["usa_swimming"]);
+    expect(output.detectedNgbIds).toEqual(["usa-swimming"]);
     expect(output.queryIntent).toBe("factual");
     expect(output.hasTimeConstraint).toBe(true);
     expect(warnings).toHaveLength(0);
+  });
+
+  it("filters out unrecognized NGB IDs and adds a warning", () => {
+    const { output, warnings } = parseClassifierResponse(
+      JSON.stringify({
+        topicDomain: "team_selection",
+        detectedNgbIds: ["usa-swimming", "not-a-real-ngb", "usa_track_field"],
+        queryIntent: "factual",
+        hasTimeConstraint: false,
+        shouldEscalate: false,
+      }),
+    );
+    expect(output.detectedNgbIds).toEqual(["usa-swimming"]);
+    expect(warnings.some((w) => w.includes("not-a-real-ngb"))).toBe(true);
+    expect(warnings.some((w) => w.includes("usa_track_field"))).toBe(true);
   });
 
   it("accepts athlete_safety as a valid domain", () => {

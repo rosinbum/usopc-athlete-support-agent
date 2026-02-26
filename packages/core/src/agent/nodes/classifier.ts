@@ -1,6 +1,6 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage } from "@langchain/core/messages";
-import { logger, CircuitBreakerError } from "@usopc/shared";
+import { logger, CircuitBreakerError, NGB_ID_SET } from "@usopc/shared";
 import { buildClassifierPromptWithHistory } from "../../prompts/index.js";
 import {
   invokeLlm,
@@ -106,9 +106,14 @@ export function parseClassifierResponse(raw: string): ParseResult {
   }
 
   const detectedNgbIds = Array.isArray(parsed.detectedNgbIds)
-    ? (parsed.detectedNgbIds as string[]).filter(
-        (id) => typeof id === "string" && id.length > 0,
-      )
+    ? (parsed.detectedNgbIds as string[]).filter((id) => {
+        if (typeof id !== "string" || id.length === 0) return false;
+        if (!NGB_ID_SET.has(id)) {
+          warnings.push(`Unrecognized ngbId filtered out: "${id}"`);
+          return false;
+        }
+        return true;
+      })
     : [];
 
   const hasTimeConstraint =

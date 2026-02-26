@@ -1,5 +1,8 @@
 import type { Document } from "@langchain/core/documents";
+import { NGB_ID_SET, logger } from "@usopc/shared";
 import type { IngestionSource } from "../pipeline.js";
+
+const log = logger.child({ service: "metadata-enricher" });
 
 /**
  * Enrich every chunk with metadata derived from the ingestion source
@@ -11,6 +14,16 @@ export function enrichMetadata(
   source: IngestionSource,
   options?: { s3Key?: string | undefined } | undefined,
 ): Document[] {
+  if (source.ngbId && !NGB_ID_SET.has(source.ngbId)) {
+    log.warn(
+      "Source has unrecognized ngbId — verify data/sport-organizations.json",
+      {
+        sourceId: source.id,
+        ngbId: source.ngbId,
+      },
+    );
+  }
+
   return chunks.map((chunk, index) => ({
     ...chunk,
     metadata: {
