@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Message } from "ai";
+import type { UIMessage } from "ai";
 import { ChatWindow } from "./ChatWindow.js";
 
 // scrollIntoView is not available in jsdom
@@ -10,21 +10,27 @@ beforeEach(() => {
 });
 
 vi.mock("./MessageBubble.js", () => ({
-  MessageBubble: ({ message }: { message: Message }) => (
-    <div data-testid={`message-${message.id}`}>{message.content}</div>
-  ),
+  MessageBubble: ({ message }: { message: UIMessage }) => {
+    const text = message.parts
+      .filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join("");
+    return <div data-testid={`message-${message.id}`}>{text}</div>;
+  },
 }));
 
-function makeMessage(overrides: Partial<Message> & { id: string }): Message {
+function makeMessage(
+  overrides: Partial<UIMessage> & { id: string },
+): UIMessage {
   return {
     role: "user",
-    content: "Test message",
+    parts: [{ type: "text", text: "Test message" }],
     ...overrides,
-  };
+  } as UIMessage;
 }
 
 const defaultProps = {
-  messages: [] as Message[],
+  messages: [] as UIMessage[],
   input: "",
   isLoading: false,
   onInputChange: vi.fn(),
@@ -39,8 +45,16 @@ describe("ChatWindow", () => {
 
   it("renders MessageBubble for each message", () => {
     const messages = [
-      makeMessage({ id: "1", role: "user", content: "Hello" }),
-      makeMessage({ id: "2", role: "assistant", content: "Hi there" }),
+      makeMessage({
+        id: "1",
+        role: "user",
+        parts: [{ type: "text", text: "Hello" }],
+      }),
+      makeMessage({
+        id: "2",
+        role: "assistant",
+        parts: [{ type: "text", text: "Hi there" }],
+      }),
     ];
     render(<ChatWindow {...defaultProps} messages={messages} />);
     expect(screen.getByTestId("message-1")).toBeInTheDocument();

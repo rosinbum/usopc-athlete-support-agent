@@ -1,9 +1,8 @@
 /**
  * Integration test for POST /api/chat
  *
- * Exercises the real `agentStreamToEvents` adapter and real
- * `formatDataStreamPart` formatter to verify SSE wire-format output
- * end-to-end. Only the transport layer (runner, auth, DB, SQS) is mocked.
+ * Exercises the real `agentStreamToEvents` adapter to verify UI message stream
+ * output end-to-end. Only the transport layer (runner, auth, DB, SQS) is mocked.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { StreamChunk } from "@usopc/core";
@@ -21,9 +20,12 @@ const {
   mockPublishDiscoveredUrls,
   executePromise,
 } = vi.hoisted(() => {
-  const capturedWrites: string[] = [];
+  const capturedWrites: unknown[] = [];
   const mockRunnerStream = vi.fn();
-  const mockWriter = { write: vi.fn((v: string) => capturedWrites.push(v)) };
+  const mockWriter = {
+    write: vi.fn((v: unknown) => capturedWrites.push(v)),
+    merge: vi.fn(),
+  };
   const mockLoadSummary = vi.fn();
   const mockSaveSummary = vi.fn();
   const mockGenerateSummary = vi.fn();
@@ -116,20 +118,22 @@ vi.mock("@usopc/core", async () => {
   };
 });
 
-// Keep real formatDataStreamPart; mock createDataStreamResponse to capture writes
-vi.mock("ai", async (importOriginal) => {
-  const real = await importOriginal<typeof import("ai")>();
-  return {
-    ...real,
-    createDataStreamResponse: vi.fn(
-      ({ execute }: { execute: (w: typeof mockWriter) => Promise<void> }) => {
-        // Capture the execute promise so tests can await stream completion
-        executePromise.current = execute(mockWriter);
-        return new Response("stream", { status: 200 });
-      },
-    ),
-  };
-});
+// Mock createUIMessageStream to capture writer calls
+vi.mock("ai", () => ({
+  createUIMessageStream: vi.fn(
+    ({
+      execute,
+    }: {
+      execute: (ctx: { writer: typeof mockWriter }) => Promise<void>;
+    }) => {
+      executePromise.current = execute({ writer: mockWriter });
+      return new ReadableStream();
+    },
+  ),
+  createUIMessageStreamResponse: vi.fn(
+    () => new Response("stream", { status: 200 }),
+  ),
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -166,7 +170,7 @@ const simpleBody = {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-describe("Chat route integration (real stream adapter + real SSE formatter)", () => {
+describe("Chat route integration (real stream adapter + UI message stream)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -183,7 +187,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
   // 1. Text streaming from synthesizer
   // -------------------------------------------------------------------
   describe("text streaming from synthesizer", () => {
-    it("emits SSE text parts for synthesizer tokens", async () => {
+    it("emits text-start, text-delta, and text-end parts", async () => {
       const chunks: StreamChunk[] = [
         ["messages", [{ content: "Hello" }, { langgraph_node: "synthesizer" }]],
         [
@@ -197,9 +201,18 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       await POST(makePOSTRequest(simpleBody));
       await waitForStream();
 
-      // Wire format: 0:"text"\n
-      expect(capturedWrites).toContain('0:"Hello"\n');
-      expect(capturedWrites).toContain('0:" world"\n');
+      expect(capturedWrites).toContainEqual(
+        expect.objectContaining({ type: "text-start" }),
+      );
+      expect(capturedWrites).toContainEqual(
+        expect.objectContaining({ type: "text-delta", delta: "Hello" }),
+      );
+      expect(capturedWrites).toContainEqual(
+        expect.objectContaining({ type: "text-delta", delta: " world" }),
+      );
+      expect(capturedWrites).toContainEqual(
+        expect.objectContaining({ type: "text-end" }),
+      );
     });
   });
 
@@ -207,7 +220,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
   // 2. Citations in stream
   // -------------------------------------------------------------------
   describe("citations in stream", () => {
-    it("emits SSE message_annotations for citations", async () => {
+    it("emits data-citations part for citations", async () => {
       const citations = [
         {
           title: "Doc A",
@@ -223,11 +236,12 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       await POST(makePOSTRequest(simpleBody));
       await waitForStream();
 
-      // Wire format: 8:[...]\n (message_annotations)
-      const citationWrite = capturedWrites.find((w) => w.startsWith("8:"));
-      expect(citationWrite).toBeDefined();
-      const parsed = JSON.parse(citationWrite!.slice(2).trimEnd());
-      expect(parsed).toEqual([{ type: "citations", citations }]);
+      expect(capturedWrites).toContainEqual(
+        expect.objectContaining({
+          type: "data-citations",
+          data: { type: "citations", citations },
+        }),
+      );
     });
   });
 
@@ -235,7 +249,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
   // 3. Stream error
   // -------------------------------------------------------------------
   describe("stream error", () => {
-    it("emits SSE error part and preserves preceding text", async () => {
+    it("emits error part and preserves preceding text", async () => {
       async function* errorStream(): AsyncGenerator<StreamChunk> {
         yield [
           "messages",
@@ -250,11 +264,13 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       await waitForStream();
 
       // Text before error is preserved
-      expect(capturedWrites).toContain('0:"Partial"\n');
-      // Wire format: 3:"error message"\n
-      const errorWrite = capturedWrites.find((w) => w.startsWith("3:"));
-      expect(errorWrite).toBeDefined();
-      expect(errorWrite).toContain("boom");
+      expect(capturedWrites).toContainEqual(
+        expect.objectContaining({ type: "text-delta", delta: "Partial" }),
+      );
+      // Error part
+      expect(capturedWrites).toContainEqual(
+        expect.objectContaining({ type: "error", errorText: "boom" }),
+      );
     });
   });
 
@@ -299,14 +315,16 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       await waitForStream();
 
       // Draft tokens should NOT appear (buffer was discarded)
-      expect(capturedWrites).not.toContain('0:"Draft"\n');
-      // No answer-reset event (buffering eliminates the need)
-      const resetWrite = capturedWrites.find(
-        (w) => w.startsWith("2:") && w.includes("answer-reset"),
+      const textDeltas = capturedWrites.filter(
+        (w) =>
+          typeof w === "object" &&
+          w !== null &&
+          (w as { type: string }).type === "text-delta",
       );
-      expect(resetWrite).toBeUndefined();
+      const deltaTexts = textDeltas.map((w) => (w as { delta: string }).delta);
+      expect(deltaTexts).not.toContain("Draft");
       // Only retry text appears
-      expect(capturedWrites).toContain('0:"Better answer"\n');
+      expect(deltaTexts).toContain("Better answer");
     });
   });
 
@@ -314,7 +332,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
   // 5. Non-LLM answer (clarification)
   // -------------------------------------------------------------------
   describe("non-LLM answer (clarification)", () => {
-    it("emits text part from values-mode answer", async () => {
+    it("emits text-delta from values-mode answer", async () => {
       const chunks: StreamChunk[] = [
         ["values", { answer: "Could you clarify which sport you mean?" }],
       ];
@@ -324,9 +342,16 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       await POST(makePOSTRequest(simpleBody));
       await waitForStream();
 
-      const textWrite = capturedWrites.find((w) => w.startsWith("0:"));
-      expect(textWrite).toBeDefined();
-      expect(textWrite).toContain("Could you clarify which sport you mean?");
+      const textDeltas = capturedWrites.filter(
+        (w) =>
+          typeof w === "object" &&
+          w !== null &&
+          (w as { type: string }).type === "text-delta",
+      );
+      const deltaTexts = textDeltas.map((w) => (w as { delta: string }).delta);
+      expect(deltaTexts.join("")).toContain(
+        "Could you clarify which sport you mean?",
+      );
     });
   });
 
@@ -414,7 +439,7 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
   // 9. Status events
   // -------------------------------------------------------------------
   describe("status events", () => {
-    it("emits SSE data part for status events with correct wire format", async () => {
+    it("emits data-status part for status events", async () => {
       const chunks: StreamChunk[] = [
         [
           "messages",
@@ -434,17 +459,23 @@ describe("Chat route integration (real stream adapter + real SSE formatter)", ()
       await POST(makePOSTRequest(simpleBody));
       await waitForStream();
 
-      // Wire format: 2:[{"type":"status","status":"..."}]\n
       const statusWrites = capturedWrites.filter(
-        (w) => w.startsWith("2:") && w.includes('"status"'),
+        (w) =>
+          typeof w === "object" &&
+          w !== null &&
+          (w as { type: string }).type === "data-status",
       );
       expect(statusWrites.length).toBeGreaterThanOrEqual(1);
 
       // First status should be classifier
-      const firstStatus = JSON.parse(statusWrites[0]!.slice(2).trimEnd());
-      expect(firstStatus).toEqual([
-        { type: "status", status: "Understanding your question..." },
-      ]);
+      const firstStatus = statusWrites[0] as {
+        type: string;
+        data: { type: string; status: string };
+      };
+      expect(firstStatus.data).toEqual({
+        type: "status",
+        status: "Understanding your question...",
+      });
     });
   });
 

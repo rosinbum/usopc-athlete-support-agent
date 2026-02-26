@@ -1,8 +1,4 @@
-import {
-  createDataStreamResponse,
-  formatDataStreamPart,
-  type JSONValue,
-} from "ai";
+import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import { getResource, logger } from "@usopc/shared";
 import { z } from "zod";
 import { isRateLimited } from "../../../lib/rate-limit.js";
@@ -90,8 +86,11 @@ export async function POST(req: Request) {
 
     const events = agentStreamToEvents(stateStream);
 
-    return createDataStreamResponse({
-      async execute(writer) {
+    const textId = crypto.randomUUID();
+    let textStarted = false;
+
+    const stream = createUIMessageStream({
+      async execute({ writer }) {
         let discoveredUrls: {
           url: string;
           title: string;
@@ -100,36 +99,48 @@ export async function POST(req: Request) {
         }[] = [];
 
         for await (const event of events) {
-          if (event.type === "answer-reset") {
-            writer.write(
-              formatDataStreamPart("data", [{ type: "answer-reset" }]),
-            );
-          } else if (event.type === "text-delta" && event.textDelta) {
-            writer.write(formatDataStreamPart("text", event.textDelta));
+          if (event.type === "text-delta" && event.textDelta) {
+            if (!textStarted) {
+              writer.write({ type: "text-start", id: textId });
+              textStarted = true;
+            }
+            writer.write({
+              type: "text-delta",
+              delta: event.textDelta,
+              id: textId,
+            });
           } else if (event.type === "error" && event.error) {
             log.error("Agent stream error", { error: String(event.error) });
-            writer.write(formatDataStreamPart("error", event.error.message));
+            writer.write({ type: "error", errorText: event.error.message });
           } else if (event.type === "citations" && event.citations) {
-            writer.write(
-              formatDataStreamPart("message_annotations", [
-                { type: "citations", citations: event.citations },
-              ] as unknown as JSONValue[]),
-            );
+            writer.write({
+              type: "data-citations",
+              data: { type: "citations", citations: event.citations },
+            } as never);
           } else if (event.type === "status" && event.status) {
-            writer.write(
-              formatDataStreamPart("data", [
-                { type: "status", status: event.status },
-              ]),
-            );
+            writer.write({
+              type: "data-status",
+              data: { type: "status", status: event.status },
+            } as never);
           } else if (event.type === "disclaimer" && event.disclaimer) {
-            writer.write(
-              formatDataStreamPart("text", "\n\n---\n\n" + event.disclaimer),
-            );
+            if (!textStarted) {
+              writer.write({ type: "text-start", id: textId });
+              textStarted = true;
+            }
+            writer.write({
+              type: "text-delta",
+              delta: "\n\n---\n\n" + event.disclaimer,
+              id: textId,
+            });
           } else if (event.type === "discovered-urls" && event.discoveredUrls) {
             // Captured server-side only for fire-and-forget persistence.
             // Not forwarded to the client — no UX signal for discovery.
             discoveredUrls = event.discoveredUrls;
           }
+        }
+
+        if (textStarted) {
+          writer.write({ type: "text-end", id: textId });
         }
 
         // Summary save is now automatic inside runner.stream()
@@ -149,6 +160,8 @@ export async function POST(req: Request) {
         return error instanceof Error ? error.message : "An error occurred";
       },
     });
+
+    return createUIMessageStreamResponse({ stream });
   } catch (error) {
     log.error("Chat request failed", { error: String(error) });
     return Response.json(

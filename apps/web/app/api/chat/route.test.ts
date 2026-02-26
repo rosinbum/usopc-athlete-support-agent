@@ -62,15 +62,14 @@ vi.mock("sst", () => ({
 }));
 
 vi.mock("ai", () => ({
-  createDataStreamResponse: vi.fn(({ execute }) => {
-    // Execute the writer callback to exercise the code path
-    const mockWriter = { write: vi.fn() };
-    execute(mockWriter);
+  createUIMessageStream: vi.fn(({ execute }) => {
+    const mockWriter = { write: vi.fn(), merge: vi.fn() };
+    execute({ writer: mockWriter });
+    return new ReadableStream();
+  }),
+  createUIMessageStreamResponse: vi.fn(() => {
     return new Response("stream", { status: 200 });
   }),
-  formatDataStreamPart: vi.fn(
-    (type: string, data: unknown) => `${type}:${data}`,
-  ),
 }));
 
 async function importRoute() {
