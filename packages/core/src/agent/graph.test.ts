@@ -55,6 +55,9 @@ function makeDeps(): GraphDependencies {
     tavilySearch: {
       invoke: vi.fn(),
     } as unknown as GraphDependencies["tavilySearch"],
+    pool: {
+      query: vi.fn(),
+    } as unknown as GraphDependencies["pool"],
     agentModel: {
       invoke: vi.fn(),
     } as unknown as GraphDependencies["agentModel"],

@@ -18,6 +18,14 @@ const {
   mockCreateAgentModels: vi.fn(),
 }));
 
+vi.mock("@usopc/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usopc/shared")>();
+  return {
+    ...actual,
+    getPool: vi.fn().mockReturnValue({ query: vi.fn() }),
+  };
+});
+
 vi.mock("./rag/embeddings.js", () => ({
   createEmbeddings: mockCreateEmbeddings,
 }));
