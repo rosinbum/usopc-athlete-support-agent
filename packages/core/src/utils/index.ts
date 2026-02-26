@@ -15,3 +15,4 @@ export {
   formatWebResults,
 } from "./buildContext.js";
 export { parseLlmJson } from "./safeParseLlmJson.js";
+export { deduplicateChunks } from "./deduplicateChunks.js";

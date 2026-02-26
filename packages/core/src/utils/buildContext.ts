@@ -48,6 +48,18 @@ export function formatDocument(doc: RetrievedDocument, index: number): string {
   if (doc.metadata.sourceUrl) {
     parts.push(`Source: ${doc.metadata.sourceUrl}`);
   }
+  if (doc.metadata.alternativeSources?.length) {
+    const altLabels = doc.metadata.alternativeSources
+      .map((alt) => {
+        const altParts: string[] = [];
+        if (alt.documentTitle) altParts.push(alt.documentTitle);
+        if (alt.sectionTitle) altParts.push(`(${alt.sectionTitle})`);
+        if (alt.sourceUrl) altParts.push(`[${alt.sourceUrl}]`);
+        return altParts.join(" ") || "Unknown source";
+      })
+      .join("; ");
+    parts.push(`Also found in: ${altLabels}`);
+  }
   parts.push(`Relevance Score: ${doc.score.toFixed(4)}`);
   parts.push("---");
   parts.push(doc.content);

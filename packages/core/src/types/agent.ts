@@ -47,6 +47,14 @@ export interface RetrievedDocument {
   score: number;
 }
 
+export interface AlternativeSource {
+  documentTitle?: string | undefined;
+  sectionTitle?: string | undefined;
+  sourceUrl?: string | undefined;
+  authorityLevel?: AuthorityLevel | undefined;
+  score: number;
+}
+
 export interface DocumentMetadata {
   ngbId?: string | undefined;
   topicDomain?: TopicDomain | undefined;
@@ -58,6 +66,7 @@ export interface DocumentMetadata {
   ingestedAt?: string | undefined;
   authorityLevel?: AuthorityLevel | undefined;
   s3Key?: string | undefined;
+  alternativeSources?: AlternativeSource[] | undefined;
 }
 
 export type QualityIssueType =
