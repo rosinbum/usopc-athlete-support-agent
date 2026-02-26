@@ -1,3 +1,4 @@
+import type { Pool } from "pg";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger } from "@usopc/shared";
@@ -8,12 +9,17 @@ import {
 import { vectorStoreSearch } from "../../services/vectorStoreService.js";
 import { buildContextualQuery, stateContext } from "../../utils/index.js";
 import { buildRetrievalExpanderPrompt } from "../../prompts/index.js";
-import { computeConfidence } from "./retriever.js";
+import { bm25Search } from "../../rag/bm25Search.js";
+import { rrfFuse } from "../../rag/rrfFuse.js";
+import { computeHybridConfidence } from "./retriever.js";
 import type { VectorStoreLike } from "./retriever.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 
 const log = logger.child({ service: "retrieval-expander-node" });
+
+/** Standard RRF smoothing constant. */
+const RRF_K = 60;
 
 /**
  * Parses the JSON array of reformulated queries from the model response.
@@ -56,12 +62,32 @@ function buildFilter(state: AgentState): Record<string, unknown> | undefined {
 }
 
 /**
+ * Builds a SQL filter from the agent state for BM25 search.
+ */
+function buildSqlFilter(state: AgentState): {
+  ngbIds?: string[];
+  topicDomain?: string;
+} {
+  const filter: { ngbIds?: string[]; topicDomain?: string } = {};
+
+  if (state.detectedNgbIds.length > 0) {
+    filter.ngbIds = state.detectedNgbIds;
+  }
+
+  if (state.topicDomain) {
+    filter.topicDomain = state.topicDomain;
+  }
+
+  return filter;
+}
+
+/**
  * Factory function that creates a RETRIEVAL EXPANDER node.
  *
  * When retrieval confidence is low, this node reformulates the original
- * query using Haiku, runs parallel searches with reformulated queries,
- * merges results with existing documents (deduplicating by content),
- * and recomputes confidence.
+ * query using Haiku, runs parallel hybrid searches (vector + BM25) with
+ * reformulated queries, merges results with existing documents
+ * (deduplicating by content), and recomputes confidence.
  *
  * Fail-open: If the Haiku call or searches fail, returns
  * `{ expansionAttempted: true }` so the graph falls through to the
@@ -70,6 +96,7 @@ function buildFilter(state: AgentState): Record<string, unknown> | undefined {
 export function createRetrievalExpanderNode(
   vectorStore: VectorStoreLike,
   model: BaseChatModel,
+  pool: Pool,
 ) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const { currentMessage } = buildContextualQuery(state.messages);
@@ -114,14 +141,36 @@ export function createRetrievalExpanderNode(
         ...stateContext(state),
       });
 
-      // Run parallel searches for each reformulated query
+      // Run parallel hybrid searches for each reformulated query
       const filter = buildFilter(state);
-      const searchPromises = reformulatedQueries.map((query) =>
-        vectorStoreSearch(
-          () => vectorStore.similaritySearchWithScore(query, 5, filter),
-          [],
-        ),
-      );
+      const sqlFilter = buildSqlFilter(state);
+
+      const searchPromises = reformulatedQueries.map(async (query) => {
+        const [vectorResults, textResults] = await Promise.all([
+          vectorStoreSearch(
+            () => vectorStore.similaritySearchWithScore(query, 5, filter),
+            [],
+          ),
+          vectorStoreSearch(
+            () => bm25Search(pool, { query, k: 10, filter: sqlFilter }),
+            [],
+          ),
+        ]);
+
+        // Map vector results to RRF input
+        const vectorMapped = vectorResults.map(([doc, score]) => ({
+          id: (doc.metadata.id as string) ?? doc.pageContent.slice(0, 64),
+          content: doc.pageContent,
+          metadata: doc.metadata,
+          score,
+        }));
+
+        return rrfFuse(vectorMapped, textResults, {
+          k: 5,
+          rrfK: RRF_K,
+          vectorWeight: 0.5,
+        });
+      });
 
       const searchResults = await Promise.all(searchPromises);
 
@@ -130,27 +179,35 @@ export function createRetrievalExpanderNode(
       const newDocs: RetrievedDocument[] = [];
 
       for (const results of searchResults) {
-        for (const [doc, score] of results) {
-          if (!seen.has(doc.pageContent)) {
-            seen.add(doc.pageContent);
+        for (const candidate of results) {
+          if (!seen.has(candidate.content)) {
+            seen.add(candidate.content);
             newDocs.push({
-              content: doc.pageContent,
+              content: candidate.content,
               metadata: {
-                ngbId: doc.metadata.ngbId as string | undefined,
-                topicDomain: doc.metadata.topicDomain as
+                ngbId: candidate.metadata.ngbId as string | undefined,
+                topicDomain: candidate.metadata.topicDomain as
                   | RetrievedDocument["metadata"]["topicDomain"]
                   | undefined,
-                documentType: doc.metadata.documentType as string | undefined,
-                sourceUrl: doc.metadata.sourceUrl as string | undefined,
-                documentTitle: doc.metadata.documentTitle as string | undefined,
-                sectionTitle: doc.metadata.sectionTitle as string | undefined,
-                effectiveDate: doc.metadata.effectiveDate as string | undefined,
-                ingestedAt: doc.metadata.ingestedAt as string | undefined,
-                authorityLevel: doc.metadata.authorityLevel as
+                documentType: candidate.metadata.documentType as
+                  | string
+                  | undefined,
+                sourceUrl: candidate.metadata.sourceUrl as string | undefined,
+                documentTitle: candidate.metadata.documentTitle as
+                  | string
+                  | undefined,
+                sectionTitle: candidate.metadata.sectionTitle as
+                  | string
+                  | undefined,
+                effectiveDate: candidate.metadata.effectiveDate as
+                  | string
+                  | undefined,
+                ingestedAt: candidate.metadata.ingestedAt as string | undefined,
+                authorityLevel: candidate.metadata.authorityLevel as
                   | RetrievedDocument["metadata"]["authorityLevel"]
                   | undefined,
               },
-              score,
+              score: candidate.score,
             });
           }
         }
@@ -158,7 +215,7 @@ export function createRetrievalExpanderNode(
 
       const mergedDocs = [...state.retrievedDocuments, ...newDocs];
       const allScores = mergedDocs.map((d) => d.score);
-      const newConfidence = computeConfidence(allScores);
+      const newConfidence = computeHybridConfidence(allScores, RRF_K);
 
       log.info("Retrieval expansion complete", {
         originalDocs: state.retrievedDocuments.length,

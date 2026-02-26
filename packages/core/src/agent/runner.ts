@@ -4,6 +4,7 @@ import type { BaseMessage } from "@langchain/core/messages";
 import { createEmbeddings } from "../rag/embeddings.js";
 import type { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import { createVectorStore } from "../rag/vectorStore.js";
+import { getPool } from "@usopc/shared";
 import { createTavilySearchTool } from "./nodes/researcher.js";
 import type { TavilySearchLike } from "./nodes/researcher.js";
 import { logger } from "@usopc/shared";
@@ -133,6 +134,7 @@ export class AgentRunner {
     const graph = createAgentGraph({
       vectorStore,
       tavilySearch,
+      pool: getPool(),
       agentModel,
       classifierModel,
     });

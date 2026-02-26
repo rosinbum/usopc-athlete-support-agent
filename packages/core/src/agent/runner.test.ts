@@ -29,6 +29,7 @@ vi.mock("@usopc/shared", async (importOriginal) => {
         debug: vi.fn(),
       }),
     },
+    getPool: vi.fn().mockReturnValue({ query: vi.fn() }),
   };
 });
 
@@ -148,6 +149,7 @@ describe("AgentRunner", () => {
       expect(mockCreateAgentGraph).toHaveBeenCalledWith({
         vectorStore: expect.objectContaining({ fake: "vectorStore" }),
         tavilySearch: { fake: "tavily" },
+        pool: expect.any(Object),
         agentModel: expect.any(Object),
         classifierModel: expect.any(Object),
       });

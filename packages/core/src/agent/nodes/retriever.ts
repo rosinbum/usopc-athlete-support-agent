@@ -1,10 +1,18 @@
+import type { Pool } from "pg";
 import { logger, AUTHORITY_LEVELS, type AuthorityLevel } from "@usopc/shared";
 import { RunnableLambda, type RunnableConfig } from "@langchain/core/runnables";
 import { RETRIEVAL_CONFIG } from "../../config/index.js";
 import { vectorStoreSearch } from "../../services/vectorStoreService.js";
 import { buildContextualQuery, stateContext } from "../../utils/index.js";
+import { bm25Search } from "../../rag/bm25Search.js";
+import { rrfFuse } from "../../rag/rrfFuse.js";
+import type { RrfCandidate } from "../../rag/rrfFuse.js";
 import type { AgentState } from "../state.js";
-import type { RetrievedDocument, SubQuery } from "../../types/index.js";
+import type {
+  RetrievedDocument,
+  SubQuery,
+  QueryIntent,
+} from "../../types/index.js";
 
 const log = logger.child({ service: "retriever-node" });
 
@@ -29,6 +37,23 @@ export interface VectorStoreLike {
  * Maximum length for context portion of enriched query.
  */
 const MAX_CONTEXT_LENGTH = 200;
+
+/** Standard RRF smoothing constant. */
+const RRF_K = 60;
+
+/**
+ * Maps queryIntent to the vector weight (alpha) for RRF fusion.
+ * Text weight = 1 - alpha.
+ */
+const INTENT_VECTOR_WEIGHTS: Record<QueryIntent, number> = {
+  factual: 0.4,
+  procedural: 0.4,
+  deadline: 0.3,
+  escalation: 0.5,
+  general: 0.7,
+};
+
+const DEFAULT_VECTOR_WEIGHT = 0.5;
 
 /**
  * Extracts key terms from conversation context for query enrichment.
@@ -72,17 +97,12 @@ function buildEnrichedQuery(state: AgentState): string {
 }
 
 /**
- * Builds a metadata filter object from the agent state.
- *
- * When NGB IDs and/or a topic domain are present, the filter narrows
- * the search to relevant document partitions. When neither is available,
- * returns `undefined` to perform an unfiltered search.
+ * Builds a metadata filter object for PGVectorStore (JSONB-based).
  */
 function buildFilter(state: AgentState): Record<string, unknown> | undefined {
   const conditions: Record<string, unknown> = {};
 
   if (state.detectedNgbIds.length > 0) {
-    // Use `$in` for multiple NGB IDs
     conditions["ngbId"] =
       state.detectedNgbIds.length === 1
         ? state.detectedNgbIds[0]
@@ -94,6 +114,44 @@ function buildFilter(state: AgentState): Record<string, unknown> | undefined {
   }
 
   return Object.keys(conditions).length > 0 ? conditions : undefined;
+}
+
+/**
+ * Builds a SQL filter for BM25 search using denormalized columns.
+ */
+function buildSqlFilter(state: AgentState): {
+  ngbIds?: string[];
+  topicDomain?: string;
+} {
+  const filter: { ngbIds?: string[]; topicDomain?: string } = {};
+
+  if (state.detectedNgbIds.length > 0) {
+    filter.ngbIds = state.detectedNgbIds;
+  }
+
+  if (state.topicDomain) {
+    filter.topicDomain = state.topicDomain;
+  }
+
+  return filter;
+}
+
+/**
+ * Builds a SQL filter from a sub-query's domain and NGB IDs.
+ */
+function buildSubQuerySqlFilter(subQuery: SubQuery): {
+  ngbIds?: string[];
+  topicDomain?: string;
+} {
+  const filter: { ngbIds?: string[]; topicDomain?: string } = {};
+
+  if (subQuery.ngbIds.length > 0) {
+    filter.ngbIds = subQuery.ngbIds;
+  }
+
+  filter.topicDomain = subQuery.domain;
+
+  return filter;
 }
 
 /**
@@ -138,38 +196,28 @@ function buildSubQueryFilter(
 
 /**
  * Computes an authority boost for a document based on its authority level.
- * Higher authority levels get a larger boost (lower composite score).
+ * Higher authority levels get a larger boost.
  *
- * Returns a value between 0 (highest authority) and 0.3 (lowest/no authority).
- * This is subtracted from the similarity score, so lower = better.
+ * For hybrid search (RRF), the boost is **added** to the RRF score
+ * (higher = better). Scaled to 0.003 max to be meaningful relative to
+ * RRF scores (~0.008-0.016 range).
  */
 function computeAuthorityBoost(authorityLevel: string | undefined): number {
-  if (!authorityLevel) {
-    // No authority level = treated as lowest priority
-    return 0;
-  }
+  if (!authorityLevel) return 0;
 
   const index = AUTHORITY_LEVELS.indexOf(authorityLevel as AuthorityLevel);
-  if (index === -1) {
-    // Unknown authority level = no boost
-    return 0;
-  }
+  if (index === -1) return 0;
 
   // Higher index = lower authority = less boost
-  // Range: 0.3 (law, index 0) to 0 (educational_guidance, index 8)
-  const maxBoost = 0.3;
+  // Range: 0.003 (law, index 0) to 0 (educational_guidance, index 8)
+  const maxBoost = 0.003;
   return maxBoost * (1 - index / (AUTHORITY_LEVELS.length - 1));
 }
 
 /**
- * Computes a retrieval confidence score from the raw similarity scores.
+ * Computes a retrieval confidence score from cosine distance scores.
  *
- * Uses the top-K scores to calculate:
- *  - bestScore: raw top score (normalized 0-1, higher is better)
- *  - avgScore: average of all scores
- *  - spread: difference between best and worst (signals cluster quality)
- *
- * These are combined into a single 0-1 confidence value.
+ * Used for vector-only paths (e.g. retrieval expander recomputing confidence).
  */
 export function computeConfidence(scores: number[]): number {
   if (scores.length === 0) return 0;
@@ -177,35 +225,93 @@ export function computeConfidence(scores: number[]): number {
   const bestScore = scores[0]!;
   const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
 
-  // Similarity scores from pgvector cosine distance are typically in
-  // [0, 2] range where 0 is identical. Convert to a 0-1 similarity.
-  // If the store already returns normalized similarity (0-1), this
-  // still works correctly.
   const normalizedBest = Math.max(0, Math.min(1, 1 - bestScore));
   const normalizedAvg = Math.max(0, Math.min(1, 1 - avgScore));
 
-  // Weight the best score heavily (60%) with average providing a
-  // secondary signal (40%).
   return normalizedBest * 0.6 + normalizedAvg * 0.4;
 }
 
-type SearchResult = [
-  { pageContent: string; metadata: Record<string, unknown> },
-  number,
-];
+/**
+ * Computes confidence from RRF fused scores.
+ *
+ * Normalizes against the theoretical maximum RRF score (rank 1 in both
+ * lists with weights summing to 1): 1 / (rrfK + 1).
+ */
+export function computeHybridConfidence(
+  rrfScores: number[],
+  rrfK: number,
+): number {
+  if (rrfScores.length === 0) return 0;
+
+  const maxScore = 1 / (rrfK + 1);
+  const bestScore = rrfScores[0]!;
+  const avgScore = rrfScores.reduce((a, b) => a + b, 0) / rrfScores.length;
+
+  const normalizedBest = Math.min(1, bestScore / maxScore);
+  const normalizedAvg = Math.min(1, avgScore / maxScore);
+
+  return normalizedBest * 0.6 + normalizedAvg * 0.4;
+}
+
+function getVectorWeight(queryIntent: QueryIntent | undefined): number {
+  if (!queryIntent) return DEFAULT_VECTOR_WEIGHT;
+  return INTENT_VECTOR_WEIGHTS[queryIntent] ?? DEFAULT_VECTOR_WEIGHT;
+}
+
+/**
+ * Runs hybrid search (vector + BM25) and fuses results via RRF.
+ * Returns fused candidates sorted by score descending.
+ */
+async function runHybridSearch(
+  vectorStore: VectorStoreLike,
+  pool: Pool,
+  query: string,
+  vectorK: number,
+  vectorFilter: Record<string, unknown> | undefined,
+  sqlFilter: { ngbIds?: string[]; topicDomain?: string },
+  vectorWeight: number,
+  resultK: number,
+): Promise<RrfCandidate[]> {
+  // Run vector and text search in parallel
+  const [vectorResults, textResults] = await Promise.all([
+    vectorStoreSearch(
+      () => vectorStore.similaritySearchWithScore(query, vectorK, vectorFilter),
+      [],
+    ),
+    vectorStoreSearch(
+      () => bm25Search(pool, { query, k: vectorK * 2, filter: sqlFilter }),
+      [],
+    ),
+  ]);
+
+  // Map vector results to RRF input format
+  const vectorMapped = vectorResults.map(([doc, score]) => ({
+    id: (doc.metadata.id as string) ?? doc.pageContent.slice(0, 64),
+    content: doc.pageContent,
+    metadata: doc.metadata,
+    score,
+  }));
+
+  return rrfFuse(vectorMapped, textResults, {
+    k: resultK,
+    rrfK: RRF_K,
+    vectorWeight,
+  });
+}
 
 /**
  * Factory function that creates a RETRIEVER node bound to a specific
- * vector store instance.
+ * vector store and database pool.
  *
  * The node:
  * 1. Extracts the query from the latest user message
  * 2. Builds metadata filters from topicDomain and detectedNgbIds
- * 3. Runs a narrow (filtered) search first, then broadens if needed
- * 4. Computes a retrievalConfidence score
- * 5. Returns retrievedDocuments and retrievalConfidence on state
+ * 3. Runs hybrid search (vector + BM25) and fuses via RRF
+ * 4. Falls back to broadened search if narrow results are insufficient
+ * 5. Applies authority boost and computes retrievalConfidence
+ * 6. Returns retrievedDocuments and retrievalConfidence on state
  */
-export function createRetrieverNode(vectorStore: VectorStoreLike) {
+export function createRetrieverNode(vectorStore: VectorStoreLike, pool: Pool) {
   // Build traced RunnableLambda wrappers once per factory call
   const buildQuerySpan = new RunnableLambda({
     func: async (input: {
@@ -230,32 +336,34 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
     func: async (input: {
       query: string;
       filter: Record<string, unknown> | undefined;
+      sqlFilter: { ngbIds?: string[]; topicDomain?: string };
+      vectorWeight: number;
     }): Promise<{
-      results: SearchResult[];
+      results: RrfCandidate[];
       resultCount: number;
       topScore: number | null;
     }> => {
-      let results: SearchResult[] = [];
+      let results: RrfCandidate[] = [];
       if (input.filter) {
-        log.info("Running narrow retrieval", {
+        log.info("Running narrow hybrid retrieval", {
           filter: input.filter,
           topK: RETRIEVAL_CONFIG.narrowFilterTopK,
         });
-        // Use circuit breaker with fallback to empty array
-        results = await vectorStoreSearch(
-          () =>
-            vectorStore.similaritySearchWithScore(
-              input.query,
-              RETRIEVAL_CONFIG.narrowFilterTopK,
-              input.filter,
-            ),
-          [],
+        results = await runHybridSearch(
+          vectorStore,
+          pool,
+          input.query,
+          RETRIEVAL_CONFIG.narrowFilterTopK,
+          input.filter,
+          input.sqlFilter,
+          input.vectorWeight,
+          RETRIEVAL_CONFIG.topK,
         );
       }
       return {
         results,
         resultCount: results.length,
-        topScore: results.length > 0 ? results[0]![1] : null,
+        topScore: results.length > 0 ? results[0]!.score : null,
       };
     },
   }).withConfig({ runName: "retriever:narrow_search" });
@@ -263,10 +371,11 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
   const broadSearchSpan = new RunnableLambda({
     func: async (input: {
       query: string;
-      narrowResults: SearchResult[];
+      narrowResults: RrfCandidate[];
       state: AgentState;
+      vectorWeight: number;
     }): Promise<{
-      results: SearchResult[];
+      results: RrfCandidate[];
       broadened: boolean;
       finalCount: number;
     }> => {
@@ -282,23 +391,30 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
           },
         );
         const broadFilter = buildBroadFilter(input.state);
-        // Use circuit breaker with fallback to empty array
-        const broadResults = await vectorStoreSearch(
-          () =>
-            vectorStore.similaritySearchWithScore(
-              input.query,
-              RETRIEVAL_CONFIG.broadenFilterTopK,
-              broadFilter,
-            ),
-          [],
+
+        // For broadened search, relax SQL filters too (drop topicDomain)
+        const broadSqlFilter: { ngbIds?: string[]; topicDomain?: string } = {};
+        if (input.state.detectedNgbIds.length > 0) {
+          broadSqlFilter.ngbIds = input.state.detectedNgbIds;
+        }
+
+        const broadResults = await runHybridSearch(
+          vectorStore,
+          pool,
+          input.query,
+          RETRIEVAL_CONFIG.broadenFilterTopK,
+          broadFilter,
+          broadSqlFilter,
+          input.vectorWeight,
+          RETRIEVAL_CONFIG.topK,
         );
 
         // Merge, deduplicating by content
-        const seen = new Set(results.map(([doc]) => doc.pageContent));
+        const seen = new Set(results.map((c) => c.content));
         for (const result of broadResults) {
-          if (!seen.has(result[0].pageContent)) {
+          if (!seen.has(result.content)) {
             results.push(result);
-            seen.add(result[0].pageContent);
+            seen.add(result.content);
           }
         }
       }
@@ -306,75 +422,53 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
     },
   }).withConfig({ runName: "retriever:broad_search" });
 
-  const scoreAndRankSpan = new RunnableLambda({
-    func: async (input: {
-      results: SearchResult[];
-    }): Promise<{
-      topResults: SearchResult[];
-      confidence: number;
-      topScore: number | null;
-      docsReturned: number;
-    }> => {
-      const { results } = input;
-      // Sort by score ascending (lower distance = better match for cosine)
-      results.sort((a, b) => a[1] - b[1]);
+  /**
+   * Applies authority boost and computes confidence from RRF candidates.
+   */
+  function scoreAndRank(candidates: RrfCandidate[]): {
+    topResults: RrfCandidate[];
+    confidence: number;
+  } {
+    // Apply authority boost (additive — higher RRF score = better)
+    const boosted = candidates.map((c) => ({
+      ...c,
+      score:
+        c.score +
+        computeAuthorityBoost(c.metadata.authorityLevel as string | undefined),
+    }));
 
-      // Compute composite score that factors in authority level
-      // Lower composite score = higher rank
-      const scoredResults = results.map((result) => {
-        const [doc, similarityScore] = result;
-        const authorityBoost = computeAuthorityBoost(
-          doc.metadata.authorityLevel as string | undefined,
-        );
-        // Subtract authority boost (higher authority = larger boost = lower composite score)
-        const compositeScore = similarityScore - authorityBoost;
-        return { result, compositeScore };
-      });
+    // Re-sort by boosted score descending
+    boosted.sort((a, b) => b.score - a.score);
 
-      // Re-sort by composite score
-      scoredResults.sort((a, b) => a.compositeScore - b.compositeScore);
+    const topResults = boosted.slice(0, RETRIEVAL_CONFIG.topK);
+    const scores = topResults.map((c) => c.score);
+    const confidence = computeHybridConfidence(scores, RRF_K);
 
-      // Limit to configured topK
-      const topResults = scoredResults
-        .slice(0, RETRIEVAL_CONFIG.topK)
-        .map((s) => s.result);
-
-      const scores = topResults.map(([, score]) => score);
-      const confidence = computeConfidence(scores);
-
-      return {
-        topResults,
-        confidence,
-        topScore: scores[0] ?? null,
-        docsReturned: topResults.length,
-      };
-    },
-  }).withConfig({ runName: "retriever:score_and_rank" });
+    return { topResults, confidence };
+  }
 
   /**
-   * Maps raw search results to RetrievedDocument format.
+   * Maps RRF candidates to RetrievedDocument format.
    */
   function mapToRetrievedDocuments(
-    results: SearchResult[],
+    candidates: RrfCandidate[],
   ): RetrievedDocument[] {
-    return results.map(([doc, score]) => ({
-      content: doc.pageContent,
+    return candidates.map((c) => ({
+      content: c.content,
       metadata: {
-        ngbId: doc.metadata.ngbId as string | undefined,
-        topicDomain: doc.metadata.topicDomain as
+        ngbId: c.metadata.ngbId as string | undefined,
+        topicDomain: c.metadata.topicDomain as
           | RetrievedDocument["metadata"]["topicDomain"]
           | undefined,
-        documentType: doc.metadata.documentType as string | undefined,
-        sourceUrl: doc.metadata.sourceUrl as string | undefined,
-        documentTitle: doc.metadata.documentTitle as string | undefined,
-        sectionTitle: doc.metadata.sectionTitle as string | undefined,
-        effectiveDate: doc.metadata.effectiveDate as string | undefined,
-        ingestedAt: doc.metadata.ingestedAt as string | undefined,
-        authorityLevel: doc.metadata.authorityLevel as
-          | AuthorityLevel
-          | undefined,
+        documentType: c.metadata.documentType as string | undefined,
+        sourceUrl: c.metadata.sourceUrl as string | undefined,
+        documentTitle: c.metadata.documentTitle as string | undefined,
+        sectionTitle: c.metadata.sectionTitle as string | undefined,
+        effectiveDate: c.metadata.effectiveDate as string | undefined,
+        ingestedAt: c.metadata.ingestedAt as string | undefined,
+        authorityLevel: c.metadata.authorityLevel as AuthorityLevel | undefined,
       },
-      score,
+      score: c.score,
     }));
   }
 
@@ -382,51 +476,56 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
     state: AgentState,
     config?: RunnableConfig,
   ): Promise<Partial<AgentState>> => {
-    // Sub-query retrieval: run parallel searches per sub-query
+    const vectorWeight = getVectorWeight(state.queryIntent);
+
+    // Sub-query retrieval: run parallel hybrid searches per sub-query
     if (state.subQueries && state.subQueries.length > 0) {
       try {
-        log.info("Running sub-query retrieval", {
+        log.info("Running sub-query hybrid retrieval", {
           subQueryCount: state.subQueries.length,
           domains: state.subQueries.map((sq) => sq.domain),
+          vectorWeight,
           ...stateContext(state),
         });
 
         const subQueryResults = await Promise.all(
           state.subQueries.map(async (subQuery) => {
             const filter = buildSubQueryFilter(subQuery);
-            return vectorStoreSearch(
-              () =>
-                vectorStore.similaritySearchWithScore(
-                  subQuery.query,
-                  RETRIEVAL_CONFIG.narrowFilterTopK,
-                  filter,
-                ),
-              [],
+            const sqlFilter = buildSubQuerySqlFilter(subQuery);
+            const sqVectorWeight = getVectorWeight(
+              subQuery.intent as QueryIntent | undefined,
+            );
+            return runHybridSearch(
+              vectorStore,
+              pool,
+              subQuery.query,
+              RETRIEVAL_CONFIG.narrowFilterTopK,
+              filter,
+              sqlFilter,
+              sqVectorWeight,
+              RETRIEVAL_CONFIG.topK,
             );
           }),
         );
 
         // Merge and deduplicate by content
         const seen = new Set<string>();
-        const mergedResults: SearchResult[] = [];
+        const mergedResults: RrfCandidate[] = [];
         for (const results of subQueryResults) {
           for (const result of results) {
-            if (!seen.has(result[0].pageContent)) {
-              seen.add(result[0].pageContent);
+            if (!seen.has(result.content)) {
+              seen.add(result.content);
               mergedResults.push(result);
             }
           }
         }
 
-        const { topResults, confidence, topScore } =
-          await scoreAndRankSpan.invoke({ results: mergedResults }, config);
-
+        const { topResults, confidence } = scoreAndRank(mergedResults);
         const retrievedDocuments = mapToRetrievedDocuments(topResults);
 
-        log.info("Sub-query retrieval complete", {
+        log.info("Sub-query hybrid retrieval complete", {
           documentCount: retrievedDocuments.length,
           confidence: confidence.toFixed(3),
-          topScore: topScore?.toFixed(3) ?? "N/A",
           ...stateContext(state),
         });
 
@@ -448,7 +547,7 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
       }
     }
 
-    // Standard single-domain retrieval
+    // Standard single-domain hybrid retrieval
     const { query } = await buildQuerySpan.invoke({ state }, config);
 
     if (!query) {
@@ -458,26 +557,25 @@ export function createRetrieverNode(vectorStore: VectorStoreLike) {
 
     try {
       const filter = buildFilter(state);
+      const sqlFilter = buildSqlFilter(state);
 
       const { results: narrowResults } = await narrowSearchSpan.invoke(
-        { query, filter },
+        { query, filter, sqlFilter, vectorWeight },
         config,
       );
 
       const { results } = await broadSearchSpan.invoke(
-        { query, narrowResults, state },
+        { query, narrowResults, state, vectorWeight },
         config,
       );
 
-      const { topResults, confidence, topScore } =
-        await scoreAndRankSpan.invoke({ results }, config);
-
+      const { topResults, confidence } = scoreAndRank(results);
       const retrievedDocuments = mapToRetrievedDocuments(topResults);
 
-      log.info("Retrieval complete", {
+      log.info("Hybrid retrieval complete", {
         documentCount: retrievedDocuments.length,
         confidence: confidence.toFixed(3),
-        topScore: topScore?.toFixed(3) ?? "N/A",
+        vectorWeight,
         ...stateContext(state),
       });
 

@@ -1,3 +1,4 @@
+import type { Pool } from "pg";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { StateGraph } from "@langchain/langgraph";
 import { AgentStateAnnotation } from "./state.js";
@@ -36,6 +37,8 @@ import { withMetrics } from "./nodeMetrics.js";
 export interface GraphDependencies {
   vectorStore: VectorStoreLike;
   tavilySearch: TavilySearchLike;
+  /** Database pool for BM25 full-text search queries. */
+  pool: Pool;
   /** Sonnet instance used by synthesizer, escalate, and other heavy-reasoning nodes. */
   agentModel: BaseChatModel;
   /** Haiku instance used by classifier, qualityChecker, queryPlanner, and retrievalExpander. */
@@ -66,7 +69,10 @@ export function createAgentGraph(deps: GraphDependencies) {
     .addNode("clarify", withMetrics("clarify", clarifyNode))
     .addNode(
       "retriever",
-      withMetrics("retriever", createRetrieverNode(deps.vectorStore)),
+      withMetrics(
+        "retriever",
+        createRetrieverNode(deps.vectorStore, deps.pool),
+      ),
     )
     .addNode(
       "researcher",
@@ -102,7 +108,11 @@ export function createAgentGraph(deps: GraphDependencies) {
       "retrievalExpander",
       withMetrics(
         "retrievalExpander",
-        createRetrievalExpanderNode(deps.vectorStore, deps.classifierModel),
+        createRetrievalExpanderNode(
+          deps.vectorStore,
+          deps.classifierModel,
+          deps.pool,
+        ),
       ),
     )
     .addNode(
