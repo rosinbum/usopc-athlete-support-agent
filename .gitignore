@@ -34,6 +34,7 @@ coverage/
 
 # misc
 *.tsbuildinfo
+.hours.json
 data/sources/llm-generated-sources/
 
 # LangGraph API
