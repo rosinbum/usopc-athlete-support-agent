@@ -235,12 +235,15 @@ export function computeConfidence(scores: number[]): number {
  * Computes confidence from RRF fused scores.
  *
  * Normalizes against the theoretical maximum RRF score (rank 1 in both
- * lists): 2 / (rrfK + 1).
+ * lists with weights summing to 1): 1 / (rrfK + 1).
  */
-function computeHybridConfidence(rrfScores: number[], rrfK: number): number {
+export function computeHybridConfidence(
+  rrfScores: number[],
+  rrfK: number,
+): number {
   if (rrfScores.length === 0) return 0;
 
-  const maxScore = 2 / (rrfK + 1);
+  const maxScore = 1 / (rrfK + 1);
   const bestScore = rrfScores[0]!;
   const avgScore = rrfScores.reduce((a, b) => a + b, 0) / rrfScores.length;
 

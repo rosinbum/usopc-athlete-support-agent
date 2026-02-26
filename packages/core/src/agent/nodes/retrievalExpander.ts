@@ -11,7 +11,7 @@ import { buildContextualQuery, stateContext } from "../../utils/index.js";
 import { buildRetrievalExpanderPrompt } from "../../prompts/index.js";
 import { bm25Search } from "../../rag/bm25Search.js";
 import { rrfFuse } from "../../rag/rrfFuse.js";
-import { computeConfidence } from "./retriever.js";
+import { computeHybridConfidence } from "./retriever.js";
 import type { VectorStoreLike } from "./retriever.js";
 import type { AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
@@ -215,7 +215,7 @@ export function createRetrievalExpanderNode(
 
       const mergedDocs = [...state.retrievedDocuments, ...newDocs];
       const allScores = mergedDocs.map((d) => d.score);
-      const newConfidence = computeConfidence(allScores);
+      const newConfidence = computeHybridConfidence(allScores, RRF_K);
 
       log.info("Retrieval expansion complete", {
         originalDocs: state.retrievedDocuments.length,
