@@ -64,7 +64,7 @@ vi.mock("../config/index.js", () => ({
   GRAPH_CONFIG: {
     invokeTimeoutMs: 90_000,
     streamTimeoutMs: 120_000,
-    recursionLimit: 50,
+    recursionLimit: 30,
   },
 }));
 
@@ -279,7 +279,7 @@ describe("AgentRunner", () => {
           conversationId: "conv-123",
         }),
         expect.objectContaining({
-          recursionLimit: 50,
+          recursionLimit: 30,
           configurable: { thread_id: "conv-123" },
           metadata: { session_id: "conv-123" },
         }),
@@ -299,7 +299,7 @@ describe("AgentRunner", () => {
       expect(graph.invoke).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          recursionLimit: 50,
+          recursionLimit: 30,
           configurable: { thread_id: "conv-abc" },
           metadata: { session_id: "conv-abc" },
         }),
@@ -318,7 +318,7 @@ describe("AgentRunner", () => {
       expect(graph.invoke).toHaveBeenCalledWith(
         expect.objectContaining({ conversationId: undefined }),
         expect.objectContaining({
-          recursionLimit: 50,
+          recursionLimit: 30,
           configurable: { thread_id: expect.any(String) },
         }),
       );
@@ -341,7 +341,7 @@ describe("AgentRunner", () => {
       expect(graph.invoke).toHaveBeenCalledWith(
         expect.objectContaining({ conversationId: undefined }),
         expect.objectContaining({
-          recursionLimit: 50,
+          recursionLimit: 30,
           configurable: { thread_id: expect.any(String) },
         }),
       );
@@ -411,7 +411,7 @@ describe("AgentRunner", () => {
         }),
         expect.objectContaining({
           streamMode: ["values", "messages"],
-          recursionLimit: 50,
+          recursionLimit: 30,
           configurable: { thread_id: expect.any(String) },
         }),
       );
@@ -434,7 +434,7 @@ describe("AgentRunner", () => {
         expect.objectContaining({ conversationId: "conv-456" }),
         expect.objectContaining({
           streamMode: ["values", "messages"],
-          recursionLimit: 50,
+          recursionLimit: 30,
           configurable: { thread_id: "conv-456" },
           metadata: { session_id: "conv-456" },
         }),
@@ -457,7 +457,7 @@ describe("AgentRunner", () => {
         expect.objectContaining({ conversationId: undefined }),
         expect.objectContaining({
           streamMode: ["values", "messages"],
-          recursionLimit: 50,
+          recursionLimit: 30,
           configurable: { thread_id: expect.any(String) },
         }),
       );
