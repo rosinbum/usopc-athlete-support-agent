@@ -411,6 +411,34 @@ describe("parseQueryPlannerResponse", () => {
     expect(warnings.length).toBeGreaterThan(0);
   });
 
+  it("accepts athlete_safety and financial_assistance domains", () => {
+    const { output, warnings } = parseQueryPlannerResponse(
+      JSON.stringify({
+        isComplex: true,
+        subQueries: [
+          {
+            query: "What SafeSport protections exist for athlete safety?",
+            domain: "athlete_safety",
+            intent: "factual",
+            ngbIds: [],
+          },
+          {
+            query: "What financial assistance is available?",
+            domain: "financial_assistance",
+            intent: "procedural",
+            ngbIds: [],
+          },
+        ],
+      }),
+    );
+
+    expect(output.isComplex).toBe(true);
+    expect(output.subQueries).toHaveLength(2);
+    expect(output.subQueries[0]!.domain).toBe("athlete_safety");
+    expect(output.subQueries[1]!.domain).toBe("financial_assistance");
+    expect(warnings).toHaveLength(0);
+  });
+
   it("filters out invalid NGB IDs", () => {
     const { output } = parseQueryPlannerResponse(
       JSON.stringify({

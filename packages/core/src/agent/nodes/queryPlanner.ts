@@ -1,6 +1,6 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage } from "@langchain/core/messages";
-import { logger, CircuitBreakerError } from "@usopc/shared";
+import { logger, CircuitBreakerError, TOPIC_DOMAINS } from "@usopc/shared";
 import { buildQueryPlannerPrompt } from "../../prompts/index.js";
 import {
   invokeLlm,
@@ -18,15 +18,7 @@ const log = logger.child({ service: "query-planner-node" });
 
 const MAX_SUB_QUERIES = 4;
 
-const VALID_DOMAINS: TopicDomain[] = [
-  "team_selection",
-  "dispute_resolution",
-  "safesport",
-  "anti_doping",
-  "eligibility",
-  "governance",
-  "athlete_rights",
-];
+const VALID_DOMAINS: readonly string[] = TOPIC_DOMAINS;
 
 const VALID_INTENTS: QueryIntent[] = [
   "factual",

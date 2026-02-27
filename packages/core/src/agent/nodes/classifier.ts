@@ -1,6 +1,11 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage } from "@langchain/core/messages";
-import { logger, CircuitBreakerError, NGB_ID_SET } from "@usopc/shared";
+import {
+  logger,
+  CircuitBreakerError,
+  NGB_ID_SET,
+  TOPIC_DOMAINS,
+} from "@usopc/shared";
 import { buildClassifierPromptWithHistory } from "../../prompts/index.js";
 import {
   invokeLlm,
@@ -22,20 +27,9 @@ const log = logger.child({ service: "classifier-node" });
 
 /**
  * Valid topic domains for guard-checking the classifier output.
- * Must be kept in sync with the TopicDomain type in packages/core/src/types/agent.ts
- * and the TOPIC_DOMAINS constant in packages/shared/src/validation.ts.
+ * Single source of truth: TOPIC_DOMAINS from @usopc/shared.
  */
-const VALID_DOMAINS: TopicDomain[] = [
-  "team_selection",
-  "dispute_resolution",
-  "safesport",
-  "anti_doping",
-  "eligibility",
-  "governance",
-  "athlete_rights",
-  "athlete_safety",
-  "financial_assistance",
-];
+const VALID_DOMAINS: readonly string[] = TOPIC_DOMAINS;
 
 /**
  * Valid query intents for guard-checking the classifier output.
