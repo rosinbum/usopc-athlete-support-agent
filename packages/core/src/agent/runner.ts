@@ -9,6 +9,7 @@ import { createTavilySearchTool } from "./nodes/researcher.js";
 import type { TavilySearchLike } from "./nodes/researcher.js";
 import { logger } from "@usopc/shared";
 import { createAgentGraph } from "./graph.js";
+import { createPostgresCheckpointer } from "./checkpointer.js";
 import { GRAPH_CONFIG, createAgentModels } from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
 import { nodeMetrics } from "./nodeMetrics.js";
@@ -16,6 +17,7 @@ import {
   generateSummary,
   saveSummary,
 } from "../services/conversationMemory.js";
+import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
 
@@ -82,15 +84,18 @@ export class AgentRunner {
   private graph: ReturnType<typeof createAgentGraph>;
   private vectorStore: PGVectorStore;
   private _classifierModel: BaseChatModel;
+  private checkpointer: BaseCheckpointSaver | undefined;
 
   private constructor(
     graph: ReturnType<typeof createAgentGraph>,
     vectorStore: PGVectorStore,
     classifierModel: BaseChatModel,
+    checkpointer?: BaseCheckpointSaver,
   ) {
     this.graph = graph;
     this.vectorStore = vectorStore;
     this._classifierModel = classifierModel;
+    this.checkpointer = checkpointer;
   }
 
   /**
@@ -131,23 +136,33 @@ export class AgentRunner {
 
     log.info("Agent models constructed");
 
-    const graph = createAgentGraph({
-      vectorStore,
-      tavilySearch,
-      pool: getPool(),
-      agentModel,
-      classifierModel,
-    });
+    // Create checkpointer for graph state persistence (idempotent DDL)
+    const checkpointer = await createPostgresCheckpointer(config.databaseUrl);
+    log.info("Postgres checkpointer initialized");
 
-    return new AgentRunner(graph, vectorStore, classifierModel);
+    const graph = createAgentGraph(
+      {
+        vectorStore,
+        tavilySearch,
+        pool: getPool(),
+        agentModel,
+        classifierModel,
+      },
+      { checkpointer },
+    );
+
+    return new AgentRunner(graph, vectorStore, classifierModel, checkpointer);
   }
 
   /**
-   * Close the underlying vector store connection pool.
+   * Close the underlying connection pools (vector store + checkpointer).
    * Call this when the runner is no longer needed to prevent connection leaks.
    */
   async close(): Promise<void> {
     await this.vectorStore.end();
+    if (this.checkpointer && "end" in this.checkpointer) {
+      await (this.checkpointer as { end: () => Promise<void> }).end();
+    }
   }
 
   /**
@@ -157,9 +172,16 @@ export class AgentRunner {
   async invoke(input: AgentInput): Promise<AgentOutput> {
     nodeMetrics.reset();
     const initialState = this.buildInitialState(input);
-    const config = initialState.conversationId
-      ? { metadata: { session_id: initialState.conversationId } }
-      : undefined;
+    const threadId =
+      (initialState.conversationId as string | undefined) ??
+      crypto.randomUUID();
+    const config = {
+      recursionLimit: GRAPH_CONFIG.recursionLimit,
+      configurable: { thread_id: threadId },
+      ...(initialState.conversationId
+        ? { metadata: { session_id: initialState.conversationId } }
+        : {}),
+    };
     const finalState = await withTimeout(
       this.graph.invoke(initialState, config),
       GRAPH_CONFIG.invokeTimeoutMs,
@@ -214,9 +236,15 @@ export class AgentRunner {
     const initialState = this.buildInitialState(input);
     const deadline = Date.now() + GRAPH_CONFIG.streamTimeoutMs;
 
+    const threadId =
+      (initialState.conversationId as string | undefined) ??
+      crypto.randomUUID();
+
     // Dual stream mode: "values" for state after each node, "messages" for token streaming
     const stream = await this.graph.stream(initialState, {
       streamMode: ["values", "messages"],
+      recursionLimit: GRAPH_CONFIG.recursionLimit,
+      configurable: { thread_id: threadId },
       ...(initialState.conversationId
         ? { metadata: { session_id: initialState.conversationId } }
         : {}),

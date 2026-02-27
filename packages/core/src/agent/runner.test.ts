@@ -10,11 +10,13 @@ const {
   mockCreateVectorStore,
   mockCreateTavilySearchTool,
   mockCreateAgentGraph,
+  mockCreatePostgresCheckpointer,
 } = vi.hoisted(() => ({
   mockCreateEmbeddings: vi.fn(),
   mockCreateVectorStore: vi.fn(),
   mockCreateTavilySearchTool: vi.fn(),
   mockCreateAgentGraph: vi.fn(),
+  mockCreatePostgresCheckpointer: vi.fn(),
 }));
 
 vi.mock("@usopc/shared", async (importOriginal) => {
@@ -49,13 +51,21 @@ vi.mock("./graph.js", () => ({
   createAgentGraph: mockCreateAgentGraph,
 }));
 
+vi.mock("./checkpointer.js", () => ({
+  createPostgresCheckpointer: mockCreatePostgresCheckpointer,
+}));
+
 const { mockCreateAgentModels } = vi.hoisted(() => ({
   mockCreateAgentModels: vi.fn(),
 }));
 
 vi.mock("../config/index.js", () => ({
   createAgentModels: mockCreateAgentModels,
-  GRAPH_CONFIG: { invokeTimeoutMs: 90_000, streamTimeoutMs: 120_000 },
+  GRAPH_CONFIG: {
+    invokeTimeoutMs: 90_000,
+    streamTimeoutMs: 120_000,
+    recursionLimit: 50,
+  },
 }));
 
 import { AgentRunner, convertMessages } from "./runner.js";
@@ -95,6 +105,8 @@ const fakeAgentModel = { invoke: vi.fn(), role: "agent" };
 const fakeClassifierModel = { invoke: vi.fn(), role: "classifier" };
 
 describe("AgentRunner", () => {
+  const fakeCheckpointer = { fake: "checkpointer" };
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreateEmbeddings.mockReturnValue({ fake: "embeddings" });
@@ -108,6 +120,7 @@ describe("AgentRunner", () => {
       agentModel: fakeAgentModel,
       classifierModel: fakeClassifierModel,
     });
+    mockCreatePostgresCheckpointer.mockResolvedValue(fakeCheckpointer);
   });
 
   describe("create()", () => {
@@ -140,19 +153,22 @@ describe("AgentRunner", () => {
       expect(mockCreateTavilySearchTool).not.toHaveBeenCalled();
     });
 
-    it("compiles agent graph with dependencies", async () => {
+    it("compiles agent graph with dependencies and checkpointer", async () => {
       await AgentRunner.create({
         ...defaultConfig,
         tavilyApiKey: "test-tavily-key",
       });
 
-      expect(mockCreateAgentGraph).toHaveBeenCalledWith({
-        vectorStore: expect.objectContaining({ fake: "vectorStore" }),
-        tavilySearch: { fake: "tavily" },
-        pool: expect.any(Object),
-        agentModel: expect.any(Object),
-        classifierModel: expect.any(Object),
-      });
+      expect(mockCreateAgentGraph).toHaveBeenCalledWith(
+        {
+          vectorStore: expect.objectContaining({ fake: "vectorStore" }),
+          tavilySearch: { fake: "tavily" },
+          pool: expect.any(Object),
+          agentModel: expect.any(Object),
+          classifierModel: expect.any(Object),
+        },
+        { checkpointer: fakeCheckpointer },
+      );
     });
 
     it("passes a no-op tavily stub when tavilyApiKey is absent", async () => {
@@ -163,6 +179,7 @@ describe("AgentRunner", () => {
           vectorStore: expect.objectContaining({ fake: "vectorStore" }),
           tavilySearch: expect.any(Object),
         }),
+        { checkpointer: fakeCheckpointer },
       );
     });
 
@@ -176,6 +193,14 @@ describe("AgentRunner", () => {
       await AgentRunner.create(defaultConfig);
 
       expect(mockCreateAgentModels).toHaveBeenCalledOnce();
+    });
+
+    it("creates Postgres checkpointer with databaseUrl", async () => {
+      await AgentRunner.create(defaultConfig);
+
+      expect(mockCreatePostgresCheckpointer).toHaveBeenCalledWith(
+        "postgresql://localhost:5432/test",
+      );
     });
 
     it("passes model instances from factory to graph and exposes classifierModel", async () => {
@@ -253,7 +278,11 @@ describe("AgentRunner", () => {
           userSport: "swimming",
           conversationId: "conv-123",
         }),
-        { metadata: { session_id: "conv-123" } },
+        expect.objectContaining({
+          recursionLimit: 50,
+          configurable: { thread_id: "conv-123" },
+          metadata: { session_id: "conv-123" },
+        }),
       );
     });
 
@@ -267,12 +296,17 @@ describe("AgentRunner", () => {
         conversationId: "conv-abc",
       });
 
-      expect(graph.invoke).toHaveBeenCalledWith(expect.anything(), {
-        metadata: { session_id: "conv-abc" },
-      });
+      expect(graph.invoke).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          recursionLimit: 50,
+          configurable: { thread_id: "conv-abc" },
+          metadata: { session_id: "conv-abc" },
+        }),
+      );
     });
 
-    it("passes no config when conversationId is absent", async () => {
+    it("passes config with ephemeral thread_id when conversationId is absent", async () => {
       const graph = makeFakeGraph();
       mockCreateAgentGraph.mockReturnValue(graph);
 
@@ -283,8 +317,14 @@ describe("AgentRunner", () => {
 
       expect(graph.invoke).toHaveBeenCalledWith(
         expect.objectContaining({ conversationId: undefined }),
-        undefined,
+        expect.objectContaining({
+          recursionLimit: 50,
+          configurable: { thread_id: expect.any(String) },
+        }),
       );
+      // No metadata.session_id for one-shot
+      const config = graph.invoke.mock.calls[0]![1];
+      expect(config.metadata).toBeUndefined();
     });
 
     it("ignores conversationId with invalid format", async () => {
@@ -297,11 +337,16 @@ describe("AgentRunner", () => {
         conversationId: "'; DROP TABLE users; --",
       });
 
-      // Invalid conversationId should be stripped (no metadata passed)
+      // Invalid conversationId should be stripped — ephemeral thread_id used
       expect(graph.invoke).toHaveBeenCalledWith(
         expect.objectContaining({ conversationId: undefined }),
-        undefined,
+        expect.objectContaining({
+          recursionLimit: 50,
+          configurable: { thread_id: expect.any(String) },
+        }),
       );
+      const config = graph.invoke.mock.calls[0]![1];
+      expect(config.metadata).toBeUndefined();
     });
 
     it("returns empty answer string when graph produces no answer", async () => {
@@ -364,7 +409,11 @@ describe("AgentRunner", () => {
         expect.objectContaining({
           userSport: "track",
         }),
-        { streamMode: ["values", "messages"] },
+        expect.objectContaining({
+          streamMode: ["values", "messages"],
+          recursionLimit: 50,
+          configurable: { thread_id: expect.any(String) },
+        }),
       );
     });
 
@@ -383,14 +432,16 @@ describe("AgentRunner", () => {
 
       expect(graph.stream).toHaveBeenCalledWith(
         expect.objectContaining({ conversationId: "conv-456" }),
-        {
+        expect.objectContaining({
           streamMode: ["values", "messages"],
+          recursionLimit: 50,
+          configurable: { thread_id: "conv-456" },
           metadata: { session_id: "conv-456" },
-        },
+        }),
       );
     });
 
-    it("passes no metadata when conversationId is absent", async () => {
+    it("passes ephemeral thread_id when conversationId is absent", async () => {
       const graph = makeFakeGraph();
       mockCreateAgentGraph.mockReturnValue(graph);
 
@@ -404,8 +455,15 @@ describe("AgentRunner", () => {
 
       expect(graph.stream).toHaveBeenCalledWith(
         expect.objectContaining({ conversationId: undefined }),
-        { streamMode: ["values", "messages"] },
+        expect.objectContaining({
+          streamMode: ["values", "messages"],
+          recursionLimit: 50,
+          configurable: { thread_id: expect.any(String) },
+        }),
       );
+      // No metadata.session_id for one-shot
+      const config = graph.stream.mock.calls[0]![1];
+      expect(config.metadata).toBeUndefined();
     });
 
     it("propagates stream errors", async () => {
@@ -492,6 +550,18 @@ describe("AgentRunner", () => {
       await runner.close();
 
       expect(mockEnd).toHaveBeenCalledOnce();
+    });
+
+    it("closes checkpointer pool when it has an end() method", async () => {
+      const mockCheckpointerEnd = vi.fn().mockResolvedValue(undefined);
+      mockCreatePostgresCheckpointer.mockResolvedValue({
+        end: mockCheckpointerEnd,
+      });
+
+      const runner = await AgentRunner.create(defaultConfig);
+      await runner.close();
+
+      expect(mockCheckpointerEnd).toHaveBeenCalledOnce();
     });
   });
 
