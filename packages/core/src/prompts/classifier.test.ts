@@ -88,6 +88,17 @@ describe("CLASSIFIER_PROMPT", () => {
     expect(CLASSIFIER_PROMPT).toContain("{{userMessage}}");
   });
 
+  it("includes canonical NGB IDs in the prompt", () => {
+    expect(CLASSIFIER_PROMPT).toContain("usa-swimming");
+    expect(CLASSIFIER_PROMPT).toContain("us-speedskating");
+    expect(CLASSIFIER_PROMPT).toContain("usopc-breaking");
+    expect(CLASSIFIER_PROMPT).toContain("us-ski-snowboard");
+  });
+
+  it("includes the single-NGB rule", () => {
+    expect(CLASSIFIER_PROMPT).toContain("at most ONE NGB ID");
+  });
+
   it("lists all 7 topic domains", () => {
     const domains = [
       "team_selection",

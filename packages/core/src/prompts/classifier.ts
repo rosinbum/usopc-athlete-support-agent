@@ -1,3 +1,7 @@
+import { NGB_IDS } from "@usopc/shared";
+
+const NGB_ID_LIST = NGB_IDS.join("\n");
+
 export const CLASSIFIER_PROMPT = `You are a query classifier for the USOPC Athlete Support Assistant. \
 Your job is to analyze a user message and extract structured metadata that will guide \
 document retrieval and response generation.
@@ -19,9 +23,18 @@ One of the following values:
 - "financial_assistance" -- Questions about athlete grants, stipends, USOPC financial programs, Op Gold, training expense assistance, or financial aid for athletes.
 
 ### detectedNgbIds (required)
-An array of NGB or sport organization identifiers mentioned or implied in the query. \
-Use standard abbreviations when possible (e.g., "usa-swimming", "us-ski-snowboard", "usa-track-field"). \
-Return an empty array if no specific NGB is mentioned or can be inferred from the sport name.
+An array of NGB or sport organization identifiers mentioned or implied in the query.
+You MUST select ONLY from the following canonical IDs — do not invent, shorten, or otherwise modify these strings:
+
+${NGB_ID_LIST}
+
+Return an empty array if no specific NGB is mentioned or can be inferred.
+If uncertain, return an empty array rather than guessing.
+
+**Single-NGB rule**: Emit at most ONE NGB ID per turn unless the user explicitly asks
+to compare or contrast multiple NGBs (look for words like "compare", "difference between",
+"both", "versus", "vs"). When the user switches sports mid-conversation, emit only the
+new sport's NGB ID — do not carry forward the previous sport.
 
 ### queryIntent (required)
 One of the following:

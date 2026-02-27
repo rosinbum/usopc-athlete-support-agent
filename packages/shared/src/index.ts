@@ -116,6 +116,8 @@ export type {
   SportOrganization,
 } from "./types/sport-org.js";
 
+export { NGB_IDS, NGB_ID_SET, type NgbId } from "./ngbIds.js";
+
 export { normalizeUrl, urlToId } from "./url.js";
 
 export { getResource } from "./resources.js";
