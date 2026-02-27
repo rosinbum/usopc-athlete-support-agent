@@ -75,6 +75,17 @@ const INTENT_AUTHORITY_MULTIPLIERS: Record<QueryIntent, number> = {
 const DEFAULT_AUTHORITY_MULTIPLIER = 0.5;
 
 /**
+ * Maximum authority boost added to an RRF score for the highest-authority
+ * document (law/statute, index 0 in AUTHORITY_LEVELS).
+ *
+ * Calibrated against the typical RRF score range (~0.008–0.016): a max
+ * boost of 0.003 is meaningful (~20–40% of a typical score) without
+ * swamping semantic relevance. Tune this constant if the corpus or RRF
+ * parameters change significantly.
+ */
+const MAX_AUTHORITY_BOOST = 0.003;
+
+/**
  * Extracts key terms from conversation context for query enrichment.
  * Keeps it concise to avoid diluting the search query.
  */
@@ -218,8 +229,7 @@ function buildSubQueryFilter(
  * Higher authority levels get a larger boost.
  *
  * For hybrid search (RRF), the boost is **added** to the RRF score
- * (higher = better). Scaled to 0.003 max to be meaningful relative to
- * RRF scores (~0.008-0.016 range).
+ * (higher = better). See MAX_AUTHORITY_BOOST for calibration rationale.
  */
 function computeAuthorityBoost(
   authorityLevel: string | undefined,
@@ -231,8 +241,8 @@ function computeAuthorityBoost(
   if (index === -1) return 0;
 
   // Higher index = lower authority = less boost
-  // Range: 0.003 (law, index 0) to 0 (educational_guidance, index 8)
-  const maxBoost = 0.003;
+  // Range: MAX_AUTHORITY_BOOST (law, index 0) to 0 (educational_guidance, last index)
+  const maxBoost = MAX_AUTHORITY_BOOST;
   const baseBoost = maxBoost * (1 - index / (AUTHORITY_LEVELS.length - 1));
   const multiplier = queryIntent
     ? (INTENT_AUTHORITY_MULTIPLIERS[queryIntent] ??

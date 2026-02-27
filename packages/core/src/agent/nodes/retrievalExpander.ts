@@ -96,6 +96,15 @@ function buildSqlFilter(state: AgentState): {
  * Fail-open: If the Haiku call or searches fail, returns
  * `{ expansionAttempted: true }` so the graph falls through to the
  * researcher node on the next routing decision.
+ *
+ * ### Re-entry prevention
+ * The `expansionAttempted` boolean on state ensures this node runs at
+ * most once per turn. The `needsMoreInfo` edge checks the flag before
+ * routing here, so a second low-confidence result after expansion falls
+ * through to the researcher rather than looping. This mirrors the
+ * `qualityRetryCount` cap on the synthesizer, but uses a boolean because
+ * there is no value in attempting more than one expansion pass — a second
+ * reformulation rarely recovers from a genuinely sparse corpus.
  */
 export function createRetrievalExpanderNode(
   vectorStore: VectorStoreLike,
