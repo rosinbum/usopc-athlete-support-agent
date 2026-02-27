@@ -26,6 +26,7 @@ export function getPool(): Pool {
       max: 5,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
+      allowExitOnIdle: true,
       ...(needsSsl ? { ssl: true } : {}),
     });
   }
