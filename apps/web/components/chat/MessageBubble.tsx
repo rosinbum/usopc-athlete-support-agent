@@ -1,21 +1,30 @@
-import type { Message } from "ai";
+import type { UIMessage } from "ai";
 import { MarkdownMessage } from "./MarkdownMessage.js";
 import { CitationList } from "./CitationList.js";
 import { FeedbackButtons } from "./FeedbackButtons.js";
 import { isCitationAnnotation, type Citation } from "../../types/citation.js";
 
 interface MessageBubbleProps {
-  message: Message;
+  message: UIMessage;
   conversationId?: string | undefined;
   isStreaming?: boolean;
 }
 
-function extractCitations(annotations: Message["annotations"]): Citation[] {
-  if (!annotations) return [];
+function getMessageText(message: UIMessage): string {
+  return message.parts
+    .filter((p): p is { type: "text"; text: string } => p.type === "text")
+    .map((p) => p.text)
+    .join("");
+}
+
+function extractCitations(message: UIMessage): Citation[] {
   const results: Citation[] = [];
-  for (const ann of annotations) {
-    if (isCitationAnnotation(ann)) {
-      results.push(...ann.citations);
+  for (const part of message.parts) {
+    if ("type" in part && "data" in part) {
+      const data = (part as { type: string; data: unknown }).data;
+      if (isCitationAnnotation(data)) {
+        results.push(...data.citations);
+      }
     }
   }
   return results;
@@ -27,7 +36,8 @@ export function MessageBubble({
   isStreaming,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
-  const citations = isUser ? [] : extractCitations(message.annotations);
+  const content = getMessageText(message);
+  const citations = isUser ? [] : extractCitations(message);
 
   return (
     <div
@@ -40,11 +50,11 @@ export function MessageBubble({
       >
         {isUser ? (
           <div className="whitespace-pre-wrap text-sm leading-relaxed">
-            {message.content}
+            {content}
           </div>
         ) : (
           <>
-            <MarkdownMessage content={message.content} />
+            <MarkdownMessage content={content} />
             <CitationList citations={citations} />
             {conversationId && !isStreaming && (
               <FeedbackButtons

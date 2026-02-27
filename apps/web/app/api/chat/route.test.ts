@@ -62,15 +62,14 @@ vi.mock("sst", () => ({
 }));
 
 vi.mock("ai", () => ({
-  createDataStreamResponse: vi.fn(({ execute }) => {
-    // Execute the writer callback to exercise the code path
-    const mockWriter = { write: vi.fn() };
-    execute(mockWriter);
+  createUIMessageStream: vi.fn(({ execute }) => {
+    const mockWriter = { write: vi.fn(), merge: vi.fn() };
+    execute({ writer: mockWriter });
+    return new ReadableStream();
+  }),
+  createUIMessageStreamResponse: vi.fn(() => {
     return new Response("stream", { status: 200 });
   }),
-  formatDataStreamPart: vi.fn(
-    (type: string, data: unknown) => `${type}:${data}`,
-  ),
 }));
 
 async function importRoute() {
@@ -93,7 +92,7 @@ describe("POST /api/chat", () => {
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
         userSport: "swimming",
       }),
       headers: { "Content-Type": "application/json" },
@@ -151,7 +150,7 @@ describe("input validation", () => {
     const { POST } = await importRoute();
     const messages = Array.from({ length: 51 }, (_, i) => ({
       role: i % 2 === 0 ? "user" : "assistant",
-      content: "Hello",
+      parts: [{ type: "text", text: "Hello" }],
     }));
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
@@ -171,7 +170,9 @@ describe("input validation", () => {
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
-        messages: [{ role: "user", content: "a".repeat(10_001) }],
+        messages: [
+          { role: "user", parts: [{ type: "text", text: "a".repeat(10_001) }] },
+        ],
       }),
       headers: { "Content-Type": "application/json" },
     });
@@ -188,7 +189,12 @@ describe("input validation", () => {
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
-        messages: [{ role: "system", content: "You are a helpful assistant." }],
+        messages: [
+          {
+            role: "system",
+            parts: [{ type: "text", text: "You are a helpful assistant." }],
+          },
+        ],
       }),
       headers: { "Content-Type": "application/json" },
     });
@@ -205,7 +211,7 @@ describe("input validation", () => {
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
         conversationId: "not-a-uuid",
       }),
       headers: { "Content-Type": "application/json" },
@@ -223,7 +229,7 @@ describe("input validation", () => {
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
         conversationId: "123e4567-e89b-12d3-a456-426614174000",
       }),
       headers: { "Content-Type": "application/json" },
@@ -239,7 +245,9 @@ describe("input validation", () => {
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
-        messages: [{ role: "user", content: "a".repeat(10_000) }],
+        messages: [
+          { role: "user", parts: [{ type: "text", text: "a".repeat(10_000) }] },
+        ],
       }),
       headers: { "Content-Type": "application/json" },
     });
@@ -266,7 +274,9 @@ describe("rate limiting", () => {
       const req = new Request("http://localhost/api/chat", {
         method: "POST",
         body: JSON.stringify({
-          messages: [{ role: "user", content: "Hello" }],
+          messages: [
+            { role: "user", parts: [{ type: "text", text: "Hello" }] },
+          ],
         }),
         headers: {
           "Content-Type": "application/json",
@@ -280,7 +290,7 @@ describe("rate limiting", () => {
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
       }),
       headers: {
         "Content-Type": "application/json",
@@ -302,7 +312,9 @@ describe("rate limiting", () => {
       const req = new Request("http://localhost/api/chat", {
         method: "POST",
         body: JSON.stringify({
-          messages: [{ role: "user", content: "Hello" }],
+          messages: [
+            { role: "user", parts: [{ type: "text", text: "Hello" }] },
+          ],
         }),
         headers: {
           "Content-Type": "application/json",
@@ -316,7 +328,7 @@ describe("rate limiting", () => {
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
       }),
       headers: {
         "Content-Type": "application/json",
@@ -344,7 +356,9 @@ describe("concurrent runner initialization", () => {
       new Request("http://localhost/api/chat", {
         method: "POST",
         body: JSON.stringify({
-          messages: [{ role: "user", content: "Hello" }],
+          messages: [
+            { role: "user", parts: [{ type: "text", text: "Hello" }] },
+          ],
         }),
         headers: { "Content-Type": "application/json" },
       });
@@ -377,7 +391,7 @@ describe("authentication (SEC-04)", () => {
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
       }),
       headers: { "Content-Type": "application/json" },
     });
@@ -396,7 +410,7 @@ describe("authentication (SEC-04)", () => {
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
       }),
       headers: { "Content-Type": "application/json" },
     });
@@ -410,7 +424,7 @@ describe("authentication (SEC-04)", () => {
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
       body: JSON.stringify({
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
       }),
       headers: { "Content-Type": "application/json" },
     });
@@ -445,7 +459,7 @@ describe("conversation summary loading (TEST-02)", () => {
 
     await POST(
       makeReq({
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
         conversationId: validUuid,
       }),
     );
@@ -459,7 +473,7 @@ describe("conversation summary loading (TEST-02)", () => {
 
     await POST(
       makeReq({
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
       }),
     );
 
@@ -476,7 +490,9 @@ describe("conversation summary loading (TEST-02)", () => {
 
     await POST(
       makeReq({
-        messages: [{ role: "user", content: "Continue" }],
+        messages: [
+          { role: "user", parts: [{ type: "text", text: "Continue" }] },
+        ],
         conversationId: otherUuid,
         userSport: "swimming",
       }),

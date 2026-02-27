@@ -1,12 +1,12 @@
 "use client";
 
-import type { Message } from "ai";
+import type { UIMessage } from "ai";
 import { MessageBubble } from "./MessageBubble";
 import { Send } from "lucide-react";
 import { FormEvent, ChangeEvent, useRef, useEffect } from "react";
 
 interface ChatWindowProps {
-  messages: Message[];
+  messages: UIMessage[];
   input: string;
   isLoading: boolean;
   statusText?: string | undefined;
