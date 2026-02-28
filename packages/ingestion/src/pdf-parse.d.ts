@@ -1,17 +1,23 @@
+// Type declarations for pdf-parse v2 (class-based API).
+// The package ships its own ESM types but TypeScript's bundler resolution
+// can have trouble seeing the named PDFParse export due to pdfjs-dist type
+// complexity, so we provide this explicit ambient override.
 declare module "pdf-parse" {
-  interface PdfData {
-    numpages: number;
-    numrender: number;
-    info: Record<string, unknown>;
-    metadata: Record<string, unknown> | null;
-    version: string;
+  interface TextResult {
     text: string;
+    /** Total page count. */
+    total: number;
   }
 
-  function pdfParse(
-    dataBuffer: Buffer,
-    options?: Record<string, unknown>,
-  ): Promise<PdfData>;
+  interface LoadParameters {
+    data: Buffer | Uint8Array;
+    [key: string]: unknown;
+  }
 
-  export = pdfParse;
+  class PDFParse {
+    constructor(options: LoadParameters);
+    getText(): Promise<TextResult>;
+  }
+
+  export { PDFParse };
 }

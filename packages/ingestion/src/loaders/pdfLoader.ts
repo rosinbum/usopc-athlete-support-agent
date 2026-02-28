@@ -1,5 +1,5 @@
 import { Document } from "@langchain/core/documents";
-import pdfParse from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import { readFile } from "node:fs/promises";
 import { fetchWithRetry } from "./fetchWithRetry.js";
 
@@ -42,6 +42,9 @@ export function withParseTimeout<T>(
  *
  * Each PDF is returned as a single {@link Document} (pdf-parse extracts the
  * full text).  The upstream splitter is responsible for chunking.
+ *
+ * Uses pdf-parse v2 class API: new PDFParse({ data: buffer }).getText()
+ * returns { text: string, total: number } where total is the page count.
  */
 export async function loadPdf(source: string): Promise<Document[]> {
   let buffer: Buffer;
@@ -66,7 +69,8 @@ export async function loadPdf(source: string): Promise<Document[]> {
     buffer = await readFile(source);
   }
 
-  const parsed = await withParseTimeout(pdfParse(buffer), 60_000, source);
+  const parser = new PDFParse({ data: buffer });
+  const parsed = await withParseTimeout(parser.getText(), 60_000, source);
 
   if (!parsed.text || parsed.text.trim().length === 0) {
     throw new Error(`PDF at ${source} produced no extractable text`);
@@ -78,7 +82,7 @@ export async function loadPdf(source: string): Promise<Document[]> {
       metadata: {
         source,
         format: "pdf",
-        pages: parsed.numpages,
+        pages: parsed.total,
       },
     }),
   ];

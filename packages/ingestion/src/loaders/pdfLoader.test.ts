@@ -30,9 +30,16 @@ vi.mock("./fetchWithRetry.js", () => ({
   },
 }));
 
-const mockPdfParse = vi.fn();
+// pdf-parse v2 API: PDFParse class with getText() method.
+// getText() returns { text: string, total: number } where total is page count.
+const mockGetText = vi.fn();
 vi.mock("pdf-parse", () => ({
-  default: (buffer: Buffer) => mockPdfParse(buffer),
+  PDFParse: class {
+    constructor(public opts: { data: Buffer }) {}
+    getText() {
+      return mockGetText();
+    }
+  },
 }));
 
 const mockReadFile = vi.fn();
@@ -74,9 +81,9 @@ describe("loadPdf", () => {
       mockFetchWithRetry.mockResolvedValueOnce(
         createMockPdfResponse(pdfContent),
       );
-      mockPdfParse.mockResolvedValueOnce({
+      mockGetText.mockResolvedValueOnce({
         text: "PDF document content",
-        numpages: 5,
+        total: 5,
       });
 
       const docs = await loadPdf("https://example.com/document.pdf");
@@ -93,9 +100,9 @@ describe("loadPdf", () => {
       mockFetchWithRetry.mockResolvedValueOnce(
         createMockPdfResponse(pdfContent),
       );
-      mockPdfParse.mockResolvedValueOnce({
+      mockGetText.mockResolvedValueOnce({
         text: "Content",
-        numpages: 1,
+        total: 1,
       });
 
       await loadPdf("https://example.com/document.pdf");
@@ -119,9 +126,9 @@ describe("loadPdf", () => {
       mockFetchWithRetry.mockResolvedValueOnce(
         createMockPdfResponse(pdfContent),
       );
-      mockPdfParse.mockResolvedValueOnce({
+      mockGetText.mockResolvedValueOnce({
         text: "HTTPS content",
-        numpages: 1,
+        total: 1,
       });
 
       const docs = await loadPdf("https://secure.example.com/doc.pdf");
@@ -139,9 +146,9 @@ describe("loadPdf", () => {
       mockFetchWithRetry.mockResolvedValueOnce(
         createMockPdfResponse(pdfContent),
       );
-      mockPdfParse.mockResolvedValueOnce({
+      mockGetText.mockResolvedValueOnce({
         text: "HTTP content",
-        numpages: 1,
+        total: 1,
       });
 
       const docs = await loadPdf("http://example.com/doc.pdf");
@@ -159,9 +166,9 @@ describe("loadPdf", () => {
     it("reads PDF from local file path", async () => {
       const pdfBuffer = Buffer.from("fake pdf content");
       mockReadFile.mockResolvedValueOnce(pdfBuffer);
-      mockPdfParse.mockResolvedValueOnce({
+      mockGetText.mockResolvedValueOnce({
         text: "Local PDF content",
-        numpages: 3,
+        total: 3,
       });
 
       const docs = await loadPdf("/path/to/local/document.pdf");
@@ -175,9 +182,9 @@ describe("loadPdf", () => {
     it("does not use fetchWithRetry for local files", async () => {
       const pdfBuffer = Buffer.from("fake pdf content");
       mockReadFile.mockResolvedValueOnce(pdfBuffer);
-      mockPdfParse.mockResolvedValueOnce({
+      mockGetText.mockResolvedValueOnce({
         text: "Local content",
-        numpages: 1,
+        total: 1,
       });
 
       await loadPdf("/path/to/document.pdf");
@@ -192,9 +199,9 @@ describe("loadPdf", () => {
       mockFetchWithRetry.mockResolvedValueOnce(
         createMockPdfResponse(pdfContent),
       );
-      mockPdfParse.mockResolvedValueOnce({
+      mockGetText.mockResolvedValueOnce({
         text: "Content after retry",
-        numpages: 1,
+        total: 1,
       });
 
       const docs = await loadPdf("https://example.com/retry.pdf");
@@ -258,9 +265,9 @@ describe("loadPdf", () => {
       mockFetchWithRetry.mockResolvedValueOnce(
         createMockPdfResponse(pdfContent),
       );
-      mockPdfParse.mockResolvedValueOnce({
+      mockGetText.mockResolvedValueOnce({
         text: "",
-        numpages: 1,
+        total: 1,
       });
 
       await expect(loadPdf("https://example.com/doc.pdf")).rejects.toThrow(
@@ -273,9 +280,9 @@ describe("loadPdf", () => {
       mockFetchWithRetry.mockResolvedValueOnce(
         createMockPdfResponse(pdfContent),
       );
-      mockPdfParse.mockResolvedValueOnce({
+      mockGetText.mockResolvedValueOnce({
         text: "   \n\t  ",
-        numpages: 1,
+        total: 1,
       });
 
       await expect(loadPdf("https://example.com/doc.pdf")).rejects.toThrow(
@@ -294,7 +301,7 @@ describe("loadPdf", () => {
       mockFetchWithRetry.mockResolvedValueOnce(
         createMockPdfResponse(pdfContent),
       );
-      mockPdfParse.mockRejectedValueOnce(new Error("Invalid PDF structure"));
+      mockGetText.mockRejectedValueOnce(new Error("Invalid PDF structure"));
 
       await expect(loadPdf("https://example.com/doc.pdf")).rejects.toThrow(
         "Invalid PDF structure",
@@ -306,8 +313,8 @@ describe("loadPdf", () => {
       const pdfBuffer = Buffer.from("fake pdf content");
       mockReadFile.mockResolvedValueOnce(pdfBuffer);
 
-      // Mock pdfParse to never resolve
-      mockPdfParse.mockReturnValueOnce(new Promise(() => {}));
+      // Mock getText to never resolve
+      mockGetText.mockReturnValueOnce(new Promise(() => {}));
 
       const promise = loadPdf("/path/to/corrupted.pdf");
       // Prevent unhandled rejection warning while timers advance
@@ -325,9 +332,9 @@ describe("loadPdf", () => {
     it("succeeds when parsing completes within timeout", async () => {
       const pdfBuffer = Buffer.from("fake pdf content");
       mockReadFile.mockResolvedValueOnce(pdfBuffer);
-      mockPdfParse.mockResolvedValueOnce({
+      mockGetText.mockResolvedValueOnce({
         text: "Parsed content",
-        numpages: 2,
+        total: 2,
       });
 
       const docs = await loadPdf("/path/to/valid.pdf");
