@@ -41,7 +41,7 @@ describe("bm25Search", () => {
 
     const call = (pool.query as ReturnType<typeof vi.fn>).mock.calls[0]!;
     const sql = call[0] as string;
-    expect(sql).toContain("plainto_tsquery");
+    expect(sql).toContain("websearch_to_tsquery");
     expect(sql).toContain("ts_rank_cd");
   });
 
