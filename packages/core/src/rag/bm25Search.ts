@@ -22,8 +22,8 @@ export interface Bm25SearchResult {
  * BM25-style full-text search using the `content_tsv` tsvector column
  * and GIN index on the `document_chunks` table.
  *
- * Uses `plainto_tsquery` for safe handling of user input (no syntax errors
- * from boolean operators).
+ * Uses `websearch_to_tsquery` which preserves quoted phrase matching and
+ * OR operators while safely handling user input (PostgreSQL 11+).
  *
  * Filters use the denormalized `ngb_id` and `topic_domain` columns which
  * have B-tree indexes.
@@ -38,7 +38,7 @@ export async function bm25Search(
 
   const params: unknown[] = [query];
   const conditions: string[] = [
-    "content_tsv @@ plainto_tsquery('english', $1)",
+    "content_tsv @@ websearch_to_tsquery('english', $1)",
   ];
 
   let paramIndex = 2;
@@ -59,7 +59,7 @@ export async function bm25Search(
 
   const sql = `
     SELECT id, content, metadata,
-           ts_rank_cd(content_tsv, plainto_tsquery('english', $1)) AS rank
+           ts_rank_cd(content_tsv, websearch_to_tsquery('english', $1)) AS rank
     FROM document_chunks
     WHERE ${conditions.join(" AND ")}
     ORDER BY rank DESC
