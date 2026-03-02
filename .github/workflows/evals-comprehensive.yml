@@ -138,10 +138,11 @@ jobs:
               `> [View full run →](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
             ].join('\n');
 
-            // Try to find the "Eval Reports" category
+            // Fetch repo ID + discussion categories in a single query
             try {
               const query = `query($owner: String!, $repo: String!) {
                 repository(owner: $owner, name: $repo) {
+                  id
                   discussionCategories(first: 25) {
                     nodes { id name }
                   }
@@ -152,6 +153,7 @@ jobs:
                 repo: context.repo.repo,
               });
 
+              const repoId = result.repository.id;
               const categories = result.repository.discussionCategories.nodes;
               const evalCategory = categories.find(c => c.name === 'Eval Reports');
 
@@ -162,17 +164,8 @@ jobs:
                   }
                 }`;
 
-                // Get repo ID
-                const repoQuery = `query($owner: String!, $repo: String!) {
-                  repository(owner: $owner, name: $repo) { id }
-                }`;
-                const repoResult = await github.graphql(repoQuery, {
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                });
-
                 await github.graphql(mutation, {
-                  repoId: repoResult.repository.id,
+                  repoId,
                   categoryId: evalCategory.id,
                   title,
                   body,

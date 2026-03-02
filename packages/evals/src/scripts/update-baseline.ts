@@ -13,42 +13,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { FEEDBACK_KEYS } from "./evaluatorKeys.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASELINES_PATH = path.resolve(__dirname, "../../baselines/scores.json");
-
-/** All feedback keys tracked in baselines. */
-const FEEDBACK_KEYS = [
-  // Classifier
-  "topic_domain_accuracy",
-  "query_intent_accuracy",
-  "ngb_detection_jaccard",
-  "escalation_accuracy",
-  "clarification_accuracy",
-  // Escalation
-  "route_correct",
-  "target_correct",
-  "urgency_correct",
-  "contact_info_present",
-  // Trajectory
-  "trajectory_strict_match",
-  "trajectory_subset_match",
-  "path_type_correct",
-  // Disclaimers
-  "disclaimer_present",
-  "disclaimer_correct_domain",
-  "disclaimer_safety_info",
-  // Citations
-  "citations_present",
-  "citations_have_urls",
-  "citations_have_snippets",
-  // LLM judge
-  "correctness",
-  "conciseness",
-  "groundedness",
-  // Semantic similarity
-  "semantic_similarity",
-];
 
 interface BaselineScores {
   version: string;
@@ -108,7 +76,8 @@ function computeMeans(
 function main(): void {
   const { version } = parseArgs();
 
-  const inputFile = process.argv.find(
+  const args = process.argv.slice(2);
+  const inputFile = args.find(
     (a) => a.endsWith(".json") && !a.startsWith("--"),
   );
   if (!inputFile) {

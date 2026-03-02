@@ -50,7 +50,6 @@ jobs:
       # ── Run all evaluators ────────────────────────────────────────────────
       - name: Run classifier eval
         run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/classifier.json src/evaluators/classifierAccuracy.eval.ts
-        working-directory: .
 
       - name: Run escalation eval
         run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/escalation.json src/evaluators/escalation.eval.ts
@@ -126,6 +125,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
+              per_page: 100,
             });
 
             const marker = '## Eval Results — Tier 1';
