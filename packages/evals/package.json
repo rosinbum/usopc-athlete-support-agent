@@ -17,7 +17,9 @@
     "eval:trajectory": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/trajectory.eval.ts",
     "eval:citations": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/citations.eval.ts",
     "eval:disclaimers": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/disclaimers.eval.ts",
+    "eval:semantic": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/semanticSimilarity.eval.ts",
     "seed-langsmith": "sst shell -- tsx src/scripts/seed-datasets.ts",
+    "seed-langsmith:force": "sst shell -- tsx src/scripts/seed-datasets.ts --force",
     "quality:seed": "sst shell -- tsx src/scripts/seed-quality-review.ts",
     "quality:run": "sst shell -- tsx src/scripts/run-quality-review.ts",
     "quality:triage": "tsx src/scripts/triage.ts",
@@ -25,6 +27,7 @@
   },
   "dependencies": {
     "@langchain/core": "^1.1.28",
+    "@langchain/openai": "^1.2.10",
     "@usopc/core": "workspace:*",
     "@usopc/shared": "workspace:*",
     "agentevals": "^0.0.6",

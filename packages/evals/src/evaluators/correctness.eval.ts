@@ -7,7 +7,7 @@ import { fetchExamples } from "../helpers/fetchExamples.js";
 const correctnessJudge = createLLMAsJudge({
   prompt: CORRECTNESS_PROMPT,
   feedbackKey: "correctness",
-  model: "openai:gpt-4o",
+  model: "openai:gpt-4o-mini",
   continuous: true,
 });
 
