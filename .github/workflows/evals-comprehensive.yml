@@ -90,6 +90,14 @@ jobs:
             --outputFile=results/all-evals.json \
             || true
 
+      # ── Update baseline on tagged releases ──────────────────────────────
+      - name: Update baseline scores
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          pnpm --filter @usopc/evals exec tsx src/scripts/update-baseline.ts \
+            --version "$TAG" results/all-evals.json
+
       # ── Upload results ────────────────────────────────────────────────────
       - name: Upload eval results
         if: always()

@@ -35,8 +35,8 @@ function parseArgs(): { version: string } {
 }
 
 /**
- * Reads vitest JSON output from stdin or a file and extracts feedback scores.
- * Expected format: newline-delimited JSON with { key, score } pairs.
+ * Reads a vitest JSON reporter file and extracts feedback scores.
+ * Expected format: `{ results: { [key]: { scores: number[] } } }`.
  */
 function readScoresFromFile(filePath: string): Map<string, number[]> {
   const scores = new Map<string, number[]>();
