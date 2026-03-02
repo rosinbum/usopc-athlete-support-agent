@@ -7,7 +7,7 @@ import { fetchExamples } from "../helpers/fetchExamples.js";
 const groundednessJudge = createLLMAsJudge({
   prompt: RAG_GROUNDEDNESS_PROMPT,
   feedbackKey: "groundedness",
-  model: "openai:gpt-4o",
+  model: "openai:gpt-4o-mini",
   continuous: true,
 });
 

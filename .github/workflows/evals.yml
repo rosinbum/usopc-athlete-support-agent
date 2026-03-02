@@ -6,65 +6,18 @@ on:
     types: [opened, synchronize, reopened, labeled]
 
 jobs:
-  deterministic-evals:
-    name: Deterministic Evaluations
+  # ── Tier 1 — Fast Evals (deterministic + classifier/escalation) ──────────
+  tier1-evals:
+    name: Tier 1 — Fast Evals
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'run-evals')
     env:
       LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
       LANGSMITH_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: usopc_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
-      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Initialize database
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
-        run: psql "$DATABASE_URL" -f scripts/init-db.sql
-
-      - name: Run classifier eval
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts src/evaluators/classifierAccuracy.eval.ts
-
-      - name: Run escalation eval
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts src/evaluators/escalation.eval.ts
-
-  llm-judge-evals:
-    name: LLM Judge Evaluations
-    runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'run-llm-evals')
-    env:
-      LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
-      LANGSMITH_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
 
     services:
       postgres:
@@ -92,16 +45,104 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Initialize database
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
         run: psql "$DATABASE_URL" -f scripts/init-db.sql
 
-      - name: Run groundedness eval
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts src/evaluators/groundedness.eval.ts
+      # ── Run all evaluators ────────────────────────────────────────────────
+      - name: Run classifier eval
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/classifier.json src/evaluators/classifierAccuracy.eval.ts
+        working-directory: .
+
+      - name: Run escalation eval
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/escalation.json src/evaluators/escalation.eval.ts
+
+      - name: Run trajectory eval
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/trajectory.json src/evaluators/trajectory.eval.ts
+
+      - name: Run disclaimers eval
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/disclaimers.json src/evaluators/disclaimers.eval.ts
+
+      - name: Run citations eval
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/citations.json src/evaluators/citations.eval.ts
 
       - name: Run correctness eval
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts src/evaluators/correctness.eval.ts
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/correctness.json src/evaluators/correctness.eval.ts
+
+      - name: Run groundedness eval
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/groundedness.json src/evaluators/groundedness.eval.ts
+
+      - name: Run semantic similarity eval
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/semantic.json src/evaluators/semanticSimilarity.eval.ts
+
+      # ── Upload results ────────────────────────────────────────────────────
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: eval-results
+          path: results/
+          retention-days: 30
+
+      # ── Post PR comment ───────────────────────────────────────────────────
+      - name: Post eval summary to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Collect pass/fail from vitest JSON output
+            const resultsDir = 'results';
+            const rows = [];
+
+            if (fs.existsSync(resultsDir)) {
+              for (const file of fs.readdirSync(resultsDir)) {
+                if (!file.endsWith('.json')) continue;
+                try {
+                  const data = JSON.parse(fs.readFileSync(path.join(resultsDir, file), 'utf-8'));
+                  const name = path.basename(file, '.json');
+                  const passed = data.numPassedTests ?? 0;
+                  const failed = data.numFailedTests ?? 0;
+                  const total = passed + failed;
+                  const icon = failed > 0 ? '🔴' : '✅';
+                  rows.push(`| ${name} | ${passed}/${total} | ${icon} |`);
+                } catch {
+                  // Skip malformed files
+                }
+              }
+            }
+
+            const body = [
+              '## Eval Results — Tier 1\n',
+              '| Evaluator | Pass Rate | Status |',
+              '|-----------|-----------|--------|',
+              ...rows,
+              '',
+              `> Run: [${context.runId}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+            ].join('\n');
+
+            // Find and update existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const marker = '## Eval Results — Tier 1';
+            const existing = comments.find(c => c.body?.startsWith(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

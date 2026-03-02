@@ -1,0 +1,28 @@
+{
+  "version": "v0.1.0",
+  "date": "2026-03-02",
+  "evaluators": {
+    "topic_domain_accuracy": { "mean": null },
+    "query_intent_accuracy": { "mean": null },
+    "ngb_detection_jaccard": { "mean": null },
+    "escalation_accuracy": { "mean": null },
+    "clarification_accuracy": { "mean": null },
+    "route_correct": { "mean": null },
+    "target_correct": { "mean": null },
+    "urgency_correct": { "mean": null },
+    "contact_info_present": { "mean": null },
+    "trajectory_strict_match": { "mean": null },
+    "trajectory_subset_match": { "mean": null },
+    "path_type_correct": { "mean": null },
+    "disclaimer_present": { "mean": null },
+    "disclaimer_correct_domain": { "mean": null },
+    "disclaimer_safety_info": { "mean": null },
+    "citations_present": { "mean": null },
+    "citations_have_urls": { "mean": null },
+    "citations_have_snippets": { "mean": null },
+    "correctness": { "mean": null },
+    "conciseness": { "mean": null },
+    "groundedness": { "mean": null },
+    "semantic_similarity": { "mean": null }
+  }
+}

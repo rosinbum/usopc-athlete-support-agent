@@ -1,0 +1,187 @@
+name: Comprehensive Evaluations
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 6 AM UTC daily
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      baseline_tag:
+        description: "Compare against a specific baseline tag"
+        required: false
+
+jobs:
+  # ── Check if agent code changed since last successful run ────────────────
+  check-changes:
+    name: Check for agent changes
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.diff.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: diff
+        run: |
+          # Always run on tags or manual dispatch
+          if [[ "${{ github.event_name }}" != "schedule" ]]; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # For nightly: skip if no agent code changed in last 24h
+          CHANGED=$(git log --since="24 hours ago" --name-only --pretty=format: -- packages/core/ packages/evals/ | grep -c . || true)
+          echo "has_changes=$([[ $CHANGED -gt 0 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  # ── Tier 2 — Full eval suite ─────────────────────────────────────────────
+  tier2-evals:
+    name: Tier 2 — Comprehensive Evals
+    needs: check-changes
+    if: needs.check-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    env:
+      LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+      LANGSMITH_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: usopc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Initialize database
+        run: psql "$DATABASE_URL" -f scripts/init-db.sql
+
+      # Force re-seed LangSmith datasets so they're always in sync
+      - name: Seed LangSmith datasets
+        run: pnpm --filter @usopc/evals exec tsx src/scripts/seed-datasets.ts --force
+
+      # ── Run ALL evaluators ────────────────────────────────────────────────
+      - name: Run all evals
+        run: |
+          mkdir -p results
+          pnpm --filter @usopc/evals exec vitest run \
+            --config ls.vitest.config.ts \
+            --reporter=json \
+            --outputFile=results/all-evals.json \
+            || true
+
+      # ── Upload results ────────────────────────────────────────────────────
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: comprehensive-eval-results
+          path: results/
+          retention-days: 90
+
+      # ── Post to GitHub Discussion ─────────────────────────────────────────
+      - name: Post results to Discussion
+        if: always()
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const resultsFile = 'results/all-evals.json';
+            let passed = 0, failed = 0;
+            if (fs.existsSync(resultsFile)) {
+              try {
+                const data = JSON.parse(fs.readFileSync(resultsFile, 'utf-8'));
+                passed = data.numPassedTests ?? 0;
+                failed = data.numFailedTests ?? 0;
+              } catch { /* ignore */ }
+            }
+
+            const total = passed + failed;
+            const event = context.eventName;
+            const ref = context.ref || 'main';
+            const date = new Date().toISOString().slice(0, 10);
+            const trigger = event === 'schedule' ? 'Nightly' :
+                            event === 'push' ? `Release ${ref}` : 'Manual';
+
+            const title = `Eval Report — ${trigger} — ${date}`;
+            const body = [
+              `## ${title}\n`,
+              `**Trigger**: ${trigger}`,
+              `**Ref**: \`${ref}\``,
+              `**Date**: ${date}\n`,
+              `### Results\n`,
+              `- **Passed**: ${passed}/${total}`,
+              `- **Failed**: ${failed}/${total}`,
+              '',
+              `> [View full run →](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+            ].join('\n');
+
+            // Try to find the "Eval Reports" category
+            try {
+              const query = `query($owner: String!, $repo: String!) {
+                repository(owner: $owner, name: $repo) {
+                  discussionCategories(first: 25) {
+                    nodes { id name }
+                  }
+                }
+              }`;
+              const result = await github.graphql(query, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+
+              const categories = result.repository.discussionCategories.nodes;
+              const evalCategory = categories.find(c => c.name === 'Eval Reports');
+
+              if (evalCategory) {
+                const mutation = `mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
+                  createDiscussion(input: {repositoryId: $repoId, categoryId: $categoryId, title: $title, body: $body}) {
+                    discussion { url }
+                  }
+                }`;
+
+                // Get repo ID
+                const repoQuery = `query($owner: String!, $repo: String!) {
+                  repository(owner: $owner, name: $repo) { id }
+                }`;
+                const repoResult = await github.graphql(repoQuery, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                });
+
+                await github.graphql(mutation, {
+                  repoId: repoResult.repository.id,
+                  categoryId: evalCategory.id,
+                  title,
+                  body,
+                });
+
+                console.log('Discussion created successfully');
+              } else {
+                console.log('No "Eval Reports" discussion category found — skipping discussion post');
+              }
+            } catch (err) {
+              console.log('Could not create discussion:', err.message);
+            }

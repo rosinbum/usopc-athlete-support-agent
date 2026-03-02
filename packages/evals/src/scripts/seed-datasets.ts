@@ -5,6 +5,7 @@
  * Idempotent — skips datasets that already exist with the expected example count.
  *
  * Usage: pnpm --filter @usopc/evals seed-langsmith
+ *        pnpm --filter @usopc/evals seed-langsmith -- --force
  */
 
 import { resolveEnv } from "../helpers/resolveEnv.js";
@@ -18,6 +19,8 @@ import { retrievalExamples } from "../datasets/retrieval.js";
 import { answerQualityExamples } from "../datasets/answerQuality.js";
 import { escalationExamples } from "../datasets/escalation.js";
 import { trajectoryExamples } from "../datasets/trajectory.js";
+
+const forceRecreate = process.argv.includes("--force");
 
 interface DatasetSpec {
   name: string;
@@ -90,26 +93,31 @@ async function seedDataset(spec: DatasetSpec): Promise<void> {
   }
 
   if (existingDataset) {
-    // Check example count
-    const examples = [];
-    for await (const ex of client.listExamples({
-      datasetId: existingDataset.id,
-    })) {
-      examples.push(ex);
-    }
+    if (forceRecreate) {
+      console.log(`  ↻ "${spec.name}" exists — force recreating`);
+      await client.deleteDataset({ datasetName: spec.name });
+    } else {
+      // Check example count
+      const examples = [];
+      for await (const ex of client.listExamples({
+        datasetId: existingDataset.id,
+      })) {
+        examples.push(ex);
+      }
 
-    if (examples.length === spec.examples.length) {
+      if (examples.length === spec.examples.length) {
+        console.log(
+          `  ✓ "${spec.name}" already exists with ${examples.length} examples — skipping`,
+        );
+        return;
+      }
+
+      // Delete and recreate if count doesn't match
       console.log(
-        `  ✓ "${spec.name}" already exists with ${examples.length} examples — skipping`,
+        `  ↻ "${spec.name}" exists with ${examples.length} examples (expected ${spec.examples.length}) — recreating`,
       );
-      return;
+      await client.deleteDataset({ datasetName: spec.name });
     }
-
-    // Delete and recreate if count doesn't match
-    console.log(
-      `  ↻ "${spec.name}" exists with ${examples.length} examples (expected ${spec.examples.length}) — recreating`,
-    );
-    await client.deleteDataset({ datasetName: spec.name });
   }
 
   // Create dataset
