@@ -5,8 +5,6 @@ import type { Document } from "@langchain/core/documents";
 // Mocks — must be before importing the module under test
 // ---------------------------------------------------------------------------
 
-const mockPoolQuery = vi.fn().mockResolvedValue({ rowCount: 0 });
-
 vi.mock("@usopc/shared", () => ({
   createLogger: () => ({
     info: vi.fn(),
@@ -14,9 +12,6 @@ vi.mock("@usopc/shared", () => ({
     error: vi.fn(),
     debug: vi.fn(),
     child: vi.fn(),
-  }),
-  getPool: () => ({
-    query: mockPoolQuery,
   }),
 }));
 
@@ -79,7 +74,6 @@ vi.mock("./transformers/sectionExtractor.js", () => ({
 // Now import the module under test
 import {
   QuotaExhaustedError,
-  backfillDenormalizedColumns,
   ingestSource,
   type IngestionSource,
 } from "./pipeline.js";
@@ -152,16 +146,6 @@ describe("ingestSource", () => {
       status: "completed",
       chunksCount: 1,
     });
-  });
-
-  it("runs backfill after embedding using shared pool", async () => {
-    mockPoolQuery.mockResolvedValueOnce({ rowCount: 5 });
-
-    await ingestSource(SOURCE, OPTIONS);
-
-    expect(mockPoolQuery).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE document_chunks"),
-    );
   });
 
   it("throws QuotaExhaustedError for 'insufficient_quota' errors", async () => {
@@ -285,39 +269,5 @@ describe("ingestSource", () => {
     expect(result.status).toBe("failed");
     expect(result.error).toBe("timeout");
     expect(mockAddVectors).toHaveBeenCalledTimes(3);
-  });
-});
-
-describe("backfillDenormalizedColumns", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("runs UPDATE using the shared pool", async () => {
-    mockPoolQuery.mockResolvedValueOnce({ rowCount: 3 });
-
-    const updated = await backfillDenormalizedColumns();
-
-    expect(mockPoolQuery).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE document_chunks"),
-    );
-    expect(mockPoolQuery).toHaveBeenCalledWith(
-      expect.stringContaining("source_url IS NULL"),
-    );
-    expect(updated).toBe(3);
-  });
-
-  it("returns 0 when no rows need backfilling", async () => {
-    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0 });
-
-    const updated = await backfillDenormalizedColumns();
-
-    expect(updated).toBe(0);
-  });
-
-  it("propagates query errors", async () => {
-    mockPoolQuery.mockRejectedValueOnce(new Error("db error"));
-
-    await expect(backfillDenormalizedColumns()).rejects.toThrow("db error");
   });
 });
