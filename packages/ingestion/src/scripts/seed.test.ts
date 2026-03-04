@@ -17,6 +17,12 @@ vi.mock("@usopc/shared", () => ({
   isProduction: () => false,
 }));
 
+vi.mock("sst", () => ({
+  Resource: {
+    DocumentsBucket: { name: "test-bucket" },
+  },
+}));
+
 vi.mock("./seed-db.js", () => ({
   initDatabase: vi.fn(async () => {}),
   loadAllSources: vi.fn(async () => []),
@@ -28,16 +34,11 @@ vi.mock("./seed-dynamodb.js", () => ({
   seedSportOrgs: vi.fn(async () => {}),
 }));
 
-vi.mock("../pipeline.js", () => ({
-  ingestSource: vi.fn(async () => ({
-    sourceId: "test",
+vi.mock("../services/sourceProcessor.js", () => ({
+  processSource: vi.fn(async () => ({
     status: "completed",
     chunksCount: 0,
   })),
-}));
-
-vi.mock("../db.js", () => ({
-  upsertIngestionStatus: vi.fn(async () => {}),
 }));
 
 vi.mock("../entities/index.js", () => ({
@@ -45,12 +46,6 @@ vi.mock("../entities/index.js", () => ({
   createSourceConfigEntity: vi.fn(() => ({
     markSuccess: vi.fn(async () => {}),
     markFailure: vi.fn(async () => {}),
-  })),
-}));
-
-vi.mock("../loaders/fetchWithRetry.js", () => ({
-  fetchWithRetry: vi.fn(async () => ({
-    text: async () => "mock content",
   })),
 }));
 

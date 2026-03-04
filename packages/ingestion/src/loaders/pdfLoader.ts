@@ -46,10 +46,15 @@ export function withParseTimeout<T>(
  * Uses pdf-parse v2 class API: new PDFParse({ data: buffer }).getText()
  * returns { text: string, total: number } where total is the page count.
  */
-export async function loadPdf(source: string): Promise<Document[]> {
+export async function loadPdf(
+  source: string,
+  prefetchedBuffer?: Buffer,
+): Promise<Document[]> {
   let buffer: Buffer;
 
-  if (source.startsWith("http://") || source.startsWith("https://")) {
+  if (prefetchedBuffer) {
+    buffer = prefetchedBuffer;
+  } else if (source.startsWith("http://") || source.startsWith("https://")) {
     const response = await fetchWithRetry(
       source,
       {

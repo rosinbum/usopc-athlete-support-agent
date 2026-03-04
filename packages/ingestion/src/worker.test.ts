@@ -5,7 +5,10 @@ import type { SQSEvent } from "aws-lambda";
 // Mocks
 // ---------------------------------------------------------------------------
 
-const mockIngestSource = vi.fn();
+const mockProcessSource = vi.fn();
+vi.mock("./services/sourceProcessor.js", () => ({
+  processSource: (...args: unknown[]) => mockProcessSource(...args),
+}));
 
 vi.mock("./pipeline.js", async () => {
   const QuotaExhaustedError = class extends Error {
@@ -15,7 +18,6 @@ vi.mock("./pipeline.js", async () => {
     }
   };
   return {
-    ingestSource: (...args: unknown[]) => mockIngestSource(...args),
     QuotaExhaustedError,
   };
 });
@@ -37,10 +39,13 @@ vi.mock("sst", () => ({
     IngestionQueue: {
       url: "https://sqs.us-east-1.amazonaws.com/123/queue.fifo",
     },
+    DocumentsBucket: {
+      name: "test-documents-bucket",
+    },
   },
 }));
 
-// Mock the entities module (IngestionLogEntity factory)
+// Mock the entities module (IngestionLogEntity + SourceConfigEntity factories)
 const mockCreate = vi.fn();
 const mockGetForSource = vi.fn();
 const mockUpdateStatus = vi.fn();
@@ -52,6 +57,10 @@ vi.mock("./entities/index.js", () => ({
     updateStatus: (...args: unknown[]) => mockUpdateStatus(...args),
     getLastContentHash: (...args: unknown[]) => mockGetLastContentHash(...args),
     getRecent: vi.fn(),
+  })),
+  createSourceConfigEntity: vi.fn(() => ({
+    markSuccess: vi.fn(),
+    markFailure: vi.fn(),
   })),
 }));
 
@@ -117,7 +126,6 @@ const MESSAGE_BODY = {
     priority: "medium",
     description: "desc",
   },
-  contentHash: "abc123",
   triggeredAt: "2025-01-01T00:00:00.000Z",
 };
 
@@ -132,28 +140,28 @@ describe("worker handler", () => {
     mockSend.mockResolvedValue({});
   });
 
-  it("upserts completed status and returns empty failures on success", async () => {
-    mockIngestSource.mockResolvedValueOnce({
-      sourceId: "src-1",
+  it("calls processSource and returns empty failures on success", async () => {
+    mockProcessSource.mockResolvedValueOnce({
       status: "completed",
       chunksCount: 10,
+      contentHash: "abc123",
+      s3Key: "sources/src-1/abc123.pdf",
     });
 
     const result = await handler(makeSQSEvent(MESSAGE_BODY));
 
     expect(result).toEqual({ batchItemFailures: [] });
-    expect(mockUpsertIngestionStatus).toHaveBeenCalledWith(
-      expect.anything(),
-      "src-1",
-      "https://example.com/doc.pdf",
-      "completed",
-      { contentHash: "abc123", chunksCount: 10 },
+    expect(mockProcessSource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: MESSAGE_BODY.source,
+        openaiApiKey: "sk-test-key",
+        bucketName: "test-documents-bucket",
+      }),
     );
   });
 
-  it("upserts failed status and returns empty failures on graceful failure", async () => {
-    mockIngestSource.mockResolvedValueOnce({
-      sourceId: "src-1",
+  it("returns empty failures on graceful ingestion failure", async () => {
+    mockProcessSource.mockResolvedValueOnce({
       status: "failed",
       chunksCount: 0,
       error: "load error",
@@ -162,17 +170,10 @@ describe("worker handler", () => {
     const result = await handler(makeSQSEvent(MESSAGE_BODY));
 
     expect(result).toEqual({ batchItemFailures: [] });
-    expect(mockUpsertIngestionStatus).toHaveBeenCalledWith(
-      expect.anything(),
-      "src-1",
-      "https://example.com/doc.pdf",
-      "failed",
-      { errorMessage: "load error" },
-    );
   });
 
-  it("upserts quota_exceeded, purges queue, and returns empty failures on QuotaExhaustedError", async () => {
-    mockIngestSource.mockRejectedValueOnce(
+  it("purges queue and returns empty failures on QuotaExhaustedError", async () => {
+    mockProcessSource.mockRejectedValueOnce(
       new QuotaExhaustedError("insufficient_quota"),
     );
 
@@ -190,7 +191,7 @@ describe("worker handler", () => {
   });
 
   it("returns batchItemFailures with messageId on unexpected error", async () => {
-    mockIngestSource.mockRejectedValueOnce(new Error("kaboom"));
+    mockProcessSource.mockRejectedValueOnce(new Error("kaboom"));
 
     const result = await handler(makeSQSEvent(MESSAGE_BODY, "msg-42"));
 
@@ -205,14 +206,12 @@ describe("worker handler", () => {
       source: { ...MESSAGE_BODY.source, id: "src-2" },
     };
 
-    mockIngestSource
+    mockProcessSource
       .mockResolvedValueOnce({
-        sourceId: "src-1",
         status: "completed",
         chunksCount: 5,
       })
       .mockResolvedValueOnce({
-        sourceId: "src-2",
         status: "completed",
         chunksCount: 3,
       });
@@ -227,13 +226,11 @@ describe("worker handler", () => {
     const result = await handler(event);
 
     expect(result).toEqual({ batchItemFailures: [] });
-    expect(mockIngestSource).toHaveBeenCalledTimes(2);
-    expect(mockUpsertIngestionStatus).toHaveBeenCalledTimes(2);
+    expect(mockProcessSource).toHaveBeenCalledTimes(2);
   });
 
   it("skips malformed messages and continues", async () => {
-    mockIngestSource.mockResolvedValueOnce({
-      sourceId: "src-1",
+    mockProcessSource.mockResolvedValueOnce({
       status: "completed",
       chunksCount: 5,
     });
@@ -248,11 +245,11 @@ describe("worker handler", () => {
     const result = await handler(event);
 
     expect(result).toEqual({ batchItemFailures: [] });
-    expect(mockIngestSource).toHaveBeenCalledTimes(1);
+    expect(mockProcessSource).toHaveBeenCalledTimes(1);
   });
 
   it("marks remaining records as failures on QuotaExhaustedError", async () => {
-    mockIngestSource.mockRejectedValueOnce(
+    mockProcessSource.mockRejectedValueOnce(
       new QuotaExhaustedError("quota hit"),
     );
 
@@ -280,7 +277,7 @@ describe("worker handler", () => {
       { itemIdentifier: "msg-2" },
       { itemIdentifier: "msg-3" },
     ]);
-    expect(mockIngestSource).toHaveBeenCalledTimes(1);
+    expect(mockProcessSource).toHaveBeenCalledTimes(1);
     expect(mockSend).toHaveBeenCalledOnce();
   });
 });

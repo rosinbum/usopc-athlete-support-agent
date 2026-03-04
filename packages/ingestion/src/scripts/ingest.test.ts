@@ -17,8 +17,14 @@ vi.mock("@usopc/shared", () => ({
   isProduction: () => false,
 }));
 
+vi.mock("sst", () => ({
+  Resource: {
+    DocumentsBucket: { name: "test-bucket" },
+  },
+}));
+
 vi.mock("../cron.js", () => ({
-  loadSourceConfigs: vi.fn(async () => ({ sources: [], entity: undefined })),
+  toIngestionSource: vi.fn((c: unknown) => c),
 }));
 
 vi.mock("../pipeline.js", () => ({
@@ -28,6 +34,34 @@ vi.mock("../pipeline.js", () => ({
 
 vi.mock("../loaders/fetchWithRetry.js", () => ({
   fetchWithRetry: vi.fn(),
+  FetchWithRetryError: class extends Error {
+    constructor(
+      message: string,
+      public url: string,
+      public attempts: number,
+      public statusCode?: number,
+    ) {
+      super(message);
+      this.name = "FetchWithRetryError";
+    }
+  },
+}));
+
+vi.mock("../services/sourceProcessor.js", () => ({
+  processSource: vi.fn(async () => ({
+    status: "completed",
+    chunksCount: 0,
+  })),
+}));
+
+vi.mock("../entities/index.js", () => ({
+  createSourceConfigEntity: vi.fn(() => ({
+    getAllEnabled: vi.fn(async () => []),
+    getById: vi.fn(),
+    markSuccess: vi.fn(),
+    markFailure: vi.fn(),
+  })),
+  createIngestionLogEntity: vi.fn(() => ({})),
 }));
 
 // Import after mocks
