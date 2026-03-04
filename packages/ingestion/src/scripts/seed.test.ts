@@ -23,6 +23,11 @@ vi.mock("sst", () => ({
   },
 }));
 
+vi.mock("@usopc/core", () => ({
+  createRawEmbeddings: vi.fn(() => ({})),
+  createVectorStore: vi.fn(async () => ({ addVectors: vi.fn() })),
+}));
+
 vi.mock("./seed-db.js", () => ({
   initDatabase: vi.fn(async () => {}),
   loadAllSources: vi.fn(async () => []),
