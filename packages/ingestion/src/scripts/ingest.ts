@@ -130,7 +130,6 @@ async function main(): Promise<void> {
     const result = await processSource({
       source,
       openaiApiKey,
-      // @ts-expect-error - DocumentsBucket exists at runtime from SST
       bucketName: Resource.DocumentsBucket.name,
       ingestionLogEntity,
       sourceConfigEntity: entity,
@@ -233,7 +232,6 @@ async function main(): Promise<void> {
       const result = await processSource({
         source,
         openaiApiKey,
-        // @ts-expect-error - DocumentsBucket exists at runtime from SST
         bucketName: Resource.DocumentsBucket.name,
         ingestionLogEntity,
         sourceConfigEntity: entity,

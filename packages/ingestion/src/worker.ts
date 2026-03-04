@@ -53,7 +53,6 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
       const result = await processSource({
         source: message.source,
         openaiApiKey,
-        // @ts-expect-error - DocumentsBucket exists at runtime from SST
         bucketName: Resource.DocumentsBucket.name,
         ingestionLogEntity,
         sourceConfigEntity,
