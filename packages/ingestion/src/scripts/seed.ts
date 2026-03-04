@@ -16,8 +16,8 @@
  * Requires SST context (run via `pnpm seed` which uses `sst shell`).
  */
 
-import { createHash } from "node:crypto";
 import { Pool } from "pg";
+import { Resource } from "sst";
 import { getDatabaseUrl, getSecretValue, createLogger } from "@usopc/shared";
 import { initDatabase, loadAllSources } from "./seed-db.js";
 import {
@@ -25,13 +25,11 @@ import {
   seedSportOrgs,
   type CliOptions,
 } from "./seed-dynamodb.js";
-import { ingestSource } from "../pipeline.js";
-import { upsertIngestionStatus } from "../db.js";
 import {
   createIngestionLogEntity,
   createSourceConfigEntity,
 } from "../entities/index.js";
-import { fetchWithRetry } from "../loaders/fetchWithRetry.js";
+import { processSource } from "../services/sourceProcessor.js";
 
 const logger = createLogger({ service: "seed" });
 
@@ -66,10 +64,6 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): ParsedArgs {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function hashContent(content: string): string {
-  return createHash("sha256").update(content).digest("hex");
-}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -131,59 +125,19 @@ async function main(): Promise<void> {
             await sleep(60_000);
           }
 
-          // Mark as ingesting in DynamoDB
-          await upsertIngestionStatus(
-            ingestionLogEntity,
-            source.id,
-            source.url,
-            "ingesting",
-          );
-
-          const result = await ingestSource(source, {
+          const result = await processSource({
+            source,
             openaiApiKey,
+            bucketName: Resource.DocumentsBucket.name,
+            ingestionLogEntity,
+            sourceConfigEntity,
           });
 
           if (result.status === "completed") {
-            // Fetch content to compute hash (same as cron/worker path)
-            let contentHash = "";
-            try {
-              const res = await fetchWithRetry(
-                source.url,
-                { headers: { "User-Agent": "USOPC-Ingestion/1.0" } },
-                { timeoutMs: 60000, maxRetries: 3 },
-              );
-              const rawContent = await res.text();
-              contentHash = hashContent(rawContent);
-            } catch (fetchError) {
-              logger.warn(
-                `Could not fetch content hash for ${source.id}: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`,
-              );
-            }
-
-            await upsertIngestionStatus(
-              ingestionLogEntity,
-              source.id,
-              source.url,
-              "completed",
-              { contentHash, chunksCount: result.chunksCount },
-            );
-            await sourceConfigEntity.markSuccess(source.id, contentHash);
-
             succeeded++;
             totalChunks += result.chunksCount;
             logger.info(`Ingested ${source.id} (${result.chunksCount} chunks)`);
           } else {
-            const errorMessage = result.error ?? "Unknown error";
-
-            await upsertIngestionStatus(
-              ingestionLogEntity,
-              source.id,
-              source.url,
-              "failed",
-              { errorMessage },
-            );
-            await sourceConfigEntity.markFailure(source.id, errorMessage);
-
             failures.push({ sourceId: source.id, error: result.error });
           }
         }

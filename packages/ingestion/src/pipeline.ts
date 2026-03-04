@@ -65,17 +65,28 @@ export interface IngestionResult {
 
 /**
  * Load raw documents from the source based on its declared format.
+ * When `content` is provided the loaders skip the HTTP fetch and use the
+ * pre-fetched data directly, eliminating the double-fetch problem.
  */
-async function loadDocuments(source: IngestionSource): Promise<Document[]> {
+async function loadDocuments(
+  source: IngestionSource,
+  content?: Buffer,
+): Promise<Document[]> {
   switch (source.format) {
     case "pdf":
-      return await loadPdf(source.url);
+      return await loadPdf(source.url, content);
     case "html":
-      return await loadWeb(source.url);
+      return await loadWeb(
+        source.url,
+        content !== undefined ? content.toString("utf-8") : undefined,
+      );
     case "text":
       // Plain text URLs are loaded via the web loader which will extract
       // the text content from the response body.
-      return await loadWeb(source.url);
+      return await loadWeb(
+        source.url,
+        content !== undefined ? content.toString("utf-8") : undefined,
+      );
     default:
       throw new Error(`Unsupported format: ${source.format as string}`);
   }
@@ -233,6 +244,7 @@ export async function ingestSource(
   options: {
     openaiApiKey: string;
     s3Key?: string | undefined;
+    content?: Buffer | undefined;
     vectorStore?: Awaited<ReturnType<typeof createVectorStore>> | undefined;
   },
 ): Promise<IngestionResult> {
@@ -243,8 +255,8 @@ export async function ingestSource(
   });
 
   try {
-    // 1. Load raw document(s)
-    const rawDocs = await loadDocuments(source);
+    // 1. Load raw document(s) — use pre-fetched content when available
+    const rawDocs = await loadDocuments(source, options.content);
     if (rawDocs.length === 0) {
       throw new Error(`Loader returned 0 documents for ${source.url}`);
     }

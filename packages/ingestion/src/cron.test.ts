@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createHash } from "node:crypto";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -31,21 +30,7 @@ vi.mock("sst", () => ({
     IngestionQueue: {
       url: "https://sqs.us-east-1.amazonaws.com/123/queue.fifo",
     },
-    DocumentsBucket: {
-      name: "test-documents-bucket",
-    },
   },
-}));
-
-const mockStoreDocument = vi.fn();
-const mockDocumentExists = vi.fn();
-const mockGetKeyForSource = vi.fn();
-vi.mock("./services/documentStorage.js", () => ({
-  DocumentStorageService: vi.fn(() => ({
-    storeDocument: (...args: unknown[]) => mockStoreDocument(...args),
-    documentExists: (...args: unknown[]) => mockDocumentExists(...args),
-    getKeyForSource: (...args: unknown[]) => mockGetKeyForSource(...args),
-  })),
 }));
 
 const { mockLoggerInstance } = vi.hoisted(() => ({
@@ -60,12 +45,6 @@ const { mockLoggerInstance } = vi.hoisted(() => ({
 vi.mock("@usopc/shared", () => ({
   isProduction: () => false, // Always use JSON files in tests
   createLogger: () => mockLoggerInstance,
-}));
-
-// Mock fetchWithRetry to use the global fetch mock
-const mockFetchWithRetry = vi.fn();
-vi.mock("./loaders/fetchWithRetry.js", () => ({
-  fetchWithRetry: (...args: unknown[]) => mockFetchWithRetry(...args),
 }));
 
 // Mock the entities module
@@ -120,10 +99,6 @@ function makeSourceConfig(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function hashContent(content: string): string {
-  return createHash("sha256").update(content).digest("hex");
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -142,19 +117,6 @@ describe("cron handler", () => {
     // Default: readdir returns one JSON file
     mockReaddir.mockResolvedValue(["source1.json"]);
     mockReadFile.mockResolvedValue(JSON.stringify(makeSourceConfig()));
-
-    // Mock fetchWithRetry to return a response-like object
-    mockFetchWithRetry.mockResolvedValue({
-      text: () => Promise.resolve("fetched content"),
-    });
-
-    // Default S3 mocks — document doesn't exist yet, upload succeeds
-    mockGetKeyForSource.mockReturnValue("sources/src-1/abc123.pdf");
-    mockDocumentExists.mockResolvedValue(false);
-    mockStoreDocument.mockResolvedValue({
-      key: "sources/src-1/abc123.pdf",
-      versionId: "v1",
-    });
   });
 
   afterEach(() => {
@@ -166,17 +128,10 @@ describe("cron handler", () => {
   });
 
   it("enqueues new source when no prior ingestion exists", async () => {
-    // No prior ingestion — getLastContentHash returns null
     mockGetLastContentHash.mockResolvedValueOnce(null);
 
     await handler();
 
-    expect(mockUpsertIngestionStatus).toHaveBeenCalledWith(
-      expect.anything(),
-      "src-1",
-      "https://example.com/doc.pdf",
-      "ingesting",
-    );
     expect(mockSend).toHaveBeenCalledOnce();
 
     // Verify the SendMessageCommand was created with correct params
@@ -189,13 +144,23 @@ describe("cron handler", () => {
     );
   });
 
+  it("includes source and triggeredAt in SQS message", async () => {
+    mockGetLastContentHash.mockResolvedValueOnce(null);
+
+    await handler();
+
+    const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+    const callArgs = vi.mocked(SendMessageCommand).mock.calls[0]![0]!;
+    const body = JSON.parse(callArgs.MessageBody as string);
+    expect(body.source.id).toBe("src-1");
+    expect(body.triggeredAt).toBeDefined();
+  });
+
   it("skips source when it has already been ingested (any hash)", async () => {
-    // Prior ingestion exists — getLastContentHash returns a hash
     mockGetLastContentHash.mockResolvedValueOnce("old-hash");
 
     await handler();
 
-    expect(mockUpsertIngestionStatus).not.toHaveBeenCalled();
     expect(mockSend).not.toHaveBeenCalled();
   });
 
@@ -227,151 +192,13 @@ describe("cron handler", () => {
     };
     mockReadFile.mockResolvedValue(JSON.stringify(config));
 
-    // "new" has no prior ingestion, "existing" has a hash
     mockGetLastContentHash
-      .mockResolvedValueOnce(null) // src-new -> no prior ingestion
-      .mockResolvedValueOnce("existing-hash"); // src-existing -> already ingested
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce("existing-hash");
 
     await handler();
 
-    // Only the new source should be enqueued
     expect(mockSend).toHaveBeenCalledOnce();
-    expect(mockUpsertIngestionStatus).toHaveBeenCalledTimes(1);
-    expect(mockUpsertIngestionStatus).toHaveBeenCalledWith(
-      expect.anything(),
-      "src-new",
-      "https://example.com/new.pdf",
-      "ingesting",
-    );
-  });
-
-  it("marks failure and continues when fetch throws", async () => {
-    // No prior ingestion so it will attempt fetch
-    mockGetLastContentHash.mockResolvedValueOnce(null);
-    mockFetchWithRetry.mockRejectedValueOnce(new Error("network error"));
-
-    await handler();
-
-    // When fetch fails, source should be marked as failed (not enqueued)
-    expect(mockSend).not.toHaveBeenCalled();
-  });
-
-  it("handles per-source errors without stopping other sources", async () => {
-    const config = {
-      ngbId: "ngb-1",
-      sources: [
-        {
-          id: "src-fail",
-          title: "Fail",
-          documentType: "policy",
-          topicDomains: ["t"],
-          url: "https://example.com/fail.pdf",
-          format: "pdf",
-          priority: "medium",
-          description: "d",
-        },
-        {
-          id: "src-ok",
-          title: "OK",
-          documentType: "policy",
-          topicDomains: ["t"],
-          url: "https://example.com/ok.pdf",
-          format: "pdf",
-          priority: "medium",
-          description: "d",
-        },
-      ],
-    };
-    mockReadFile.mockResolvedValue(JSON.stringify(config));
-
-    // Both are new sources (no prior ingestion)
-    mockGetLastContentHash
-      .mockResolvedValueOnce(null) // src-fail
-      .mockResolvedValueOnce(null); // src-ok
-
-    mockUpsertIngestionStatus
-      .mockRejectedValueOnce(new Error("db error")) // src-fail ingesting call fails
-      .mockResolvedValueOnce(undefined) // src-fail "failed" status (from catch)
-      .mockResolvedValueOnce(undefined); // src-ok ingesting call
-
-    await handler();
-
-    // Second source should still have been enqueued
-    expect(mockSend).toHaveBeenCalled();
-  });
-
-  it("logs alert when all sources fail", async () => {
-    // No prior ingestion so it will attempt fetch
-    mockGetLastContentHash.mockResolvedValueOnce(null);
-    // Make fetch fail for every source
-    mockFetchWithRetry.mockRejectedValue(new Error("network error"));
-
-    await handler();
-
-    expect(mockLoggerInstance.error).toHaveBeenCalledWith(
-      expect.stringContaining("ALERT: All"),
-    );
-  });
-
-  it("does not log alert during normal operation", async () => {
-    // New source, successful fetch and enqueue
-    mockGetLastContentHash.mockResolvedValueOnce(null);
-
-    await handler();
-
-    // Check that no ALERT: message was logged
-    for (const call of mockLoggerInstance.error.mock.calls) {
-      expect(call[0]).not.toMatch(/ALERT:/);
-    }
-    for (const call of mockLoggerInstance.warn.mock.calls) {
-      expect(call[0]).not.toMatch(/ALERT:/);
-    }
-  });
-
-  it("uploads to S3 and includes s3Key/s3VersionId in SQS message", async () => {
-    mockGetLastContentHash.mockResolvedValueOnce(null);
-    mockStoreDocument.mockResolvedValueOnce({
-      key: "sources/src-1/hash.pdf",
-      versionId: "ver-1",
-    });
-
-    await handler();
-
-    expect(mockStoreDocument).toHaveBeenCalledOnce();
-    expect(mockStoreDocument).toHaveBeenCalledWith(
-      "src-1",
-      expect.any(Buffer),
-      expect.any(String),
-      "pdf",
-      { title: "Test Source", documentType: "policy" },
-    );
-
-    // Verify the SQS message body includes s3Key and s3VersionId
-    const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
-    const callArgs = vi.mocked(SendMessageCommand).mock.calls[0]![0]!;
-    const body = JSON.parse(callArgs.MessageBody as string);
-    expect(body.s3Key).toBe("sources/src-1/hash.pdf");
-    expect(body.s3VersionId).toBe("ver-1");
-  });
-
-  it("continues ingestion when S3 upload fails", async () => {
-    mockGetLastContentHash.mockResolvedValueOnce(null);
-    mockStoreDocument.mockRejectedValueOnce(new Error("S3 unavailable"));
-
-    await handler();
-
-    // Should still enqueue despite S3 failure
-    expect(mockSend).toHaveBeenCalledOnce();
-    expect(mockLoggerInstance.warn).toHaveBeenCalledWith(
-      expect.stringContaining("S3 upload failed"),
-    );
-
-    // Message should have undefined s3Key/s3VersionId
-    const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
-    const callArgs = vi.mocked(SendMessageCommand).mock.calls[0]![0]!;
-    const body = JSON.parse(callArgs.MessageBody as string);
-    expect(body.s3Key).toBeUndefined();
-    expect(body.s3VersionId).toBeUndefined();
   });
 });
 
@@ -387,19 +214,6 @@ describe("cron handler (DynamoDB mode)", () => {
     mockSend.mockResolvedValue({});
     mockMarkFailure.mockResolvedValue(undefined);
     mockMarkSuccess.mockResolvedValue(undefined);
-
-    // Mock fetchWithRetry to return a response-like object
-    mockFetchWithRetry.mockResolvedValue({
-      text: () => Promise.resolve("fetched content"),
-    });
-
-    // Default S3 mocks — document doesn't exist yet, upload succeeds
-    mockGetKeyForSource.mockReturnValue("sources/src-ok/abc123.pdf");
-    mockDocumentExists.mockResolvedValue(false);
-    mockStoreDocument.mockResolvedValue({
-      key: "sources/src-ok/abc123.pdf",
-      versionId: "v1",
-    });
   });
 
   afterEach(() => {
@@ -457,13 +271,11 @@ describe("cron handler (DynamoDB mode)", () => {
       },
     ]);
 
-    // First getById for src-broken (failure check) returns the failing config
     mockGetById
       .mockResolvedValueOnce({
         consecutiveFailures: 3,
         lastContentHash: null,
       })
-      // Second getById for src-ok returns healthy new config (no lastIngestedAt)
       .mockResolvedValueOnce({
         consecutiveFailures: 0,
         lastIngestedAt: null,
@@ -476,5 +288,40 @@ describe("cron handler (DynamoDB mode)", () => {
     expect(mockLoggerInstance.warn).toHaveBeenCalledWith(
       expect.stringContaining("Skipping src-broken"),
     );
+  });
+
+  it("skips already-ingested sources", async () => {
+    mockGetAllEnabled.mockResolvedValueOnce([
+      {
+        id: "src-done",
+        title: "Done",
+        documentType: "policy",
+        topicDomains: ["t"],
+        url: "https://example.com/done.pdf",
+        format: "pdf",
+        ngbId: null,
+        priority: "medium",
+        description: "d",
+        authorityLevel: "official",
+        enabled: true,
+        lastIngestedAt: "2025-01-01T00:00:00Z",
+        lastContentHash: "abc123",
+        consecutiveFailures: 0,
+        lastError: null,
+        s3Key: null,
+        s3VersionId: null,
+        createdAt: "2025-01-01T00:00:00Z",
+        updatedAt: "2025-01-01T00:00:00Z",
+      },
+    ]);
+
+    mockGetById.mockResolvedValueOnce({
+      consecutiveFailures: 0,
+      lastIngestedAt: "2025-01-01T00:00:00Z",
+    });
+
+    await handler();
+
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });

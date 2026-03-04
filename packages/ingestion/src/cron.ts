@@ -1,20 +1,16 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createLogger, isProduction, type AuthorityLevel } from "@usopc/shared";
-import { createHash } from "node:crypto";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
 import type { IngestionSource } from "./pipeline.js";
-import { getLastContentHash, upsertIngestionStatus } from "./db.js";
+import { getLastContentHash } from "./db.js";
 import {
   createSourceConfigEntity,
   createIngestionLogEntity,
   createDiscoveredSourceEntity,
   type SourceConfig,
-  type DiscoveredSource,
 } from "./entities/index.js";
-import { fetchWithRetry } from "./loaders/fetchWithRetry.js";
-import { DocumentStorageService } from "./services/documentStorage.js";
 
 const logger = createLogger({ service: "ingestion-cron" });
 
@@ -24,10 +20,7 @@ const logger = createLogger({ service: "ingestion-cron" });
 
 export interface IngestionMessage {
   source: IngestionSource;
-  contentHash: string;
   triggeredAt: string;
-  s3Key?: string | undefined;
-  s3VersionId?: string | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -133,14 +126,6 @@ export async function loadSourceConfigs(): Promise<{
 }
 
 // ---------------------------------------------------------------------------
-// Content hashing
-// ---------------------------------------------------------------------------
-
-function hashContent(content: string): string {
-  return createHash("sha256").update(content).digest("hex");
-}
-
-// ---------------------------------------------------------------------------
 // Approved discoveries processing
 // ---------------------------------------------------------------------------
 
@@ -235,11 +220,14 @@ export async function processApprovedDiscoveries(
 /**
  * EventBridge-triggered coordinator Lambda.
  *
+ * Lightweight coordinator — only performs skip-logic and SQS enqueue.
+ * Content fetching, hashing, S3 upload, and ingestion are handled by
+ * the worker via `processSource()`.
+ *
  * 1. Processes newly approved discoveries and creates SourceConfigs (production only).
  * 2. Loads all enabled source configs (from DynamoDB in production, JSON files in dev).
- * 3. Skips sources that have already been ingested (only new sources are processed).
- * 4. For each new source, fetches the content (with retry) and computes a hash.
- * 5. Enqueues new sources to the SQS FIFO queue for the worker to process.
+ * 3. Skips sources that have already been ingested or have too many failures.
+ * 4. Enqueues eligible sources to the SQS FIFO queue for the worker to process.
  *
  * To re-ingest existing sources, use the admin UI (single or bulk) or the
  * CLI with --resume (content-change detection) or --force (unconditional).
@@ -273,7 +261,6 @@ export async function handler(): Promise<void> {
 
     let enqueued = 0;
     let skipped = 0;
-    let failed = 0;
 
     const triggeredAt = new Date().toISOString();
 
@@ -318,88 +305,10 @@ export async function handler(): Promise<void> {
           }
         }
 
-        // Fetch the content to compute a hash for the worker
-        let rawContent: string;
-        try {
-          const res = await fetchWithRetry(
-            source.url,
-            {
-              headers: { "User-Agent": "USOPC-Ingestion/1.0" },
-            },
-            {
-              timeoutMs: 60000,
-              maxRetries: 3,
-            },
-          );
-          rawContent = await res.text();
-        } catch (fetchError) {
-          const fetchMsg =
-            fetchError instanceof Error ? fetchError.message : "Unknown error";
-          logger.warn(`Fetch failed for ${source.id}: ${fetchMsg}`);
-
-          // Mark failure in DynamoDB if available
-          if (entity) {
-            await entity.markFailure(source.id, fetchMsg);
-          }
-
-          failed++;
-          continue;
-        }
-
-        const contentHash = hashContent(rawContent);
-
-        // Upload original document to S3 for archival (skip if already exists)
-        let s3Key: string | undefined;
-        let s3VersionId: string | undefined;
-        try {
-          const storage = new DocumentStorageService(
-            Resource.DocumentsBucket.name,
-          );
-          const expectedKey = storage.getKeyForSource(
-            source.id,
-            contentHash,
-            source.format,
-          );
-          const alreadyExists = await storage.documentExists(expectedKey);
-          if (alreadyExists) {
-            s3Key = expectedKey;
-            logger.info(
-              `S3 document already exists for ${source.id}, skipping upload`,
-            );
-          } else {
-            const result = await storage.storeDocument(
-              source.id,
-              Buffer.from(rawContent),
-              contentHash,
-              source.format,
-              { title: source.title, documentType: source.documentType },
-            );
-            s3Key = result.key;
-            s3VersionId = result.versionId;
-          }
-        } catch (s3Error) {
-          const s3Msg =
-            s3Error instanceof Error ? s3Error.message : "Unknown S3 error";
-          logger.warn(
-            `S3 upload failed for ${source.id} — ingestion will continue: ${s3Msg}`,
-          );
-        }
-
-        // Mark as ingesting in DynamoDB
-        await upsertIngestionStatus(
-          ingestionLogEntity,
-          source.id,
-          source.url,
-          "ingesting",
-        );
-
-        // Enqueue for the worker
+        // Enqueue for the worker (worker handles fetch/hash/S3/ingest)
         const message: IngestionMessage = {
           source,
-          contentHash,
           triggeredAt,
-          s3Key,
-          s3VersionId,
         };
 
         await sqs.send(
@@ -416,39 +325,13 @@ export async function handler(): Promise<void> {
       } catch (error) {
         const msg = error instanceof Error ? error.message : "Unknown error";
         logger.error(`Coordinator error for ${source.id}: ${msg}`);
-
-        // Mark failure in DynamoDB
-        await upsertIngestionStatus(
-          ingestionLogEntity,
-          source.id,
-          source.url,
-          "failed",
-          {
-            errorMessage: msg,
-          },
-        );
-        if (entity) {
-          await entity.markFailure(source.id, msg);
-        }
-        failed++;
+        skipped++;
       }
     }
 
     logger.info(
-      `Coordinator complete: ${enqueued} enqueued, ${skipped} skipped, ${failed} failed`,
+      `Coordinator complete: ${enqueued} enqueued, ${skipped} skipped`,
     );
-
-    // Systematic failure alerting
-    const totalProcessed = enqueued + failed;
-    if (failed > 0 && enqueued === 0) {
-      logger.error(
-        `ALERT: All ${failed} processed source(s) failed — no sources were enqueued`,
-      );
-    } else if (totalProcessed > 0 && failed > totalProcessed * 0.5) {
-      logger.warn(
-        `ALERT: Majority of sources failed (${failed}/${totalProcessed})`,
-      );
-    }
   } finally {
     // No pool cleanup needed — DynamoDB client handles its own connections
   }

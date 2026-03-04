@@ -56,21 +56,31 @@ const CONTENT_SELECTORS = [
  * Uses fetchWithRetry for automatic retry on transient failures (5xx, 429,
  * network errors) with exponential backoff.
  */
-export async function loadWeb(url: string): Promise<Document[]> {
-  const response = await fetchWithRetry(
-    url,
-    {
-      headers: {
-        "User-Agent": "USOPC-Ingestion/1.0",
-        Accept: "text/html,application/xhtml+xml",
-      },
-    },
-    {
-      timeoutMs: 60000, // 60 second timeout for web pages
-    },
-  );
+export async function loadWeb(
+  url: string,
+  prefetchedHtml?: string,
+): Promise<Document[]> {
+  let html: string;
 
-  const html = await response.text();
+  if (prefetchedHtml !== undefined) {
+    html = prefetchedHtml;
+  } else {
+    const response = await fetchWithRetry(
+      url,
+      {
+        headers: {
+          "User-Agent": "USOPC-Ingestion/1.0",
+          Accept: "text/html,application/xhtml+xml",
+        },
+      },
+      {
+        timeoutMs: 60000, // 60 second timeout for web pages
+      },
+    );
+
+    html = await response.text();
+  }
+
   const $ = cheerio.load(html);
 
   // Remove non-content elements
