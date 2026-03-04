@@ -19,6 +19,7 @@
 import { Pool } from "pg";
 import { Resource } from "sst";
 import { getDatabaseUrl, getSecretValue, createLogger } from "@usopc/shared";
+import { createRawEmbeddings, createVectorStore } from "@usopc/core";
 import { initDatabase, loadAllSources } from "./seed-db.js";
 import {
   seedSourceConfigs,
@@ -76,90 +77,96 @@ async function main(): Promise<void> {
   const databaseUrl = getDatabaseUrl();
   const pool = new Pool({ connectionString: databaseUrl });
 
-  try {
-    // Step 1: PG schema init
-    logger.info("--- Step 1: PostgreSQL schema init ---");
-    await initDatabase(pool);
+  // Step 1: PG schema init
+  logger.info("--- Step 1: PostgreSQL schema init ---");
+  await initDatabase(pool);
+  // Release the local pool immediately so its connections don't compete
+  // with the shared pool used by PGVectorStore during ingestion.
+  await pool.end();
 
-    // Step 2: DynamoDB seed
-    logger.info("--- Step 2: DynamoDB seed ---");
-    const dynamoOptions: CliOptions = { dryRun, force };
-    await seedSourceConfigs(dynamoOptions);
-    await seedSportOrgs(dynamoOptions);
+  // Step 2: DynamoDB seed
+  logger.info("--- Step 2: DynamoDB seed ---");
+  const dynamoOptions: CliOptions = { dryRun, force };
+  await seedSourceConfigs(dynamoOptions);
+  await seedSportOrgs(dynamoOptions);
 
-    // Step 3: Document ingestion (optional)
-    if (dryRun) {
-      logger.info("--- Step 3: Skipping ingestion (--dry-run) ---");
-    } else if (skipIngest) {
-      logger.info("--- Step 3: Skipping ingestion (--skip-ingest) ---");
-    } else {
-      let openaiApiKey: string | undefined;
-      try {
-        openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
-      } catch {
-        // Key not available — skip gracefully
-      }
-
-      if (!openaiApiKey) {
-        logger.warn(
-          "--- Step 3: Skipping ingestion (OPENAI_API_KEY not found) ---",
-        );
-      } else {
-        logger.info("--- Step 3: Document ingestion ---");
-        const sources = await loadAllSources();
-        logger.info(`Loaded ${sources.length} source configuration(s)`);
-
-        const ingestionLogEntity = createIngestionLogEntity();
-        const sourceConfigEntity = createSourceConfigEntity();
-
-        let succeeded = 0;
-        let totalChunks = 0;
-        const failures: { sourceId: string; error?: string | undefined }[] = [];
-
-        for (let i = 0; i < sources.length; i++) {
-          const source = sources[i]!;
-
-          // Wait between sources for TPM window reset
-          if (i > 0 && totalChunks > 0) {
-            logger.info("Waiting 60s between sources for TPM window reset...");
-            await sleep(60_000);
-          }
-
-          const result = await processSource({
-            source,
-            openaiApiKey,
-            bucketName: Resource.DocumentsBucket.name,
-            ingestionLogEntity,
-            sourceConfigEntity,
-          });
-
-          if (result.status === "completed") {
-            succeeded++;
-            totalChunks += result.chunksCount;
-            logger.info(`Ingested ${source.id} (${result.chunksCount} chunks)`);
-          } else {
-            failures.push({ sourceId: source.id, error: result.error });
-          }
-        }
-
-        logger.info(
-          `Ingestion: ${succeeded}/${sources.length} succeeded, ${totalChunks} total chunks`,
-        );
-
-        if (failures.length > 0) {
-          logger.error("Failed sources:");
-          for (const f of failures) {
-            logger.error(`  - ${f.sourceId}: ${f.error}`);
-          }
-          process.exit(1);
-        }
-      }
+  // Step 3: Document ingestion (optional)
+  if (dryRun) {
+    logger.info("--- Step 3: Skipping ingestion (--dry-run) ---");
+  } else if (skipIngest) {
+    logger.info("--- Step 3: Skipping ingestion (--skip-ingest) ---");
+  } else {
+    let openaiApiKey: string | undefined;
+    try {
+      openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
+    } catch {
+      // Key not available — skip gracefully
     }
 
-    logger.info("Seed complete.");
-  } finally {
-    await pool.end();
+    if (!openaiApiKey) {
+      logger.warn(
+        "--- Step 3: Skipping ingestion (OPENAI_API_KEY not found) ---",
+      );
+    } else {
+      logger.info("--- Step 3: Document ingestion ---");
+      const sources = await loadAllSources();
+      logger.info(`Loaded ${sources.length} source configuration(s)`);
+
+      const ingestionLogEntity = createIngestionLogEntity();
+      const sourceConfigEntity = createSourceConfigEntity();
+
+      // Create a single shared vectorStore so all sources reuse the same
+      // PGVectorStore instance (avoids repeated schema checks that exhaust
+      // the connection pool).
+      const embeddings = createRawEmbeddings(openaiApiKey);
+      const vectorStore = await createVectorStore(embeddings);
+
+      let succeeded = 0;
+      let totalChunks = 0;
+      const failures: { sourceId: string; error?: string | undefined }[] = [];
+
+      for (let i = 0; i < sources.length; i++) {
+        const source = sources[i]!;
+
+        // Wait between sources for TPM window reset
+        if (i > 0 && totalChunks > 0) {
+          logger.info("Waiting 60s between sources for TPM window reset...");
+          await sleep(60_000);
+        }
+
+        const result = await processSource({
+          source,
+          openaiApiKey,
+          bucketName: Resource.DocumentsBucket.name,
+          ingestionLogEntity,
+          sourceConfigEntity,
+          vectorStore,
+        });
+
+        if (result.status === "completed") {
+          succeeded++;
+          totalChunks += result.chunksCount;
+          logger.info(`Ingested ${source.id} (${result.chunksCount} chunks)`);
+        } else {
+          failures.push({ sourceId: source.id, error: result.error });
+        }
+      }
+
+      logger.info(
+        `Ingestion: ${succeeded}/${sources.length} succeeded, ${totalChunks} total chunks`,
+      );
+
+      if (failures.length > 0) {
+        logger.error("Failed sources:");
+        for (const f of failures) {
+          logger.error(`  - ${f.sourceId}: ${f.error}`);
+        }
+        process.exit(1);
+      }
+    }
   }
+
+  logger.info("Seed complete.");
 }
 
 // Only run main() when executed directly (not when imported by tests)
