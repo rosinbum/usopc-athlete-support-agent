@@ -19,7 +19,7 @@ import { getPool, closePool } from "@usopc/shared";
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
-const CHUNKS_PER_DOMAIN = 10;
+const CHUNKS_PER_DOMAIN = 12;
 const OUTPUT_PATH = path.resolve(
   import.meta.dirname,
   "../../fixtures/test-corpus.sql",
@@ -37,7 +37,7 @@ const DOMAIN_KEYWORDS: Record<string, string> = {
 };
 
 /** NGB IDs to include extra chunks for (matching retrieval eval queries). */
-const TARGET_NGBS = ["usa-swimming", "usa-wrestling", "usa-gymnastics"];
+const TARGET_NGBS = ["usa-swimming", "usa-wrestling"];
 
 // ── Database queries ─────────────────────────────────────────────────────────
 

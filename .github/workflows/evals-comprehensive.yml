@@ -76,6 +76,13 @@ jobs:
       - name: Initialize database
         run: psql "$DATABASE_URL" -f scripts/init-db.sql
 
+      - name: Run database migrations
+        run: |
+          for f in scripts/migrations/*.sql; do
+            echo "Applying $f ..."
+            psql "$DATABASE_URL" -f "$f"
+          done
+
       - name: Seed test corpus
         run: psql "$DATABASE_URL" -f packages/evals/fixtures/test-corpus.sql
 
