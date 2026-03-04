@@ -47,6 +47,9 @@ jobs:
       - name: Initialize database
         run: psql "$DATABASE_URL" -f scripts/init-db.sql
 
+      - name: Seed test corpus
+        run: psql "$DATABASE_URL" -f packages/evals/fixtures/test-corpus.sql
+
       # ── Run all evaluators ────────────────────────────────────────────────
       - name: Run classifier eval
         run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/classifier.json src/evaluators/classifierAccuracy.eval.ts
