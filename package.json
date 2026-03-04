@@ -37,7 +37,7 @@
     "overrides": {
       "zod-to-json-schema": "3.24.1",
       "@langchain/openai": "^1.2.8",
-      "hono": ">=4.11.4",
+      "hono": ">=4.12.4",
       "@modelcontextprotocol/sdk": ">=1.25.2",
       "h3": ">=1.15.5",
       "axios": ">=1.13.5",
