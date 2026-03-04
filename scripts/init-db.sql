@@ -7,19 +7,29 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Document chunks table with pgvector
+-- Denormalized text columns are GENERATED ALWAYS AS ... STORED so PostgreSQL
+-- auto-populates them from the JSONB metadata on INSERT (no backfill needed).
 CREATE TABLE IF NOT EXISTS document_chunks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   content TEXT NOT NULL,
   embedding vector(1536),
   metadata JSONB NOT NULL DEFAULT '{}',
-  ngb_id TEXT,
-  topic_domain TEXT,
-  document_type TEXT,
-  source_url TEXT,
-  document_title TEXT,
-  section_title TEXT,
+  ngb_id          TEXT GENERATED ALWAYS AS (metadata->>'ngbId') STORED,
+  topic_domain    TEXT GENERATED ALWAYS AS (metadata->>'topicDomain') STORED,
+  document_type   TEXT GENERATED ALWAYS AS (metadata->>'documentType') STORED,
+  source_url      TEXT GENERATED ALWAYS AS (metadata->>'sourceUrl') STORED,
+  document_title  TEXT GENERATED ALWAYS AS (metadata->>'documentTitle') STORED,
+  section_title   TEXT GENERATED ALWAYS AS (metadata->>'sectionTitle') STORED,
   effective_date TIMESTAMPTZ,
-  authority_level TEXT,
+  authority_level TEXT GENERATED ALWAYS AS (metadata->>'authorityLevel') STORED,
+  -- content_tsv references metadata directly (not the generated columns above)
+  -- because PostgreSQL does not allow generated columns to reference other
+  -- generated columns.
+  content_tsv tsvector GENERATED ALWAYS AS (
+    setweight(to_tsvector('english', coalesce(metadata->>'documentTitle', '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(metadata->>'sectionTitle', '')), 'B') ||
+    setweight(to_tsvector('english', content), 'C')
+  ) STORED,
   ingested_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -36,6 +46,7 @@ CREATE INDEX IF NOT EXISTS idx_chunks_document_type ON document_chunks (document
 CREATE INDEX IF NOT EXISTS idx_chunks_authority_level ON document_chunks (authority_level);
 CREATE INDEX IF NOT EXISTS idx_chunks_metadata ON document_chunks USING gin (metadata);
 CREATE INDEX IF NOT EXISTS idx_chunks_source_id ON document_chunks ((metadata->>'sourceId'));
+CREATE INDEX IF NOT EXISTS idx_chunks_content_tsv ON document_chunks USING gin (content_tsv);
 
 -- Conversations table
 CREATE TABLE IF NOT EXISTS conversations (

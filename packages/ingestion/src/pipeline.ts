@@ -1,5 +1,5 @@
 import type { Document } from "@langchain/core/documents";
-import { createLogger, getPool, type AuthorityLevel } from "@usopc/shared";
+import { createLogger, type AuthorityLevel } from "@usopc/shared";
 import {
   MODEL_CONFIG,
   createRawEmbeddings,
@@ -210,28 +210,6 @@ async function embedBatchWithRetry(
   }
 }
 
-/**
- * Backfill denormalized text columns from the JSONB metadata column.
- * LangChain's PGVectorStore only writes id, content, embedding, and metadata —
- * the dedicated columns (source_url, document_title, etc.) are left NULL.
- */
-export async function backfillDenormalizedColumns(): Promise<number> {
-  const result = await getPool().query(`
-    UPDATE document_chunks
-    SET
-      source_url      = metadata->>'sourceUrl',
-      document_title  = metadata->>'documentTitle',
-      document_type   = metadata->>'documentType',
-      ngb_id          = metadata->>'ngbId',
-      topic_domain    = metadata->>'topicDomain',
-      authority_level  = metadata->>'authorityLevel',
-      section_title   = metadata->>'sectionTitle'
-    WHERE source_url IS NULL
-      AND metadata->>'sourceUrl' IS NOT NULL
-  `);
-  return result.rowCount ?? 0;
-}
-
 // ---------------------------------------------------------------------------
 // Pipeline entry points
 // ---------------------------------------------------------------------------
@@ -327,13 +305,6 @@ export async function ingestSource(
         { sourceId: source.id },
       );
     }
-
-    // 7. Backfill denormalized columns from JSONB metadata
-    const backfilled = await backfillDenormalizedColumns();
-    logger.info(
-      `Backfilled ${backfilled} row(s) with denormalized column values`,
-      { sourceId: source.id },
-    );
 
     logger.info(
       `Successfully ingested ${withSections.length} chunks for ${source.id}`,
