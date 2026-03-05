@@ -76,7 +76,7 @@ const examples = scenarios.map((s) => ({
 
 ls.describe("usopc-quality-review", () => {
   ls.test.each(examples)(
-    "quality review: $inputs.scenarioId",
+    "quality review scenario",
     async ({ inputs, referenceOutputs }) => {
       const messages = inputs.messages as Array<{
         role: "user" | "assistant";

@@ -183,4 +183,10 @@ function main(): void {
   }
 }
 
-main();
+// Run only when executed directly (not when imported for testing)
+const isMain =
+  process.argv[1]?.endsWith("compare-baseline.ts") ||
+  process.argv[1]?.endsWith("compare-baseline.js");
+if (isMain) {
+  main();
+}
