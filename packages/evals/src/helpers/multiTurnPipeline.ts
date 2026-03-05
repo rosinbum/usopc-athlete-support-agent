@@ -1,7 +1,6 @@
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { AgentRunner, nodeMetrics, type AgentState } from "@usopc/core";
-import { closePool } from "@usopc/shared";
 
 /**
  * Converts a simple message array to LangChain BaseMessage objects.
@@ -104,10 +103,9 @@ export async function runMultiTurnPipeline(
       trajectory,
     };
   } finally {
-    await runner.close();
-    // runner.close() ends the PGVectorStore's pool, which is the shared
-    // singleton from getPool(). Reset the singleton so the next call to
-    // getPool() creates a fresh pool instead of reusing the ended one.
-    await closePool();
+    // Do NOT call runner.close() here — it ends the shared pg pool
+    // singleton, which prevents subsequent tests from creating new
+    // connections. The pool is reused across tests and cleaned up
+    // automatically when the vitest process exits.
   }
 }
