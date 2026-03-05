@@ -1,6 +1,31 @@
 import { HumanMessage } from "@langchain/core/messages";
 import { AgentRunner, nodeMetrics, type AgentState } from "@usopc/core";
 
+// ---------------------------------------------------------------------------
+// Shared runner — lazy-initialized, reused across all eval invocations so we
+// don't exhaust the pg connection pool (max 5) by creating a new runner per
+// test.  The process-exit cleanup releases connections automatically.
+// ---------------------------------------------------------------------------
+
+let sharedRunner: AgentRunner | null = null;
+
+async function getRunner(): Promise<AgentRunner> {
+  if (!sharedRunner) {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error(
+        "DATABASE_URL is required. Run within `sst shell` to set environment variables.",
+      );
+    }
+    sharedRunner = await AgentRunner.create({
+      databaseUrl,
+      openaiApiKey: process.env.OPENAI_API_KEY,
+      tavilyApiKey: process.env.TAVILY_API_KEY,
+    });
+  }
+  return sharedRunner;
+}
+
 /**
  * Runs the full agent pipeline for a user message and returns the final state.
  *
@@ -16,73 +41,55 @@ export async function runPipeline(userMessage: string): Promise<{
   state: AgentState;
   trajectory: string[];
 }> {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    throw new Error(
-      "DATABASE_URL is required. Run within `sst shell` to set environment variables.",
-    );
-  }
-
   // Reset metrics to capture only this run's trajectory
   nodeMetrics.reset();
 
-  const runner = await AgentRunner.create({
-    databaseUrl,
-    openaiApiKey: process.env.OPENAI_API_KEY,
-    tavilyApiKey: process.env.TAVILY_API_KEY,
+  const runner = await getRunner();
+
+  const output = await runner.invoke({
+    messages: [new HumanMessage(userMessage)],
   });
 
-  try {
-    const output = await runner.invoke({
+  // Extract trajectory from the metrics collector
+  const trajectory = nodeMetrics.getAll().map((entry) => entry.name);
+
+  return {
+    state: {
       messages: [new HumanMessage(userMessage)],
-    });
-
-    // Extract trajectory from the metrics collector
-    const trajectory = nodeMetrics.getAll().map((entry) => entry.name);
-
-    return {
-      state: {
-        messages: [new HumanMessage(userMessage)],
-        answer: output.answer,
-        citations: output.citations,
-        escalation: output.escalation,
-        disclaimer: output.disclaimer,
-        // These fields aren't directly available from AgentOutput,
-        // so we set sensible defaults. Full state is available through
-        // the graph's stream mode if needed.
-        topicDomain: undefined,
-        detectedNgbIds: [],
-        queryIntent: undefined,
-        retrievedDocuments: [],
-        webSearchResults: [],
-        webSearchResultUrls: [],
-        retrievalConfidence: 0,
-        disclaimerRequired: true,
-        hasTimeConstraint: false,
-        conversationId: undefined,
-        conversationSummary: undefined,
-        userSport: undefined,
-        needsClarification: false,
-        clarificationQuestion: undefined,
-        escalationReason: undefined,
-        retrievalStatus: "success",
-        emotionalState: "neutral",
-        emotionalSupportContext: undefined,
-        qualityCheckResult: undefined,
-        qualityRetryCount: 0,
-        expansionAttempted: false,
-        reformulatedQueries: [],
-        isComplexQuery: false,
-        subQueries: [],
-      },
-      trajectory,
-    };
-  } finally {
-    // Do NOT call runner.close() here — it ends the shared pg pool
-    // singleton, which prevents subsequent tests from creating new
-    // connections. The pool is reused across tests and cleaned up
-    // automatically when the vitest process exits.
-  }
+      answer: output.answer,
+      citations: output.citations,
+      escalation: output.escalation,
+      disclaimer: output.disclaimer,
+      // These fields aren't directly available from AgentOutput,
+      // so we set sensible defaults. Full state is available through
+      // the graph's stream mode if needed.
+      topicDomain: undefined,
+      detectedNgbIds: [],
+      queryIntent: undefined,
+      retrievedDocuments: [],
+      webSearchResults: [],
+      webSearchResultUrls: [],
+      retrievalConfidence: 0,
+      disclaimerRequired: true,
+      hasTimeConstraint: false,
+      conversationId: undefined,
+      conversationSummary: undefined,
+      userSport: undefined,
+      needsClarification: false,
+      clarificationQuestion: undefined,
+      escalationReason: undefined,
+      retrievalStatus: "success",
+      emotionalState: "neutral",
+      emotionalSupportContext: undefined,
+      qualityCheckResult: undefined,
+      qualityRetryCount: 0,
+      expansionAttempted: false,
+      reformulatedQueries: [],
+      isComplexQuery: false,
+      subQueries: [],
+    },
+    trajectory,
+  };
 }
 
 /**
