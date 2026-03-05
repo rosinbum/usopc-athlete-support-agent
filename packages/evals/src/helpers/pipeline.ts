@@ -1,5 +1,6 @@
 import { HumanMessage } from "@langchain/core/messages";
 import { AgentRunner, nodeMetrics, type AgentState } from "@usopc/core";
+import { closePool } from "@usopc/shared";
 
 /**
  * Runs the full agent pipeline for a user message and returns the final state.
@@ -79,6 +80,10 @@ export async function runPipeline(userMessage: string): Promise<{
     };
   } finally {
     await runner.close();
+    // runner.close() ends the PGVectorStore's pool, which is the shared
+    // singleton from getPool(). Reset the singleton so the next call to
+    // getPool() creates a fresh pool instead of reusing the ended one.
+    await closePool();
   }
 }
 
