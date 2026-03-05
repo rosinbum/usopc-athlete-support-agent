@@ -18,6 +18,8 @@
     "eval:citations": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/citations.eval.ts",
     "eval:disclaimers": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/disclaimers.eval.ts",
     "eval:semantic": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/semanticSimilarity.eval.ts",
+    "eval:quality": "sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/qualityReview.eval.ts",
+    "eval:quality:full": "QUALITY_REVIEW_SCOPE=full sst shell -- vitest run --config ls.vitest.config.ts src/evaluators/qualityReview.eval.ts",
     "seed-langsmith": "sst shell -- tsx src/scripts/seed-datasets.ts",
     "seed-langsmith:force": "sst shell -- tsx src/scripts/seed-datasets.ts --force",
     "quality:seed": "sst shell -- tsx src/scripts/seed-quality-review.ts",

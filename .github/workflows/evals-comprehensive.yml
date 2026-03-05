@@ -10,6 +10,10 @@ on:
       baseline_tag:
         description: "Compare against a specific baseline tag"
         required: false
+      quality_review_scope:
+        description: "Quality review scope: canary (15) or full (60)"
+        required: false
+        default: "canary"
 
 jobs:
   # ── Check if agent code changed since last successful run ────────────────
@@ -47,6 +51,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/usopc_test
+      QUALITY_REVIEW_SCOPE: ${{ startsWith(github.ref, 'refs/tags/v') && 'full' || inputs.quality_review_scope || 'canary' }}
 
     services:
       postgres:
