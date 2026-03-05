@@ -68,7 +68,6 @@ export async function POST(req: Request) {
       getAppRunner,
       AgentRunner,
       agentStreamToEvents,
-      loadSummary,
       publishDiscoveredUrls,
       detectInjection,
       INJECTION_RESPONSE,
@@ -88,15 +87,7 @@ export async function POST(req: Request) {
       tracingEnabled: process.env.LANGCHAIN_TRACING_V2,
     });
 
-    // Load existing conversation summary (scoped by user to prevent cross-user access)
     const userEmail = session.user.email;
-    let conversationSummary: string | undefined;
-    if (conversationId) {
-      const summaryKey = `${userEmail}:${conversationId}`;
-      conversationSummary = (await loadSummary(summaryKey)) as
-        | string
-        | undefined;
-    }
 
     // Convert UIMessage parts format to {role, content} for LangChain
     const plainMessages = messages.map((m) => ({
@@ -108,7 +99,6 @@ export async function POST(req: Request) {
       messages: langchainMessages,
       userSport,
       conversationId,
-      conversationSummary,
       userId: userEmail,
     });
 
@@ -170,8 +160,6 @@ export async function POST(req: Request) {
         if (textStarted) {
           writer.write({ type: "text-end", id: textId });
         }
-
-        // Summary save is now automatic inside runner.stream()
 
         // Fire-and-forget: publish discovered URLs to SQS for async evaluation
         if (discoveredUrls.length > 0) {

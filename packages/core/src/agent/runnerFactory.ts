@@ -12,8 +12,7 @@ let runnerPromise: Promise<AgentRunner> | null = null;
  * 1. Secret resolution via `@usopc/shared` (`getSecretValue`, `getDatabaseUrl`)
  * 2. `ANTHROPIC_API_KEY` env var setup (required before LangChain import)
  * 3. LangSmith tracing configuration (optional)
- * 4. `DynamoSummaryStore` wiring via `setSummaryStore()`
- * 5. `AgentRunner.create()` with all API keys
+ * 4. `AgentRunner.create()` with all API keys
  *
  * On initialization failure the cached promise is cleared so the next call
  * retries instead of permanently returning a rejected promise.
@@ -37,12 +36,8 @@ export function resetAppRunner(): void {
 
 async function initRunner(): Promise<AgentRunner> {
   // Dynamic imports so env vars are set BEFORE LangChain modules load
-  const {
-    getDatabaseUrl,
-    getSecretValue,
-    getOptionalEnv,
-    createConversationSummaryEntity,
-  } = await import("@usopc/shared");
+  const { getDatabaseUrl, getSecretValue, getOptionalEnv } =
+    await import("@usopc/shared");
 
   // Set env vars BEFORE importing @usopc/core modules (which load LangChain)
   process.env.ANTHROPIC_API_KEY = getSecretValue(
@@ -76,13 +71,6 @@ async function initRunner(): Promise<AgentRunner> {
 
   // Now import agent modules (LangChain env vars are set)
   const { AgentRunner } = await import("./runner.js");
-  const { setSummaryStore } = await import("../services/conversationMemory.js");
-  const { DynamoSummaryStore } =
-    await import("../services/dynamoSummaryStore.js");
-
-  // Replace in-memory store with DynamoDB-backed store
-  const summaryEntity = createConversationSummaryEntity();
-  setSummaryStore(new DynamoSummaryStore(summaryEntity));
 
   return await AgentRunner.create({
     databaseUrl: getDatabaseUrl(),

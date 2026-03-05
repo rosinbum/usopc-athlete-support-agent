@@ -4,7 +4,6 @@ import { AppTableSchema } from "./schema.js";
 import { SourceConfigEntity } from "./SourceConfigEntity.js";
 import { IngestionLogEntity } from "./IngestionLogEntity.js";
 import { DiscoveredSourceEntity } from "./DiscoveredSourceEntity.js";
-import { ConversationSummaryEntity } from "./ConversationSummaryEntity.js";
 import { InviteEntity } from "./InviteEntity.js";
 import { FeedbackEntity } from "./FeedbackEntity.js";
 import { getResource } from "../resources.js";
@@ -43,14 +42,6 @@ export function createDiscoveredSourceEntity(
   tableName?: string,
 ): DiscoveredSourceEntity {
   return new DiscoveredSourceEntity(
-    getOrCreateAppTable(tableName ?? getAppTableName()),
-  );
-}
-
-export function createConversationSummaryEntity(
-  tableName?: string,
-): ConversationSummaryEntity {
-  return new ConversationSummaryEntity(
     getOrCreateAppTable(tableName ?? getAppTableName()),
   );
 }

@@ -14,9 +14,6 @@ const {
   capturedWrites,
   mockRunnerStream,
   mockWriter,
-  mockLoadSummary,
-  mockSaveSummary,
-  mockGenerateSummary,
   mockPublishDiscoveredUrls,
   executePromise,
 } = vi.hoisted(() => {
@@ -26,9 +23,6 @@ const {
     write: vi.fn((v: unknown) => capturedWrites.push(v)),
     merge: vi.fn(),
   };
-  const mockLoadSummary = vi.fn();
-  const mockSaveSummary = vi.fn();
-  const mockGenerateSummary = vi.fn();
   const mockPublishDiscoveredUrls = vi.fn();
   // Store the execute() promise so tests can await stream completion
   const executePromise: { current: Promise<void> | null } = { current: null };
@@ -36,9 +30,6 @@ const {
     capturedWrites,
     mockRunnerStream,
     mockWriter,
-    mockLoadSummary,
-    mockSaveSummary,
-    mockGenerateSummary,
     mockPublishDiscoveredUrls,
     executePromise,
   };
@@ -77,7 +68,6 @@ vi.mock("@usopc/shared", () => {
     getDatabaseUrl: vi.fn(() => "postgres://localhost/test"),
     getSecretValue: vi.fn(() => "test-key"),
     getOptionalEnv: vi.fn(() => undefined),
-    createConversationSummaryEntity: vi.fn(() => ({})),
   };
 });
 
@@ -104,14 +94,10 @@ vi.mock("@usopc/core", async () => {
     agentStreamToEvents,
     getAppRunner: vi.fn(async () => ({
       stream: mockRunnerStream,
-      classifierModel: {},
     })),
     AgentRunner: {
       convertMessages: vi.fn((msgs: unknown[]) => msgs),
     },
-    loadSummary: mockLoadSummary,
-    saveSummary: mockSaveSummary,
-    generateSummary: mockGenerateSummary,
     publishDiscoveredUrls: mockPublishDiscoveredUrls,
     detectInjection: vi.fn().mockReturnValue(null),
     INJECTION_RESPONSE: "Please rephrase your question.",
@@ -177,9 +163,6 @@ describe("Chat route integration (real stream adapter + UI message stream)", () 
     // In-place clear — hoisted ref is captured by closure
     capturedWrites.length = 0;
     executePromise.current = null;
-    mockLoadSummary.mockResolvedValue(undefined);
-    mockSaveSummary.mockResolvedValue(undefined);
-    mockGenerateSummary.mockResolvedValue("summary");
     mockPublishDiscoveredUrls.mockResolvedValue(undefined);
   });
 
@@ -358,36 +341,6 @@ describe("Chat route integration (real stream adapter + UI message stream)", () 
   // -------------------------------------------------------------------
   // 6. Conversation summary loading
   // -------------------------------------------------------------------
-  describe("conversation summary loading", () => {
-    it("loads and passes summary to runner.stream()", async () => {
-      const convId = "123e4567-e89b-12d3-a456-426614174000";
-      mockLoadSummary.mockResolvedValue("prior summary");
-      mockRunnerStream.mockReturnValue(fakeStream([]));
-
-      const { POST } = await importRoute();
-      await POST(
-        makePOSTRequest({
-          messages: [
-            { role: "user", parts: [{ type: "text", text: "Hello" }] },
-          ],
-          conversationId: convId,
-        }),
-      );
-      await waitForStream();
-
-      expect(mockLoadSummary).toHaveBeenCalledWith(
-        `test@example.com:${convId}`,
-      );
-      expect(mockRunnerStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          conversationSummary: "prior summary",
-          userId: "test@example.com",
-        }),
-      );
-    });
-  });
-
-  // -------------------------------------------------------------------
   // 7. Discovered URLs fire-and-forget
   // -------------------------------------------------------------------
   describe("discovered URLs fire-and-forget", () => {
@@ -415,32 +368,7 @@ describe("Chat route integration (real stream adapter + UI message stream)", () 
   });
 
   // -------------------------------------------------------------------
-  // 8. Summary save (now automatic inside runner.stream())
-  // -------------------------------------------------------------------
-  describe("summary save", () => {
-    it("does not call generateSummary/saveSummary from the route (handled by runner)", async () => {
-      const convId = "123e4567-e89b-12d3-a456-426614174000";
-      mockRunnerStream.mockReturnValue(fakeStream([]));
-
-      const { POST } = await importRoute();
-      await POST(
-        makePOSTRequest({
-          messages: [
-            { role: "user", parts: [{ type: "text", text: "Hello" }] },
-          ],
-          conversationId: convId,
-        }),
-      );
-      await waitForFireAndForget();
-
-      // Summary save moved into AgentRunner.stream() — route no longer calls these
-      expect(mockGenerateSummary).not.toHaveBeenCalled();
-      expect(mockSaveSummary).not.toHaveBeenCalled();
-    });
-  });
-
-  // -------------------------------------------------------------------
-  // 9. Status events
+  // 8. Status events
   // -------------------------------------------------------------------
   describe("status events", () => {
     it("emits data-status part for status events", async () => {

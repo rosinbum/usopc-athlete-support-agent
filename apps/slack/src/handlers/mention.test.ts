@@ -11,9 +11,8 @@ const { mockPostMessage, mockAddReaction, mockCleanUpPreviousBotMessages } =
     mockCleanUpPreviousBotMessages: vi.fn().mockResolvedValue(undefined),
   }));
 
-const { mockGetAppRunner, mockLoadSummary } = vi.hoisted(() => ({
+const { mockGetAppRunner } = vi.hoisted(() => ({
   mockGetAppRunner: vi.fn(),
-  mockLoadSummary: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@usopc/shared", async (importOriginal) => {
@@ -31,7 +30,6 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 
 vi.mock("@usopc/core", () => ({
   getAppRunner: mockGetAppRunner,
-  loadSummary: mockLoadSummary,
   convertMessages: vi
     .fn()
     .mockImplementation((msgs: { role: string; content: string }[]) =>
@@ -199,26 +197,6 @@ describe("handleMention", () => {
         "Error processing request",
         expect.any(Array),
         "1234567890.123456",
-      );
-    });
-  });
-
-  it("loads conversation summary for the thread", async () => {
-    mockLoadSummary.mockResolvedValueOnce("Previous context about appeals.");
-
-    await handleMention(makeEvent());
-
-    await vi.waitFor(() => {
-      expect(mockLoadSummary).toHaveBeenCalledWith(
-        "slack:U456:1234567890.123456",
-      );
-    });
-
-    await vi.waitFor(() => {
-      expect(fakeRunner.invoke).toHaveBeenCalledWith(
-        expect.objectContaining({
-          conversationSummary: "Previous context about appeals.",
-        }),
       );
     });
   });

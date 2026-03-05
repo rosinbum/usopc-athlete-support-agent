@@ -68,7 +68,6 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
     qualityRetryCount: 0,
     expansionAttempted: false,
     reformulatedQueries: [],
-    conversationSummary: undefined,
     isComplexQuery: false,
     subQueries: [],
     ...overrides,

@@ -1,7 +1,6 @@
 import { createLogger } from "@usopc/shared";
 import {
   getAppRunner,
-  loadSummary,
   convertMessages,
   detectInjection,
   INJECTION_RESPONSE,
@@ -87,14 +86,11 @@ async function processMentionAsync(
   try {
     const runner = await getAppRunner();
     const conversationId = thread_ts ?? ts;
-    const summaryKey = `slack:${user}:${conversationId}`;
-    const conversationSummary = await loadSummary(summaryKey);
     const messages = convertMessages([{ role: "user", content: cleanedText }]);
 
     const { answer, citations, escalation, disclaimer } = await runner.invoke({
       messages,
       conversationId,
-      conversationSummary,
       userId: `slack:${user}`,
     });
 

@@ -178,7 +178,6 @@ export function createClassifierNode(model: BaseChatModel) {
     // Build contextual query from conversation history
     const { currentMessage, conversationContext } = buildContextualQuery(
       state.messages,
-      { conversationSummary: state.conversationSummary },
     );
 
     if (!currentMessage) {

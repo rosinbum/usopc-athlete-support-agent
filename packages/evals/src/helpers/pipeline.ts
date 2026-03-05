@@ -73,7 +73,6 @@ export async function runPipeline(userMessage: string): Promise<{
       disclaimerRequired: true,
       hasTimeConstraint: false,
       conversationId: undefined,
-      conversationSummary: undefined,
       userSport: undefined,
       needsClarification: false,
       clarificationQuestion: undefined,

@@ -5,7 +5,6 @@ export {
   createSourceConfigEntity,
   createIngestionLogEntity,
   createDiscoveredSourceEntity,
-  createConversationSummaryEntity,
   createInviteEntity,
   createFeedbackEntity,
 } from "./factory.js";
@@ -26,10 +25,6 @@ export { SportOrgEntity } from "./SportOrgEntity.js";
 export { AgentModelEntity, type AgentModelConfig } from "./AgentModelEntity.js";
 export { IngestionLogEntity, type IngestionLog } from "./IngestionLogEntity.js";
 export { PromptEntity, type PromptConfig } from "./PromptEntity.js";
-export {
-  ConversationSummaryEntity,
-  type ConversationSummary,
-} from "./ConversationSummaryEntity.js";
 export {
   InviteEntity,
   type Invite,

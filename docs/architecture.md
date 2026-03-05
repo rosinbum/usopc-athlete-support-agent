@@ -291,18 +291,17 @@ The agent's shared state is defined by `AgentStateAnnotation` in `packages/core/
 | **Quality Iteration**      | `qualityCheckResult`, `qualityRetryCount`, `expansionAttempted`, `reformulatedQueries`                                                                   | `qualityChecker`, `retrievalExpander`                           |
 | **Emotional Support**      | `emotionalSupportContext`                                                                                                                                | `emotionalSupport`                                              |
 | **Response/Safety**        | `answer`, `citations`, `disclaimerRequired`, `escalation`                                                                                                | `synthesizer`, `citationBuilder`, `disclaimerGuard`, `escalate` |
-| **User Context**           | `conversationId`, `conversationSummary`, `userSport`                                                                                                     | Input via `buildInitialState()`                                 |
+| **User Context**           | `conversationId`, `userSport`                                                                                                                            | Input via `buildInitialState()`                                 |
 
 ### Initial State
 
-`AgentRunner.buildInitialState()` passes only four fields from the caller; everything else uses Annotation defaults (empty arrays, `undefined`, `false`, `0`, etc.):
+`AgentRunner.buildInitialState()` passes only three fields from the caller; everything else uses Annotation defaults (empty arrays, `undefined`, `false`, `0`, etc.). Multi-turn context is handled automatically by the PostgresSaver checkpointer — when `graph.invoke()` is called with the same `thread_id`, LangGraph loads all prior messages from the checkpoint.
 
 ```typescript
 return {
   messages: input.messages,
   userSport: input.userSport,
   conversationId: input.conversationId,
-  conversationSummary: input.conversationSummary,
 };
 ```
 

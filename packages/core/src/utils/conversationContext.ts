@@ -3,18 +3,16 @@ import { parseEnvInt } from "@usopc/shared";
 
 /**
  * Default number of conversation turns to include in context.
+ * With PostgresSaver checkpointing providing full message history,
+ * a wider window (20 turns) gives the classifier and synthesizer
+ * enough raw context without needing a rolling summary.
  */
-const DEFAULT_MAX_TURNS = 5;
+const DEFAULT_MAX_TURNS = 20;
 
 /**
  * Maximum length for individual messages before truncation.
  */
 const MAX_MESSAGE_LENGTH = 500;
-
-/**
- * Default reduced turn count when a rolling summary provides earlier context.
- */
-const DEFAULT_SUMMARY_MAX_TURNS = 2;
 
 /**
  * Returns the maximum number of conversation turns to include in context.
@@ -25,30 +23,15 @@ export function getMaxTurns(): number {
 }
 
 /**
- * Returns the max turns to include when a conversation summary is available.
- * Configurable via SUMMARY_MAX_TURNS env var (set in sst.config.ts).
- */
-export function getSummaryMaxTurns(): number {
-  return parseEnvInt("SUMMARY_MAX_TURNS", DEFAULT_SUMMARY_MAX_TURNS);
-}
-
-/**
  * Options for formatting conversation history.
  */
 export interface FormatHistoryOptions {
   /**
    * Maximum number of conversation turns to include.
    * A turn is one user message + one assistant response.
-   * Defaults to getMaxTurns() (5 by default).
+   * Defaults to getMaxTurns() (20 by default).
    */
   maxTurns?: number;
-
-  /**
-   * Rolling conversation summary from earlier turns.
-   * When provided, maxTurns is reduced to 2 and the summary is
-   * prepended to the conversation context.
-   */
-  conversationSummary?: string | undefined;
 }
 
 /**
@@ -151,20 +134,7 @@ export function buildContextualQuery(
   const lastMessage = messages[messages.length - 1]!;
   const currentMessage = getMessageContent(lastMessage);
 
-  // When a summary is available, reduce raw history and prepend the summary
-  const effectiveOptions = options?.conversationSummary
-    ? { ...options, maxTurns: options.maxTurns ?? getSummaryMaxTurns() }
-    : options;
-
-  const rawHistory = formatConversationHistory(messages, effectiveOptions);
-
-  let conversationContext = rawHistory;
-  if (options?.conversationSummary) {
-    const summaryBlock = `[Conversation Summary]\n${options.conversationSummary}`;
-    conversationContext = rawHistory
-      ? `${summaryBlock}\n\n${rawHistory}`
-      : summaryBlock;
-  }
+  const conversationContext = formatConversationHistory(messages, options);
 
   return { currentMessage, conversationContext };
 }

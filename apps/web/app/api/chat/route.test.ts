@@ -12,7 +12,6 @@ let initCallCount = 0;
 
 const mockRunner = {
   stream: vi.fn(),
-  classifierModel: {},
 };
 
 vi.mock("@usopc/shared", () => ({
@@ -43,7 +42,6 @@ vi.mock("@usopc/core", () => ({
       next: vi.fn(async () => ({ done: true, value: undefined })),
     }),
   })),
-  loadSummary: vi.fn(),
   publishDiscoveredUrls: vi.fn(),
   detectInjection: vi.fn().mockReturnValue(null),
   INJECTION_RESPONSE: "Please rephrase your question.",
@@ -453,39 +451,7 @@ describe("conversation summary loading (TEST-02)", () => {
   const validUuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
   const otherUuid = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
 
-  it("calls loadSummary with conversationId when provided", async () => {
-    const { POST } = await importRoute();
-    const { loadSummary } = await import("@usopc/core");
-
-    await POST(
-      makeReq({
-        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
-        conversationId: validUuid,
-      }),
-    );
-
-    expect(loadSummary).toHaveBeenCalledWith(`test@example.com:${validUuid}`);
-  });
-
-  it("does not call loadSummary when conversationId is absent", async () => {
-    const { POST } = await importRoute();
-    const { loadSummary } = await import("@usopc/core");
-
-    await POST(
-      makeReq({
-        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }] }],
-      }),
-    );
-
-    expect(loadSummary).not.toHaveBeenCalled();
-  });
-
-  it("passes loaded summary to the agent runner stream", async () => {
-    const coreMod = await import("@usopc/core");
-    vi.mocked(coreMod.loadSummary).mockResolvedValueOnce(
-      "Previous conversation context",
-    );
-
+  it("passes conversationId and userSport to the agent runner stream", async () => {
     const { POST } = await importRoute();
 
     await POST(
@@ -500,7 +466,6 @@ describe("conversation summary loading (TEST-02)", () => {
 
     expect(mockRunner.stream).toHaveBeenCalledWith(
       expect.objectContaining({
-        conversationSummary: "Previous conversation context",
         conversationId: otherUuid,
         userSport: "swimming",
       }),
