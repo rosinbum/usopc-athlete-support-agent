@@ -48,11 +48,7 @@ function isMultiTurn(scenario: QualityReviewScenario): boolean {
   );
 }
 
-/**
- * Map scenarios to the shape expected by `ls.test.each()`.
- * Each entry needs `inputs` and `referenceOutputs` (mapped as `outputs`
- * in LangSmith, available as `referenceOutputs` in the test callback).
- */
+/** Map scenarios to the shape expected by `ls.test()`. */
 const examples = scenarios.map((s) => ({
   inputs: {
     messages: s.input.messages,
@@ -75,66 +71,75 @@ const examples = scenarios.map((s) => ({
 // ---------------------------------------------------------------------------
 
 ls.describe("usopc-quality-review", () => {
-  ls.test.each(examples)(
-    "quality review scenario",
-    async ({ inputs, referenceOutputs }) => {
-      const messages = inputs.messages as Array<{
-        role: "user" | "assistant";
-        content: string;
-      }>;
-      const userSport = inputs.userSport as string | undefined;
-      const scenarioId = String(inputs.scenarioId);
+  for (const example of examples) {
+    const scenarioId = String(example.inputs.scenarioId);
 
-      // Find original scenario for multi-turn detection
-      const scenario = qualityReviewScenarios.find((s) => s.id === scenarioId)!;
-      const multiTurn = isMultiTurn(scenario);
+    ls.test(
+      scenarioId,
+      {
+        inputs: example.inputs,
+        referenceOutputs: example.referenceOutputs,
+      },
+      async ({ inputs, referenceOutputs }) => {
+        const messages = inputs.messages as Array<{
+          role: "user" | "assistant";
+          content: string;
+        }>;
+        const userSport = inputs.userSport as string | undefined;
 
-      const result = multiTurn
-        ? await runMultiTurnPipeline(messages, {
-            userSport: userSport ?? undefined,
-          })
-        : await runPipeline(messages[0]!.content);
+        // Find original scenario for multi-turn detection
+        const scenario = qualityReviewScenarios.find(
+          (s) => s.id === scenarioId,
+        )!;
+        const multiTurn = isMultiTurn(scenario);
 
-      const answer = result.state.answer ?? "";
-      const trajectory = result.trajectory;
+        const result = multiTurn
+          ? await runMultiTurnPipeline(messages, {
+              userSport: userSport ?? undefined,
+            })
+          : await runPipeline(messages[0]!.content);
 
-      ls.logOutputs({
-        answer,
-        trajectory,
-        category: referenceOutputs?.category,
-        difficulty: referenceOutputs?.difficulty,
-      });
+        const answer = result.state.answer ?? "";
+        const trajectory = result.trajectory;
 
-      // -- Deterministic feedback --
-
-      // 1. Did the scenario complete without error?
-      ls.logFeedback({ key: "qr_completed", score: 1.0 });
-
-      // 2. Did the agent produce a non-empty answer?
-      ls.logFeedback({
-        key: "qr_has_answer",
-        score: answer.trim().length > 0 ? 1.0 : 0.0,
-      });
-
-      // 3. Trajectory match (when expected path is provided)
-      const expectedPath = referenceOutputs?.expected_path;
-      if (typeof expectedPath === "string" && expectedPath.length > 0) {
-        const expectedNodes = expectedPath
-          .split("→")
-          .map((s: string) => s.trim());
-        // Subset match — did the actual trajectory contain all expected nodes in order?
-        let idx = 0;
-        for (const node of trajectory) {
-          if (idx < expectedNodes.length && node === expectedNodes[idx]) {
-            idx++;
-          }
-        }
-        ls.logFeedback({
-          key: "qr_trajectory_match",
-          score: idx === expectedNodes.length ? 1.0 : 0.0,
+        ls.logOutputs({
+          answer,
+          trajectory,
+          category: referenceOutputs?.category,
+          difficulty: referenceOutputs?.difficulty,
         });
-      }
-    },
-    300_000,
-  );
+
+        // -- Deterministic feedback --
+
+        // 1. Did the scenario complete without error?
+        ls.logFeedback({ key: "qr_completed", score: 1.0 });
+
+        // 2. Did the agent produce a non-empty answer?
+        ls.logFeedback({
+          key: "qr_has_answer",
+          score: answer.trim().length > 0 ? 1.0 : 0.0,
+        });
+
+        // 3. Trajectory match (when expected path is provided)
+        const expectedPath = referenceOutputs?.expected_path;
+        if (typeof expectedPath === "string" && expectedPath.length > 0) {
+          const expectedNodes = expectedPath
+            .split("→")
+            .map((s: string) => s.trim());
+          // Subset match — did the actual trajectory contain all expected nodes in order?
+          let idx = 0;
+          for (const node of trajectory) {
+            if (idx < expectedNodes.length && node === expectedNodes[idx]) {
+              idx++;
+            }
+          }
+          ls.logFeedback({
+            key: "qr_trajectory_match",
+            score: idx === expectedNodes.length ? 1.0 : 0.0,
+          });
+        }
+      },
+      300_000,
+    );
+  }
 });
