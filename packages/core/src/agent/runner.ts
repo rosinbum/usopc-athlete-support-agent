@@ -1,4 +1,3 @@
-import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { createEmbeddings } from "../rag/embeddings.js";
@@ -13,10 +12,6 @@ import { createPostgresCheckpointer } from "./checkpointer.js";
 import { GRAPH_CONFIG, createAgentModels } from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
 import { nodeMetrics } from "./nodeMetrics.js";
-import {
-  generateSummary,
-  saveSummary,
-} from "../services/conversationMemory.js";
 import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
@@ -48,8 +43,7 @@ export interface AgentInput {
   messages: BaseMessage[];
   userSport?: string | undefined;
   conversationId?: string | undefined;
-  conversationSummary?: string | undefined;
-  /** User identity for scoping summaries. Prevents cross-user summary access. */
+  /** User identity for future per-user features. */
   userId?: string | undefined;
 }
 
@@ -83,27 +77,16 @@ export function convertMessages(
 export class AgentRunner {
   private graph: ReturnType<typeof createAgentGraph>;
   private vectorStore: PGVectorStore;
-  private _classifierModel: BaseChatModel;
   private checkpointer: BaseCheckpointSaver | undefined;
 
   private constructor(
     graph: ReturnType<typeof createAgentGraph>,
     vectorStore: PGVectorStore,
-    classifierModel: BaseChatModel,
     checkpointer?: BaseCheckpointSaver,
   ) {
     this.graph = graph;
     this.vectorStore = vectorStore;
-    this._classifierModel = classifierModel;
     this.checkpointer = checkpointer;
-  }
-
-  /**
-   * The shared Haiku model instance. Exposed so callers (e.g., route handlers)
-   * can pass it to `generateSummary()` without a module-level singleton.
-   */
-  get classifierModel(): BaseChatModel {
-    return this._classifierModel;
   }
 
   /**
@@ -151,7 +134,7 @@ export class AgentRunner {
       { checkpointer },
     );
 
-    return new AgentRunner(graph, vectorStore, classifierModel, checkpointer);
+    return new AgentRunner(graph, vectorStore, checkpointer);
   }
 
   /**
@@ -188,32 +171,12 @@ export class AgentRunner {
       "graph.invoke",
     );
 
-    const output: AgentOutput = {
+    return {
       answer: finalState.answer ?? "",
       citations: finalState.citations ?? [],
       escalation: finalState.escalation,
       disclaimer: finalState.disclaimer,
     };
-
-    // Fire-and-forget: save conversation summary for multi-turn context
-    if (input.conversationId && initialState.conversationId) {
-      const summaryKey = input.userId
-        ? `${input.userId}:${input.conversationId}`
-        : input.conversationId;
-      generateSummary(
-        input.messages,
-        input.conversationSummary,
-        this._classifierModel,
-      )
-        .then((s) => saveSummary(summaryKey, s))
-        .catch((e) =>
-          log.error("Failed to save conversation summary", {
-            error: String(e),
-          }),
-        );
-    }
-
-    return output;
   }
 
   /**
@@ -257,24 +220,6 @@ export class AgentRunner {
       // LangGraph emits [mode, data] tuples when using array streamMode
       yield chunk as StreamChunk;
     }
-
-    // Runs after consumer finishes iterating the generator
-    if (input.conversationId && initialState.conversationId) {
-      const summaryKey = input.userId
-        ? `${input.userId}:${input.conversationId}`
-        : input.conversationId;
-      generateSummary(
-        input.messages,
-        input.conversationSummary,
-        this._classifierModel,
-      )
-        .then((s) => saveSummary(summaryKey, s))
-        .catch((e) =>
-          log.error("Failed to save conversation summary", {
-            error: String(e),
-          }),
-        );
-    }
   }
 
   /**
@@ -303,7 +248,6 @@ export class AgentRunner {
       messages: input.messages,
       userSport: input.userSport,
       conversationId,
-      conversationSummary: input.conversationSummary,
     };
   }
 }

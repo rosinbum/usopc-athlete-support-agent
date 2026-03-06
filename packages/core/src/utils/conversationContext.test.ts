@@ -21,9 +21,9 @@ describe("conversationContext", () => {
   });
 
   describe("getMaxTurns", () => {
-    it("returns default value of 5 when env var is not set", () => {
+    it("returns default value of 20 when env var is not set", () => {
       delete process.env.CONVERSATION_MAX_TURNS;
-      expect(getMaxTurns()).toBe(5);
+      expect(getMaxTurns()).toBe(20);
     });
 
     it("returns parsed value from env var", () => {
@@ -40,7 +40,7 @@ describe("conversationContext", () => {
 
     it("returns default for empty string", () => {
       process.env.CONVERSATION_MAX_TURNS = "";
-      expect(getMaxTurns()).toBe(5);
+      expect(getMaxTurns()).toBe(20);
     });
   });
 
@@ -182,69 +182,6 @@ describe("conversationContext", () => {
       expect(result.conversationContext).toContain("Third");
       expect(result.conversationContext).toContain("Third response");
       expect(result.conversationContext).not.toContain("Second response");
-    });
-
-    it("prepends conversation summary when provided", () => {
-      const messages = [
-        new HumanMessage("First"),
-        new AIMessage("First response"),
-        new HumanMessage("Second"),
-        new AIMessage("Second response"),
-        new HumanMessage("Third"),
-        new AIMessage("Third response"),
-        new HumanMessage("Current"),
-      ];
-
-      const summary = "The user is a swimmer asking about team selection.";
-      const result = buildContextualQuery(messages, {
-        conversationSummary: summary,
-      });
-
-      expect(result.currentMessage).toBe("Current");
-      expect(result.conversationContext).toContain("[Conversation Summary]");
-      expect(result.conversationContext).toContain(summary);
-    });
-
-    it("reduces maxTurns to 2 when summary is provided", () => {
-      const messages = [
-        new HumanMessage("First"),
-        new AIMessage("First response"),
-        new HumanMessage("Second"),
-        new AIMessage("Second response"),
-        new HumanMessage("Third"),
-        new AIMessage("Third response"),
-        new HumanMessage("Fourth"),
-        new AIMessage("Fourth response"),
-        new HumanMessage("Current"),
-      ];
-
-      const result = buildContextualQuery(messages, {
-        conversationSummary: "Summary text",
-      });
-
-      // With summary, maxTurns defaults to 2 — only last 2 turns
-      expect(result.conversationContext).toContain("Third");
-      expect(result.conversationContext).toContain("Fourth");
-      expect(result.conversationContext).not.toContain("First response");
-      expect(result.conversationContext).not.toContain("Second response");
-    });
-
-    it("does not alter behavior when conversationSummary is undefined", () => {
-      const messages = [
-        new HumanMessage("First"),
-        new AIMessage("First response"),
-        new HumanMessage("Current"),
-      ];
-
-      const withSummary = buildContextualQuery(messages, {
-        conversationSummary: undefined,
-      });
-      const without = buildContextualQuery(messages);
-
-      expect(withSummary.conversationContext).toBe(without.conversationContext);
-      expect(withSummary.conversationContext).not.toContain(
-        "[Conversation Summary]",
-      );
     });
   });
 });

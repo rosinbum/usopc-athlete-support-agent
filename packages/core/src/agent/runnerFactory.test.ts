@@ -11,12 +11,6 @@ const { mockGetDatabaseUrl, mockGetSecretValue, mockGetOptionalEnv } =
     mockGetOptionalEnv: vi.fn().mockReturnValue(undefined),
   }));
 
-const { mockCreateConversationSummaryEntity } = vi.hoisted(() => ({
-  mockCreateConversationSummaryEntity: vi
-    .fn()
-    .mockReturnValue({ get: vi.fn(), upsert: vi.fn() }),
-}));
-
 vi.mock("@usopc/shared", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@usopc/shared")>();
   return {
@@ -24,7 +18,6 @@ vi.mock("@usopc/shared", async (importOriginal) => {
     getDatabaseUrl: mockGetDatabaseUrl,
     getSecretValue: mockGetSecretValue,
     getOptionalEnv: mockGetOptionalEnv,
-    createConversationSummaryEntity: mockCreateConversationSummaryEntity,
     logger: {
       child: () => ({
         info: vi.fn(),
@@ -42,14 +35,6 @@ const { mockAgentRunnerCreate } = vi.hoisted(() => ({
 
 vi.mock("./runner.js", () => ({
   AgentRunner: { create: mockAgentRunnerCreate },
-}));
-
-vi.mock("../services/conversationMemory.js", () => ({
-  setSummaryStore: vi.fn(),
-}));
-
-vi.mock("../services/dynamoSummaryStore.js", () => ({
-  DynamoSummaryStore: vi.fn(),
 }));
 
 import { getAppRunner, resetAppRunner } from "./runnerFactory.js";

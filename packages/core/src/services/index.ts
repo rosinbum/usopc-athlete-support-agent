@@ -36,19 +36,7 @@ export {
 export { generateSupportContext } from "./emotionalSupport.js";
 
 export {
-  type SummaryStore,
-  InMemorySummaryStore,
-  getSummaryStore,
-  setSummaryStore,
-  loadSummary,
-  saveSummary,
-  generateSummary,
-} from "./conversationMemory.js";
-
-export {
   publishDiscoveredUrls,
   normalizeUrl,
   urlToId,
 } from "./discoveryFeedService.js";
-
-export { DynamoSummaryStore } from "./dynamoSummaryStore.js";

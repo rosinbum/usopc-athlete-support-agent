@@ -11,9 +11,8 @@ const { mockPostMessage, mockAddReaction, mockCleanUpPreviousBotMessages } =
     mockCleanUpPreviousBotMessages: vi.fn().mockResolvedValue(undefined),
   }));
 
-const { mockGetAppRunner, mockLoadSummary } = vi.hoisted(() => ({
+const { mockGetAppRunner } = vi.hoisted(() => ({
   mockGetAppRunner: vi.fn(),
-  mockLoadSummary: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@usopc/shared", async (importOriginal) => {
@@ -31,7 +30,6 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 
 vi.mock("@usopc/core", () => ({
   getAppRunner: mockGetAppRunner,
-  loadSummary: mockLoadSummary,
   convertMessages: vi
     .fn()
     .mockImplementation((msgs: { role: string; content: string }[]) =>

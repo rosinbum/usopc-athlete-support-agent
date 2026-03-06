@@ -51,8 +51,7 @@ export function createChatModel(config: {
  * Creates the shared model instances used by all graph nodes.
  *
  * Call once at startup (AgentRunner.create, studio.ts, eval setup) and pass
- * the returned models into `createAgentGraph`. The classifierModel can also
- * be passed to `generateSummary()` for conversation memory.
+ * the returned models into `createAgentGraph`.
  * This eliminates redundant model construction across entry points.
  */
 export async function createAgentModels(): Promise<AgentModels> {
