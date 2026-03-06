@@ -1,0 +1,66 @@
+diff --git a/dist/vectorstores/pgvector.cjs b/dist/vectorstores/pgvector.cjs
+index fc1bb9230ec922fde28c797b862643b0fdc70953..1e3c02057cc1cc687631ec27d241961784c9a6a5 100644
+--- a/dist/vectorstores/pgvector.cjs
++++ b/dist/vectorstores/pgvector.cjs
+@@ -270,6 +270,7 @@ var PGVectorStore = class PGVectorStore extends _langchain_core_vectorstores.Vec
+ 		this.idColumnName = config.columns?.idColumnName ?? "id";
+ 		this.metadataColumnName = config.columns?.metadataColumnName ?? "metadata";
+ 		if (!config.postgresConnectionOptions && !config.pool) throw new Error("You must provide either a `postgresConnectionOptions` object or a `pool` instance.");
++		this._isInternalPool = !config.pool;
+ 		this.pool = config.pool ?? new pg.default.Pool(config.postgresConnectionOptions);
+ 		this.chunkSize = config.chunkSize ?? 500;
+ 		this.distanceStrategy = config.distanceStrategy ?? this.distanceStrategy;
+@@ -320,7 +321,8 @@ var PGVectorStore = class PGVectorStore extends _langchain_core_vectorstores.Vec
+ 		return postgresqlVectorStore;
+ 	}
+ 	async _initializeClient() {
+-		this.client = await this.pool.connect();
++		// No-op: previously acquired a pool client that was never used.
++		// All queries use this.pool.query() directly.
+ 	}
+ 	/**
+ 	* Method to add documents to the vector store. It converts the documents into
+@@ -718,7 +720,9 @@ var PGVectorStore = class PGVectorStore extends _langchain_core_vectorstores.Vec
+ 	*/
+ 	async end() {
+ 		this.client?.release();
+-		return this.pool.end();
++		if (this._isInternalPool) {
++			return this.pool.end();
++		}
+ 	}
+ 	/**
+ 	* Method to create the HNSW index on the vector column.
+diff --git a/dist/vectorstores/pgvector.js b/dist/vectorstores/pgvector.js
+index 0dc34348f2e2decd1eee1218e4e24b7662e1c024..1bdd6a4ff9f602000cbf2903fd9ef50b0439973a 100644
+--- a/dist/vectorstores/pgvector.js
++++ b/dist/vectorstores/pgvector.js
+@@ -268,6 +268,7 @@ var PGVectorStore = class PGVectorStore extends VectorStore {
+ 		this.idColumnName = config.columns?.idColumnName ?? "id";
+ 		this.metadataColumnName = config.columns?.metadataColumnName ?? "metadata";
+ 		if (!config.postgresConnectionOptions && !config.pool) throw new Error("You must provide either a `postgresConnectionOptions` object or a `pool` instance.");
++		this._isInternalPool = !config.pool;
+ 		this.pool = config.pool ?? new pg.Pool(config.postgresConnectionOptions);
+ 		this.chunkSize = config.chunkSize ?? 500;
+ 		this.distanceStrategy = config.distanceStrategy ?? this.distanceStrategy;
+@@ -318,7 +319,8 @@ var PGVectorStore = class PGVectorStore extends VectorStore {
+ 		return postgresqlVectorStore;
+ 	}
+ 	async _initializeClient() {
+-		this.client = await this.pool.connect();
++		// No-op: previously acquired a pool client that was never used.
++		// All queries use this.pool.query() directly.
+ 	}
+ 	/**
+ 	* Method to add documents to the vector store. It converts the documents into
+@@ -716,7 +718,9 @@ var PGVectorStore = class PGVectorStore extends VectorStore {
+ 	*/
+ 	async end() {
+ 		this.client?.release();
+-		return this.pool.end();
++		if (this._isInternalPool) {
++			return this.pool.end();
++		}
+ 	}
+ 	/**
+ 	* Method to create the HNSW index on the vector column.
