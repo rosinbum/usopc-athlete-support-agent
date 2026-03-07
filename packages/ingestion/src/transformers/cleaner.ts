@@ -14,8 +14,11 @@ export function cleanText(text: string): string {
       .replace(/\n{4,}/g, "\n\n\n")
       // Remove standalone page number lines (e.g. "Page 3", "Page 3 of 10")
       .replace(/^\s*Page\s+\d+\s*(of\s+\d+)?\s*$/gm, "")
-      // Remove centered page numbers (e.g. "- 3 -")
+      // Remove centered page numbers (e.g. "- 3 -", "-- 3 of 72 --")
       .replace(/^\s*-\s*\d+\s*-\s*$/gm, "")
+      .replace(/^\s*--\s*\d+\s+of\s+\d+\s*--\s*$/gm, "")
+      // Remove bare page numbers on their own line (e.g. "3", "72")
+      .replace(/^\s*\d{1,3}\s*$/gm, "")
       // Replace form-feed characters with paragraph breaks
       .replace(/\f/g, "\n\n")
       // Replace tabs with a single space

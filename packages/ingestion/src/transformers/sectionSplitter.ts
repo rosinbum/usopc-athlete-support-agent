@@ -6,17 +6,19 @@ import { createSplitter } from "./splitter.js";
  * documents.  Each regex must match from the beginning of a line.
  */
 const SECTION_BOUNDARY =
-  /^(ARTICLE\s+[IVXLCDM\d]+[.:]\s*.+|SECTION\s+[\d.]+[.:]\s*.+|Section\s+[\d.]+[.:]\s*.+|CHAPTER\s+[\d]+[.:]\s*.+|PART\s+[IVXLCDM\d]+[.:]\s*.+|Rule\s+[\d.]+[.:]\s*.+)/im;
+  /^(ARTICLE\s+[IVXLCDM\d]+[.:]\s*.+|SECTION\s+[\d.]+[.:]\s*.+|Section\s+[\d.]+[.:]\s*.+|CHAPTER\s+[\d]+[.:—]\s*.+|PART\s+[IVXLCDM\d]+[.:]\s*.+|Rule\s+[\d.]+[.:]\s*.+|SUBCHAPTER\s+[IVXLCDM\d]+[—:].+|§\s*\d{4,}\.\s*.+)/im;
 
 /**
- * Title extraction patterns — same as sectionExtractor.ts.  First match
- * wins and becomes `metadata.section_title`.
+ * Title extraction patterns — first match wins and becomes
+ * `metadata.section_title`.
  */
 const TITLE_PATTERNS: RegExp[] = [
   /^(ARTICLE\s+[IVXLCDM\d]+[.:]\s*.+)/im,
   /^(SECTION\s+[\d.]+[.:]\s*.+)/im,
   /^(Section\s+[\d.]+[.:]\s*.+)/im,
-  /^(CHAPTER\s+[\d]+[.:]\s*.+)/im,
+  /^(CHAPTER\s+[\d]+[.:—]\s*.+)/im,
+  /^(SUBCHAPTER\s+[IVXLCDM\d]+[—:].+)/im,
+  /^(§\s*\d{4,}\.\s*.+)/im,
   /^(Rule\s+[\d.]+[.:]\s*.+)/im,
 ];
 
@@ -111,12 +113,19 @@ interface Section {
 }
 
 /**
+ * Minimum content length for a section to be emitted as its own chunk.
+ * Sections shorter than this are prepended to the following section
+ * (common for heading-only lines like "Section 3.9 The Chair.").
+ */
+const MIN_SECTION_CONTENT = 50;
+
+/**
  * Split raw text into sections at heading boundaries.  The heading line
  * is included in the section content so the LLM can read it in context.
  */
 function splitIntoSections(text: string): Section[] {
   const lines = text.split("\n");
-  const sections: Section[] = [];
+  const raw: Section[] = [];
   let currentLines: string[] = [];
   let currentTitle: string | undefined;
 
@@ -127,7 +136,7 @@ function splitIntoSections(text: string): Section[] {
       if (currentLines.length > 0) {
         const content = currentLines.join("\n").trim();
         if (content.length > 0) {
-          sections.push({ title: currentTitle, content });
+          raw.push({ title: currentTitle, content });
         }
       }
       currentTitle = match[1]!.trim();
@@ -141,9 +150,28 @@ function splitIntoSections(text: string): Section[] {
   if (currentLines.length > 0) {
     const content = currentLines.join("\n").trim();
     if (content.length > 0) {
-      sections.push({ title: currentTitle, content });
+      raw.push({ title: currentTitle, content });
     }
   }
 
-  return sections;
+  // Merge heading-only sections into the following section so we don't
+  // emit tiny chunks that are just a title with no body.
+  const merged: Section[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const section = raw[i]!;
+    if (
+      section.content.length < MIN_SECTION_CONTENT &&
+      section.title !== undefined &&
+      i + 1 < raw.length
+    ) {
+      // Prepend this heading-only content to the next section
+      const next = raw[i + 1]!;
+      next.content = section.content + "\n" + next.content;
+      // Keep the next section's own title (more specific)
+    } else {
+      merged.push(section);
+    }
+  }
+
+  return merged;
 }

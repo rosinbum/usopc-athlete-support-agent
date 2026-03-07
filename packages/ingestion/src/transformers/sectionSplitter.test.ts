@@ -34,10 +34,10 @@ describe("sectionAwareSplit", () => {
   it("produces distinct section_title values for multiple sections", async () => {
     const content = [
       "ARTICLE I: Governance",
-      "The governance framework.",
+      "The governance framework establishes the rules and procedures for the organization.",
       "",
       "ARTICLE II: Membership",
-      "Membership rules apply.",
+      "Membership rules apply to all athletes and organizations within the federation.",
     ].join("\n");
     const input = doc(content);
     const chunks = await sectionAwareSplit([input]);
@@ -98,10 +98,10 @@ describe("sectionAwareSplit", () => {
   it("handles PART headings", async () => {
     const content = [
       "PART I: General Provisions",
-      "General provisions text.",
+      "General provisions text that applies to all members of the organization and affiliates.",
       "",
       "PART II: Specific Rules",
-      "Specific rules text.",
+      "Specific rules text governing the conduct and responsibilities of each participating body.",
     ].join("\n");
     const chunks = await sectionAwareSplit([doc(content)]);
 
@@ -115,13 +115,13 @@ describe("sectionAwareSplit", () => {
   it("handles mixed heading types in one document", async () => {
     const content = [
       "ARTICLE III: Organization",
-      "Organization structure.",
+      "The organizational structure of the corporation is defined by the following provisions and rules.",
       "",
       "SECTION 3.1: Board Composition",
-      "Board details.",
+      "The board shall consist of no fewer than fifteen members appointed according to these bylaws.",
       "",
       "Section 3.2: Committees",
-      "Committee details.",
+      "Standing committees shall be established to oversee governance, finance, and athlete welfare.",
     ].join("\n");
     const chunks = await sectionAwareSplit([doc(content)]);
 
@@ -131,5 +131,20 @@ describe("sectionAwareSplit", () => {
       "SECTION 3.1: Board Composition",
     );
     expect(chunks[2]!.metadata.section_title).toBe("Section 3.2: Committees");
+  });
+
+  it("merges heading-only sections into the following section", async () => {
+    const content = [
+      "Section 3.9: The Chair.",
+      "Section 3.9.1: Duties. The Chair will preside over all meetings of the Board and execute duties.",
+    ].join("\n");
+    const chunks = await sectionAwareSplit([doc(content)]);
+
+    // "Section 3.9: The Chair." is < 50 chars, so it merges into 3.9.1
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]!.metadata.section_title).toBe(
+      "Section 3.9.1: Duties. The Chair will preside over all meetings of the Board and execute duties.",
+    );
+    expect(chunks[0]!.pageContent).toContain("Section 3.9: The Chair.");
   });
 });

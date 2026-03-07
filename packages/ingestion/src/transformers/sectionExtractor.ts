@@ -8,7 +8,9 @@ const SECTION_PATTERNS: RegExp[] = [
   /^(ARTICLE\s+[IVXLCDM\d]+[.:]\s*.+)/im,
   /^(SECTION\s+[\d.]+[.:]\s*.+)/im,
   /^(Section\s+[\d.]+[.:]\s*.+)/im,
-  /^(CHAPTER\s+[\d]+[.:]\s*.+)/im,
+  /^(CHAPTER\s+[\d]+[.:—]\s*.+)/im,
+  /^(SUBCHAPTER\s+[IVXLCDM\d]+[—:].+)/im,
+  /^(§\s*\d{4,}\.\s*.+)/im,
   /^(Rule\s+[\d.]+[.:]\s*.+)/im,
 ];
 
