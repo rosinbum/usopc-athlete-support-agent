@@ -338,4 +338,30 @@ describe("createRetrievalExpanderNode", () => {
     // Score is now an RRF fused score, not raw cosine distance
     expect(newDoc!.score).toBeGreaterThan(0);
   });
+
+  it("limits concurrent searches to avoid pool exhaustion (PERF-1)", async () => {
+    const queries = ["q1", "q2", "q3"];
+    setupMockModel(JSON.stringify(queries));
+
+    let concurrent = 0;
+    let maxConcurrent = 0;
+
+    const store: VectorStoreLike = {
+      similaritySearchWithScore: vi.fn().mockImplementation(async () => {
+        concurrent++;
+        maxConcurrent = Math.max(maxConcurrent, concurrent);
+        await new Promise((r) => setTimeout(r, 20));
+        concurrent--;
+        return [];
+      }),
+    };
+
+    const node = createRetrievalExpanderNode(store, mockModel, mockPool);
+    await node(makeState());
+
+    // MAX_CONCURRENT_SEARCHES = 2, so at most 2 vector searches at once
+    expect(maxConcurrent).toBeLessThanOrEqual(2);
+    // All 3 queries should still be executed
+    expect(store.similaritySearchWithScore).toHaveBeenCalledTimes(3);
+  });
 });

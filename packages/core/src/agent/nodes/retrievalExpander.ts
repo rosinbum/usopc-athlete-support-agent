@@ -26,6 +26,13 @@ const log = logger.child({ service: "retrieval-expander-node" });
 const RRF_K = 60;
 
 /**
+ * Max hybrid searches to run concurrently. Each search uses 2 pool
+ * connections (vector + BM25 in parallel), so this caps concurrent
+ * DB connections from the expander at MAX_CONCURRENT_SEARCHES * 2.
+ */
+const MAX_CONCURRENT_SEARCHES = 2;
+
+/**
  * Parses the JSON array of reformulated queries from the model response.
  * Returns an empty array if parsing fails.
  */
@@ -158,7 +165,9 @@ export function createRetrievalExpanderNode(
       const filter = buildFilter(state);
       const sqlFilter = buildSqlFilter(state);
 
-      const searchPromises = reformulatedQueries.map(async (query) => {
+      // Build search thunks (deferred execution) so we can limit concurrency.
+      // Each thunk uses 2 pool connections (vector + BM25 in parallel).
+      const searchThunks = reformulatedQueries.map((query) => async () => {
         const [vectorResults, textResults] = await Promise.all([
           vectorStoreSearch(
             () => vectorStore.similaritySearchWithScore(query, 5, filter),
@@ -185,7 +194,13 @@ export function createRetrievalExpanderNode(
         });
       });
 
-      const searchResults = await Promise.all(searchPromises);
+      // Execute with concurrency limit to avoid pool exhaustion (PERF-1).
+      const searchResults: Awaited<ReturnType<(typeof searchThunks)[0]>>[] = [];
+      for (let i = 0; i < searchThunks.length; i += MAX_CONCURRENT_SEARCHES) {
+        const batch = searchThunks.slice(i, i + MAX_CONCURRENT_SEARCHES);
+        const batchResults = await Promise.all(batch.map((fn) => fn()));
+        searchResults.push(...batchResults);
+      }
 
       // Merge with existing documents, deduplicating by content
       const seen = new Set(state.retrievedDocuments.map((d) => d.content));

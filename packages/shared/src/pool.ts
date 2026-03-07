@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import { getDatabaseUrl } from "./env.js";
+import { logger } from "./logger.js";
 
 let pool: Pool | null = null;
 
@@ -23,11 +24,21 @@ export function getPool(): Pool {
       connectionString.includes("sslmode=require");
     pool = new Pool({
       connectionString,
-      max: 5,
+      max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
       allowExitOnIdle: true,
       ...(needsSsl ? { ssl: true } : {}),
+    });
+
+    // Prevent process crash on idle connection backend errors (SEC-1).
+    // When Neon suspends compute or a network blip occurs, idle connections
+    // emit 'error' events. Without a handler Node treats these as uncaught
+    // exceptions. The pool automatically removes dead connections.
+    pool.on("error", (err) => {
+      logger.error("Idle pool connection error (non-fatal)", {
+        message: err.message,
+      });
     });
   }
   return pool;

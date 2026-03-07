@@ -195,11 +195,11 @@ describe("AgentRunner", () => {
       expect(mockCreateAgentModels).toHaveBeenCalledOnce();
     });
 
-    it("creates Postgres checkpointer with databaseUrl", async () => {
+    it("creates Postgres checkpointer with shared pool", async () => {
       await AgentRunner.create(defaultConfig);
 
       expect(mockCreatePostgresCheckpointer).toHaveBeenCalledWith(
-        "postgresql://localhost:5432/test",
+        expect.objectContaining({ query: expect.any(Function) }),
       );
     });
 
@@ -549,7 +549,7 @@ describe("AgentRunner", () => {
       expect(mockEnd).toHaveBeenCalledOnce();
     });
 
-    it("closes checkpointer pool when it has an end() method", async () => {
+    it("does NOT close checkpointer pool (shared pool managed separately)", async () => {
       const mockCheckpointerEnd = vi.fn().mockResolvedValue(undefined);
       mockCreatePostgresCheckpointer.mockResolvedValue({
         end: mockCheckpointerEnd,
@@ -558,7 +558,7 @@ describe("AgentRunner", () => {
       const runner = await AgentRunner.create(defaultConfig);
       await runner.close();
 
-      expect(mockCheckpointerEnd).toHaveBeenCalledOnce();
+      expect(mockCheckpointerEnd).not.toHaveBeenCalled();
     });
   });
 
