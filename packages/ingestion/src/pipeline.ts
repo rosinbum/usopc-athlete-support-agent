@@ -8,9 +8,8 @@ import {
 import { loadPdf } from "./loaders/pdfLoader.js";
 import { loadWeb } from "./loaders/webLoader.js";
 import { cleanText } from "./transformers/cleaner.js";
-import { splitDocuments, createSplitter } from "./transformers/splitter.js";
 import { enrichMetadata } from "./transformers/metadataEnricher.js";
-import { extractSections } from "./transformers/sectionExtractor.js";
+import { sectionAwareSplit } from "./transformers/sectionSplitter.js";
 
 const logger = createLogger({ service: "ingestion-pipeline" });
 
@@ -215,7 +214,7 @@ async function embedBatchWithRetry(
 // ---------------------------------------------------------------------------
 
 /**
- * Ingest a single source: load -> clean -> split -> enrich -> embed -> store.
+ * Ingest a single source: load -> clean -> section-split -> enrich -> embed -> store.
  */
 export async function ingestSource(
   source: IngestionSource,
@@ -253,9 +252,9 @@ export async function ingestSource(
       );
     }
 
-    // 3. Split into chunks
-    const splitter = createSplitter();
-    const chunks = await splitDocuments(cleanedDocs, splitter);
+    // 3. Section-aware split — detects section headings first, then splits
+    //    within sections so every chunk inherits its section_title.
+    const chunks = await sectionAwareSplit(cleanedDocs);
     logger.info(`Split into ${chunks.length} chunks`, {
       sourceId: source.id,
     });
@@ -267,10 +266,7 @@ export async function ingestSource(
       options.s3Key !== undefined ? { s3Key: options.s3Key } : undefined,
     );
 
-    // 5. Extract section titles
-    const withSections = extractSections(enriched);
-
-    // 6. Generate embeddings & store in pgvector (batched to respect TPM limits)
+    // 5. Generate embeddings & store in pgvector (batched to respect TPM limits)
     const embeddings = createRawEmbeddings(options.openaiApiKey);
     const vectorStore =
       options.vectorStore ?? (await createVectorStore(embeddings));
@@ -278,9 +274,9 @@ export async function ingestSource(
     // Use small batches (~8K tokens) to avoid OpenAI 500 errors on large
     // payloads, with a 15s inter-batch delay to stay under the 40K TPM limit
     // (8K per 15s ≈ 32K/min, leaving headroom).
-    const batches = batchByTokenBudget(withSections, 8_000);
+    const batches = batchByTokenBudget(enriched, 8_000);
     logger.info(
-      `Embedding ${withSections.length} chunks in ${batches.length} batch(es)`,
+      `Embedding ${enriched.length} chunks in ${batches.length} batch(es)`,
       { sourceId: source.id },
     );
 
@@ -307,14 +303,14 @@ export async function ingestSource(
     }
 
     logger.info(
-      `Successfully ingested ${withSections.length} chunks for ${source.id}`,
+      `Successfully ingested ${enriched.length} chunks for ${source.id}`,
       { sourceId: source.id },
     );
 
     return {
       sourceId: source.id,
       status: "completed",
-      chunksCount: withSections.length,
+      chunksCount: enriched.length,
     };
   } catch (error) {
     if (error instanceof QuotaExhaustedError) throw error;

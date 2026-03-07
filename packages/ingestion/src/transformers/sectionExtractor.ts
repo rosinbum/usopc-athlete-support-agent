@@ -1,16 +1,5 @@
 import type { Document } from "@langchain/core/documents";
-
-/**
- * Patterns used to detect section headings commonly found in legal and
- * governance documents (articles, sections, chapters, rules).
- */
-const SECTION_PATTERNS: RegExp[] = [
-  /^(ARTICLE\s+[IVXLCDM\d]+[.:]\s*.+)/im,
-  /^(SECTION\s+[\d.]+[.:]\s*.+)/im,
-  /^(Section\s+[\d.]+[.:]\s*.+)/im,
-  /^(CHAPTER\s+[\d]+[.:]\s*.+)/im,
-  /^(Rule\s+[\d.]+[.:]\s*.+)/im,
-];
+import { HEADING_PATTERNS } from "./headingPatterns.js";
 
 /**
  * Walk through each chunk and attempt to extract a section title from the
@@ -21,7 +10,7 @@ export function extractSections(chunks: Document[]): Document[] {
   return chunks.map((chunk) => {
     let sectionTitle: string | undefined;
 
-    for (const pattern of SECTION_PATTERNS) {
+    for (const pattern of HEADING_PATTERNS) {
       const match = chunk.pageContent.match(pattern);
       if (match) {
         sectionTitle = match[1]!.trim();
