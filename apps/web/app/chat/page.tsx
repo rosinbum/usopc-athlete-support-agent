@@ -3,13 +3,8 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { MessageSquarePlus } from "lucide-react";
-import {
-  useState,
-  useMemo,
-  useCallback,
-  type ChangeEvent,
-  type FormEvent,
-} from "react";
+import { useState, useMemo, type ChangeEvent, type FormEvent } from "react";
+
 import { ChatWindow } from "../../components/chat/ChatWindow";
 import { DisclaimerBanner } from "../../components/chat/DisclaimerBanner";
 
@@ -19,11 +14,17 @@ function ChatSession() {
   const [input, setInput] = useState("");
   const [currentStatus, setCurrentStatus] = useState<string | undefined>();
 
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        body: { userSport, conversationId },
+      }),
+    [userSport, conversationId],
+  );
+
   const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      body: { userSport, conversationId },
-    }),
+    transport,
     onData: (dataPart) => {
       const part = dataPart as { type?: string; data?: { status?: string } };
       if (part?.type === "data-status" && part.data?.status) {
@@ -34,11 +35,7 @@ function ChatSession() {
 
   const isLoading = status === "submitted" || status === "streaming";
 
-  // Clear status when streaming finishes
-  const statusText = useMemo(() => {
-    if (!isLoading) return undefined;
-    return currentStatus;
-  }, [isLoading, currentStatus]);
+  const statusText = isLoading ? currentStatus : undefined;
 
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -70,9 +67,7 @@ function ChatSession() {
 export default function ChatPage() {
   const [sessionKey, setSessionKey] = useState(0);
 
-  const handleNewChat = useCallback(() => {
-    setSessionKey((k) => k + 1);
-  }, []);
+  const handleNewChat = () => setSessionKey((k) => k + 1);
 
   return (
     <div className="flex flex-col h-screen">
