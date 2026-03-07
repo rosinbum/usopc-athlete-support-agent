@@ -12,6 +12,8 @@ const SECTION_PATTERNS: RegExp[] = [
   /^(SUBCHAPTER\s+[IVXLCDM\d]+[—:].+)/im,
   /^(§\s*\d{4,}\.\s*.+)/im,
   /^(Rule\s+[\d.]+[.:]\s*.+)/im,
+  /^(\d{1,2}\.\d+[\d.]*\s+[A-Z].+)/im,
+  /^(\d{1,2}\.\s+[A-Z][A-Z].+)/im,
 ];
 
 /**
