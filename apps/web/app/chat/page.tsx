@@ -2,11 +2,18 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useState, useMemo, type ChangeEvent, type FormEvent } from "react";
+import { MessageSquarePlus } from "lucide-react";
+import {
+  useState,
+  useMemo,
+  useCallback,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { ChatWindow } from "../../components/chat/ChatWindow";
 import { DisclaimerBanner } from "../../components/chat/DisclaimerBanner";
 
-export default function ChatPage() {
+function ChatSession() {
   const [userSport] = useState<string | undefined>();
   const [conversationId] = useState(() => crypto.randomUUID());
   const [input, setInput] = useState("");
@@ -48,23 +55,44 @@ export default function ChatPage() {
   };
 
   return (
+    <ChatWindow
+      messages={messages}
+      input={input}
+      isLoading={isLoading}
+      statusText={statusText}
+      conversationId={conversationId}
+      onInputChange={handleInputChange}
+      onSubmit={handleSubmit}
+    />
+  );
+}
+
+export default function ChatPage() {
+  const [sessionKey, setSessionKey] = useState(0);
+
+  const handleNewChat = useCallback(() => {
+    setSessionKey((k) => k + 1);
+  }, []);
+
+  return (
     <div className="flex flex-col h-screen">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold">Athlete Support Chat</h1>
-        <a href="/" className="text-sm text-blue-600 hover:underline">
-          Home
-        </a>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleNewChat}
+            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <MessageSquarePlus className="w-4 h-4" />
+            New Chat
+          </button>
+          <a href="/" className="text-sm text-blue-600 hover:underline">
+            Home
+          </a>
+        </div>
       </header>
       <DisclaimerBanner />
-      <ChatWindow
-        messages={messages}
-        input={input}
-        isLoading={isLoading}
-        statusText={statusText}
-        conversationId={conversationId}
-        onInputChange={handleInputChange}
-        onSubmit={handleSubmit}
-      />
+      <ChatSession key={sessionKey} />
     </div>
   );
 }
