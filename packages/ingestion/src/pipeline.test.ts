@@ -58,17 +58,14 @@ vi.mock("./transformers/cleaner.js", () => ({
   cleanText: vi.fn((text: string) => text),
 }));
 
-vi.mock("./transformers/splitter.js", () => ({
-  createSplitter: vi.fn(() => ({})),
-  splitDocuments: vi.fn(async (docs: Document[]): Promise<Document[]> => docs),
+vi.mock("./transformers/sectionSplitter.js", () => ({
+  sectionAwareSplit: vi.fn(
+    async (docs: Document[]): Promise<Document[]> => docs,
+  ),
 }));
 
 vi.mock("./transformers/metadataEnricher.js", () => ({
   enrichMetadata: vi.fn((docs: Document[]) => docs),
-}));
-
-vi.mock("./transformers/sectionExtractor.js", () => ({
-  extractSections: vi.fn((docs: Document[]) => docs),
 }));
 
 // Now import the module under test
