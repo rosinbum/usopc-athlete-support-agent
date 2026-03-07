@@ -1,48 +1,47 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockFromConnString, mockSetup, MockMemorySaver } = vi.hoisted(() => {
+const { MockPostgresSaver, mockSetup, MockMemorySaver } = vi.hoisted(() => {
   const mockSetup = vi.fn().mockResolvedValue(undefined);
-  const mockFromConnString = vi.fn().mockReturnValue({ setup: mockSetup });
+  const MockPostgresSaver = vi.fn().mockReturnValue({ setup: mockSetup });
   const MockMemorySaver = vi.fn();
-  return { mockFromConnString, mockSetup, MockMemorySaver };
+  return { MockPostgresSaver, mockSetup, MockMemorySaver };
 });
 
 vi.mock("@langchain/langgraph-checkpoint-postgres", () => ({
-  PostgresSaver: { fromConnString: mockFromConnString },
+  PostgresSaver: MockPostgresSaver,
 }));
 
 vi.mock("@langchain/langgraph", () => ({
   MemorySaver: MockMemorySaver,
 }));
 
+import type { Pool } from "pg";
 import {
   createPostgresCheckpointer,
   createMemoryCheckpointer,
 } from "./checkpointer.js";
 
 describe("createPostgresCheckpointer", () => {
+  const fakePool = { query: vi.fn() } as unknown as Pool;
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("calls PostgresSaver.fromConnString with the connection string", async () => {
-    await createPostgresCheckpointer("postgresql://localhost:5432/test");
+  it("constructs PostgresSaver with the provided pool", async () => {
+    await createPostgresCheckpointer(fakePool);
 
-    expect(mockFromConnString).toHaveBeenCalledWith(
-      "postgresql://localhost:5432/test",
-    );
+    expect(MockPostgresSaver).toHaveBeenCalledWith(fakePool);
   });
 
   it("calls setup() on the saver", async () => {
-    await createPostgresCheckpointer("postgresql://localhost:5432/test");
+    await createPostgresCheckpointer(fakePool);
 
     expect(mockSetup).toHaveBeenCalledOnce();
   });
 
   it("returns the saver instance", async () => {
-    const result = await createPostgresCheckpointer(
-      "postgresql://localhost:5432/test",
-    );
+    const result = await createPostgresCheckpointer(fakePool);
 
     expect(result).toEqual({ setup: mockSetup });
   });

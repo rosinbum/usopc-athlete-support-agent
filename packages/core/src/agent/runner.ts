@@ -12,7 +12,7 @@ import { createPostgresCheckpointer } from "./checkpointer.js";
 import { GRAPH_CONFIG, createAgentModels } from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
 import { nodeMetrics } from "./nodeMetrics.js";
-import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
+
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
 
@@ -77,16 +77,13 @@ export function convertMessages(
 export class AgentRunner {
   private graph: ReturnType<typeof createAgentGraph>;
   private vectorStore: PGVectorStore;
-  private checkpointer: BaseCheckpointSaver | undefined;
 
   private constructor(
     graph: ReturnType<typeof createAgentGraph>,
     vectorStore: PGVectorStore,
-    checkpointer?: BaseCheckpointSaver,
   ) {
     this.graph = graph;
     this.vectorStore = vectorStore;
-    this.checkpointer = checkpointer;
   }
 
   /**
@@ -119,8 +116,9 @@ export class AgentRunner {
 
     log.info("Agent models constructed");
 
-    // Create checkpointer for graph state persistence (idempotent DDL)
-    const checkpointer = await createPostgresCheckpointer(config.databaseUrl);
+    // Create checkpointer using the shared pool (PERF-3: avoids a second
+    // unmanaged pool that would double connection usage per Lambda container)
+    const checkpointer = await createPostgresCheckpointer(getPool());
     log.info("Postgres checkpointer initialized");
 
     const graph = createAgentGraph(
@@ -134,18 +132,17 @@ export class AgentRunner {
       { checkpointer },
     );
 
-    return new AgentRunner(graph, vectorStore, checkpointer);
+    return new AgentRunner(graph, vectorStore);
   }
 
   /**
-   * Close the underlying connection pools (vector store + checkpointer).
-   * Call this when the runner is no longer needed to prevent connection leaks.
+   * Close the underlying vector store connection.
+   * The checkpointer shares the singleton pool (managed by closePool() in
+   * @usopc/shared), so we intentionally skip checkpointer.end() — calling
+   * it would destroy the shared pool for all consumers.
    */
   async close(): Promise<void> {
     await this.vectorStore.end();
-    if (this.checkpointer && "end" in this.checkpointer) {
-      await (this.checkpointer as { end: () => Promise<void> }).end();
-    }
   }
 
   /**

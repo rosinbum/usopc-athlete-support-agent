@@ -1,15 +1,20 @@
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 import { MemorySaver } from "@langchain/langgraph";
 import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
+import type { Pool } from "pg";
 
 /**
- * Creates a PostgresSaver checkpointer from a connection string.
+ * Creates a PostgresSaver checkpointer using an existing pool.
  * Calls `setup()` to ensure checkpoint tables exist (idempotent DDL).
+ *
+ * IMPORTANT: The returned checkpointer shares the provided pool.
+ * Do NOT call `checkpointer.end()` — it would destroy the shared pool.
+ * Pool lifecycle is managed by `closePool()` in `@usopc/shared`.
  */
 export async function createPostgresCheckpointer(
-  connString: string,
+  pool: Pool,
 ): Promise<BaseCheckpointSaver> {
-  const saver = PostgresSaver.fromConnString(connString);
+  const saver = new PostgresSaver(pool);
   await saver.setup();
   return saver;
 }
