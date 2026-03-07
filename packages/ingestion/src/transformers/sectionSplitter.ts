@@ -1,39 +1,6 @@
 import type { Document } from "@langchain/core/documents";
 import { createSplitter } from "./splitter.js";
-
-/**
- * Patterns that mark the start of a new section in legal / governance
- * documents.  Each regex must match from the beginning of a line.
- */
-const SECTION_BOUNDARY =
-  /^(ARTICLE\s+[IVXLCDM\d]+[.:]\s*.+|SECTION\s+[\d.]+[.:]\s*.+|Section\s+[\d.]+[.:]\s*.+|CHAPTER\s+[\d]+[.:—]\s*.+|PART\s+[IVXLCDM\d]+[.:]\s*.+|Rule\s+[\d.]+[.:]\s*.+|SUBCHAPTER\s+[IVXLCDM\d]+[—:].+|§\s*\d{4,}\.\s*.+|\d{1,2}\.\d+[\d.]*\s+[A-Z].+|\d{1,2}\.\s+[A-Z][A-Z].+)/im;
-
-/**
- * Title extraction patterns — first match wins and becomes
- * `metadata.section_title`.
- */
-const TITLE_PATTERNS: RegExp[] = [
-  /^(ARTICLE\s+[IVXLCDM\d]+[.:]\s*.+)/im,
-  /^(SECTION\s+[\d.]+[.:]\s*.+)/im,
-  /^(Section\s+[\d.]+[.:]\s*.+)/im,
-  /^(CHAPTER\s+[\d]+[.:—]\s*.+)/im,
-  /^(SUBCHAPTER\s+[IVXLCDM\d]+[—:].+)/im,
-  /^(§\s*\d{4,}\.\s*.+)/im,
-  /^(Rule\s+[\d.]+[.:]\s*.+)/im,
-  // Numbered headings common in NGB selection criteria (e.g., "1.3.4 Title")
-  /^(\d{1,2}\.\d+[\d.]*\s+[A-Z].+)/im,
-  // Top-level numbered headings (e.g., "3. REMOVAL OF ATHLETES")
-  /^(\d{1,2}\.\s+[A-Z][A-Z].+)/im,
-];
-
-/** Extract a section title from the start of a text block. */
-function detectTitle(text: string): string | undefined {
-  for (const pattern of TITLE_PATTERNS) {
-    const match = text.match(pattern);
-    if (match) return match[1]!.trim();
-  }
-  return undefined;
-}
+import { HEADING_BOUNDARY, detectTitle } from "./headingPatterns.js";
 
 interface SectionAwareSplitOptions {
   chunkSize?: number;
@@ -134,7 +101,7 @@ function splitIntoSections(text: string): Section[] {
   let currentTitle: string | undefined;
 
   for (const line of lines) {
-    const match = line.match(SECTION_BOUNDARY);
+    const match = line.match(HEADING_BOUNDARY);
     if (match) {
       // Flush previous section
       if (currentLines.length > 0) {

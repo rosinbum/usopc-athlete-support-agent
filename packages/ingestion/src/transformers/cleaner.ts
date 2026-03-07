@@ -8,8 +8,7 @@ export function cleanText(text: string): string {
   return (
     text
       // Normalize line endings
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
+      .replace(/\r\n?/g, "\n")
       // Remove excessive blank lines (4+ consecutive newlines -> 3)
       .replace(/\n{4,}/g, "\n\n\n")
       // Remove standalone page number lines (e.g. "Page 3", "Page 3 of 10")
