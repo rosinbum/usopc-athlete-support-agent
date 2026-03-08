@@ -139,25 +139,24 @@ export function buildContext(state: {
     const docs = state.retrievedDocuments;
     const webResults = state.webSearchResultUrls!;
 
-    // Compute max scores for normalization (avoid division by zero)
+    // Normalize scores to 0-1 range within each source (scores are always positive)
     const maxDocScore =
       docs.length > 0 ? Math.max(...docs.map((d) => d.score)) : 1;
-    const maxWebScore =
-      webResults.length > 0 ? Math.max(...webResults.map((w) => w.score)) : 1;
+    const maxWebScore = Math.max(...webResults.map((w) => w.score));
 
     const items: ScoredItem[] = [
       ...docs.map(
         (doc): ScoredItem => ({
           kind: "doc",
           doc,
-          normalizedScore: maxDocScore > 0 ? doc.score / maxDocScore : 0,
+          normalizedScore: doc.score / maxDocScore,
         }),
       ),
       ...webResults.map(
         (result): ScoredItem => ({
           kind: "web",
           result,
-          normalizedScore: maxWebScore > 0 ? result.score / maxWebScore : 0,
+          normalizedScore: result.score / maxWebScore,
         }),
       ),
     ];
@@ -175,10 +174,6 @@ export function buildContext(state: {
         return formatWebResult(item.result, webIndex++);
       }
     });
-
-    if (formatted.length === 0) {
-      return "No documents or search results were found for this query.";
-    }
 
     return formatted.join("\n\n");
   }
