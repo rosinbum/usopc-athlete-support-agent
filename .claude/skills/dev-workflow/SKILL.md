@@ -67,6 +67,7 @@ For each new source file planned, create a co-located test file (`*.test.ts`) wi
 For existing test files, add new describe/it blocks with real assertions.
 
 **What "real assertions" means:**
+
 - If adding a function, test its expected inputs → outputs
 - If fixing a bug, write a test that reproduces the bug (expects the correct behavior)
 - If adding an API route, test the expected response shape and status codes
