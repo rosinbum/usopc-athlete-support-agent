@@ -30,14 +30,18 @@ vi.mock("./fetchWithRetry.js", () => ({
   },
 }));
 
-// pdf-parse v2 API: PDFParse class with getText() method.
+// pdf-parse v2 API: PDFParse class with getText() and destroy() methods.
 // getText() returns { text: string, total: number } where total is page count.
 const mockGetText = vi.fn();
+const mockDestroy = vi.fn();
 vi.mock("pdf-parse", () => ({
   PDFParse: class {
     constructor(public opts: { data: Buffer }) {}
     getText() {
       return mockGetText();
+    }
+    destroy() {
+      return mockDestroy();
     }
   },
 }));
@@ -208,6 +212,55 @@ describe("loadPdf", () => {
 
       expect(mockFetchWithRetry).toHaveBeenCalledTimes(1);
       expect(docs[0]!.pageContent).toBe("Content after retry");
+    });
+  });
+
+  describe("parser cleanup", () => {
+    it("calls parser.destroy() after successful parse", async () => {
+      const pdfBuffer = Buffer.from("fake pdf content");
+      mockReadFile.mockResolvedValueOnce(pdfBuffer);
+      mockDestroy.mockResolvedValueOnce(undefined);
+      mockGetText.mockResolvedValueOnce({
+        text: "Parsed content",
+        total: 2,
+      });
+
+      await loadPdf("/path/to/valid.pdf");
+
+      expect(mockDestroy).toHaveBeenCalledOnce();
+    });
+
+    it("calls parser.destroy() even when parsing throws", async () => {
+      const pdfContent = new ArrayBuffer(100);
+      mockFetchWithRetry.mockResolvedValueOnce(
+        createMockPdfResponse(pdfContent),
+      );
+      mockDestroy.mockResolvedValueOnce(undefined);
+      mockGetText.mockRejectedValueOnce(new Error("Invalid PDF structure"));
+
+      await expect(loadPdf("https://example.com/doc.pdf")).rejects.toThrow(
+        "Invalid PDF structure",
+      );
+
+      expect(mockDestroy).toHaveBeenCalledOnce();
+    });
+
+    it("calls parser.destroy() even when text is empty", async () => {
+      const pdfContent = new ArrayBuffer(100);
+      mockFetchWithRetry.mockResolvedValueOnce(
+        createMockPdfResponse(pdfContent),
+      );
+      mockDestroy.mockResolvedValueOnce(undefined);
+      mockGetText.mockResolvedValueOnce({
+        text: "",
+        total: 1,
+      });
+
+      await expect(loadPdf("https://example.com/doc.pdf")).rejects.toThrow(
+        "no extractable text",
+      );
+
+      expect(mockDestroy).toHaveBeenCalledOnce();
     });
   });
 
