@@ -6,7 +6,7 @@ import {
 import { Resource } from "sst";
 import { DiscoveryService } from "./services/discoveryService.js";
 import { EvaluationService } from "./services/evaluationService.js";
-import { loadWeb } from "./loaders/index.js";
+import { loadWeb } from "./loaders/webLoader.js";
 import type { DiscoveryConfig } from "./types.js";
 
 const logger = createLogger({ service: "discovery-coordinator" });

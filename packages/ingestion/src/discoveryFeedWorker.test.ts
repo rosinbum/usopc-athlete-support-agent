@@ -30,13 +30,13 @@ vi.mock("./services/evaluationService.js", () => ({
 }));
 
 // Mock loadWeb
-vi.mock("./loaders/index.js", () => ({
+vi.mock("./loaders/webLoader.js", () => ({
   loadWeb: vi.fn(),
 }));
 
 import { DiscoveredSourceEntity, normalizeUrl } from "@usopc/shared";
 import { EvaluationService } from "./services/evaluationService.js";
-import { loadWeb } from "./loaders/index.js";
+import { loadWeb } from "./loaders/webLoader.js";
 import { handler } from "./discoveryFeedWorker.js";
 
 const MockDiscoveredSourceEntity = vi.mocked(DiscoveredSourceEntity);
