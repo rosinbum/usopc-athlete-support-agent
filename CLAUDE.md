@@ -51,7 +51,7 @@ For any implementation task:
 6. Format changed files: `npx prettier --write <files>`
 7. Type-check **all packages**: `pnpm typecheck` (CI runs this across the full monorepo — never use `--filter` for typecheck)
 8. Commit, push, and open a PR referencing the issue (`gh pr create`)
-9. After PR is merged, remove the worktree: `git worktree remove ../usopc-issue-<number>`
+9. After PR is merged, clean up: remove the worktree (`git worktree remove ../usopc-issue-<number>`), switch to main, and pull (`git pull`)
 
 **Workflow skills** automate these steps — see [Workflow Skills](#workflow-skills) below.
 
@@ -131,11 +131,17 @@ pnpm --filter @usopc/evals quality:run       # Run quality review scenarios
 - **Vitest mock hoisting**: Declare `vi.mock()` with inline factory functions, then use `vi.mocked()` after imports to get typed mocks. Don't declare `const mockFn = vi.fn()` above `vi.mock()` — hoisting causes "Cannot access before initialization" errors.
 - **Web test paths**: File paths for `pnpm --filter @usopc/web test` don't include `src/` prefix (e.g., `components/sources/...` not `src/components/...`).
 - **`vi.clearAllMocks()` clears mock results**: Access `MockConstructor.mock.results[0]` _after_ the constructor is called in your test, not before — `clearAllMocks` empties the results array.
+- **Update tests when changing defaults**: When modifying default values or configuration constants, always update corresponding test expectations in the same change.
 
 ### CI Gotchas
 
 - **Prettier checks all files**: CI runs prettier on the entire repo, not just changed files. Unformatted files on `main` will fail your PR. Fix with `npx prettier --write <file>` and include in your commit.
 - **`sst.config.ts` type errors in worktrees**: Expected — `.sst/platform/config.d.ts` is generated at runtime by `sst dev`. Ignore these diagnostics.
+
+### Debugging
+
+- **Ask for the error first.** When debugging, ask the user for the actual error message or stack trace before exploring broadly. Do not spend time investigating infrastructure or architecture when a simple error log would clarify the root cause.
+- **Focus on the error, not the symptom.** If the user describes a symptom (e.g., "Lambda crashes at startup"), ask for the exact error before exploring. A `DOMMatrix is not defined` error points to a specific import issue, not an infrastructure problem.
 
 See [docs/conventions.md](./docs/conventions.md) for the full list.
 
@@ -170,7 +176,9 @@ Specialized sub-agents in `.claude/agents/` provide deep domain expertise. Claud
 
 ### Hooks
 
-Five PostToolUse hooks fire automatically:
+Six hooks fire automatically:
+
+- **Pre-commit quality gate** — Before any `git commit`, reminds to run tests and typecheck first.
 
 - **Agent-change guard** — When `Edit` or `Write` modifies a file in `packages/core/src/agent/`, prints a reminder to run `/eval-check`.
 - **Test-coverage reminder** — When `Write` creates a new `.ts` file in `src/` without a corresponding `.test.ts`, prints a reminder to add tests.
