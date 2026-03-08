@@ -12,6 +12,7 @@ export { isUserMessage, getLastUserMessage } from "./messageHelpers.js";
 export {
   buildContext,
   formatDocument,
+  formatWebResult,
   formatWebResults,
 } from "./buildContext.js";
 export { parseLlmJson } from "./safeParseLlmJson.js";

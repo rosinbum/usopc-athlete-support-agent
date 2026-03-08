@@ -2,7 +2,7 @@ import type { BaseChatModel } from "@langchain/core/language_models/chat_models"
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { TavilySearch } from "@langchain/tavily";
 import { logger, CircuitBreakerError } from "@usopc/shared";
-import { TRUSTED_DOMAINS } from "../../config/index.js";
+import { TRUSTED_DOMAINS, getAuthorityForDomain } from "../../config/index.js";
 import {
   invokeLlm,
   extractTextFromResponse,
@@ -185,6 +185,7 @@ function extractStructuredResults(rawResult: unknown): WebSearchResult[] {
         title: r.title as string,
         content: r.content as string,
         score: typeof r.score === "number" ? (r.score as number) : 0,
+        authorityLevel: getAuthorityForDomain(r.url as string),
       }));
   }
   return [];

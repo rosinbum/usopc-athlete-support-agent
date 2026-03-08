@@ -10,6 +10,8 @@ export {
   GRAPH_CONFIG,
   TRUSTED_DOMAINS,
   QUALITY_CHECKER_CONFIG,
+  DOMAIN_AUTHORITY_MAP,
+  getAuthorityForDomain,
 } from "./settings.js";
 export {
   createAgentModels,
