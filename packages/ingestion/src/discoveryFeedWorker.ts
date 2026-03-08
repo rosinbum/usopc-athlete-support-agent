@@ -10,7 +10,7 @@ import {
 import type { DiscoveryFeedMessage } from "@usopc/core";
 import { Resource } from "sst";
 import { EvaluationService } from "./services/evaluationService.js";
-import { loadWeb } from "./loaders/index.js";
+import { loadWeb } from "./loaders/webLoader.js";
 
 const logger = createLogger({ service: "discovery-feed-worker" });
 
