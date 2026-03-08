@@ -10,6 +10,11 @@ USOPC Athlete Support Agent — an AI-powered governance and compliance assistan
 
 **Never commit directly to `main`.** Always create a feature branch and open a pull request.
 
+**Avoid compound bash commands** (using `&&`, `|`, or `;`) — they trigger permission prompts. Instead:
+- Use `git -C <path>` instead of `cd <path> && git ...`
+- Run sequential commands as separate Bash tool calls
+- If commands are independent, run them as parallel Bash tool calls
+
 **Prefer git worktrees** for parallel development. Worktrees allow multiple branches to be checked out simultaneously in separate directories, enabling work on multiple issues without stashing or switching branches.
 
 ### Git Worktrees
