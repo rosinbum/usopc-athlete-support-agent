@@ -35,3 +35,4 @@ Read the file `.claude/skills/dev-workflow/SKILL.md` and execute all steps (Step
 - **Follow project conventions**: ESM imports with `.js` extensions, Vitest with co-located tests, inline `vi.mock()` factories.
 - **All work happens in the worktree directory**, not the main repo.
 - If the issue description is vague, use AskUserQuestion to clarify before implementing.
+- **Never self-approve plans.** Always wait for explicit user approval before writing code.

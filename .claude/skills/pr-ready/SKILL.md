@@ -3,7 +3,7 @@ name: pr-ready
 description: Pre-PR quality gate — runs tests, typecheck, and prettier for changed packages. Reports pass/fail with actionable fix commands.
 argument-hint: ""
 disable-model-invocation: true
-allowed-tools: Bash(git diff *), Bash(git log *), Bash(git fetch *), Bash(git branch *), Bash(pnpm --filter *), Bash(pnpm test *), Bash(npx prettier *), Read, Glob, Grep
+allowed-tools: Bash(git diff *), Bash(git log *), Bash(git fetch *), Bash(git branch *), Bash(pnpm --filter *), Bash(pnpm test *), Bash(pnpm typecheck *), Bash(npx prettier *), Read, Glob, Grep, Agent
 ---
 
 # Pre-PR Quality Gate
@@ -44,35 +44,43 @@ Map changed files to packages by path prefix:
 
 If no packages were changed (only root files like CLAUDE.md, docs, etc.), skip package-specific checks and just run prettier.
 
-## Step 3: Run tests for each changed package
+## Step 3: Run tests, typecheck, and prettier in parallel
 
-For each affected package, run:
+**When only 1 package changed**, run checks sequentially (tests → typecheck → prettier) — sub-agents aren't worth the overhead.
 
-```bash
-pnpm --filter @usopc/<pkg> test
+**When 2+ packages changed**, spawn parallel sub-agents to run checks simultaneously. In a **single message**, spawn one Agent per package plus one for prettier. Use `subagent_type: "general-purpose"` for each:
+
+**Per-package agent prompt:**
+
+```
+Run quality checks for package @usopc/<pkg> in the directory <worktree-or-repo-path>.
+
+1. Run tests: cd <path> && pnpm --filter @usopc/<pkg> test
+2. Run typecheck: cd <path> && pnpm --filter @usopc/<pkg> typecheck
+
+Return a structured result:
+  Package: @usopc/<pkg>
+  Tests: PASS or FAIL (with failure summary if failed)
+  Typecheck: PASS or FAIL (with error summary if failed)
 ```
 
-Track pass/fail for each.
+**Prettier agent prompt:**
 
-## Step 4: Run typecheck for each changed package
+```
+Run prettier check on these files in <worktree-or-repo-path>:
+<list of changed .ts/.tsx/.js/.jsx/.json/.md files>
 
-For each affected package, run:
+Command: cd <path> && npx prettier --check <files>
 
-```bash
-pnpm --filter @usopc/<pkg> typecheck
+Return:
+  Prettier: PASS or FAIL (list unformatted files if failed)
 ```
 
-Track pass/fail for each.
+After all agents complete, collect their results into the summary table in Step 5.
 
-## Step 5: Run prettier check on changed files
+## Step 4: (reserved — merged into Step 3)
 
-Run prettier in check mode on all changed files (only `.ts`, `.tsx`, `.js`, `.jsx`, `.json`, `.md` files):
-
-```bash
-npx prettier --check <file1> <file2> ...
-```
-
-If prettier fails, record which files need formatting.
+## Step 5: (reserved — merged into Step 3)
 
 ## Step 6: Agent code warning
 
@@ -126,7 +134,7 @@ Fix the above issues before creating a PR.
 
 ## Important notes
 
-- Run tests and typechecks sequentially per package to keep output readable.
+- For 2+ packages, run tests and typechecks in parallel via sub-agents. For 1 package, run sequentially.
 - Do NOT run `pnpm test` (root-level) — only run for changed packages to save time.
 - Do NOT commit, push, or modify any files. This is a read-only validation.
 - If a package has no test script or typecheck script, skip it and note that in the output.

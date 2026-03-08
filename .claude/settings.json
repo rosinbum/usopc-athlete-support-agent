@@ -6,6 +6,9 @@
       "Write",
       "Glob",
       "Grep",
+      "Agent",
+      "AskUserQuestion",
+      "mcp__github__*",
       "Bash(pnpm *)",
       "Bash(npx *)",
       "Bash(git *)",
@@ -20,6 +23,7 @@
       "Bash(sed *)",
       "Bash(tail *)",
       "Bash(grep *)",
+      "Bash(chmod *)",
       "Bash(for *)",
       "Bash(cp * && cd * && pnpm install)",
       "Bash(cd * && pnpm *)",
@@ -31,6 +35,18 @@
   },
   "enableAllProjectMcpServers": true,
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git commit*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-commit-checks.sh",
+            "timeout": 180
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
