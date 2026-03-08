@@ -107,6 +107,7 @@ export interface WebSearchResult {
   title: string;
   content: string;
   score: number;
+  authorityLevel?: AuthorityLevel | undefined;
 }
 
 export interface DiscoveryFeedMessage {

@@ -1,3 +1,5 @@
+import type { AuthorityLevel } from "@usopc/shared";
+
 export const RETRIEVAL_CONFIG = {
   topK: 10,
   confidenceThreshold: 0.5,
@@ -26,8 +28,11 @@ export const TRUSTED_DOMAINS = [
   "usopc.org",
   "teamusa.org",
   "usada.org",
+  "wada-ama.org",
   "safesport.org",
   "uscenterforsafesport.org",
+  "olympics.com",
+  "paralympic.org",
   "tas-cas.org",
   // Summer Olympic international federation domains
   "worldaquatics.com",
@@ -78,3 +83,53 @@ export const QUALITY_CHECKER_CONFIG = {
   passThreshold: 0.6,
   maxRetries: 1,
 } as const;
+
+/**
+ * Explicit authority overrides for domains that are not international federations.
+ * All other TRUSTED_DOMAINS default to `international_rule`.
+ */
+const DOMAIN_AUTHORITY_OVERRIDES: Record<string, AuthorityLevel> = {
+  "usopc.org": "usopc_governance",
+  "teamusa.org": "usopc_governance",
+  "usada.org": "anti_doping_national",
+  "wada-ama.org": "anti_doping_national",
+  "safesport.org": "independent_office",
+  "uscenterforsafesport.org": "independent_office",
+};
+
+/**
+ * Maps known domains to their authority level.
+ * Derived from {@link TRUSTED_DOMAINS} — domains listed in
+ * {@link DOMAIN_AUTHORITY_OVERRIDES} get their explicit level;
+ * all others default to `international_rule`.
+ */
+export const DOMAIN_AUTHORITY_MAP: Record<string, AuthorityLevel> =
+  Object.fromEntries(
+    TRUSTED_DOMAINS.map((domain) => [
+      domain,
+      DOMAIN_AUTHORITY_OVERRIDES[domain] ?? "international_rule",
+    ]),
+  );
+
+/**
+ * Returns the authority level for a given URL based on its domain.
+ * Strips `www.` prefix and matches against {@link DOMAIN_AUTHORITY_MAP}.
+ * Returns `educational_guidance` for unknown domains.
+ */
+export function getAuthorityForDomain(url: string): AuthorityLevel {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, "");
+    // Check exact match first, then try parent domain (e.g., "news.usopc.org" → "usopc.org")
+    const exact = DOMAIN_AUTHORITY_MAP[hostname];
+    if (exact) return exact;
+
+    const parts = hostname.split(".");
+    if (parts.length > 2) {
+      const parent = DOMAIN_AUTHORITY_MAP[parts.slice(-2).join(".")];
+      if (parent) return parent;
+    }
+    return "educational_guidance";
+  } catch {
+    return "educational_guidance";
+  }
+}

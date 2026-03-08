@@ -162,14 +162,54 @@ describe("createResearcherNode", () => {
         title: "Selection Procedures",
         content: "result 1 content",
         score: 0.95,
+        authorityLevel: "usopc_governance",
       },
       {
         url: "https://teamusa.org/doc2",
         title: "Athlete Rights",
         content: "result 2 content",
         score: 0.82,
+        authorityLevel: "usopc_governance",
       },
     ]);
+  });
+
+  it("assigns authorityLevel based on domain in structured results", async () => {
+    const tavily = makeMockTavily({
+      results: [
+        {
+          url: "https://usada.org/whereabouts",
+          title: "USADA Whereabouts",
+          content: "whereabouts content",
+          score: 0.9,
+        },
+        {
+          url: "https://worldathletics.org/rules",
+          title: "WA Rules",
+          content: "rules content",
+          score: 0.85,
+        },
+        {
+          url: "https://random-blog.com/post",
+          title: "Blog Post",
+          content: "blog content",
+          score: 0.7,
+        },
+      ],
+    });
+    const node = createResearcherNode(tavily, mockModel);
+    const state = makeState();
+
+    const result = await node(state);
+    expect(result.webSearchResultUrls![0]!.authorityLevel).toBe(
+      "anti_doping_national",
+    );
+    expect(result.webSearchResultUrls![1]!.authorityLevel).toBe(
+      "international_rule",
+    );
+    expect(result.webSearchResultUrls![2]!.authorityLevel).toBe(
+      "educational_guidance",
+    );
   });
 
   it("limits results to MAX_SEARCH_RESULTS (5)", async () => {
