@@ -75,20 +75,24 @@ export async function loadPdf(
   }
 
   const parser = new PDFParse({ data: buffer });
-  const parsed = await withParseTimeout(parser.getText(), 60_000, source);
+  try {
+    const parsed = await withParseTimeout(parser.getText(), 60_000, source);
 
-  if (!parsed.text || parsed.text.trim().length === 0) {
-    throw new Error(`PDF at ${source} produced no extractable text`);
+    if (!parsed.text || parsed.text.trim().length === 0) {
+      throw new Error(`PDF at ${source} produced no extractable text`);
+    }
+
+    return [
+      new Document({
+        pageContent: parsed.text,
+        metadata: {
+          source,
+          format: "pdf",
+          pages: parsed.total,
+        },
+      }),
+    ];
+  } finally {
+    await parser.destroy();
   }
-
-  return [
-    new Document({
-      pageContent: parsed.text,
-      metadata: {
-        source,
-        format: "pdf",
-        pages: parsed.total,
-      },
-    }),
-  ];
 }
