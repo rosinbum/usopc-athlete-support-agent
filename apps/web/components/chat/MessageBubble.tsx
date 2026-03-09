@@ -45,7 +45,9 @@ export function MessageBubble({
     >
       <div
         className={`max-w-[80%] rounded-lg px-4 py-3 ${
-          isUser ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
+          isUser
+            ? "bg-usopc-navy text-white"
+            : "bg-usopc-gray-100 text-usopc-gray-900"
         }`}
       >
         {isUser ? (

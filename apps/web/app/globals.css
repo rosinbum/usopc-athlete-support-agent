@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+@theme {
+  /* USOPC Brand Colors */
+  --color-usopc-navy: #002244;
+  --color-usopc-navy-light: #003366;
+  --color-usopc-red: #bf0d3e;
+  --color-usopc-red-dark: #9b0a32;
+  --color-usopc-gold: #ffd700;
+  --color-usopc-gold-dark: #e6c200;
+
+  /* Neutral scale */
+  --color-usopc-gray-50: #f9fafb;
+  --color-usopc-gray-100: #f3f4f6;
+  --color-usopc-gray-200: #e5e7eb;
+  --color-usopc-gray-300: #d1d5db;
+  --color-usopc-gray-500: #6b7280;
+  --color-usopc-gray-700: #374151;
+  --color-usopc-gray-900: #111827;
+
+  /* Font */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}

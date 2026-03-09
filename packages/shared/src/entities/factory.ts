@@ -6,6 +6,7 @@ import { IngestionLogEntity } from "./IngestionLogEntity.js";
 import { DiscoveredSourceEntity } from "./DiscoveredSourceEntity.js";
 import { InviteEntity } from "./InviteEntity.js";
 import { FeedbackEntity } from "./FeedbackEntity.js";
+import { AccessRequestEntity } from "./AccessRequestEntity.js";
 import { getResource } from "../resources.js";
 
 const tableCache = new Map<string, Table<typeof AppTableSchema>>();
@@ -52,6 +53,14 @@ export function createInviteEntity(tableName?: string): InviteEntity {
 
 export function createFeedbackEntity(tableName?: string): FeedbackEntity {
   return new FeedbackEntity(
+    getOrCreateAppTable(tableName ?? getAppTableName()),
+  );
+}
+
+export function createAccessRequestEntity(
+  tableName?: string,
+): AccessRequestEntity {
+  return new AccessRequestEntity(
     getOrCreateAppTable(tableName ?? getAppTableName()),
   );
 }

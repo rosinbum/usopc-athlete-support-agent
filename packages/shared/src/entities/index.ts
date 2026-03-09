@@ -7,6 +7,7 @@ export {
   createDiscoveredSourceEntity,
   createInviteEntity,
   createFeedbackEntity,
+  createAccessRequestEntity,
 } from "./factory.js";
 export {
   SourceConfigEntity,
@@ -35,3 +36,9 @@ export {
   type Feedback,
   type CreateFeedbackInput,
 } from "./FeedbackEntity.js";
+export {
+  AccessRequestEntity,
+  type AccessRequest,
+  type AccessRequestStatus,
+  type CreateAccessRequestInput,
+} from "./AccessRequestEntity.js";
