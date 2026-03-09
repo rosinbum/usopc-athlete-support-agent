@@ -11,6 +11,7 @@ import {
   MessageCircle,
   FileSearch,
 } from "lucide-react";
+import { auth } from "../auth.js";
 import { AccessRequestForm } from "../components/landing/AccessRequestForm";
 
 const categories = [
@@ -89,7 +90,8 @@ const steps = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth();
   return (
     <div className="min-h-screen">
       {/* Nav */}
@@ -99,10 +101,10 @@ export default function HomePage() {
             USOPC Athlete Support
           </span>
           <Link
-            href="/auth/login?callbackUrl=/chat"
+            href={session ? "/chat" : "/auth/login?callbackUrl=/chat"}
             className="text-sm font-medium text-white/90 hover:text-white transition-colors"
           >
-            Sign In
+            {session ? "Go to Chat" : "Sign In"}
           </Link>
         </div>
       </nav>
@@ -127,18 +129,29 @@ export default function HomePage() {
               bylaws, NGB policies, and federal law.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/auth/login?callbackUrl=/chat"
-                className="inline-flex items-center rounded-lg bg-usopc-red px-7 py-3.5 text-white font-semibold hover:bg-usopc-red-dark transition-colors"
-              >
-                Sign In
-              </Link>
-              <a
-                href="#request-access"
-                className="inline-flex items-center rounded-lg border-2 border-white/30 px-7 py-3.5 text-white font-semibold hover:border-white/60 transition-colors"
-              >
-                Request Access
-              </a>
+              {session ? (
+                <Link
+                  href="/chat"
+                  className="inline-flex items-center rounded-lg bg-usopc-red px-7 py-3.5 text-white font-semibold hover:bg-usopc-red-dark transition-colors"
+                >
+                  Go to Chat
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/auth/login?callbackUrl=/chat"
+                    className="inline-flex items-center rounded-lg bg-usopc-red px-7 py-3.5 text-white font-semibold hover:bg-usopc-red-dark transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                  <a
+                    href="#request-access"
+                    className="inline-flex items-center rounded-lg border-2 border-white/30 px-7 py-3.5 text-white font-semibold hover:border-white/60 transition-colors"
+                  >
+                    Request Access
+                  </a>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -211,19 +224,21 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Access Request Form */}
-      <section id="request-access" className="py-16 bg-white">
-        <div className="mx-auto max-w-xl px-6">
-          <h2 className="text-2xl font-bold text-usopc-gray-900 mb-2 text-center">
-            Request Access
-          </h2>
-          <p className="text-usopc-gray-500 mb-8 text-center">
-            This tool is currently available by invitation. Submit your details
-            and we&apos;ll review your request.
-          </p>
-          <AccessRequestForm />
-        </div>
-      </section>
+      {/* Access Request Form — hidden for signed-in users */}
+      {!session && (
+        <section id="request-access" className="py-16 bg-white">
+          <div className="mx-auto max-w-xl px-6">
+            <h2 className="text-2xl font-bold text-usopc-gray-900 mb-2 text-center">
+              Request Access
+            </h2>
+            <p className="text-usopc-gray-500 mb-8 text-center">
+              This tool is currently available by invitation. Submit your
+              details and we&apos;ll review your request.
+            </p>
+            <AccessRequestForm />
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="bg-usopc-navy">
