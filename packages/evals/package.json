@@ -29,7 +29,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@langchain/core": "^1.1.30",
+    "@langchain/core": "^1.1.31",
     "@langchain/openai": "^1.2.12",
     "@usopc/core": "workspace:*",
     "@usopc/shared": "workspace:*",
