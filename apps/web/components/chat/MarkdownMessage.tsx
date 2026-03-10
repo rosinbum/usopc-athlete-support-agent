@@ -44,7 +44,7 @@ const components: Components = {
     }
     // Inline code
     return (
-      <code className="bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded text-xs">
+      <code className="bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded text-xs break-words">
         {children}
       </code>
     );

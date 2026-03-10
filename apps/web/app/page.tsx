@@ -118,7 +118,7 @@ export default async function HomePage() {
         />
         <div className="relative mx-auto max-w-6xl px-6">
           <div className="max-w-2xl">
-            <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight tracking-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white leading-tight tracking-tight">
               Know Your Rights.
               <br />
               Navigate the System.
@@ -132,7 +132,7 @@ export default async function HomePage() {
               {session ? (
                 <Link
                   href="/chat"
-                  className="inline-flex items-center rounded-lg bg-usopc-red px-7 py-3.5 text-white font-semibold hover:bg-usopc-red-dark transition-colors"
+                  className="inline-flex items-center justify-center rounded-lg bg-usopc-red px-7 py-3.5 text-white font-semibold hover:bg-usopc-red-dark transition-colors w-full sm:w-auto"
                 >
                   Go to Chat
                 </Link>
@@ -140,13 +140,13 @@ export default async function HomePage() {
                 <>
                   <Link
                     href="/auth/login?callbackUrl=/chat"
-                    className="inline-flex items-center rounded-lg bg-usopc-red px-7 py-3.5 text-white font-semibold hover:bg-usopc-red-dark transition-colors"
+                    className="inline-flex items-center justify-center rounded-lg bg-usopc-red px-7 py-3.5 text-white font-semibold hover:bg-usopc-red-dark transition-colors w-full sm:w-auto"
                   >
                     Sign In
                   </Link>
                   <a
                     href="#request-access"
-                    className="inline-flex items-center rounded-lg border-2 border-white/30 px-7 py-3.5 text-white font-semibold hover:border-white/60 transition-colors"
+                    className="inline-flex items-center justify-center rounded-lg border-2 border-white/30 px-7 py-3.5 text-white font-semibold hover:border-white/60 transition-colors w-full sm:w-auto"
                   >
                     Request Access
                   </a>
@@ -174,7 +174,7 @@ export default async function HomePage() {
                 <Link
                   key={cat.id}
                   href={`/chat?topic=${cat.id}`}
-                  className="group border border-usopc-gray-200 rounded-lg p-5 pl-6 border-l-4 border-l-usopc-red hover:shadow-md hover:-translate-y-0.5 transition-all"
+                  className="group border border-usopc-gray-200 rounded-lg p-4 sm:p-5 sm:pl-6 border-l-4 border-l-usopc-red hover:shadow-md hover:-translate-y-0.5 transition-all"
                 >
                   <div className="flex items-center gap-3 mb-2">
                     <div className="flex items-center justify-center w-9 h-9 rounded-full bg-usopc-navy/10">

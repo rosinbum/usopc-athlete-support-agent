@@ -388,7 +388,7 @@ export function DiscoveriesAdminClient() {
   return (
     <div>
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <button
           type="button"
           onClick={() => {
@@ -603,7 +603,7 @@ export function DiscoveriesAdminClient() {
       )}
 
       {/* Table */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="border border-gray-200 rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -623,9 +623,9 @@ export function DiscoveriesAdminClient() {
                   Title <SortBtn field="title" />
                 </span>
               </th>
-              <th className="px-3 py-3 text-left">URL</th>
+              <th className="px-3 py-3 text-left hidden md:table-cell">URL</th>
               <th
-                className="px-3 py-3 text-left cursor-pointer select-none"
+                className="px-3 py-3 text-left cursor-pointer select-none hidden md:table-cell"
                 onClick={() => handleSort("discoveryMethod")}
               >
                 <span className="flex items-center gap-1">
@@ -681,10 +681,10 @@ export function DiscoveriesAdminClient() {
                   <td className="px-3 py-3 font-medium max-w-[250px] truncate">
                     {d.title}
                   </td>
-                  <td className="px-3 py-3 text-gray-500 max-w-[200px] truncate">
+                  <td className="px-3 py-3 text-gray-500 max-w-[200px] truncate hidden md:table-cell">
                     {d.url}
                   </td>
-                  <td className="px-3 py-3 capitalize text-gray-500">
+                  <td className="px-3 py-3 capitalize text-gray-500 hidden md:table-cell">
                     {d.discoveryMethod}
                   </td>
                   <td className="px-3 py-3">
