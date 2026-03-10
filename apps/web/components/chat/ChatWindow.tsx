@@ -68,32 +68,41 @@ export function ChatWindow({
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-usopc-gray-50/50 chat-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 py-6 pb-4 space-y-4 bg-usopc-gray-50/50 chat-scrollbar">
         {messages.length === 0 && (
-          <div className="text-center mt-20">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-usopc-navy/5 mb-5">
+          <div className="text-center mt-4 sm:mt-20">
+            <div className="hidden sm:inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-usopc-navy/5 mb-5">
               <Shield className="w-7 h-7 text-usopc-navy/70" />
             </div>
-            <div className="w-10 h-0.5 bg-usopc-gold mx-auto mb-5 rounded-full" />
-            <p className="text-xl font-semibold text-usopc-navy">
+            <div className="hidden sm:block w-10 h-0.5 bg-usopc-gold mx-auto mb-5 rounded-full" />
+            <p className="text-lg sm:text-xl font-semibold text-usopc-navy">
               Welcome to Athlete Support
             </p>
-            <p className="mt-2 text-usopc-gray-500 max-w-md mx-auto">
-              Ask me about team selection, dispute resolution, SafeSport,
-              anti-doping, eligibility, governance, or athlete rights.
+            <p className="mt-1.5 text-sm sm:text-base text-usopc-gray-400 max-w-xs sm:max-w-md mx-auto leading-relaxed">
+              Ask about team selection, disputes, SafeSport, anti-doping,
+              eligibility, governance, or athlete rights.
             </p>
             {onSuggestionSubmit && (
-              <div className="mt-8 flex flex-col sm:flex-row sm:flex-wrap justify-center gap-2 max-w-xl mx-auto">
-                {SUGGESTIONS.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => onSuggestionSubmit(suggestion)}
-                    className="rounded-full border border-usopc-gray-300 bg-white px-4 py-2 text-sm text-usopc-gray-700 hover:border-usopc-navy hover:text-usopc-navy hover:bg-usopc-navy/5 transition-colors"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
+              <div className="mt-3 sm:mt-8 flex flex-col sm:flex-row sm:flex-wrap justify-center gap-1.5 sm:gap-2 max-w-xl mx-auto pb-4">
+                {SUGGESTIONS.map((suggestion, i) => {
+                  // Tiered visibility: 3 on small phones, 4 on ≥375px, all 6 on ≥640px
+                  const visibility =
+                    i < 3
+                      ? ""
+                      : i < 4
+                        ? " hidden min-[375px]:block sm:inline-flex"
+                        : " hidden sm:inline-flex";
+                  return (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => onSuggestionSubmit(suggestion)}
+                      className={`rounded-full border border-usopc-gray-200 bg-white px-3.5 py-1.5 text-xs sm:text-sm text-usopc-gray-500 hover:border-usopc-navy hover:text-usopc-navy hover:bg-usopc-navy/5 transition-colors${visibility}`}
+                    >
+                      {suggestion}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

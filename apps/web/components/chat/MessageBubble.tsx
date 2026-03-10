@@ -39,6 +39,9 @@ export function MessageBubble({
   const content = getMessageText(message);
   const citations = isUser ? [] : extractCitations(message);
 
+  // Hide empty assistant bubble while waiting for streamed content
+  if (!isUser && !content && isStreaming) return null;
+
   return (
     <div
       className={`flex ${isUser ? "justify-end" : "justify-start"} max-w-4xl mx-auto`}
