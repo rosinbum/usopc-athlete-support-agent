@@ -10,14 +10,18 @@ vi.mock("@langchain/anthropic", () => ({
 }));
 
 // Mock @usopc/shared
-vi.mock("@usopc/shared", () => ({
-  createLogger: vi.fn(() => ({
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-  })),
-}));
+vi.mock("@usopc/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usopc/shared")>();
+  return {
+    ...actual,
+    createLogger: vi.fn(() => ({
+      info: vi.fn(),
+      error: vi.fn(),
+      warn: vi.fn(),
+      debug: vi.fn(),
+    })),
+  };
+});
 
 describe("EvaluationService", () => {
   let service: EvaluationService;
