@@ -53,6 +53,20 @@ export class DocumentStorageService {
   }
 
   /**
+   * Sanitize a key segment to prevent path traversal and invalid S3 keys.
+   * Allows only alphanumeric characters, hyphens, and underscores.
+   */
+  private sanitizeKeySegment(segment: string): string {
+    if (!segment) {
+      throw new Error("S3 key segment must not be empty");
+    }
+    if (segment.includes("\x00")) {
+      throw new Error("S3 key segment must not contain null bytes");
+    }
+    return segment.replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
+
+  /**
    * Build the S3 key for a document.
    * Format: sources/{sourceId}/{contentHash}.{format}
    */
@@ -61,7 +75,9 @@ export class DocumentStorageService {
     contentHash: string,
     format: DocumentFormat | string,
   ): string {
-    return `sources/${sourceId}/${contentHash}.${format}`;
+    const safeSourceId = this.sanitizeKeySegment(sourceId);
+    const safeContentHash = this.sanitizeKeySegment(contentHash);
+    return `sources/${safeSourceId}/${safeContentHash}.${format}`;
   }
 
   /**
