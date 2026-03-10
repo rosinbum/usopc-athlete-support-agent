@@ -10,25 +10,44 @@ export interface PoolStatus {
   waitingRequests: number;
 }
 
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]", ""]);
+
+/**
+ * Determines whether SSL should be enabled for a database connection.
+ *
+ * Parses the connection string as a URL to extract the hostname and
+ * `sslmode` query parameter. SSL is enabled for all non-local hosts
+ * unless explicitly disabled via `sslmode=disable`.
+ */
+export function needsSsl(connectionString: string): boolean {
+  try {
+    const url = new URL(connectionString);
+    const sslmode = url.searchParams.get("sslmode");
+    if (sslmode === "disable") return false;
+    if (sslmode === "require" || sslmode === "verify-full") return true;
+    return !LOCAL_HOSTNAMES.has(url.hostname);
+  } catch {
+    // Unparseable URL — fall back to safe default (SSL on)
+    return true;
+  }
+}
+
 /**
  * Returns a singleton database pool instance.
  * Uses getDatabaseUrl() to resolve the connection string from
  * DATABASE_URL env var or SST Secret binding.
- * Enables SSL automatically for Neon Postgres connections.
+ * Enables SSL automatically for all non-local connections (SEC-2).
  */
 export function getPool(): Pool {
   if (!pool) {
     const connectionString = getDatabaseUrl();
-    const needsSsl =
-      connectionString.includes("neon.tech") ||
-      connectionString.includes("sslmode=require");
     pool = new Pool({
       connectionString,
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
       allowExitOnIdle: true,
-      ...(needsSsl ? { ssl: true } : {}),
+      ...(needsSsl(connectionString) ? { ssl: true } : {}),
     });
 
     // Prevent process crash on idle connection backend errors (SEC-1).
