@@ -94,7 +94,11 @@ export async function POST(req: Request) {
       role: m.role,
       content: getTextFromParts(m.parts),
     }));
-    const langchainMessages = AgentRunner.convertMessages(plainMessages);
+    // When continuing a conversation, only send the new message —
+    // the checkpoint already has the full history via thread_id.
+    const langchainMessages = conversationId
+      ? AgentRunner.convertMessages(plainMessages.slice(-1))
+      : AgentRunner.convertMessages(plainMessages);
     const stateStream = runner.stream({
       messages: langchainMessages,
       userSport,

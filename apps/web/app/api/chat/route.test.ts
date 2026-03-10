@@ -432,6 +432,70 @@ describe("authentication (SEC-04)", () => {
   });
 });
 
+describe("duplicate message prevention (#513)", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    shouldFailInit = false;
+    initCallCount = 0;
+    vi.resetModules();
+  });
+
+  function makeReq(body: Record<string, unknown>) {
+    return new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const validUuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+
+  it("sends only the last message when conversationId is present", async () => {
+    const { POST } = await importRoute();
+    const { AgentRunner } = await import("@usopc/core");
+    const convertMessages = vi.mocked(AgentRunner.convertMessages);
+
+    await POST(
+      makeReq({
+        messages: [
+          { role: "user", parts: [{ type: "text", text: "First" }] },
+          { role: "assistant", parts: [{ type: "text", text: "Reply" }] },
+          { role: "user", parts: [{ type: "text", text: "Second" }] },
+        ],
+        conversationId: validUuid,
+      }),
+    );
+
+    // Should only receive the last message (slice(-1))
+    expect(convertMessages).toHaveBeenCalledWith([
+      { role: "user", content: "Second" },
+    ]);
+  });
+
+  it("sends all messages when conversationId is absent", async () => {
+    const { POST } = await importRoute();
+    const { AgentRunner } = await import("@usopc/core");
+    const convertMessages = vi.mocked(AgentRunner.convertMessages);
+
+    await POST(
+      makeReq({
+        messages: [
+          { role: "user", parts: [{ type: "text", text: "First" }] },
+          { role: "assistant", parts: [{ type: "text", text: "Reply" }] },
+          { role: "user", parts: [{ type: "text", text: "Second" }] },
+        ],
+      }),
+    );
+
+    // Should receive all messages
+    expect(convertMessages).toHaveBeenCalledWith([
+      { role: "user", content: "First" },
+      { role: "assistant", content: "Reply" },
+      { role: "user", content: "Second" },
+    ]);
+  });
+});
+
 describe("conversation summary loading (TEST-02)", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
