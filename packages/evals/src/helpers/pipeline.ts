@@ -1,9 +1,5 @@
 import { HumanMessage } from "@langchain/core/messages";
-import {
-  AgentRunner,
-  makeDefaultState,
-  type AgentState,
-} from "@usopc/core";
+import { AgentRunner, makeDefaultState, type AgentState } from "@usopc/core";
 
 // ---------------------------------------------------------------------------
 // Shared runner — lazy-initialized, reused across all eval invocations so we
