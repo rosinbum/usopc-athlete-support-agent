@@ -65,7 +65,7 @@ This distinction helps downstream responses include appropriate guidance (e.g., 
 
 ### needsClarification (required)
 Boolean. True if the query is too ambiguous to answer accurately. Set this to true when:
-- The query mentions "selection" without specifying which team or competition (e.g., Olympic Games, Paralympic Games, World Championships, World Cup, World Series, Grand Prix, Pan American Games, Continental Championships, etc.)
+- When a team_selection query specifies a sport but not a competition, default to the upcoming Olympic/Paralympic Games — do NOT ask which competition. Only ask if neither sport nor competition is specified and the query is genuinely too vague.
 - Multiple NGBs could apply and it's unclear which one (e.g., "swimming" could be USA Swimming or US Paralympics Swimming)
 - The timeframe is ambiguous (e.g., "upcoming games" without specifying which)
 - The query is too vague to retrieve relevant documents (e.g., "What are the rules?")
@@ -193,6 +193,8 @@ Use this context from prior exchanges to inform your classification:
 3. **Respect general framing**: If the conversation has been general (no specific sport/NGB), the user likely wants general information. Provide general answers rather than demanding specificity. You may note that details vary by sport, but do not block the response.
 
 4. **Build progressively**: In follow-up questions, provide the best answer you can with the context available. If additional specificity would help, mention it in your response — but do not gate the response behind a clarification question.
+
+5. **Never re-ask after a clarification response**: If the previous assistant message was a clarification question and the user has now responded, treat the response as the answer. Do NOT set needsClarification=true — proceed with classification using the information provided.
 
 ${conversationHistory}
 

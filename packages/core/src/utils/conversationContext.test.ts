@@ -5,6 +5,7 @@ import {
   formatConversationHistory,
   buildContextualQuery,
   getMaxTurns,
+  wasFollowUpToClarification,
 } from "./conversationContext.js";
 
 describe("conversationContext", () => {
@@ -132,6 +133,53 @@ describe("conversationContext", () => {
       // Should truncate to ~500 chars with ellipsis
       expect(result.length).toBeLessThan(longMessage.length);
       expect(result).toContain("...");
+    });
+  });
+
+  describe("wasFollowUpToClarification", () => {
+    it("returns false for fewer than 3 messages", () => {
+      const messages = [
+        new HumanMessage("Hello"),
+        new AIMessage("Which sport?"),
+      ];
+      expect(wasFollowUpToClarification(messages)).toBe(false);
+    });
+
+    it("returns false when previous message is HumanMessage", () => {
+      const messages = [
+        new HumanMessage("Hello"),
+        new HumanMessage("Olympic games"),
+        new HumanMessage("Another question"),
+      ];
+      expect(wasFollowUpToClarification(messages)).toBe(false);
+    });
+
+    it("returns true when previous AIMessage is short and ends with ?", () => {
+      const messages = [
+        new HumanMessage("How does team selection work for super g?"),
+        new AIMessage("Which competition are you asking about?"),
+        new HumanMessage("Olympic games"),
+      ];
+      expect(wasFollowUpToClarification(messages)).toBe(true);
+    });
+
+    it("returns false when previous AIMessage is long (>300 chars)", () => {
+      const longAnswer = "A".repeat(301) + "?";
+      const messages = [
+        new HumanMessage("How does team selection work?"),
+        new AIMessage(longAnswer),
+        new HumanMessage("Tell me more"),
+      ];
+      expect(wasFollowUpToClarification(messages)).toBe(false);
+    });
+
+    it("returns false when previous AIMessage does not end with ?", () => {
+      const messages = [
+        new HumanMessage("How does team selection work?"),
+        new AIMessage("Here is how team selection works."),
+        new HumanMessage("Thanks"),
+      ];
+      expect(wasFollowUpToClarification(messages)).toBe(false);
     });
   });
 
