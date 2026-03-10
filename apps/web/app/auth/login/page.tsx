@@ -15,7 +15,7 @@ export default async function LoginPage(props: {
   const isChatLogin = callbackUrl.startsWith("/chat");
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-usopc-gray-50">
+    <div className="min-h-dvh flex items-center justify-center bg-usopc-gray-50 px-4">
       <div className="max-w-sm w-full space-y-6 p-6 sm:p-8 bg-white rounded-lg shadow border-t-4 border-usopc-navy">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-usopc-navy">
