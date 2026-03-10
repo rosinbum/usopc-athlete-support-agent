@@ -83,7 +83,7 @@ export function ChatWindow({
               anti-doping, eligibility, governance, or athlete rights.
             </p>
             {onSuggestionSubmit && (
-              <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-xl mx-auto">
+              <div className="mt-8 flex flex-col sm:flex-row sm:flex-wrap justify-center gap-2 max-w-xl mx-auto">
                 {SUGGESTIONS.map((suggestion) => (
                   <button
                     key={suggestion}
@@ -140,7 +140,7 @@ export function ChatWindow({
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="self-end rounded-xl bg-usopc-red px-4 py-3 text-white hover:bg-usopc-red-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="self-end rounded-xl bg-usopc-red px-4 py-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-white hover:bg-usopc-red-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Send className="w-5 h-5" />
           </button>

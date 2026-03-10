@@ -39,7 +39,7 @@ export function FeedbackButtons({
         aria-label="Helpful"
         disabled={selected !== null || submitting}
         onClick={() => handleClick(1)}
-        className={`p-1 rounded transition-colors ${
+        className={`p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded transition-colors ${
           selected === "up"
             ? "text-green-600"
             : "text-gray-400 hover:text-gray-600 disabled:opacity-50"
@@ -52,7 +52,7 @@ export function FeedbackButtons({
         aria-label="Not helpful"
         disabled={selected !== null || submitting}
         onClick={() => handleClick(0)}
-        className={`p-1 rounded transition-colors ${
+        className={`p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded transition-colors ${
           selected === "down"
             ? "text-red-600"
             : "text-gray-400 hover:text-gray-600 disabled:opacity-50"

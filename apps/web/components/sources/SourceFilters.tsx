@@ -42,7 +42,7 @@ export function SourceFilters({
 }: SourceFiltersProps) {
   return (
     <div className="flex flex-wrap gap-4 mb-6">
-      <div className="flex-1 min-w-[200px]">
+      <div className="w-full sm:flex-1 sm:min-w-[200px]">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -55,7 +55,7 @@ export function SourceFilters({
         </div>
       </div>
 
-      <div>
+      <div className="w-full sm:w-auto">
         <label htmlFor="documentType" className="sr-only">
           Document Type
         </label>
@@ -65,7 +65,7 @@ export function SourceFilters({
           onChange={(e) =>
             onFilterChange({ documentType: e.target.value || undefined })
           }
-          className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          className="w-full sm:w-auto px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         >
           <option value="">All Document Types</option>
           {DOCUMENT_TYPES.map((dt) => (
@@ -76,7 +76,7 @@ export function SourceFilters({
         </select>
       </div>
 
-      <div>
+      <div className="w-full sm:w-auto">
         <label htmlFor="topicDomain" className="sr-only">
           Topic
         </label>
@@ -86,7 +86,7 @@ export function SourceFilters({
           onChange={(e) =>
             onFilterChange({ topicDomain: e.target.value || undefined })
           }
-          className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          className="w-full sm:w-auto px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         >
           <option value="">All Topics</option>
           {TOPIC_DOMAINS.map((td) => (
@@ -97,7 +97,7 @@ export function SourceFilters({
         </select>
       </div>
 
-      <div>
+      <div className="w-full sm:w-auto">
         <label htmlFor="organization" className="sr-only">
           Organization
         </label>
@@ -107,7 +107,7 @@ export function SourceFilters({
           onChange={(e) =>
             onFilterChange({ ngbId: e.target.value || undefined })
           }
-          className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          className="w-full sm:w-auto px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         >
           <option value="">All Organizations</option>
           {organizations.map((org) => (

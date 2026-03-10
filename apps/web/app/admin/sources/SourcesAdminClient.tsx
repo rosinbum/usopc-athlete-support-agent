@@ -315,7 +315,7 @@ export function SourcesAdminClient() {
       </div>
 
       {/* Health Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <button
           type="button"
           onClick={() => {
@@ -520,7 +520,7 @@ export function SourcesAdminClient() {
       )}
 
       {/* Table */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="border border-gray-200 rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -565,7 +565,7 @@ export function SourcesAdminClient() {
                 </span>
               </th>
               <th
-                className="px-3 py-3 text-left cursor-pointer select-none"
+                className="px-3 py-3 text-left cursor-pointer select-none hidden md:table-cell"
                 onClick={() => handleSort("consecutiveFailures")}
               >
                 <span className="flex items-center gap-1">
@@ -573,14 +573,14 @@ export function SourcesAdminClient() {
                 </span>
               </th>
               <th
-                className="px-3 py-3 text-left cursor-pointer select-none"
+                className="px-3 py-3 text-left cursor-pointer select-none hidden md:table-cell"
                 onClick={() => handleSort("lastIngestedAt")}
               >
                 <span className="flex items-center gap-1">
                   Last Ingested <SortBtn field="lastIngestedAt" />
                 </span>
               </th>
-              <th className="px-3 py-3 text-left">NGB</th>
+              <th className="px-3 py-3 text-left hidden md:table-cell">NGB</th>
             </tr>
           </thead>
           <tbody>
@@ -631,7 +631,7 @@ export function SourcesAdminClient() {
                     {source.priority}
                   </span>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-3 py-3 hidden md:table-cell">
                   {source.consecutiveFailures > 0 ? (
                     <span className="text-red-600 font-medium">
                       {source.consecutiveFailures}
@@ -640,10 +640,10 @@ export function SourcesAdminClient() {
                     <span className="text-gray-400">0</span>
                   )}
                 </td>
-                <td className="px-3 py-3 text-gray-500">
+                <td className="px-3 py-3 text-gray-500 hidden md:table-cell">
                   {formatDate(source.lastIngestedAt)}
                 </td>
-                <td className="px-3 py-3 text-gray-500">
+                <td className="px-3 py-3 text-gray-500 hidden md:table-cell">
                   {source.ngbId ?? "USOPC"}
                 </td>
               </tr>
