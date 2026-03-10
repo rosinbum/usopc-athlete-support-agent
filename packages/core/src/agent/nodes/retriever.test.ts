@@ -23,7 +23,7 @@ vi.mock("../../rag/bm25Search.js", () => ({
 import { createRetrieverNode, type VectorStoreLike } from "./retriever.js";
 import { bm25Search } from "../../rag/bm25Search.js";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
-import type { AgentState } from "../state.js";
+import { makeDefaultState, type AgentState } from "../state.js";
 
 const mockedBm25Search = vi.mocked(bm25Search);
 
@@ -32,37 +32,10 @@ const mockedBm25Search = vi.mocked(bm25Search);
 // ---------------------------------------------------------------------------
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {
-  return {
+  return makeDefaultState({
     messages: [new HumanMessage("How are athletes selected for the Olympics?")],
-    topicDomain: undefined,
-    detectedNgbIds: [],
-    queryIntent: undefined,
-    retrievedDocuments: [],
-    webSearchResults: [],
-    webSearchResultUrls: [],
-    retrievalConfidence: 0,
-    citations: [],
-    answer: undefined,
-    escalation: undefined,
-    disclaimer: undefined,
-    disclaimerRequired: true,
-    hasTimeConstraint: false,
-    conversationId: undefined,
-    userSport: undefined,
-    needsClarification: false,
-    clarificationQuestion: undefined,
-    escalationReason: undefined,
-    retrievalStatus: "success",
-    emotionalState: "neutral",
-    emotionalSupportContext: undefined,
-    qualityCheckResult: undefined,
-    qualityRetryCount: 0,
-    expansionAttempted: false,
-    reformulatedQueries: [],
-    isComplexQuery: false,
-    subQueries: [],
     ...overrides,
-  };
+  });
 }
 
 type SearchResult = [

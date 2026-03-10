@@ -1,4 +1,4 @@
-export { AgentStateAnnotation } from "./state.js";
+export { AgentStateAnnotation, makeDefaultState } from "./state.js";
 export type { AgentState } from "./state.js";
 export { createAgentGraph } from "./graph.js";
 export type { GraphDependencies, GraphOptions } from "./graph.js";

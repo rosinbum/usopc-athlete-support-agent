@@ -1,40 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { HumanMessage } from "@langchain/core/messages";
 import { stateContext } from "./nodeLogging.js";
-import type { AgentState } from "../agent/state.js";
+import { makeDefaultState, type AgentState } from "../agent/state.js";
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {
-  return {
-    messages: [new HumanMessage("test")],
-    topicDomain: undefined,
-    detectedNgbIds: [],
-    queryIntent: undefined,
-    retrievedDocuments: [],
-    webSearchResults: [],
-    webSearchResultUrls: [],
-    retrievalConfidence: 0,
-    citations: [],
-    answer: undefined,
-    escalation: undefined,
-    disclaimer: undefined,
-    disclaimerRequired: true,
-    hasTimeConstraint: false,
-    conversationId: undefined,
-    userSport: undefined,
-    needsClarification: false,
-    clarificationQuestion: undefined,
-    escalationReason: undefined,
-    retrievalStatus: "success",
-    emotionalState: "neutral",
-    emotionalSupportContext: undefined,
-    qualityCheckResult: undefined,
-    qualityRetryCount: 0,
-    expansionAttempted: false,
-    reformulatedQueries: [],
-    isComplexQuery: false,
-    subQueries: [],
-    ...overrides,
-  };
+  return makeDefaultState(overrides);
 }
 
 describe("stateContext", () => {

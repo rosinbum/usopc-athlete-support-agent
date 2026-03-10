@@ -28,7 +28,7 @@ import {
 } from "./queryPlanner.js";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
-import type { AgentState } from "../state.js";
+import { makeDefaultState, type AgentState } from "../state.js";
 
 const queryPlannerNode = createQueryPlannerNode({ invoke: mockInvoke } as any);
 
@@ -37,41 +37,16 @@ const queryPlannerNode = createQueryPlannerNode({ invoke: mockInvoke } as any);
 // ---------------------------------------------------------------------------
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {
-  return {
+  return makeDefaultState({
     messages: [
       new HumanMessage(
         "How do anti-doping rules interact with team selection?",
       ),
     ],
     topicDomain: "anti_doping",
-    detectedNgbIds: [],
     queryIntent: "factual",
-    retrievedDocuments: [],
-    webSearchResults: [],
-    webSearchResultUrls: [],
-    retrievalConfidence: 0,
-    citations: [],
-    answer: undefined,
-    escalation: undefined,
-    disclaimer: undefined,
-    disclaimerRequired: true,
-    hasTimeConstraint: false,
-    conversationId: undefined,
-    userSport: undefined,
-    needsClarification: false,
-    clarificationQuestion: undefined,
-    escalationReason: undefined,
-    retrievalStatus: "success",
-    emotionalState: "neutral",
-    emotionalSupportContext: undefined,
-    qualityCheckResult: undefined,
-    qualityRetryCount: 0,
-    expansionAttempted: false,
-    reformulatedQueries: [],
-    isComplexQuery: false,
-    subQueries: [],
     ...overrides,
-  };
+  });
 }
 
 function plannerResponse(data: Record<string, unknown>): {

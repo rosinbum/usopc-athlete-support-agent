@@ -24,7 +24,7 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 import { createQualityCheckerNode } from "./qualityChecker.js";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
-import type { AgentState } from "../state.js";
+import { makeDefaultState, type AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 
 const qualityCheckerNode = createQualityCheckerNode({
@@ -36,39 +36,17 @@ const qualityCheckerNode = createQualityCheckerNode({
 // ---------------------------------------------------------------------------
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {
-  return {
+  return makeDefaultState({
     messages: [
       new HumanMessage("How do I file a Section 9 arbitration complaint?"),
     ],
     topicDomain: "dispute_resolution",
-    detectedNgbIds: [],
     queryIntent: "procedural",
     retrievedDocuments: [makeDoc("Section 9 arbitration procedures...")],
-    webSearchResults: [],
-    webSearchResultUrls: [],
     retrievalConfidence: 0.8,
-    citations: [],
     answer: "Here is a detailed answer about Section 9 arbitration...",
-    escalation: undefined,
-    disclaimer: undefined,
-    disclaimerRequired: true,
-    hasTimeConstraint: false,
-    conversationId: undefined,
-    userSport: undefined,
-    needsClarification: false,
-    clarificationQuestion: undefined,
-    escalationReason: undefined,
-    retrievalStatus: "success",
-    emotionalState: "neutral",
-    emotionalSupportContext: undefined,
-    qualityCheckResult: undefined,
-    qualityRetryCount: 0,
-    expansionAttempted: false,
-    reformulatedQueries: [],
-    isComplexQuery: false,
-    subQueries: [],
     ...overrides,
-  };
+  });
 }
 
 function makeDoc(content: string): RetrievedDocument {

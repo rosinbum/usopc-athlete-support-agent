@@ -1,6 +1,10 @@
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
-import { AgentRunner, type AgentState } from "@usopc/core";
+import {
+  AgentRunner,
+  makeDefaultState,
+  type AgentState,
+} from "@usopc/core";
 
 /**
  * Converts a simple message array to LangChain BaseMessage objects.
@@ -77,39 +81,15 @@ export async function runMultiTurnPipeline(
   const trajectory = output.trajectory ?? [];
 
   return {
-    state: {
+    state: makeDefaultState({
       messages: baseMessages,
       answer: output.answer,
       citations: output.citations,
       escalation: output.escalation,
       disclaimer: output.disclaimer,
-      // These fields aren't directly available from AgentOutput,
-      // so we set sensible defaults. Full state is available through
-      // the graph's stream mode if needed.
-      topicDomain: undefined,
-      detectedNgbIds: [],
-      queryIntent: undefined,
-      retrievedDocuments: [],
-      webSearchResults: [],
-      webSearchResultUrls: [],
-      retrievalConfidence: 0,
-      disclaimerRequired: true,
-      hasTimeConstraint: false,
       conversationId: opts?.conversationId,
       userSport: opts?.userSport,
-      needsClarification: false,
-      clarificationQuestion: undefined,
-      escalationReason: undefined,
-      retrievalStatus: "success",
-      emotionalState: "neutral",
-      emotionalSupportContext: undefined,
-      qualityCheckResult: undefined,
-      qualityRetryCount: 0,
-      expansionAttempted: false,
-      reformulatedQueries: [],
-      isComplexQuery: false,
-      subQueries: [],
-    },
+    }),
     trajectory,
   };
 }
