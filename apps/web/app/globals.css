@@ -21,3 +21,26 @@
   /* Font */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Chat scrollbar */
+.chat-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 34, 68, 0.15);
+  border-radius: 3px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 34, 68, 0.3);
+}
+
+.chat-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 34, 68, 0.15) transparent;
+}
