@@ -37,7 +37,26 @@ export class NodeMetricsCollector {
 export const nodeMetrics = new NodeMetricsCollector();
 
 /**
+ * Extract the request-scoped metrics collector from RunnableConfig,
+ * falling back to the global singleton for backward compatibility.
+ */
+export function getMetricsCollector(
+  config?: RunnableConfig,
+): NodeMetricsCollector {
+  const configurable = config?.configurable as
+    | Record<string, unknown>
+    | undefined;
+  if (configurable?.nodeMetrics instanceof NodeMetricsCollector) {
+    return configurable.nodeMetrics;
+  }
+  return nodeMetrics;
+}
+
+/**
  * Higher-order function that wraps a graph node with timing metrics.
+ *
+ * Uses a request-scoped collector from `config.configurable.nodeMetrics`
+ * when available, falling back to the global singleton.
  *
  * Since nodes catch their own errors (they never throw), the error
  * field is only populated if the node unexpectedly throws.
@@ -56,13 +75,14 @@ export function withMetrics(
     state: AgentState,
     config?: RunnableConfig,
   ): Promise<Partial<AgentState>> => {
+    const collector = getMetricsCollector(config);
     const start = Date.now();
     try {
       const result = await fn(state, config);
-      nodeMetrics.record(nodeName, Date.now() - start);
+      collector.record(nodeName, Date.now() - start);
       return result;
     } catch (error) {
-      nodeMetrics.record(
+      collector.record(
         nodeName,
         Date.now() - start,
         error instanceof Error ? error.message : String(error),

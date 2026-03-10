@@ -1,6 +1,6 @@
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
-import { AgentRunner, nodeMetrics, type AgentState } from "@usopc/core";
+import { AgentRunner, type AgentState } from "@usopc/core";
 
 /**
  * Converts a simple message array to LangChain BaseMessage objects.
@@ -65,8 +65,6 @@ export async function runMultiTurnPipeline(
   state: AgentState;
   trajectory: string[];
 }> {
-  nodeMetrics.reset();
-
   const runner = await getRunner();
   const baseMessages = toBaseMessages(messages);
 
@@ -76,7 +74,7 @@ export async function runMultiTurnPipeline(
     conversationId: opts?.conversationId,
   });
 
-  const trajectory = nodeMetrics.getAll().map((entry) => entry.name);
+  const trajectory = output.trajectory ?? [];
 
   return {
     state: {

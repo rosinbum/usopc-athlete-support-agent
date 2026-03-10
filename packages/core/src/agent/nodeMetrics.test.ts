@@ -4,6 +4,7 @@ import {
   NodeMetricsCollector,
   nodeMetrics,
   withMetrics,
+  getMetricsCollector,
 } from "./nodeMetrics.js";
 import type { AgentState } from "./state.js";
 
@@ -102,6 +103,24 @@ describe("nodeMetrics singleton", () => {
   });
 });
 
+describe("getMetricsCollector", () => {
+  it("returns the global singleton when no config is provided", () => {
+    expect(getMetricsCollector()).toBe(nodeMetrics);
+  });
+
+  it("returns the global singleton when config has no nodeMetrics", () => {
+    expect(getMetricsCollector({ configurable: { thread_id: "t1" } })).toBe(
+      nodeMetrics,
+    );
+  });
+
+  it("returns request-scoped collector from config.configurable", () => {
+    const scoped = new NodeMetricsCollector();
+    const config = { configurable: { thread_id: "t1", nodeMetrics: scoped } };
+    expect(getMetricsCollector(config)).toBe(scoped);
+  });
+});
+
 describe("withMetrics", () => {
   beforeEach(() => {
     nodeMetrics.reset();
@@ -141,5 +160,32 @@ describe("withMetrics", () => {
     await wrapped(state);
 
     expect(node).toHaveBeenCalledWith(state, undefined);
+  });
+
+  it("uses request-scoped collector from config instead of global", async () => {
+    const scoped = new NodeMetricsCollector();
+    const node = vi.fn().mockResolvedValue({ answer: "scoped" });
+    const wrapped = withMetrics("synthesizer", node);
+    const config = { configurable: { thread_id: "t1", nodeMetrics: scoped } };
+
+    await wrapped(makeState(), config);
+
+    // Scoped collector should have the entry
+    expect(scoped.getAll()).toHaveLength(1);
+    expect(scoped.getAll()[0]!.name).toBe("synthesizer");
+
+    // Global singleton should be untouched
+    expect(nodeMetrics.getAll()).toHaveLength(0);
+  });
+
+  it("falls back to global when config has no nodeMetrics", async () => {
+    const node = vi.fn().mockResolvedValue({});
+    const wrapped = withMetrics("classifier", node);
+    const config = { configurable: { thread_id: "t1" } };
+
+    await wrapped(makeState(), config);
+
+    expect(nodeMetrics.getAll()).toHaveLength(1);
+    expect(nodeMetrics.getAll()[0]!.name).toBe("classifier");
   });
 });
