@@ -247,6 +247,52 @@ describe("DocumentStorageService", () => {
     });
   });
 
+  describe("buildKey - input sanitization", () => {
+    it("strips path traversal sequences from sourceId", () => {
+      const key = (service as any).buildKey(
+        "../../etc/passwd",
+        "abc123",
+        "pdf",
+      );
+      expect(key).toBe("sources/______etc_passwd/abc123.pdf");
+    });
+
+    it("strips path traversal from contentHash", () => {
+      const key = (service as any).buildKey(
+        "safe-source",
+        "../../../hack",
+        "pdf",
+      );
+      expect(key).toBe("sources/safe-source/_________hack.pdf");
+    });
+
+    it("rejects empty sourceId", () => {
+      expect(() => (service as any).buildKey("", "hash", "pdf")).toThrow(
+        "S3 key segment must not be empty",
+      );
+    });
+
+    it("rejects sourceId with null bytes", () => {
+      expect(() =>
+        (service as any).buildKey("bad\x00source", "hash", "pdf"),
+      ).toThrow("S3 key segment must not contain null bytes");
+    });
+
+    it("passes through valid sourceIds unchanged", () => {
+      const key = (service as any).buildKey(
+        "my-source_123",
+        "abc123DEF",
+        "pdf",
+      );
+      expect(key).toBe("sources/my-source_123/abc123DEF.pdf");
+    });
+
+    it("sanitizes slashes in sourceId", () => {
+      const key = (service as any).buildKey("foo/bar", "hash", "pdf");
+      expect(key).toBe("sources/foo_bar/hash.pdf");
+    });
+  });
+
   describe("getKeyForSource", () => {
     it("generates key for a source and hash", () => {
       const key = service.getKeyForSource("my-source", "content-hash", "pdf");
