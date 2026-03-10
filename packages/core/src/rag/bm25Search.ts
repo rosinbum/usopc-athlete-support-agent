@@ -18,6 +18,9 @@ export interface Bm25SearchResult {
   textRank: number;
 }
 
+/** Max query length to prevent oversized tsquery trees in websearch_to_tsquery. */
+const MAX_QUERY_LENGTH = 500;
+
 /**
  * BM25-style full-text search using the `content_tsv` tsvector column
  * and GIN index on the `document_chunks` table.
@@ -32,10 +35,11 @@ export async function bm25Search(
   pool: Pool,
   options: Bm25SearchOptions,
 ): Promise<Bm25SearchResult[]> {
-  const { query, k = 20, filter } = options;
+  const { query: rawQuery, k = 20, filter } = options;
 
-  if (!query.trim()) return [];
+  if (!rawQuery.trim()) return [];
 
+  const query = rawQuery.slice(0, MAX_QUERY_LENGTH);
   const params: unknown[] = [query];
   const conditions: string[] = [
     "content_tsv @@ websearch_to_tsquery('english', $1)",
