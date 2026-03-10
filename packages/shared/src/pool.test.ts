@@ -25,7 +25,7 @@ vi.mock("./logger.js", () => ({
 }));
 
 import { Pool } from "pg";
-import { getPool, closePool, getPoolStatus } from "./pool.js";
+import { getPool, closePool, getPoolStatus, needsSsl } from "./pool.js";
 import { getDatabaseUrl } from "./env.js";
 import { logger } from "./logger.js";
 
@@ -88,8 +88,8 @@ describe("pool", () => {
     });
   });
 
-  describe("SSL configuration (SEC-01)", () => {
-    it("enables SSL with default CA validation for Neon connections", () => {
+  describe("SSL configuration (SEC-2)", () => {
+    it("enables SSL for remote host", () => {
       mockGetDatabaseUrl.mockReturnValue(
         "postgres://user:pass@ep-example.us-east-1.aws.neon.tech/db",
       );
@@ -99,23 +99,70 @@ describe("pool", () => {
       );
     });
 
-    it("does not set rejectUnauthorized: false", () => {
+    it("enables SSL for any non-local host", () => {
       mockGetDatabaseUrl.mockReturnValue(
-        "postgres://user:pass@ep-example.us-east-1.aws.neon.tech/db",
+        "postgres://user:pass@my-rds-instance.amazonaws.com/db",
       );
       getPool();
-      const poolConfig = MockPool.mock.calls[0]?.[0] as Record<string, unknown>;
-      expect(poolConfig.ssl).toBe(true);
-      expect(poolConfig.ssl).not.toEqual(
-        expect.objectContaining({ rejectUnauthorized: false }),
+      expect(MockPool).toHaveBeenCalledWith(
+        expect.objectContaining({ ssl: true }),
       );
     });
 
-    it("skips SSL for non-Neon local connections", () => {
+    it("skips SSL for localhost", () => {
       mockGetDatabaseUrl.mockReturnValue("postgres://localhost/test");
       getPool();
       const poolConfig = MockPool.mock.calls[0]?.[0] as Record<string, unknown>;
       expect(poolConfig.ssl).toBeUndefined();
+    });
+
+    it("skips SSL for 127.0.0.1", () => {
+      mockGetDatabaseUrl.mockReturnValue("postgres://127.0.0.1/test");
+      getPool();
+      const poolConfig = MockPool.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(poolConfig.ssl).toBeUndefined();
+    });
+  });
+
+  describe("needsSsl", () => {
+    it("returns true for remote hosts", () => {
+      expect(needsSsl("postgres://user:pass@db.neon.tech/mydb")).toBe(true);
+      expect(needsSsl("postgres://user:pass@rds.amazonaws.com/mydb")).toBe(
+        true,
+      );
+    });
+
+    it("returns false for localhost", () => {
+      expect(needsSsl("postgres://localhost/test")).toBe(false);
+      expect(needsSsl("postgres://localhost:5432/test")).toBe(false);
+    });
+
+    it("returns false for 127.0.0.1", () => {
+      expect(needsSsl("postgres://127.0.0.1/test")).toBe(false);
+    });
+
+    it("returns false for ::1", () => {
+      expect(needsSsl("postgres://[::1]/test")).toBe(false);
+    });
+
+    it("respects sslmode=require", () => {
+      expect(needsSsl("postgres://localhost/test?sslmode=require")).toBe(true);
+    });
+
+    it("respects sslmode=verify-full", () => {
+      expect(needsSsl("postgres://localhost/test?sslmode=verify-full")).toBe(
+        true,
+      );
+    });
+
+    it("respects sslmode=disable", () => {
+      expect(needsSsl("postgres://remote.host.com/db?sslmode=disable")).toBe(
+        false,
+      );
+    });
+
+    it("returns true for unparseable URLs (safe default)", () => {
+      expect(needsSsl("not-a-url")).toBe(true);
     });
   });
 });
