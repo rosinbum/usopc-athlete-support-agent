@@ -101,4 +101,55 @@ describe("GET /api/sources", () => {
     expect(doc.ngbId).toBeUndefined();
     expect(doc.chunkCount).toBeUndefined();
   });
+
+  it("runs count and data queries in parallel for list endpoint", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ total: "0" }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const { GET } = await import("./route.js");
+    const request = new Request("http://localhost/api/sources");
+    await GET(request);
+
+    // Both count and data queries should be issued
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+    const countSql = mockQuery.mock.calls[0]![0] as string;
+    const dataSql = mockQuery.mock.calls[1]![0] as string;
+    expect(countSql).toContain("COUNT(*) as total");
+    expect(dataSql).toContain("ORDER BY ingested_at DESC");
+  });
+
+  it("caches stats results on subsequent calls", async () => {
+    vi.useFakeTimers();
+    try {
+      mockQuery.mockResolvedValue({
+        rows: [
+          {
+            total_documents: "5",
+            total_organizations: "2",
+            last_ingested_at: new Date("2024-06-15T00:00:00Z"),
+          },
+        ],
+      });
+
+      const { GET } = await import("./route.js");
+
+      const req1 = new Request("http://localhost/api/sources?action=stats");
+      const res1 = await GET(req1);
+      expect(res1.status).toBe(200);
+      const callsAfterFirst = mockQuery.mock.calls.length;
+
+      // Second call within TTL should use cache
+      const req2 = new Request("http://localhost/api/sources?action=stats");
+      const res2 = await GET(req2);
+      const body2 = await res2.json();
+
+      expect(res2.status).toBe(200);
+      expect(body2.totalDocuments).toBe(5);
+      // No additional DB query should have been made
+      expect(mockQuery).toHaveBeenCalledTimes(callsAfterFirst);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
