@@ -1,17 +1,8 @@
 import { createLogger } from "@usopc/shared";
-import {
-  getAppRunner,
-  convertMessages,
-  detectInjection,
-  INJECTION_RESPONSE,
-} from "@usopc/core";
-import {
-  postMessage,
-  addReaction,
-  cleanUpPreviousBotMessages,
-} from "../slack/client.js";
-import { buildAnswerBlocks, buildErrorBlocks } from "../slack/blocks.js";
+import { detectInjection, INJECTION_RESPONSE } from "@usopc/core";
+import { postMessage, addReaction } from "../slack/client.js";
 import { isUserInvited } from "../lib/inviteGuard.js";
+import { processQuery } from "./processQuery.js";
 
 const logger = createLogger({ service: "slack-message" });
 
@@ -60,50 +51,21 @@ export async function handleMessage(event: SlackMessageEvent): Promise<void> {
   // Add a reaction to acknowledge receipt
   await addReaction(channel, ts, "eyes");
 
+  const replyTs = thread_ts ?? ts;
+
   // Process asynchronously — return immediately so Slack gets a fast 200
-  processMessageAsync(event).catch((error) => {
+  processQuery({
+    text: text.trim(),
+    channel,
+    user,
+    replyTs,
+    conversationId: replyTs,
+    logger,
+  }).catch((error) => {
     logger.error("Async message processing failed", {
       error: error instanceof Error ? error.message : String(error),
       user,
       channel,
     });
   });
-}
-
-async function processMessageAsync(event: SlackMessageEvent): Promise<void> {
-  const { channel, text, ts, user, thread_ts } = event;
-  const replyTs = thread_ts ?? ts;
-
-  try {
-    const runner = await getAppRunner();
-    const conversationId = thread_ts ?? ts;
-    const messages = convertMessages([{ role: "user", content: text.trim() }]);
-
-    const { answer, citations, escalation, disclaimer } = await runner.invoke({
-      messages,
-      conversationId,
-      userId: `slack:${user}`,
-    });
-
-    const blocks = buildAnswerBlocks(answer, citations, disclaimer, escalation);
-    const postedTs = await postMessage(channel, answer, blocks, replyTs);
-
-    // Fire-and-forget: strip disclaimer/buttons from previous bot messages
-    cleanUpPreviousBotMessages(channel, replyTs, postedTs).catch((error) => {
-      logger.error("Failed to clean up previous bot messages", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
-  } catch (error) {
-    logger.error("Failed to handle message", {
-      error: error instanceof Error ? error.message : String(error),
-      user,
-      channel,
-    });
-
-    const blocks = buildErrorBlocks(
-      "Sorry, I encountered an error processing your question. Please try again.",
-    );
-    await postMessage(channel, "Error processing request", blocks, replyTs);
-  }
 }
