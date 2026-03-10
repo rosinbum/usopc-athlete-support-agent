@@ -13,6 +13,7 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+
 export const metadata: Metadata = {
   title: "USOPC Athlete Support",
   description:
