@@ -17,6 +17,24 @@ const DELETE_BATCH_SIZE = 500;
  *
  * Verified against @langchain/langgraph-checkpoint-postgres@1.0.1 schema.
  */
+const CHECKPOINT_TABLES = [
+  "checkpoint_blobs",
+  "checkpoint_writes",
+  "checkpoints",
+] as const;
+
+async function deleteFromTable(
+  pool: pg.Pool,
+  table: string,
+  threadIds: string[],
+): Promise<number> {
+  const result = await pool.query(
+    `DELETE FROM ${table} WHERE thread_id = ANY($1)`,
+    [threadIds],
+  );
+  return result.rowCount ?? 0;
+}
+
 async function ensureCreatedAtColumn(pool: pg.Pool): Promise<void> {
   await pool.query(`
     ALTER TABLE checkpoints
@@ -65,36 +83,23 @@ export async function handler(): Promise<void> {
     });
 
     // Delete in batches to avoid oversized query plans and row-level locks
-    let deletedBlobs = 0;
-    let deletedWrites = 0;
-    let deletedCheckpoints = 0;
+    const deleted: Record<string, number> = {};
+    for (const table of CHECKPOINT_TABLES) {
+      deleted[table] = 0;
+    }
 
     for (let i = 0; i < threadIds.length; i += DELETE_BATCH_SIZE) {
       const batch = threadIds.slice(i, i + DELETE_BATCH_SIZE);
-
-      const blobsResult = await pool.query(
-        `DELETE FROM checkpoint_blobs WHERE thread_id = ANY($1)`,
-        [batch],
-      );
-      const writesResult = await pool.query(
-        `DELETE FROM checkpoint_writes WHERE thread_id = ANY($1)`,
-        [batch],
-      );
-      const checkpointsResult = await pool.query(
-        `DELETE FROM checkpoints WHERE thread_id = ANY($1)`,
-        [batch],
-      );
-
-      deletedBlobs += blobsResult.rowCount ?? 0;
-      deletedWrites += writesResult.rowCount ?? 0;
-      deletedCheckpoints += checkpointsResult.rowCount ?? 0;
+      for (const table of CHECKPOINT_TABLES) {
+        deleted[table]! += await deleteFromTable(pool, table, batch);
+      }
     }
 
     log.info("Checkpoint cleanup complete", {
       threads: threadIds.length,
-      deletedCheckpoints,
-      deletedWrites,
-      deletedBlobs,
+      deletedCheckpoints: deleted["checkpoints"],
+      deletedWrites: deleted["checkpoint_writes"],
+      deletedBlobs: deleted["checkpoint_blobs"],
       cutoffDate: cutoff.toISOString(),
     });
   } catch (error) {
