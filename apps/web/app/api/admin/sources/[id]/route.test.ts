@@ -20,6 +20,8 @@ const mockCountChunks = vi.fn().mockResolvedValue(0);
 vi.mock("@usopc/shared", () => ({
   getPool: () => "mock-pool",
   countChunksBySourceId: (...args: unknown[]) => mockCountChunks(...args),
+  FORMATS: ["pdf", "html", "text"],
+  PRIORITY_LEVELS: ["high", "medium", "low"],
   logger: {
     child: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() })),
   },

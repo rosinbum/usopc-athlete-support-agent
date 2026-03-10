@@ -4,6 +4,8 @@ import {
   TOPIC_DOMAINS,
   AUTHORITY_LEVELS,
   DOCUMENT_TYPES,
+  FORMATS,
+  PRIORITY_LEVELS,
   logger,
 } from "@usopc/shared";
 
@@ -25,9 +27,9 @@ const sourceItemSchema = z.object({
   documentType: z.enum(DOCUMENT_TYPES),
   topicDomains: z.array(z.enum(TOPIC_DOMAINS)).min(1),
   url: z.string().url(),
-  format: z.enum(["pdf", "html", "text"]),
+  format: z.enum(FORMATS),
   ngbId: z.string().nullable(),
-  priority: z.enum(["high", "medium", "low"]),
+  priority: z.enum(PRIORITY_LEVELS),
   description: z.string().min(1),
   authorityLevel: z.enum(AUTHORITY_LEVELS),
 });
