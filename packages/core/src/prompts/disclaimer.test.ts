@@ -33,6 +33,18 @@ describe("getDisclaimer", () => {
     });
   }
 
+  it("team_selection disclaimer does not contain dispute language", () => {
+    const disclaimer = getDisclaimer("team_selection");
+    expect(disclaimer).not.toContain("made in error");
+    expect(disclaimer).not.toContain("ombudsman@usathlete.org");
+  });
+
+  it("dispute_resolution disclaimer still contains Ombuds contact info", () => {
+    const disclaimer = getDisclaimer("dispute_resolution");
+    expect(disclaimer).toContain("ombudsman@usathlete.org");
+    expect(disclaimer).toContain("719-866-5000");
+  });
+
   it("all domain disclaimers include the general not-legal-advice text", () => {
     const domains: TopicDomain[] = [
       "team_selection",

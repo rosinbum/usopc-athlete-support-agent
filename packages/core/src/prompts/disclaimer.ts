@@ -47,9 +47,7 @@ const ATHLETE_RIGHTS_DISCLAIMER =
 const TEAM_SELECTION_DISCLAIMER =
   GENERAL_DISCLAIMER +
   "\n\nTeam selection procedures vary by sport and event. Always refer to the specific " +
-  "NGB's published selection procedures for the competition in question. " +
-  "If you believe a selection decision was made in error, contact the Athlete Ombuds " +
-  "at ombudsman@usathlete.org or 719-866-5000 for guidance on your options.";
+  "NGB's published selection procedures for the competition in question.";
 
 const ELIGIBILITY_DISCLAIMER =
   GENERAL_DISCLAIMER +
