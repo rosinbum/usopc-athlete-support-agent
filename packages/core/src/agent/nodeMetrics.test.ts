@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { HumanMessage } from "@langchain/core/messages";
 import {
   NodeMetricsCollector,
   nodeMetrics,

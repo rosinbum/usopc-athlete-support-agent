@@ -1,5 +1,4 @@
 import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
-import { HumanMessage } from "@langchain/core/messages";
 import type {
   TopicDomain,
   QueryIntent,
@@ -291,7 +290,7 @@ export type AgentState = typeof AgentStateAnnotation.State;
  * Use this instead of manually listing every field — it stays in sync
  * with the annotation spec automatically.
  *
- * Requires at least one message (defaults to a placeholder HumanMessage).
+ * Callers must provide their own `messages` array via overrides.
  */
 export function makeDefaultState(
   overrides: Partial<AgentState> = {},
@@ -306,7 +305,7 @@ export function makeDefaultState(
     }
   }
   return {
-    messages: [new HumanMessage("test")],
+    messages: [],
     ...defaults,
     ...overrides,
   } as AgentState;

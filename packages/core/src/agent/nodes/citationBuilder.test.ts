@@ -12,7 +12,6 @@ vi.mock("@usopc/shared", () => ({
 }));
 
 import { citationBuilderNode } from "./citationBuilder.js";
-import { HumanMessage } from "@langchain/core/messages";
 import { makeDefaultState, type AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 

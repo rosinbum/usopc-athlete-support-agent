@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { emotionalSupportNode } from "./emotionalSupport.js";
-import { HumanMessage } from "@langchain/core/messages";
 import { makeDefaultState, type AgentState } from "../state.js";
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {

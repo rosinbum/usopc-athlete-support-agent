@@ -16,7 +16,6 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 });
 
 import { disclaimerGuardNode } from "./disclaimerGuard.js";
-import { HumanMessage } from "@langchain/core/messages";
 import { makeDefaultState, type AgentState } from "../state.js";
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {
