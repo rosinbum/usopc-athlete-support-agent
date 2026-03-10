@@ -136,6 +136,42 @@ function batchByTokenBudget(docs: Document[], maxTokens: number): Document[][] {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// ---------------------------------------------------------------------------
+// Adaptive rate limiting
+// ---------------------------------------------------------------------------
+
+export const TPM_LIMIT = 40_000;
+export const TPM_HEADROOM = 0.8; // use 80% of limit = 32K effective
+export const RATE_WINDOW_MS = 60_000;
+
+export class TokenRateLimiter {
+  private log: { time: number; tokens: number }[] = [];
+
+  record(tokens: number): void {
+    this.log.push({ time: Date.now(), tokens });
+  }
+
+  async waitIfNeeded(nextTokens: number): Promise<void> {
+    const now = Date.now();
+    this.log = this.log.filter((e) => now - e.time < RATE_WINDOW_MS);
+    const consumed = this.log.reduce((sum, e) => sum + e.tokens, 0);
+    const budget = TPM_LIMIT * TPM_HEADROOM;
+
+    if (consumed + nextTokens > budget) {
+      const oldest = this.log[0]!.time;
+      const waitMs = RATE_WINDOW_MS - (now - oldest) + 500;
+      if (waitMs > 0) {
+        logger.info(`Rate limiter: waiting ${(waitMs / 1000).toFixed(1)}s ...`);
+        await sleep(waitMs);
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Embedding helpers
+// ---------------------------------------------------------------------------
+
 const EMBED_BATCH_MAX_RETRIES = 2;
 const EMBED_BATCH_RETRY_DELAY_MS = 30_000;
 
@@ -223,6 +259,7 @@ export async function ingestSource(
     s3Key?: string | undefined;
     content?: Buffer | undefined;
     vectorStore?: Awaited<ReturnType<typeof createVectorStore>> | undefined;
+    rateLimiter?: TokenRateLimiter | undefined;
   },
 ): Promise<IngestionResult> {
   logger.info(`Starting ingestion for source: ${source.id}`, {
@@ -272,21 +309,20 @@ export async function ingestSource(
       options.vectorStore ?? (await createVectorStore(embeddings));
 
     // Use small batches (~8K tokens) to avoid OpenAI 500 errors on large
-    // payloads, with a 15s inter-batch delay to stay under the 40K TPM limit
-    // (8K per 15s ≈ 32K/min, leaving headroom).
+    // payloads. Adaptive rate limiting sleeps only when approaching the TPM cap.
     const batches = batchByTokenBudget(enriched, 8_000);
+    const limiter = options.rateLimiter ?? new TokenRateLimiter();
     logger.info(
       `Embedding ${enriched.length} chunks in ${batches.length} batch(es)`,
       { sourceId: source.id },
     );
 
     for (let i = 0; i < batches.length; i++) {
-      if (i > 0) {
-        logger.info(`Waiting 15s before batch ${i + 1}/${batches.length}...`, {
-          sourceId: source.id,
-        });
-        await sleep(15_000);
-      }
+      const batchTokens = batches[i]!.reduce(
+        (sum, doc) => sum + estimateTokens(doc.pageContent),
+        0,
+      );
+      await limiter.waitIfNeeded(batchTokens);
       await embedBatchWithRetry(
         vectorStore,
         embeddings,
@@ -296,6 +332,7 @@ export async function ingestSource(
         i,
         batches.length,
       );
+      limiter.record(batchTokens);
       logger.info(
         `Batch ${i + 1}/${batches.length} complete (${batches[i]!.length} chunks)`,
         { sourceId: source.id },
@@ -348,17 +385,16 @@ export async function ingestAll(
   const embeddings = createRawEmbeddings(options.openaiApiKey);
   const vectorStore = await createVectorStore(embeddings);
 
+  // Shared rate limiter tracks token consumption across all sources so
+  // inter-source gaps are only as long as actually needed.
+  const rateLimiter = new TokenRateLimiter();
+
   const results: IngestionResult[] = [];
   for (let i = 0; i < sources.length; i++) {
-    // Wait between sources to avoid TPM overlap from the previous source's
-    // last batch. Skip the delay for the first source.
-    if (i > 0 && results[i - 1]!.status === "completed") {
-      logger.info("Waiting 15s between sources for TPM window reset...");
-      await sleep(15_000);
-    }
     const result = await ingestSource(sources[i]!, {
       openaiApiKey: options.openaiApiKey,
       vectorStore,
+      rateLimiter,
     });
     results.push(result);
   }
