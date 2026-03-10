@@ -65,7 +65,7 @@ START → classifier → (routeByDomain) → clarify | queryPlanner | escalate
 | `classifier`        | Analyzes query to determine domain, intent, emotional state          | Haiku      |
 | `clarify`           | Returns a clarifying question when the query is ambiguous            | None       |
 | `queryPlanner`      | Decomposes complex multi-domain queries into sub-queries             | Haiku      |
-| `retriever`         | Performs pgvector similarity search on embedded documents            | Embeddings |
+| `retriever`         | Hybrid vector+BM25 search with RRF fusion and authority boosting     | Embeddings |
 | `retrievalExpander` | Reformulates queries on low confidence, re-searches + merges results | Haiku      |
 | `researcher`        | Queries Tavily for additional web context                            | None       |
 | `emotionalSupport`  | Generates domain-aware, trauma-informed support guidance             | None       |
@@ -83,6 +83,38 @@ START → classifier → (routeByDomain) → clarify | queryPlanner | escalate
 
 Agent tools are in `packages/core/src/tools/`.
 
+### Retrieval Pipeline
+
+The retriever node (`packages/core/src/agent/nodes/retriever.ts`) implements a hybrid search pipeline that goes well beyond basic vector similarity:
+
+**Hybrid search (vector + BM25):** Every query runs two searches in parallel — pgvector cosine similarity and PostgreSQL full-text BM25 (`ts_rank_cd` with weighted tsvectors: title=A, section=B, content=C). Results are fused via **Reciprocal Rank Fusion (RRF)** with a smoothing constant K=60:
+
+```
+RRF_score(d) = α / (K + rank_vector(d)) + (1 - α) / (K + rank_text(d))
+```
+
+**Intent-aware weighting:** The vector weight (α) varies by classified `queryIntent`:
+
+| Intent       | Vector weight (α) | Authority multiplier |
+| ------------ | ----------------- | -------------------- |
+| `factual`    | 0.4               | 0.7                  |
+| `procedural` | 0.4               | 0.7                  |
+| `deadline`   | 0.3               | 0.5                  |
+| `escalation` | 0.5               | 1.0                  |
+| `general`    | 0.7               | 0.3                  |
+
+**Authority boosting:** After RRF fusion, documents receive an additive boost based on their `authorityLevel` metadata (5-level hierarchy from `AUTHORITY_LEVELS` in `@usopc/shared`). Maximum boost is 0.003, scaled linearly by authority rank and multiplied by the intent-dependent authority multiplier. This ensures law/statute sources rank above educational guidance for legal queries.
+
+**Narrow-then-broaden strategy:**
+
+1. **Narrow search**: Filter by both `topicDomain` and `ngbId` (if detected by classifier)
+2. If narrow returns < 2 results, **broaden**: drop `topicDomain` filter, keep NGB filter + include universal docs (`ngbId IS NULL`)
+3. Merge and deduplicate results
+
+**Sub-query parallel retrieval:** For complex multi-domain queries (decomposed by `queryPlanner`), the retriever runs independent hybrid searches per sub-query in parallel, then merges and deduplicates by content.
+
+**Confidence scoring:** Computed from the top RRF scores, normalized against the theoretical maximum RRF score: `confidence = 0.6 × normalized_best + 0.4 × normalized_avg`. Used by the `needsMoreInfo` edge to decide whether to proceed to synthesis, fall back to web search, or attempt query expansion.
+
 ### Model Instance Management
 
 `ChatAnthropic` instances are created once at startup and injected into graph nodes via factory closures — the same pattern as `createRetrieverNode(vectorStore)`.
@@ -90,7 +122,7 @@ Agent tools are in `packages/core/src/tools/`.
 **Two model roles:**
 
 - `agentModel` (Sonnet) — synthesizer, escalate
-- `classifierModel` (Haiku) — classifier, qualityChecker, queryPlanner, retrievalExpander, conversationMemory
+- `classifierModel` (Haiku) — classifier, qualityChecker, queryPlanner, retrievalExpander
 
 **Shared factory:** `createAgentModels()` in `config/modelFactory.ts` constructs both instances from `getModelConfig()`. All entry points (`AgentRunner.create()`, `studio.ts`, evals) call this factory instead of constructing models directly.
 
@@ -105,7 +137,7 @@ export function createSynthesizerNode(model: ChatAnthropic) {
 }
 ```
 
-**Lifecycle:** In Lambda, model instances live for the container's lifetime (cold start → warm reuse). Config changes (model name, temperature, maxTokens) take effect only on cold start. The `conversationMemory` service receives its model via `initConversationMemoryModel()` called from the entry point.
+**Lifecycle:** In Lambda, model instances live for the container's lifetime (cold start → warm reuse). Config changes (model name, temperature, maxTokens) take effect only on cold start.
 
 **Runtime model configuration:** Model names, temperature, and token limits are defined in `config/models.ts` (`MODEL_CONFIG`) with hardcoded defaults. In production, `getModelConfig()` reads overrides from DynamoDB (`AgentModelEntity`) with a 5-minute TTL cache. If DynamoDB is unavailable, the hardcoded defaults are used. Changes to DynamoDB config take effect on the next cold start (or after cache expiry within a warm container). There are no feature flags — all graph features (quality checker, retrieval expansion, query planning, emotional support) are always enabled.
 
@@ -307,14 +339,9 @@ return {
 
 ### Adding a New State Field
 
-> **Critical gotcha:** Adding a field to `AgentStateAnnotation` is a cross-package change. CI will fail if any state constructor is missing the new field. Update all of these:
->
-> 1. `packages/core/src/agent/state.ts` — the Annotation definition
-> 2. `packages/evals/src/helpers/stateFactory.ts` — `makeTestState()`
-> 3. `packages/evals/src/helpers/pipeline.ts` and `multiTurnPipeline.ts` — state construction
-> 4. All `packages/core/src/agent/nodes/*.test.ts` and `edges/*.test.ts` — test fixtures
->
-> **Search strategy:** `grep -r "webSearchResults: \[\]" packages/` finds all state object literals that need updating.
+> 1. Add the field to `AgentStateAnnotation` in `packages/core/src/agent/state.ts` with a reducer and default.
+> 2. `makeDefaultState()` (exported from `@usopc/core`) auto-derives defaults from `initialValueFactory`, so test fixtures using it need no changes.
+> 3. If any test file still constructs state manually (without `makeDefaultState`), add the new field there too.
 
 ## Admin Data Fetching (SWR)
 

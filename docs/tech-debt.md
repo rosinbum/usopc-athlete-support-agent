@@ -45,6 +45,14 @@ Key untested files:
 
 - `apps/slack/src/handlers/*` — all event handlers
 
+## Vendored Patches
+
+| Patch                                 | Package                | Purpose                                                                                                                                                                                                                                                                                                                                                                       | Removal condition                                                                                                                             |
+| ------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `patches/@langchain__community.patch` | `@langchain/community` | Fixes `PGVectorStore` pool lifecycle when an external pool is passed. Adds `_isInternalPool` flag so `end()` only closes pools the store created internally; makes `_initializeClient()` a no-op (it acquired a client that was never used). Without this patch, calling `end()` destroys the shared singleton pool from `@usopc/shared`, breaking all subsequent DB queries. | Remove when `@langchain/community` merges an upstream fix for external pool handling. Check the `PGVectorStore.end()` method in new releases. |
+
+Patches are applied automatically by pnpm via the `patchedDependencies` field in the root `package.json`.
+
 ## Dependency Issues (LOW)
 
 - **Vitest version drift**: `apps/web` on `^2.1.9` while everything else is `^2.1.8`

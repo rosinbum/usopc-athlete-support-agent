@@ -7,7 +7,7 @@ import { getModelConfig } from "./models.js";
 export interface AgentModels {
   /** Model instance for synthesizer, escalate, and other heavy-reasoning nodes. */
   agentModel: BaseChatModel;
-  /** Model instance for classifier, qualityChecker, queryPlanner, retrievalExpander, and conversationMemory. */
+  /** Model instance for classifier, qualityChecker, queryPlanner, and retrievalExpander. */
   classifierModel: BaseChatModel;
 }
 
