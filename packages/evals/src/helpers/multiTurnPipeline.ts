@@ -1,10 +1,6 @@
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
-import {
-  AgentRunner,
-  makeDefaultState,
-  type AgentState,
-} from "@usopc/core";
+import { AgentRunner, makeDefaultState, type AgentState } from "@usopc/core";
 
 /**
  * Converts a simple message array to LangChain BaseMessage objects.
