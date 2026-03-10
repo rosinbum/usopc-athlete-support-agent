@@ -133,6 +133,27 @@ describe("bm25Search", () => {
     expect(params[params.length - 1]).toBe(5);
   });
 
+  it("truncates queries longer than 500 characters", async () => {
+    const pool = makeMockPool([]);
+    const longQuery = "a".repeat(1000);
+
+    await bm25Search(pool, { query: longQuery });
+
+    const call = (pool.query as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const params = call[1] as unknown[];
+    expect((params[0] as string).length).toBe(500);
+  });
+
+  it("passes short queries unchanged", async () => {
+    const pool = makeMockPool([]);
+
+    await bm25Search(pool, { query: "short query" });
+
+    const call = (pool.query as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const params = call[1] as unknown[];
+    expect(params[0]).toBe("short query");
+  });
+
   it("handles null metadata in rows", async () => {
     const pool = makeMockPool([
       { id: "chunk-1", content: "some content", metadata: null, rank: 0.5 },
