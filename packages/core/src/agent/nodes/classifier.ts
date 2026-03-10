@@ -13,6 +13,7 @@ import {
 } from "../../services/llmService.js";
 import {
   buildContextualQuery,
+  wasFollowUpToClarification,
   stateContext,
   parseLlmJson,
 } from "../../utils/index.js";
@@ -159,6 +160,27 @@ export function parseClassifierResponse(raw: string): ParseResult {
 }
 
 /**
+ * Keywords that indicate a clarification question is asking about which
+ * competition (Olympic vs World Championships vs etc). Used by Guard B
+ * to default team_selection queries to the upcoming Olympic/Paralympic Games.
+ */
+const COMPETITION_KEYWORDS = [
+  "competition",
+  "event",
+  "olympic",
+  "paralympic",
+  "games",
+  "world championships",
+  "which team",
+];
+
+function isCompetitionClarification(question: string | undefined): boolean {
+  if (!question) return false;
+  const lower = question.toLowerCase();
+  return COMPETITION_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
+/**
  * CLASSIFIER node.
  *
  * Analyzes the latest user message using Claude Haiku to extract:
@@ -205,6 +227,35 @@ export function createClassifierNode(model: BaseChatModel) {
           warnings,
           ...stateContext(state),
         });
+      }
+
+      // Guard A — Loop prevention: if the user just answered a clarification,
+      // never re-ask. The LLM sometimes ignores the "do not re-ask" prompt.
+      if (
+        result.needsClarification &&
+        wasFollowUpToClarification(state.messages)
+      ) {
+        log.info("Suppressed re-clarification (loop prevention guard)", {
+          ...stateContext(state),
+        });
+        result.needsClarification = false;
+        result.clarificationQuestion = undefined;
+      }
+
+      // Guard B — Olympic/Paralympic default: when a team_selection query
+      // triggers a competition clarification, default to the upcoming
+      // Olympic/Paralympic Games instead of asking.
+      if (
+        result.needsClarification &&
+        result.topicDomain === "team_selection" &&
+        isCompetitionClarification(result.clarificationQuestion)
+      ) {
+        log.info(
+          "Suppressed competition clarification (Olympic/Paralympic default)",
+          { ...stateContext(state) },
+        );
+        result.needsClarification = false;
+        result.clarificationQuestion = undefined;
       }
 
       log.info("Classification complete", {

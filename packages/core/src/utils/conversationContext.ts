@@ -122,6 +122,23 @@ export interface ContextualQuery {
  * @param options - Formatting options
  * @returns Object with currentMessage and conversationContext
  */
+/**
+ * Detects if the current message is a follow-up to a prior clarification question.
+ * Used as a programmatic guard to prevent clarification loops — if the agent
+ * just asked a clarification question and the user responded, we should never
+ * re-ask for clarification.
+ */
+export function wasFollowUpToClarification(messages: BaseMessage[]): boolean {
+  // Need at least 3 messages: original question, AI clarification, user follow-up
+  if (messages.length < 3) return false;
+  const prev = messages[messages.length - 2];
+  if (!prev || prev._getType() !== "ai") return false;
+  const content = typeof prev.content === "string" ? prev.content : "";
+  // Clarification messages are short (<300 chars) and end with "?"
+  // Normal synthesized answers are much longer with citations/disclaimers
+  return content.length < 300 && content.trimEnd().endsWith("?");
+}
+
 export function buildContextualQuery(
   messages: BaseMessage[],
   options?: FormatHistoryOptions,

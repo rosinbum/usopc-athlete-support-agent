@@ -2,6 +2,7 @@ export {
   formatConversationHistory,
   buildContextualQuery,
   getMaxTurns,
+  wasFollowUpToClarification,
   type FormatHistoryOptions,
   type ContextualQuery,
 } from "./conversationContext.js";

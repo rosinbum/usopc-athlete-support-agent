@@ -565,6 +565,113 @@ describe("classifierNode", () => {
       expect(result.needsClarification).toBe(false);
       expect(result.topicDomain).toBe("athlete_rights");
     });
+
+    it("suppresses re-clarification after user answers a clarification question", async () => {
+      // LLM incorrectly returns needsClarification=true even though user just answered
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "team_selection",
+          detectedNgbIds: ["us-ski-snowboard"],
+          queryIntent: "procedural",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: true,
+          clarificationQuestion:
+            "Which competition are you asking about — the Olympics, World Championships, or something else?",
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage("How does team selection for super g downhill?"),
+          new AIMessage(
+            "Which competition are you asking about — the Olympics, World Championships, or something else?",
+          ),
+          new HumanMessage("Olympic games"),
+        ],
+      });
+
+      const result = await classifierNode(state);
+      // Guard A should suppress re-clarification
+      expect(result.needsClarification).toBe(false);
+      expect(result.clarificationQuestion).toBeUndefined();
+    });
+
+    it("defaults team_selection to Olympics when competition not specified", async () => {
+      // LLM asks which competition for a team_selection query — Guard B defaults to Olympics
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "team_selection",
+          detectedNgbIds: ["us-ski-snowboard"],
+          queryIntent: "procedural",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: true,
+          clarificationQuestion:
+            "Which competition are you asking about — the Olympics, World Championships, or something else?",
+        }),
+      );
+
+      const state = makeState({
+        messages: [
+          new HumanMessage("How does team selection for super g downhill?"),
+        ],
+      });
+
+      const result = await classifierNode(state);
+      // Guard B should suppress competition clarification for team_selection
+      expect(result.needsClarification).toBe(false);
+      expect(result.clarificationQuestion).toBeUndefined();
+    });
+
+    it("does NOT suppress when clarification is about sport, not competition", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "team_selection",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: true,
+          clarificationQuestion:
+            "That's a great question — which sport is this about?",
+        }),
+      );
+
+      const state = makeState({
+        messages: [new HumanMessage("What are the selection criteria?")],
+      });
+
+      const result = await classifierNode(state);
+      // Sport clarification should NOT be suppressed
+      expect(result.needsClarification).toBe(true);
+      expect(result.clarificationQuestion).toBe(
+        "That's a great question — which sport is this about?",
+      );
+    });
+
+    it("does NOT suppress clarification on first turn with no prior AI message", async () => {
+      mockInvoke.mockResolvedValueOnce(
+        classifierResponse({
+          topicDomain: "eligibility",
+          detectedNgbIds: [],
+          queryIntent: "factual",
+          hasTimeConstraint: false,
+          shouldEscalate: false,
+          needsClarification: true,
+          clarificationQuestion:
+            "Happy to help with that. Which sport are you asking about?",
+        }),
+      );
+
+      const state = makeState({
+        messages: [new HumanMessage("What are the age requirements?")],
+      });
+
+      const result = await classifierNode(state);
+      // First turn, no prior AI message → Guard A should not fire
+      expect(result.needsClarification).toBe(true);
+    });
   });
 
   describe("universal framework questions do not request clarification", () => {
