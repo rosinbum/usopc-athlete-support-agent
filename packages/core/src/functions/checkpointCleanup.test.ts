@@ -108,6 +108,39 @@ describe("checkpointCleanup handler", () => {
     expect(mockEnd).toHaveBeenCalledOnce();
   });
 
+  it("batches deletes when thread count exceeds batch size", async () => {
+    // Create 600 stale threads (batch size is 500, so 2 batches)
+    const threads = Array.from({ length: 600 }, (_, i) => ({
+      thread_id: `t${i}`,
+    }));
+
+    mockQuery.mockReset();
+    mockQuery
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] }) // ALTER TABLE
+      .mockResolvedValueOnce({ rowCount: 600, rows: threads }) // stale threads
+      // Batch 1: 3 deletes
+      .mockResolvedValueOnce({ rowCount: 100 }) // DELETE blobs batch 1
+      .mockResolvedValueOnce({ rowCount: 200 }) // DELETE writes batch 1
+      .mockResolvedValueOnce({ rowCount: 500 }) // DELETE checkpoints batch 1
+      // Batch 2: 3 deletes
+      .mockResolvedValueOnce({ rowCount: 50 }) // DELETE blobs batch 2
+      .mockResolvedValueOnce({ rowCount: 80 }) // DELETE writes batch 2
+      .mockResolvedValueOnce({ rowCount: 100 }); // DELETE checkpoints batch 2
+
+    await handler();
+
+    // 2 setup calls + 2 batches × 3 deletes = 8 total queries
+    expect(mockQuery).toHaveBeenCalledTimes(8);
+
+    // First batch should have 500 thread IDs
+    const [, batch1Params] = mockQuery.mock.calls[2]!;
+    expect(batch1Params[0]).toHaveLength(500);
+
+    // Second batch should have 100 thread IDs
+    const [, batch2Params] = mockQuery.mock.calls[5]!;
+    expect(batch2Params[0]).toHaveLength(100);
+  });
+
   it("calls pool.end() even on error", async () => {
     mockQuery.mockReset();
     mockQuery.mockRejectedValueOnce(new Error("DB down"));

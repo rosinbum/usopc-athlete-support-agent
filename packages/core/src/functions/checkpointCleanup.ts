@@ -5,6 +5,7 @@ import { logger } from "@usopc/shared";
 const log = logger.child({ service: "checkpoint-cleanup" });
 
 const RETENTION_DAYS = 7;
+const DELETE_BATCH_SIZE = 500;
 
 /**
  * Ensures a `created_at` column exists on the `checkpoints` table.
@@ -63,25 +64,37 @@ export async function handler(): Promise<void> {
       count: threadIds.length,
     });
 
-    // Delete from all three tables by thread_id (no FK cascade available)
-    const blobsResult = await pool.query(
-      `DELETE FROM checkpoint_blobs WHERE thread_id = ANY($1)`,
-      [threadIds],
-    );
-    const writesResult = await pool.query(
-      `DELETE FROM checkpoint_writes WHERE thread_id = ANY($1)`,
-      [threadIds],
-    );
-    const checkpointsResult = await pool.query(
-      `DELETE FROM checkpoints WHERE thread_id = ANY($1)`,
-      [threadIds],
-    );
+    // Delete in batches to avoid oversized query plans and row-level locks
+    let deletedBlobs = 0;
+    let deletedWrites = 0;
+    let deletedCheckpoints = 0;
+
+    for (let i = 0; i < threadIds.length; i += DELETE_BATCH_SIZE) {
+      const batch = threadIds.slice(i, i + DELETE_BATCH_SIZE);
+
+      const blobsResult = await pool.query(
+        `DELETE FROM checkpoint_blobs WHERE thread_id = ANY($1)`,
+        [batch],
+      );
+      const writesResult = await pool.query(
+        `DELETE FROM checkpoint_writes WHERE thread_id = ANY($1)`,
+        [batch],
+      );
+      const checkpointsResult = await pool.query(
+        `DELETE FROM checkpoints WHERE thread_id = ANY($1)`,
+        [batch],
+      );
+
+      deletedBlobs += blobsResult.rowCount ?? 0;
+      deletedWrites += writesResult.rowCount ?? 0;
+      deletedCheckpoints += checkpointsResult.rowCount ?? 0;
+    }
 
     log.info("Checkpoint cleanup complete", {
       threads: threadIds.length,
-      deletedCheckpoints: checkpointsResult.rowCount,
-      deletedWrites: writesResult.rowCount,
-      deletedBlobs: blobsResult.rowCount,
+      deletedCheckpoints,
+      deletedWrites,
+      deletedBlobs,
       cutoffDate: cutoff.toISOString(),
     });
   } catch (error) {
