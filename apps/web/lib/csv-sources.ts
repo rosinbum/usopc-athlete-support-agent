@@ -4,6 +4,8 @@ import {
   TOPIC_DOMAINS,
   AUTHORITY_LEVELS,
   DOCUMENT_TYPES,
+  FORMATS,
+  PRIORITY_LEVELS,
 } from "./source-constants.js";
 
 // ---------------------------------------------------------------------------
@@ -39,8 +41,8 @@ const csvSourceSchema = z.object({
     .min(1, "At least one topic domain is required"),
   url: z.string().url("Must be a valid URL"),
   description: z.string().min(1, "Description is required"),
-  format: z.enum(["pdf", "html", "text"]),
-  priority: z.enum(["high", "medium", "low"]),
+  format: z.enum(FORMATS),
+  priority: z.enum(PRIORITY_LEVELS),
   authorityLevel: z.enum(AUTHORITY_LEVELS, {
     error: `Must be one of: ${AUTHORITY_LEVELS.join(", ")}`,
   }),

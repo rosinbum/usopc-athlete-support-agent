@@ -1,6 +1,10 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
-import { authorityLevelSchema, createLogger } from "@usopc/shared";
+import {
+  authorityLevelSchema,
+  createLogger,
+  priorityLevelSchema,
+} from "@usopc/shared";
 import { z } from "zod";
 import {
   buildMetadataEvaluationPrompt,
@@ -28,7 +32,7 @@ const ContentEvaluationSchema = z.object({
   documentType: z.string(),
   topicDomains: z.array(z.string()),
   authorityLevel: authorityLevelSchema,
-  priority: z.enum(["high", "medium", "low"]),
+  priority: priorityLevelSchema,
   description: z.string(),
   keyTopics: z.array(z.string()),
   ngbId: z.string().nullable(),

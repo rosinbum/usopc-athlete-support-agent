@@ -17,6 +17,8 @@ export const TOPIC_DOMAINS = [
   "eligibility",
   "governance",
   "athlete_rights",
+  "athlete_safety",
+  "financial_assistance",
 ] as const;
 
 export const AUTHORITY_LEVELS = [
@@ -41,3 +43,7 @@ export const DOCUMENT_TYPES = [
   "rulebook",
   "selection_procedures",
 ] as const;
+
+export const PRIORITY_LEVELS = ["high", "medium", "low"] as const;
+
+export const FORMATS = ["pdf", "html", "text"] as const;

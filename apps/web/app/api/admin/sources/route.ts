@@ -4,6 +4,8 @@ import {
   TOPIC_DOMAINS,
   AUTHORITY_LEVELS,
   DOCUMENT_TYPES,
+  FORMATS,
+  PRIORITY_LEVELS,
   logger,
 } from "@usopc/shared";
 
@@ -27,9 +29,9 @@ const createSourceSchema = z.object({
     .array(z.enum(TOPIC_DOMAINS))
     .min(1, "At least one topic domain is required"),
   url: z.string().url("Must be a valid URL"),
-  format: z.enum(["pdf", "html", "text"]),
+  format: z.enum(FORMATS),
   ngbId: z.string().nullable(),
-  priority: z.enum(["high", "medium", "low"]),
+  priority: z.enum(PRIORITY_LEVELS),
   description: z.string().min(1, "Description is required"),
   authorityLevel: z.enum(AUTHORITY_LEVELS),
 });

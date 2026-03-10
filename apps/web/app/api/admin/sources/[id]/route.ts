@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   getPool,
   countChunksBySourceId,
+  FORMATS,
+  PRIORITY_LEVELS,
   logger,
   type SourceConfig,
 } from "@usopc/shared";
@@ -25,11 +27,11 @@ const patchSourceSchema = z
     title: z.string().min(1).optional(),
     description: z.string().optional(),
     url: z.string().url("Must be a valid URL").optional(),
-    format: z.enum(["pdf", "html", "text"]).optional(),
+    format: z.enum(FORMATS).optional(),
     documentType: z.string().min(1).optional(),
     topicDomains: z.array(z.string().min(1)).min(1).optional(),
     ngbId: z.string().nullable().optional(),
-    priority: z.enum(["high", "medium", "low"]).optional(),
+    priority: z.enum(PRIORITY_LEVELS).optional(),
     authorityLevel: z.string().min(1).optional(),
     enabled: z.boolean().optional(),
   })

@@ -93,3 +93,21 @@ export const DOCUMENT_TYPES = [
 export const documentTypeSchema = z.enum(DOCUMENT_TYPES);
 
 export type DocumentType = z.infer<typeof documentTypeSchema>;
+
+/**
+ * Priority levels for source ingestion ordering.
+ */
+export const PRIORITY_LEVELS = ["high", "medium", "low"] as const;
+
+export const priorityLevelSchema = z.enum(PRIORITY_LEVELS);
+
+export type PriorityLevel = z.infer<typeof priorityLevelSchema>;
+
+/**
+ * Supported document formats.
+ */
+export const FORMATS = ["pdf", "html", "text"] as const;
+
+export const formatSchema = z.enum(FORMATS);
+
+export type Format = z.infer<typeof formatSchema>;
