@@ -104,6 +104,13 @@ export {
   type Feedback,
   type CreateFeedbackInput,
 } from "./entities/index.js";
+export {
+  createAccessRequestEntity,
+  AccessRequestEntity,
+  type AccessRequest,
+  type AccessRequestStatus,
+  type CreateAccessRequestInput,
+} from "./entities/index.js";
 export type {
   OlympicProgram,
   OrgStatus,

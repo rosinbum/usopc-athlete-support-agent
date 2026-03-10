@@ -44,8 +44,10 @@ export function MessageBubble({
       className={`flex ${isUser ? "justify-end" : "justify-start"} max-w-4xl mx-auto`}
     >
       <div
-        className={`max-w-[80%] rounded-lg px-4 py-3 ${
-          isUser ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
+        className={`max-w-[80%] px-4 py-3 ${
+          isUser
+            ? "rounded-2xl rounded-br-md bg-usopc-navy text-white"
+            : "rounded-2xl rounded-bl-md bg-usopc-gray-100 text-usopc-gray-900 shadow-sm"
         }`}
       >
         {isUser ? (

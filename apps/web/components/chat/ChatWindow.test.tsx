@@ -35,6 +35,7 @@ const defaultProps = {
   isLoading: false,
   onInputChange: vi.fn(),
   onSubmit: vi.fn(),
+  onSuggestionSubmit: vi.fn(),
 };
 
 describe("ChatWindow", () => {
@@ -94,19 +95,19 @@ describe("ChatWindow", () => {
 
   it("disables submit button when isLoading is true", () => {
     render(<ChatWindow {...defaultProps} input="Hello" isLoading={true} />);
-    const button = screen.getByRole("button");
+    const button = screen.getByRole("button", { name: "" });
     expect(button).toBeDisabled();
   });
 
   it("disables submit button when input is empty", () => {
     render(<ChatWindow {...defaultProps} input="" isLoading={false} />);
-    const button = screen.getByRole("button");
+    const button = screen.getByRole("button", { name: "" });
     expect(button).toBeDisabled();
   });
 
   it("enables submit button when input is non-empty and not loading", () => {
     render(<ChatWindow {...defaultProps} input="Hello" isLoading={false} />);
-    const button = screen.getByRole("button");
+    const button = screen.getByRole("button", { name: "" });
     expect(button).not.toBeDisabled();
   });
 
@@ -120,7 +121,7 @@ describe("ChatWindow", () => {
         onSubmit={onSubmit}
       />,
     );
-    const button = screen.getByRole("button");
+    const button = screen.getByRole("button", { name: "" });
     await userEvent.click(button);
     expect(onSubmit).toHaveBeenCalledOnce();
   });
@@ -137,5 +138,54 @@ describe("ChatWindow", () => {
     const input = screen.getByPlaceholderText(/Ask about governance/);
     await userEvent.type(input, "a");
     expect(onInputChange).toHaveBeenCalled();
+  });
+
+  describe("suggestion chips", () => {
+    it("renders suggestion chips when onSuggestionSubmit is provided", () => {
+      render(<ChatWindow {...defaultProps} />);
+      expect(
+        screen.getByText("How does team selection work?"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("How do I report a SafeSport concern?"),
+      ).toBeInTheDocument();
+    });
+
+    it("does not render suggestion chips when onSuggestionSubmit is not provided", () => {
+      render(<ChatWindow {...defaultProps} onSuggestionSubmit={undefined} />);
+      expect(
+        screen.queryByText("How does team selection work?"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("calls onSuggestionSubmit when a chip is clicked", async () => {
+      const onSuggestionSubmit = vi.fn();
+      render(
+        <ChatWindow
+          {...defaultProps}
+          onSuggestionSubmit={onSuggestionSubmit}
+        />,
+      );
+      await userEvent.click(
+        screen.getByText("How do I report a SafeSport concern?"),
+      );
+      expect(onSuggestionSubmit).toHaveBeenCalledWith(
+        "How do I report a SafeSport concern?",
+      );
+    });
+
+    it("hides suggestion chips when messages exist", () => {
+      const messages = [
+        makeMessage({
+          id: "1",
+          role: "user",
+          parts: [{ type: "text", text: "Hello" }],
+        }),
+      ];
+      render(<ChatWindow {...defaultProps} messages={messages} />);
+      expect(
+        screen.queryByText("How does team selection work?"),
+      ).not.toBeInTheDocument();
+    });
   });
 });

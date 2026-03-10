@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { MessageSquarePlus } from "lucide-react";
+import { MessageSquarePlus, Shield } from "lucide-react";
 import { useState, useMemo, type ChangeEvent, type FormEvent } from "react";
 
 import { ChatWindow } from "../../components/chat/ChatWindow";
@@ -51,6 +51,12 @@ function ChatSession() {
     setInput("");
   };
 
+  const handleSuggestionSubmit = (text: string) => {
+    if (isLoading) return;
+    setCurrentStatus(undefined);
+    sendMessage({ text });
+  };
+
   return (
     <ChatWindow
       messages={messages}
@@ -60,6 +66,7 @@ function ChatSession() {
       conversationId={conversationId}
       onInputChange={handleInputChange}
       onSubmit={handleSubmit}
+      onSuggestionSubmit={handleSuggestionSubmit}
     />
   );
 }
@@ -71,17 +78,27 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Athlete Support Chat</h1>
+      <header className="bg-usopc-navy px-6 py-4 flex items-center justify-between shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/10">
+            <Shield className="w-4.5 h-4.5 text-usopc-gold" />
+          </div>
+          <h1 className="text-lg font-semibold tracking-tight text-white">
+            Athlete Support Chat
+          </h1>
+        </div>
         <div className="flex items-center gap-4">
           <button
             onClick={handleNewChat}
-            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-usopc-gold hover:text-usopc-gold-dark transition-colors"
           >
             <MessageSquarePlus className="w-4 h-4" />
             New Chat
           </button>
-          <a href="/" className="text-sm text-blue-600 hover:underline">
+          <a
+            href="/"
+            className="text-sm text-white/70 hover:text-white transition-colors"
+          >
             Home
           </a>
         </div>
