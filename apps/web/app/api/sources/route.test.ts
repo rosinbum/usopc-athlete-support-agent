@@ -148,6 +148,13 @@ describe("GET /api/sources", () => {
       expect(body2.totalDocuments).toBe(5);
       // No additional DB query should have been made
       expect(mockQuery).toHaveBeenCalledTimes(callsAfterFirst);
+
+      // After TTL expires, a new DB query should fire
+      vi.advanceTimersByTime(31_000);
+
+      const req3 = new Request("http://localhost/api/sources?action=stats");
+      await GET(req3);
+      expect(mockQuery).toHaveBeenCalledTimes(callsAfterFirst + 1);
     } finally {
       vi.useRealTimers();
     }

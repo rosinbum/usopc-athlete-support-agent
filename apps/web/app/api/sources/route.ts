@@ -26,6 +26,12 @@ interface StatsRow {
   last_ingested_at: Date | null;
 }
 
+interface StatsResponse {
+  totalDocuments: number;
+  totalOrganizations: number;
+  lastIngestedAt: string | null;
+}
+
 const COL = {
   source_url: "COALESCE(source_url, metadata->>'sourceUrl')",
   document_title: "COALESCE(document_title, metadata->>'documentTitle')",
@@ -35,12 +41,23 @@ const COL = {
   authority_level: "COALESCE(authority_level, metadata->>'authorityLevel')",
 } as const;
 
+const GROUP_BY_COLS = [
+  COL.source_url,
+  COL.document_title,
+  COL.document_type,
+  COL.ngb_id,
+  COL.topic_domain,
+  COL.authority_level,
+  "metadata->>'effectiveDate'",
+].join(", ");
+
 // ---------------------------------------------------------------------------
-// Stats cache — avoids full table scan on every call (30s TTL)
+// Stats cache — avoids full table scan on every call (30s TTL).
+// Per-instance in serverless; each Lambda container maintains its own cache.
 // ---------------------------------------------------------------------------
 
 const STATS_TTL_MS = 30_000;
-let statsCache: { data: object; expires: number } | null = null;
+let statsCache: { data: StatsResponse; expires: number } | null = null;
 
 /**
  * Escapes PostgreSQL ILIKE wildcard characters (%, _, \) in user-supplied input
@@ -156,9 +173,7 @@ async function handleList(url: URL) {
     db.query<CountRow>(
       `SELECT COUNT(*) as total FROM (
         SELECT 1 FROM document_chunks ${whereClause}
-        GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
-                 ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level},
-                 metadata->>'effectiveDate'
+        GROUP BY ${GROUP_BY_COLS}
       ) sub`,
       values,
     ),
