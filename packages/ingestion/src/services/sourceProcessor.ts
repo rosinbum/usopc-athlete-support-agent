@@ -103,6 +103,41 @@ async function uploadToS3(
   }
 }
 
+/**
+ * Best-effort DynamoDB source config update. Swallows errors so ingestion
+ * flow is never interrupted by stats bookkeeping failures.
+ */
+async function updateSourceConfig(
+  entity: SourceConfigEntity | undefined,
+  sourceId: string,
+  update:
+    | {
+        type: "success";
+        contentHash: string;
+        s3Key?: string | undefined;
+        s3VersionId?: string | undefined;
+      }
+    | { type: "failure"; error: string },
+): Promise<void> {
+  if (!entity) return;
+  try {
+    if (update.type === "success") {
+      await entity.markSuccess(sourceId, update.contentHash, {
+        ...(update.s3Key !== undefined ? { s3Key: update.s3Key } : {}),
+        ...(update.s3VersionId !== undefined
+          ? { s3VersionId: update.s3VersionId }
+          : {}),
+      });
+    } else {
+      await entity.markFailure(sourceId, update.error);
+    }
+  } catch (err) {
+    logger.warn(
+      `Failed to update DynamoDB stats for ${sourceId}: ${err instanceof Error ? err.message : "Unknown error"}`,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
@@ -134,15 +169,10 @@ export async function processSource(
     const msg =
       fetchError instanceof Error ? fetchError.message : "Unknown error";
     logger.warn(`Fetch failed for ${source.id}: ${msg}`);
-
-    if (sourceConfigEntity) {
-      try {
-        await sourceConfigEntity.markFailure(source.id, msg);
-      } catch {
-        /* best-effort */
-      }
-    }
-
+    await updateSourceConfig(sourceConfigEntity, source.id, {
+      type: "failure",
+      error: msg,
+    });
     return { status: "failed", chunksCount: 0, error: msg };
   }
 
@@ -182,19 +212,12 @@ export async function processSource(
       "completed",
       { contentHash, chunksCount: result.chunksCount },
     );
-
-    if (sourceConfigEntity) {
-      try {
-        await sourceConfigEntity.markSuccess(source.id, contentHash, {
-          ...(s3Key !== undefined ? { s3Key } : {}),
-          ...(s3VersionId !== undefined ? { s3VersionId } : {}),
-        });
-      } catch (statsError) {
-        logger.warn(
-          `Failed to update DynamoDB stats for ${source.id}: ${statsError instanceof Error ? statsError.message : "Unknown error"}`,
-        );
-      }
-    }
+    await updateSourceConfig(sourceConfigEntity, source.id, {
+      type: "success",
+      contentHash,
+      s3Key,
+      s3VersionId,
+    });
   } else {
     await upsertIngestionStatus(
       ingestionLogEntity,
@@ -203,19 +226,10 @@ export async function processSource(
       "failed",
       result.error !== undefined ? { errorMessage: result.error } : {},
     );
-
-    if (sourceConfigEntity) {
-      try {
-        await sourceConfigEntity.markFailure(
-          source.id,
-          result.error ?? "Unknown error",
-        );
-      } catch (statsError) {
-        logger.warn(
-          `Failed to update DynamoDB stats for ${source.id}: ${statsError instanceof Error ? statsError.message : "Unknown error"}`,
-        );
-      }
-    }
+    await updateSourceConfig(sourceConfigEntity, source.id, {
+      type: "failure",
+      error: result.error ?? "Unknown error",
+    });
   }
 
   return {
