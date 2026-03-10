@@ -257,8 +257,8 @@ export default async function HomePage() {
             or call 911.
           </p>
           <p className="mt-3 text-white/40">
-            &copy; {new Date().getFullYear()} Rosinbum, inc. Not an
-            official USOPC product.
+            &copy; {new Date().getFullYear()} Rosinbum, inc. Not an official
+            USOPC product.
           </p>
         </div>
       </footer>
