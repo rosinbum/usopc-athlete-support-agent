@@ -146,7 +146,9 @@ describe("ChatWindow", () => {
       expect(
         screen.getByText("How does team selection work?"),
       ).toBeInTheDocument();
-      expect(screen.getByText("How do I report a SafeSport concern?")).toBeInTheDocument();
+      expect(
+        screen.getByText("How do I report a SafeSport concern?"),
+      ).toBeInTheDocument();
     });
 
     it("does not render suggestion chips when onSuggestionSubmit is not provided", () => {
@@ -164,8 +166,12 @@ describe("ChatWindow", () => {
           onSuggestionSubmit={onSuggestionSubmit}
         />,
       );
-      await userEvent.click(screen.getByText("How do I report a SafeSport concern?"));
-      expect(onSuggestionSubmit).toHaveBeenCalledWith("How do I report a SafeSport concern?");
+      await userEvent.click(
+        screen.getByText("How do I report a SafeSport concern?"),
+      );
+      expect(onSuggestionSubmit).toHaveBeenCalledWith(
+        "How do I report a SafeSport concern?",
+      );
     });
 
     it("hides suggestion chips when messages exist", () => {
