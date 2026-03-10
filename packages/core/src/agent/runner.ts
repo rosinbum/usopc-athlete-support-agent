@@ -11,7 +11,7 @@ import { createAgentGraph } from "./graph.js";
 import { createPostgresCheckpointer } from "./checkpointer.js";
 import { GRAPH_CONFIG, createAgentModels } from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/withTimeout.js";
-import { nodeMetrics } from "./nodeMetrics.js";
+import { NodeMetricsCollector } from "./nodeMetrics.js";
 
 import type { Citation, EscalationInfo } from "../types/index.js";
 import type { AgentState } from "./state.js";
@@ -52,6 +52,7 @@ export interface AgentOutput {
   citations: Citation[];
   escalation?: EscalationInfo | undefined;
   disclaimer?: string | undefined;
+  trajectory?: string[] | undefined;
 }
 
 /**
@@ -150,14 +151,14 @@ export class AgentRunner {
    * Enforces a timeout to prevent indefinitely hung invocations.
    */
   async invoke(input: AgentInput): Promise<AgentOutput> {
-    nodeMetrics.reset();
+    const metrics = new NodeMetricsCollector();
     const initialState = this.buildInitialState(input);
     const threadId =
       (initialState.conversationId as string | undefined) ??
       crypto.randomUUID();
     const config = {
       recursionLimit: GRAPH_CONFIG.recursionLimit,
-      configurable: { thread_id: threadId },
+      configurable: { thread_id: threadId, nodeMetrics: metrics },
       ...(initialState.conversationId
         ? { metadata: { session_id: initialState.conversationId } }
         : {}),
@@ -173,6 +174,7 @@ export class AgentRunner {
       citations: finalState.citations ?? [],
       escalation: finalState.escalation,
       disclaimer: finalState.disclaimer,
+      trajectory: metrics.getAll().map((entry) => entry.name),
     };
   }
 
@@ -192,7 +194,6 @@ export class AgentRunner {
    * Enforces a deadline to prevent indefinitely hung streams.
    */
   async *stream(input: AgentInput): AsyncGenerator<StreamChunk> {
-    nodeMetrics.reset();
     const initialState = this.buildInitialState(input);
     const deadline = Date.now() + GRAPH_CONFIG.streamTimeoutMs;
 
@@ -204,7 +205,10 @@ export class AgentRunner {
     const stream = await this.graph.stream(initialState, {
       streamMode: ["values", "messages"],
       recursionLimit: GRAPH_CONFIG.recursionLimit,
-      configurable: { thread_id: threadId },
+      configurable: {
+        thread_id: threadId,
+        nodeMetrics: new NodeMetricsCollector(),
+      },
       ...(initialState.conversationId
         ? { metadata: { session_id: initialState.conversationId } }
         : {}),

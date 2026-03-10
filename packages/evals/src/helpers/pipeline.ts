@@ -1,5 +1,5 @@
 import { HumanMessage } from "@langchain/core/messages";
-import { AgentRunner, nodeMetrics, type AgentState } from "@usopc/core";
+import { AgentRunner, type AgentState } from "@usopc/core";
 
 // ---------------------------------------------------------------------------
 // Shared runner — lazy-initialized, reused across all eval invocations so we
@@ -41,17 +41,13 @@ export async function runPipeline(userMessage: string): Promise<{
   state: AgentState;
   trajectory: string[];
 }> {
-  // Reset metrics to capture only this run's trajectory
-  nodeMetrics.reset();
-
   const runner = await getRunner();
 
   const output = await runner.invoke({
     messages: [new HumanMessage(userMessage)],
   });
 
-  // Extract trajectory from the metrics collector
-  const trajectory = nodeMetrics.getAll().map((entry) => entry.name);
+  const trajectory = output.trajectory ?? [];
 
   return {
     state: {

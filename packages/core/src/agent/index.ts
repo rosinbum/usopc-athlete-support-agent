@@ -21,6 +21,7 @@ export {
   nodeMetrics,
   NodeMetricsCollector,
   withMetrics,
+  getMetricsCollector,
 } from "./nodeMetrics.js";
 export type { NodeMetricEntry } from "./nodeMetrics.js";
 export { getAppRunner, resetAppRunner } from "./runnerFactory.js";
