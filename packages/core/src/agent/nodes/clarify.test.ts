@@ -1,40 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { HumanMessage } from "@langchain/core/messages";
 import { clarifyNode } from "./clarify.js";
-import type { AgentState } from "../state.js";
+import { makeDefaultState, type AgentState } from "../state.js";
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {
-  return {
+  return makeDefaultState({
     messages: [new HumanMessage("What are the selection criteria?")],
-    topicDomain: undefined,
-    detectedNgbIds: [],
-    queryIntent: undefined,
-    retrievedDocuments: [],
-    webSearchResults: [],
-    webSearchResultUrls: [],
-    retrievalConfidence: 0,
-    citations: [],
-    answer: undefined,
-    escalation: undefined,
-    disclaimer: undefined,
-    disclaimerRequired: true,
-    hasTimeConstraint: false,
-    conversationId: undefined,
-    userSport: undefined,
     needsClarification: true,
-    clarificationQuestion: undefined,
-    escalationReason: undefined,
-    retrievalStatus: "success",
-    emotionalState: "neutral",
-    emotionalSupportContext: undefined,
-    qualityCheckResult: undefined,
-    qualityRetryCount: 0,
-    expansionAttempted: false,
-    reformulatedQueries: [],
-    isComplexQuery: false,
-    subQueries: [],
     ...overrides,
-  };
+  });
 }
 
 describe("clarifyNode", () => {

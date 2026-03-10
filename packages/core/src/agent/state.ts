@@ -283,3 +283,30 @@ export const AgentStateAnnotation = Annotation.Root({
  * Convenience type alias for the fully-resolved agent state.
  */
 export type AgentState = typeof AgentStateAnnotation.State;
+
+/**
+ * Creates a complete AgentState populated with annotation defaults.
+ *
+ * Use this instead of manually listing every field — it stays in sync
+ * with the annotation spec automatically.
+ *
+ * Callers must provide their own `messages` array via overrides.
+ */
+export function makeDefaultState(
+  overrides: Partial<AgentState> = {},
+): AgentState {
+  const spec = AgentStateAnnotation.spec;
+  const defaults: Record<string, unknown> = {};
+  for (const [key, channel] of Object.entries(spec)) {
+    if (key === "messages") continue;
+    const ch = channel as { initialValueFactory?: () => unknown };
+    if (typeof ch.initialValueFactory === "function") {
+      defaults[key] = ch.initialValueFactory();
+    }
+  }
+  return {
+    messages: [],
+    ...defaults,
+    ...overrides,
+  } as AgentState;
+}

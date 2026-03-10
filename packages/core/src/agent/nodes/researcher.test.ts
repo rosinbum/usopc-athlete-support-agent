@@ -23,7 +23,7 @@ vi.mock("../../services/llmService.js", () => ({
 import { createResearcherNode, type TavilySearchLike } from "./researcher.js";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import type { AgentState } from "../state.js";
+import { makeDefaultState, type AgentState } from "../state.js";
 import {
   invokeLlm,
   extractTextFromResponse,
@@ -37,37 +37,10 @@ const mockExtractText = vi.mocked(extractTextFromResponse);
 // ---------------------------------------------------------------------------
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {
-  return {
+  return makeDefaultState({
     messages: [new HumanMessage("What are USADA whereabouts requirements?")],
-    topicDomain: undefined,
-    detectedNgbIds: [],
-    queryIntent: undefined,
-    retrievedDocuments: [],
-    webSearchResults: [],
-    webSearchResultUrls: [],
-    retrievalConfidence: 0,
-    citations: [],
-    answer: undefined,
-    escalation: undefined,
-    disclaimer: undefined,
-    disclaimerRequired: true,
-    hasTimeConstraint: false,
-    conversationId: undefined,
-    userSport: undefined,
-    needsClarification: false,
-    clarificationQuestion: undefined,
-    escalationReason: undefined,
-    retrievalStatus: "success",
-    emotionalState: "neutral",
-    emotionalSupportContext: undefined,
-    qualityCheckResult: undefined,
-    qualityRetryCount: 0,
-    expansionAttempted: false,
-    reformulatedQueries: [],
-    isComplexQuery: false,
-    subQueries: [],
     ...overrides,
-  };
+  });
 }
 
 function makeMockTavily(result: unknown = ""): TavilySearchLike {

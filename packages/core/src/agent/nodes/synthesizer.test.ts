@@ -25,7 +25,7 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 import { createSynthesizerNode } from "./synthesizer.js";
 import { HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
-import type { AgentState } from "../state.js";
+import { makeDefaultState, type AgentState } from "../state.js";
 import type { RetrievedDocument } from "../../types/index.js";
 
 const synthesizerNode = createSynthesizerNode({ invoke: mockInvoke } as any);
@@ -35,39 +35,15 @@ const synthesizerNode = createSynthesizerNode({ invoke: mockInvoke } as any);
 // ---------------------------------------------------------------------------
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {
-  return {
+  return makeDefaultState({
     messages: [
       new HumanMessage("How do I file a Section 9 arbitration complaint?"),
     ],
     topicDomain: "dispute_resolution",
-    detectedNgbIds: [],
     queryIntent: "procedural",
-    retrievedDocuments: [],
-    webSearchResults: [],
-    webSearchResultUrls: [],
     retrievalConfidence: 0.7,
-    citations: [],
-    answer: undefined,
-    escalation: undefined,
-    disclaimer: undefined,
-    disclaimerRequired: true,
-    hasTimeConstraint: false,
-    conversationId: undefined,
-    userSport: undefined,
-    needsClarification: false,
-    clarificationQuestion: undefined,
-    escalationReason: undefined,
-    retrievalStatus: "success",
-    emotionalState: "neutral",
-    emotionalSupportContext: undefined,
-    qualityCheckResult: undefined,
-    qualityRetryCount: 0,
-    expansionAttempted: false,
-    reformulatedQueries: [],
-    isComplexQuery: false,
-    subQueries: [],
     ...overrides,
-  };
+  });
 }
 
 function makeDoc(content: string): RetrievedDocument {

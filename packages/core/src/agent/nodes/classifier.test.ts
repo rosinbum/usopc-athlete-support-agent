@@ -25,7 +25,7 @@ vi.mock("@usopc/shared", async (importOriginal) => {
 import { createClassifierNode, parseClassifierResponse } from "./classifier.js";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { CircuitBreakerError } from "@usopc/shared";
-import type { AgentState } from "../state.js";
+import { makeDefaultState, type AgentState } from "../state.js";
 
 const classifierNode = createClassifierNode({ invoke: mockInvoke } as any);
 
@@ -34,37 +34,10 @@ const classifierNode = createClassifierNode({ invoke: mockInvoke } as any);
 // ---------------------------------------------------------------------------
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {
-  return {
+  return makeDefaultState({
     messages: [new HumanMessage("What are the team selection procedures?")],
-    topicDomain: undefined,
-    detectedNgbIds: [],
-    queryIntent: undefined,
-    retrievedDocuments: [],
-    webSearchResults: [],
-    webSearchResultUrls: [],
-    retrievalConfidence: 0,
-    citations: [],
-    answer: undefined,
-    escalation: undefined,
-    disclaimer: undefined,
-    disclaimerRequired: true,
-    hasTimeConstraint: false,
-    conversationId: undefined,
-    userSport: undefined,
-    needsClarification: false,
-    clarificationQuestion: undefined,
-    escalationReason: undefined,
-    retrievalStatus: "success",
-    emotionalState: "neutral",
-    emotionalSupportContext: undefined,
-    qualityCheckResult: undefined,
-    qualityRetryCount: 0,
-    expansionAttempted: false,
-    reformulatedQueries: [],
-    isComplexQuery: false,
-    subQueries: [],
     ...overrides,
-  };
+  });
 }
 
 function classifierResponse(data: Record<string, unknown>): {

@@ -1,5 +1,9 @@
 import { HumanMessage } from "@langchain/core/messages";
-import { AgentRunner, type AgentState } from "@usopc/core";
+import {
+  AgentRunner,
+  makeDefaultState,
+  type AgentState,
+} from "@usopc/core";
 
 // ---------------------------------------------------------------------------
 // Shared runner — lazy-initialized, reused across all eval invocations so we
@@ -50,39 +54,13 @@ export async function runPipeline(userMessage: string): Promise<{
   const trajectory = output.trajectory ?? [];
 
   return {
-    state: {
+    state: makeDefaultState({
       messages: [new HumanMessage(userMessage)],
       answer: output.answer,
       citations: output.citations,
       escalation: output.escalation,
       disclaimer: output.disclaimer,
-      // These fields aren't directly available from AgentOutput,
-      // so we set sensible defaults. Full state is available through
-      // the graph's stream mode if needed.
-      topicDomain: undefined,
-      detectedNgbIds: [],
-      queryIntent: undefined,
-      retrievedDocuments: [],
-      webSearchResults: [],
-      webSearchResultUrls: [],
-      retrievalConfidence: 0,
-      disclaimerRequired: true,
-      hasTimeConstraint: false,
-      conversationId: undefined,
-      userSport: undefined,
-      needsClarification: false,
-      clarificationQuestion: undefined,
-      escalationReason: undefined,
-      retrievalStatus: "success",
-      emotionalState: "neutral",
-      emotionalSupportContext: undefined,
-      qualityCheckResult: undefined,
-      qualityRetryCount: 0,
-      expansionAttempted: false,
-      reformulatedQueries: [],
-      isComplexQuery: false,
-      subQueries: [],
-    },
+    }),
     trajectory,
   };
 }

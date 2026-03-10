@@ -23,18 +23,16 @@ import type { BaseChatModel } from "@langchain/core/language_models/chat_models"
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { createRetrievalExpanderNode } from "./retrievalExpander.js";
 import type { VectorStoreLike } from "./retriever.js";
-import type { AgentState } from "../state.js";
+import { makeDefaultState, type AgentState } from "../state.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function makeState(overrides: Partial<AgentState> = {}): AgentState {
-  return {
+  return makeDefaultState({
     messages: [new HumanMessage("How are athletes selected for the Olympics?")],
     topicDomain: "team_selection",
-    detectedNgbIds: [],
-    queryIntent: undefined,
     retrievedDocuments: [
       {
         content: "existing doc content",
@@ -52,31 +50,9 @@ function makeState(overrides: Partial<AgentState> = {}): AgentState {
         score: 0.4,
       },
     ],
-    webSearchResults: [],
-    webSearchResultUrls: [],
     retrievalConfidence: 0.3,
-    citations: [],
-    answer: undefined,
-    escalation: undefined,
-    disclaimer: undefined,
-    disclaimerRequired: true,
-    hasTimeConstraint: false,
-    conversationId: undefined,
-    userSport: undefined,
-    needsClarification: false,
-    clarificationQuestion: undefined,
-    escalationReason: undefined,
-    retrievalStatus: "success",
-    emotionalState: "neutral",
-    emotionalSupportContext: undefined,
-    qualityCheckResult: undefined,
-    qualityRetryCount: 0,
-    expansionAttempted: false,
-    reformulatedQueries: [],
-    isComplexQuery: false,
-    subQueries: [],
     ...overrides,
-  };
+  });
 }
 
 type SearchResult = [
