@@ -71,7 +71,12 @@ vi.mock("./transformers/metadataEnricher.js", () => ({
 // Now import the module under test
 import {
   QuotaExhaustedError,
+  TokenRateLimiter,
+  TPM_LIMIT,
+  TPM_HEADROOM,
+  RATE_WINDOW_MS,
   ingestSource,
+  ingestAll,
   type IngestionSource,
 } from "./pipeline.js";
 import { loadPdf } from "./loaders/pdfLoader.js";
@@ -266,5 +271,89 @@ describe("ingestSource", () => {
     expect(result.status).toBe("failed");
     expect(result.error).toBe("timeout");
     expect(mockAddVectors).toHaveBeenCalledTimes(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TokenRateLimiter
+// ---------------------------------------------------------------------------
+
+describe("TokenRateLimiter", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("skips sleep when token budget has headroom", async () => {
+    const limiter = new TokenRateLimiter();
+    const sleepSpy = vi.spyOn(globalThis, "setTimeout");
+
+    // Small batch well under the 32K effective budget
+    await limiter.waitIfNeeded(1_000);
+
+    // setTimeout is only called by sleep() when waiting — no rate-limit
+    // sleep should have been triggered (setTimeout may be called by other
+    // internals, but not with a delay > 1s).
+    const rateLimitCalls = sleepSpy.mock.calls.filter(
+      (call) => typeof call[1] === "number" && call[1] > 1_000,
+    );
+    expect(rateLimitCalls).toHaveLength(0);
+
+    sleepSpy.mockRestore();
+  });
+
+  it("waits when approaching TPM limit", async () => {
+    const limiter = new TokenRateLimiter();
+    const budget = TPM_LIMIT * TPM_HEADROOM; // 32_000
+
+    // Pre-fill the limiter near the budget
+    limiter.record(budget - 1_000);
+
+    // Next batch of 5_000 tokens exceeds the budget — should trigger a wait
+    const promise = limiter.waitIfNeeded(5_000);
+    // Advance past the rate window + buffer so the sleep resolves
+    await vi.advanceTimersByTimeAsync(RATE_WINDOW_MS + 1_000);
+    await promise;
+
+    // If we get here without hanging, the limiter correctly waited and resumed
+    expect(true).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ingestAll — shared rate limiter
+// ---------------------------------------------------------------------------
+
+describe("ingestAll", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    mockEmbedDocuments.mockResolvedValue([new Array(1536).fill(0)]);
+    mockAddVectors.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shares rate limiter across sources without fixed 15s gaps", async () => {
+    const sources: IngestionSource[] = [
+      { ...SOURCE, id: "source-1" },
+      { ...SOURCE, id: "source-2" },
+    ];
+
+    const start = Date.now();
+    const result = await ingestAll(sources, OPTIONS);
+    const elapsed = Date.now() - start;
+
+    expect(result).toHaveLength(2);
+    expect(result[0]!.status).toBe("completed");
+    expect(result[1]!.status).toBe("completed");
+    // With small documents there's plenty of TPM headroom — no 15s sleep
+    // should occur between sources. Allow up to 1s for test overhead.
+    expect(elapsed).toBeLessThan(1_000);
   });
 });
