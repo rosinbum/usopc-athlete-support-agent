@@ -5,17 +5,34 @@ import type { AccessRequest } from "@usopc/shared";
 
 const log = logger.child({ module: "access-request-notification" });
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function stripCrlf(str: string): string {
+  return str.replace(/[\r\n]/g, "");
+}
+
 function buildNotificationHtml(req: AccessRequest): string {
+  const name = escapeHtml(req.name);
+  const email = escapeHtml(req.email);
   const sportLine = req.sport
-    ? `<p><strong>Sport:</strong> ${req.sport}</p>`
+    ? `<p><strong>Sport:</strong> ${escapeHtml(req.sport)}</p>`
     : "";
-  const roleLine = req.role ? `<p><strong>Role:</strong> ${req.role}</p>` : "";
+  const roleLine = req.role
+    ? `<p><strong>Role:</strong> ${escapeHtml(req.role)}</p>`
+    : "";
 
   return `
 <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
   <h2 style="color: #002244;">New Access Request</h2>
-  <p><strong>Name:</strong> ${req.name}</p>
-  <p><strong>Email:</strong> ${req.email}</p>
+  <p><strong>Name:</strong> ${name}</p>
+  <p><strong>Email:</strong> ${email}</p>
   ${sportLine}
   ${roleLine}
   <p><strong>Requested:</strong> ${req.requestedAt}</p>
@@ -46,7 +63,7 @@ export async function sendAccessRequestNotification(
     await resend.emails.send({
       from: fromAddress,
       to: adminEmail,
-      subject: `Access Request: ${req.name} (${req.email})`,
+      subject: `Access Request: ${stripCrlf(req.name)} (${stripCrlf(req.email)})`,
       html: buildNotificationHtml(req),
     });
     return true;
