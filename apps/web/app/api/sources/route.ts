@@ -26,6 +26,12 @@ interface StatsRow {
   last_ingested_at: Date | null;
 }
 
+interface StatsResponse {
+  totalDocuments: number;
+  totalOrganizations: number;
+  lastIngestedAt: string | null;
+}
+
 const COL = {
   source_url: "COALESCE(source_url, metadata->>'sourceUrl')",
   document_title: "COALESCE(document_title, metadata->>'documentTitle')",
@@ -34,6 +40,24 @@ const COL = {
   topic_domain: "COALESCE(topic_domain, metadata->>'topicDomain')",
   authority_level: "COALESCE(authority_level, metadata->>'authorityLevel')",
 } as const;
+
+const GROUP_BY_COLS = [
+  COL.source_url,
+  COL.document_title,
+  COL.document_type,
+  COL.ngb_id,
+  COL.topic_domain,
+  COL.authority_level,
+  "metadata->>'effectiveDate'",
+].join(", ");
+
+// ---------------------------------------------------------------------------
+// Stats cache — avoids full table scan on every call (30s TTL).
+// Per-instance in serverless; each Lambda container maintains its own cache.
+// ---------------------------------------------------------------------------
+
+const STATS_TTL_MS = 30_000;
+let statsCache: { data: StatsResponse; expires: number } | null = null;
 
 /**
  * Escapes PostgreSQL ILIKE wildcard characters (%, _, \) in user-supplied input
@@ -64,6 +88,10 @@ export async function GET(request: Request) {
 }
 
 async function handleStats() {
+  if (statsCache && Date.now() < statsCache.expires) {
+    return NextResponse.json(statsCache.data);
+  }
+
   const db = getPool();
 
   const result = await db.query<StatsRow>(`
@@ -76,11 +104,15 @@ async function handleStats() {
 
   const row = result.rows[0];
 
-  return NextResponse.json({
+  const data = {
     totalDocuments: parseInt(row?.total_documents ?? "0", 10),
     totalOrganizations: parseInt(row?.total_organizations ?? "0", 10),
     lastIngestedAt: row?.last_ingested_at?.toISOString() ?? null,
-  });
+  };
+
+  statsCache = { data, expires: Date.now() + STATS_TTL_MS };
+
+  return NextResponse.json(data);
 }
 
 async function handleList(url: URL) {
@@ -134,45 +166,44 @@ async function handleList(url: URL) {
   const whereClause =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  // Count total grouped rows (must match GROUP BY in data query)
-  const countResult = await db.query<CountRow>(
-    `SELECT COUNT(*) as total FROM (
-      SELECT 1 FROM document_chunks ${whereClause}
+  const offset = (page - 1) * limit;
+
+  // Run count and data queries in parallel — they share the same WHERE/GROUP BY
+  const [countResult, dataResult] = await Promise.all([
+    db.query<CountRow>(
+      `SELECT COUNT(*) as total FROM (
+        SELECT 1 FROM document_chunks ${whereClause}
+        GROUP BY ${GROUP_BY_COLS}
+      ) sub`,
+      values,
+    ),
+    db.query<DocumentRow>(
+      `
+      SELECT
+        ${COL.source_url} as source_url,
+        ${COL.document_title} as document_title,
+        ${COL.document_type} as document_type,
+        ${COL.ngb_id} as ngb_id,
+        ${COL.topic_domain} as topic_domain,
+        ${COL.authority_level} as authority_level,
+        metadata->>'effectiveDate' as effective_date,
+        MIN(ingested_at) as ingested_at,
+        COUNT(*) as chunk_count,
+        MAX(metadata->>'s3Key') as s3_key
+      FROM document_chunks
+      ${whereClause}
       GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
                ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level},
                metadata->>'effectiveDate'
-    ) sub`,
-    values,
-  );
+      ORDER BY ingested_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `,
+      [...values, limit, offset],
+    ),
+  ]);
 
   const total = parseInt(countResult.rows[0]?.total ?? "0", 10);
-  const offset = (page - 1) * limit;
   const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
-
-  // Fetch documents
-  const dataResult = await db.query<DocumentRow>(
-    `
-    SELECT
-      ${COL.source_url} as source_url,
-      ${COL.document_title} as document_title,
-      ${COL.document_type} as document_type,
-      ${COL.ngb_id} as ngb_id,
-      ${COL.topic_domain} as topic_domain,
-      ${COL.authority_level} as authority_level,
-      metadata->>'effectiveDate' as effective_date,
-      MIN(ingested_at) as ingested_at,
-      COUNT(*) as chunk_count,
-      MAX(metadata->>'s3Key') as s3_key
-    FROM document_chunks
-    ${whereClause}
-    GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
-             ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level},
-             metadata->>'effectiveDate'
-    ORDER BY ingested_at DESC
-    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `,
-    [...values, limit, offset],
-  );
 
   // Strip internal fields (s3Key, ngbId, chunkCount) from unauthenticated response
   const documents = dataResult.rows.map((row) => ({
