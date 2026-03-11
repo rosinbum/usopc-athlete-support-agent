@@ -30,6 +30,8 @@ export default $config({
     const adminEmails = new sst.Secret("AdminEmails");
     // Email magic-link auth via Resend
     const resendApiKey = new sst.Secret("ResendApiKey");
+    // Voyage AI (embedding benchmark)
+    const voyageaiKey = new sst.Secret("VoyageaiApiKey");
     // Optional config with default value
     const conversationMaxTurns = new sst.Secret("ConversationMaxTurns", "5");
 
@@ -50,6 +52,7 @@ export default $config({
       googleKey,
       tavilyKey,
       langchainKey,
+      voyageaiKey,
       databaseUrlSecret,
     ];
 

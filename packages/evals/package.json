@@ -25,6 +25,7 @@
     "quality:seed": "sst shell -- tsx src/scripts/seed-quality-review.ts",
     "quality:run": "sst shell -- tsx src/scripts/run-quality-review.ts",
     "quality:triage": "tsx src/scripts/triage.ts",
+    "benchmark:embeddings": "sst shell -- tsx src/scripts/benchmark-embeddings.ts",
     "corpus:generate": "tsx src/scripts/generate-test-corpus.ts",
     "clean": "rm -rf dist"
   },
