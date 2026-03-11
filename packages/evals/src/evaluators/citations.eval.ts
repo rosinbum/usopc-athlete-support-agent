@@ -5,7 +5,7 @@ import { fetchExamples } from "../helpers/fetchExamples.js";
 
 const examples = await fetchExamples(DATASET_NAMES.answerQuality);
 
-ls.describe("usopc-citations", () => {
+ls.describe(DATASET_NAMES.answerQuality, () => {
   ls.test.each(examples)("citation accuracy", async ({ inputs }) => {
     const message = String(inputs.message ?? "");
     const result = await runPipeline(message);

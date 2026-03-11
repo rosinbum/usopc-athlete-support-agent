@@ -13,7 +13,7 @@ const correctnessJudge = createLLMAsJudge({
 
 const examples = await fetchExamples(DATASET_NAMES.answerQuality);
 
-ls.describe("usopc-correctness", () => {
+ls.describe(DATASET_NAMES.answerQuality, () => {
   ls.test.each(examples)(
     "answer correctness",
     async ({ inputs, referenceOutputs }) => {

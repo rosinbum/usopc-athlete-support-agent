@@ -13,7 +13,7 @@ const DOMAIN_REQUIRED_STRINGS: Partial<Record<TopicDomain, string[]>> = {
 
 const examples = await fetchExamples(DATASET_NAMES.answerQuality);
 
-ls.describe("usopc-disclaimers", () => {
+ls.describe(DATASET_NAMES.answerQuality, () => {
   ls.test.each(examples)("disclaimer compliance", async ({ inputs }) => {
     const message = String(inputs.message ?? "");
     const result = await runPipeline(message);

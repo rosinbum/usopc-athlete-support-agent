@@ -13,7 +13,7 @@ const groundednessJudge = createLLMAsJudge({
 
 const examples = await fetchExamples(DATASET_NAMES.answerQuality);
 
-ls.describe("usopc-groundedness", () => {
+ls.describe(DATASET_NAMES.answerQuality, () => {
   ls.test.each(examples)("answer groundedness", async ({ inputs }) => {
     const message = String(inputs.message ?? "");
     const result = await runPipelineForAnswerEval(message);
