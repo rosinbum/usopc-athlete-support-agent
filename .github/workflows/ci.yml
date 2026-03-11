@@ -31,53 +31,113 @@ jobs:
       - run: pnpm --filter @usopc/slack test -- --coverage
       - run: pnpm --filter @usopc/web test -- --coverage
 
-      - name: Coverage — core
-        if: always()
-        uses: davelosert/vitest-coverage-report-action@2500dafcee7dd64f85ab689c0b83798a8359770e # v2.9.3
+      - name: Download coverage baseline
+        uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
+        continue-on-error: true
         with:
-          name: core
-          working-directory: packages/core
-          comment-on: pr
+          workflow: coverage-baseline.yml
+          branch: main
+          name: coverage-baseline
+          path: baseline
+          if_no_artifact_found: warn
 
-      - name: Coverage — shared
+      - name: Update PR with coverage summary
         if: always()
-        uses: davelosert/vitest-coverage-report-action@2500dafcee7dd64f85ab689c0b83798a8359770e # v2.9.3
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
-          name: shared
-          working-directory: packages/shared
-          comment-on: pr
+          script: |
+            const fs = require('fs');
+            const packages = [
+              { name: 'core', path: 'packages/core/coverage/coverage-summary.json' },
+              { name: 'shared', path: 'packages/shared/coverage/coverage-summary.json' },
+              { name: 'ingestion', path: 'packages/ingestion/coverage/coverage-summary.json' },
+              { name: 'evals', path: 'packages/evals/coverage/coverage-summary.json' },
+              { name: 'slack', path: 'apps/slack/coverage/coverage-summary.json' },
+              { name: 'web', path: 'apps/web/coverage/coverage-summary.json' },
+            ];
 
-      - name: Coverage — ingestion
-        if: always()
-        uses: davelosert/vitest-coverage-report-action@2500dafcee7dd64f85ab689c0b83798a8359770e # v2.9.3
-        with:
-          name: ingestion
-          working-directory: packages/ingestion
-          comment-on: pr
+            // Load current coverage
+            const current = {};
+            for (const pkg of packages) {
+              if (fs.existsSync(pkg.path)) {
+                const summary = JSON.parse(fs.readFileSync(pkg.path, 'utf8'));
+                current[pkg.name] = summary.total.lines.pct;
+              }
+            }
 
-      - name: Coverage — evals
-        if: always()
-        uses: davelosert/vitest-coverage-report-action@2500dafcee7dd64f85ab689c0b83798a8359770e # v2.9.3
-        with:
-          name: evals
-          working-directory: packages/evals
-          comment-on: pr
+            // Load baseline (if available)
+            let baseline = null;
+            const baselinePath = 'baseline/coverage-baseline.json';
+            if (fs.existsSync(baselinePath)) {
+              baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+            }
 
-      - name: Coverage — slack
-        if: always()
-        uses: davelosert/vitest-coverage-report-action@2500dafcee7dd64f85ab689c0b83798a8359770e # v2.9.3
-        with:
-          name: slack
-          working-directory: apps/slack
-          comment-on: pr
+            // Build table rows
+            const regressions = [];
+            let rows = '';
+            for (const name of Object.keys(current)) {
+              const pct = current[name];
+              let deltaCell = '—';
+              if (baseline && baseline[name] != null) {
+                const diff = pct - baseline[name].lines;
+                const sign = diff >= 0 ? '+' : '';
+                const warn = diff < -1 ? ' ⚠️' : '';
+                deltaCell = `${sign}${diff.toFixed(1)}%${warn}`;
+                if (diff < -1) {
+                  regressions.push({ name, from: baseline[name].lines, to: pct, diff });
+                }
+              }
+              rows += `| ${name} | ${pct.toFixed(1)}% | ${deltaCell} |\n`;
+            }
 
-      - name: Coverage — web
-        if: always()
-        uses: davelosert/vitest-coverage-report-action@2500dafcee7dd64f85ab689c0b83798a8359770e # v2.9.3
-        with:
-          name: web
-          working-directory: apps/web
-          comment-on: pr
+            const table = [
+              '---',
+              '### Test Coverage',
+              '',
+              '| Package | Coverage | Delta |',
+              '|---------|----------|-------|',
+              rows.trimEnd(),
+            ].join('\n');
+
+            const START = '<!-- coverage-summary-start -->';
+            const END = '<!-- coverage-summary-end -->';
+            const section = `${START}\n${table}\n${END}`;
+
+            // Update PR description
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            let body = pr.body || '';
+            const startIdx = body.indexOf(START);
+            const endIdx = body.indexOf(END);
+            if (startIdx !== -1 && endIdx !== -1) {
+              body = body.slice(0, startIdx) + section + body.slice(endIdx + END.length);
+            } else {
+              body = body + '\n\n' + section;
+            }
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              body,
+            });
+
+            // Post a single comment only if coverage regressed >1%
+            if (regressions.length > 0) {
+              const lines = regressions.map(
+                r => `- **${r.name}**: ${r.from.toFixed(1)}% → ${r.to.toFixed(1)}% (${r.diff.toFixed(1)}%)`
+              );
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `⚠️ **Coverage regression detected**\n\n${lines.join('\n')}`,
+              });
+            }
 
   typecheck:
     name: Typecheck

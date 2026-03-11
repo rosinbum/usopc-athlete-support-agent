@@ -1,0 +1,57 @@
+name: Coverage Baseline
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: Upload coverage baseline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @usopc/core test -- --coverage
+      - run: pnpm --filter @usopc/shared test -- --coverage
+      - run: pnpm --filter @usopc/ingestion test -- --coverage
+      - run: pnpm --filter @usopc/evals test -- --coverage
+      - run: pnpm --filter @usopc/slack test -- --coverage
+      - run: pnpm --filter @usopc/web test -- --coverage
+
+      - name: Build coverage baseline
+        run: |
+          node -e "
+          const fs = require('fs');
+          const packages = [
+            { name: 'core', path: 'packages/core/coverage/coverage-summary.json' },
+            { name: 'shared', path: 'packages/shared/coverage/coverage-summary.json' },
+            { name: 'ingestion', path: 'packages/ingestion/coverage/coverage-summary.json' },
+            { name: 'evals', path: 'packages/evals/coverage/coverage-summary.json' },
+            { name: 'slack', path: 'apps/slack/coverage/coverage-summary.json' },
+            { name: 'web', path: 'apps/web/coverage/coverage-summary.json' },
+          ];
+          const baseline = {};
+          for (const pkg of packages) {
+            if (fs.existsSync(pkg.path)) {
+              const summary = JSON.parse(fs.readFileSync(pkg.path, 'utf8'));
+              baseline[pkg.name] = { lines: summary.total.lines.pct };
+            }
+          }
+          fs.writeFileSync('coverage-baseline.json', JSON.stringify(baseline, null, 2));
+          console.log('Baseline:', JSON.stringify(baseline, null, 2));
+          "
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-baseline
+          path: coverage-baseline.json
+          retention-days: 90
