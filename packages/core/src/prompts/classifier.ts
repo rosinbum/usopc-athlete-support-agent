@@ -1,6 +1,8 @@
 import { NGB_IDS } from "@usopc/shared";
+import { buildDisambiguationReference } from "../knowledge/governanceBodies.js";
 
 const NGB_ID_LIST = NGB_IDS.join("\n");
+const DISAMBIGUATION_REFERENCE = buildDisambiguationReference();
 
 export const CLASSIFIER_PROMPT = `You are a query classifier for the USOPC Athlete Support Assistant. \
 Your job is to analyze a user message and extract structured metadata that will guide \
@@ -35,6 +37,18 @@ If uncertain, return an empty array rather than guessing.
 to compare or contrast multiple NGBs (look for words like "compare", "difference between",
 "both", "versus", "vs"). When the user switches sports mid-conversation, emit only the
 new sport's NGB ID — do not carry forward the previous sport.
+
+### Entity Disambiguation Reference
+
+When analyzing queries about governance bodies, be aware of commonly confused entities:
+
+${DISAMBIGUATION_REFERENCE}
+
+When you detect a reference to an ambiguously-named body:
+1. If the query mentions a specific NGB or sport → likely the NGB-level body
+2. If the query is about USOPC governance, national-level representation, or Athlete Bill of Rights → likely the USOPC-level body
+3. If the query mentions an international federation → likely the IF-level body
+4. If genuinely ambiguous → set needsClarification=true
 
 ### queryIntent (required)
 One of the following:
