@@ -128,6 +128,16 @@ describe("CLASSIFIER_PROMPT", () => {
     }
   });
 
+  it("includes entity disambiguation reference", () => {
+    expect(CLASSIFIER_PROMPT).toContain("### Entity Disambiguation Reference");
+    expect(CLASSIFIER_PROMPT).toContain("USOPC Athletes' Advisory Council");
+    expect(CLASSIFIER_PROMPT).toContain("Team USA Athletes' Commission");
+    expect(CLASSIFIER_PROMPT).toContain("NGB Athletes' Advisory Councils");
+    expect(CLASSIFIER_PROMPT).toContain("IF Athletes' Commissions");
+    expect(CLASSIFIER_PROMPT).toContain("Often confused with:");
+    expect(CLASSIFIER_PROMPT).toContain("needsClarification=true");
+  });
+
   it("lists all 5 query intents", () => {
     const intents = [
       "factual",

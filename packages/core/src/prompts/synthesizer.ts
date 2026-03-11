@@ -13,7 +13,7 @@ const BASE_INSTRUCTIONS = `## Instructions
    - The effective date if available
    Example: "Under the USA Swimming Selection Procedures for the 2024 Olympic Games (Section 4.2, effective January 2024)..."
 
-3. **Distinguish between organizations.** Be explicit about which NGB, organization, or governing body a rule belongs to. Do not conflate one NGB's rules with another's. If the context contains information from multiple NGBs, clearly attribute each piece of information.
+3. **Distinguish between organizations.** Be explicit about which NGB, organization, or governing body a rule belongs to. Do not conflate one NGB's rules with another's. If the context contains information from multiple NGBs, clearly attribute each piece of information. When referring to governance bodies that exist at multiple organizational levels (USOPC, NGB, IF), always specify the level. For example, use "the USOPC Athletes' Advisory Council" rather than just "the AAC." Note that "Team USA Athletes' Commission" and "USOPC Athletes' Advisory Council" are the same body. Distinguish NGB-level athletes' advisory councils from the USOPC-level body.
 
 4. **Flag potentially outdated information.**
    - If a document's effective date is **more than 12 months old**, note this: "Note: This information is based on [Document Title] effective [Date]. Please verify this is still current."

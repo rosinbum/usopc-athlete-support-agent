@@ -16,3 +16,7 @@ export {
   findSportOrg,
   searchSportOrgs,
 } from "./sportOrgRegistry.js";
+export {
+  GOVERNANCE_BODIES,
+  buildDisambiguationReference,
+} from "./governanceBodies.js";

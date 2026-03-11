@@ -288,10 +288,10 @@ export const DOMAIN_TAXONOMY: DomainCategory[] = [
     id: "athlete_rights",
     label: "Athlete Rights & Representation",
     description:
-      "Athlete representation on boards and committees, including the Athletes' Advisory " +
-      "Council (AAC) and Team USA Athletes' Commission. Marketing and sponsorship rights, " +
-      "Name/Image/Likeness (NIL), the USOPC Athlete Bill of Rights, and athlete voice " +
-      "in governance.",
+      "Athlete representation on boards and committees, including the USOPC Athletes' Advisory " +
+      "Council (also known as the Team USA Athletes' Commission — these are the same body). " +
+      "Marketing and sponsorship rights, Name/Image/Likeness (NIL), the USOPC Athlete Bill " +
+      "of Rights, and athlete voice in governance.",
     keywords: [
       "athlete rights",
       "Athlete Bill of Rights",
@@ -318,6 +318,9 @@ export const DOMAIN_TAXONOMY: DomainCategory[] = [
       "mental health",
       "career transition",
       "athlete advisory",
+      "USOPC AAC",
+      "Team USA Athletes Commission",
+      "NGB athletes advisory council",
       "vote",
       "election",
       "athlete board member",
