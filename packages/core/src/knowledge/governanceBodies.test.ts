@@ -51,40 +51,36 @@ describe("GOVERNANCE_BODIES", () => {
 });
 
 describe("buildDisambiguationReference", () => {
+  const reference = buildDisambiguationReference();
+
   it("returns a non-empty string", () => {
-    const result = buildDisambiguationReference();
-    expect(result.length).toBeGreaterThan(0);
+    expect(reference.length).toBeGreaterThan(0);
   });
 
   it("includes canonical names", () => {
-    const result = buildDisambiguationReference();
-    expect(result).toContain("USOPC Athletes' Advisory Council");
-    expect(result).toContain("NGB Athletes' Advisory Councils");
-    expect(result).toContain("IF Athletes' Commissions");
-    expect(result).toContain("Athlete Ombuds");
-    expect(result).toContain("U.S. Center for SafeSport");
+    expect(reference).toContain("USOPC Athletes' Advisory Council");
+    expect(reference).toContain("NGB Athletes' Advisory Councils");
+    expect(reference).toContain("IF Athletes' Commissions");
+    expect(reference).toContain("Athlete Ombuds");
+    expect(reference).toContain("U.S. Center for SafeSport");
   });
 
   it("includes alias information", () => {
-    const result = buildDisambiguationReference();
-    expect(result).toContain("Team USA Athletes' Commission");
-    expect(result).toContain("Also known as:");
+    expect(reference).toContain("Team USA Athletes' Commission");
+    expect(reference).toContain("Also known as:");
   });
 
   it("includes disambiguation notes", () => {
-    const result = buildDisambiguationReference();
-    expect(result).toContain("same body");
+    expect(reference).toContain("same body");
   });
 
   it("includes confusability warnings", () => {
-    const result = buildDisambiguationReference();
-    expect(result).toContain("Often confused with:");
+    expect(reference).toContain("Often confused with:");
   });
 
   it("includes org level labels", () => {
-    const result = buildDisambiguationReference();
-    expect(result).toContain("USOPC level");
-    expect(result).toContain("NGB level");
-    expect(result).toContain("IF level");
+    expect(reference).toContain("USOPC level");
+    expect(reference).toContain("NGB level");
+    expect(reference).toContain("IF level");
   });
 });
