@@ -22,7 +22,7 @@ resolveEnv();
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { OpenAIEmbeddings } from "@langchain/openai";
+import { createRawEmbeddings } from "@usopc/core";
 import { getPool, closePool } from "@usopc/shared";
 import { retrievalExamples } from "../datasets/retrieval.js";
 
@@ -32,11 +32,10 @@ import { retrievalExamples } from "../datasets/retrieval.js";
 
 const VOYAGE_MODEL = "voyage-law-2";
 const VOYAGE_DIMS = 1024;
-const OPENAI_MODEL = "text-embedding-3-small";
-const OPENAI_DIMS = 1536;
 const SAMPLE_SIZE = 500;
 const VOYAGE_BATCH_SIZE = 64; // Voyage API max batch size
-const TOP_K_VALUES = [5, 10] as const;
+const K_SMALL = 5;
+const K_LARGE = 10;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,41 +68,43 @@ interface ModelResult {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function computeRecall(
+function evaluateRecall(
   retrievedTexts: string[],
   expectedKeywords: string[],
   k: number,
-): number {
+): { recall: number; keywordsFound: string[] } {
   const topTexts = retrievedTexts.slice(0, k).join(" ").toLowerCase();
-  let hits = 0;
-  for (const kw of expectedKeywords) {
-    if (topTexts.includes(kw.toLowerCase())) {
-      hits++;
-    }
-  }
-  return expectedKeywords.length > 0 ? hits / expectedKeywords.length : 0;
+  const keywordsFound = expectedKeywords.filter((kw) =>
+    topTexts.includes(kw.toLowerCase()),
+  );
+  return {
+    recall:
+      expectedKeywords.length > 0
+        ? keywordsFound.length / expectedKeywords.length
+        : 0,
+    keywordsFound,
+  };
 }
 
-function extractKeywordsFound(
-  retrievedTexts: string[],
+function buildModelResult(
+  texts: string[],
   expectedKeywords: string[],
-  k: number,
-): string[] {
-  const topTexts = retrievedTexts.slice(0, k).join(" ").toLowerCase();
-  return expectedKeywords.filter((kw) => topTexts.includes(kw.toLowerCase()));
+  latencyMs: number,
+): ModelResult {
+  const r5 = evaluateRecall(texts, expectedKeywords, K_SMALL);
+  const r10 = evaluateRecall(texts, expectedKeywords, K_LARGE);
+  return {
+    recall5: r5.recall,
+    recall10: r10.recall,
+    latencyMs,
+    top5Keywords: r5.keywordsFound,
+    top10Keywords: r10.keywordsFound,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Embedding clients
+// Voyage AI client (direct REST — no SDK needed)
 // ---------------------------------------------------------------------------
-
-function createOpenAIEmbeddings(): OpenAIEmbeddings {
-  return new OpenAIEmbeddings({
-    openAIApiKey: process.env.OPENAI_API_KEY,
-    modelName: OPENAI_MODEL,
-    dimensions: OPENAI_DIMS,
-  });
-}
 
 interface VoyageEmbedResponse {
   data: { embedding: number[]; index: number }[];
@@ -176,7 +177,6 @@ async function sampleChunks(
     `  Sampling ${SAMPLE_SIZE} diverse chunks from document_chunks...`,
   );
 
-  // Sample across topic domains for diversity
   const { rows } = await pool.query<ChunkRow>(
     `SELECT id, content, metadata
      FROM document_chunks
@@ -220,8 +220,7 @@ async function insertVoyageChunks(
   chunks: ChunkRow[],
   embeddings: number[][],
 ): Promise<void> {
-  // Insert in batches of 50
-  const batchSize = 50;
+  const batchSize = 250;
   for (let i = 0; i < chunks.length; i += batchSize) {
     const batchChunks = chunks.slice(i, i + batchSize);
     const batchEmbeddings = embeddings.slice(i, i + batchSize);
@@ -265,20 +264,17 @@ async function dropVoyageTable(
 
 async function vectorSearchOpenAI(
   pool: ReturnType<typeof getPool>,
-  openai: OpenAIEmbeddings,
-  query: string,
+  openaiEmbStr: string,
   topK: number,
 ): Promise<{ texts: string[]; latencyMs: number }> {
   const start = performance.now();
-  const embeddings = await openai.embedDocuments([query]);
-  const embStr = `[${embeddings[0]!.join(",")}]`;
 
   const { rows } = await pool.query<{ content: string }>(
     `SELECT content
      FROM document_chunks
      ORDER BY embedding <=> $1::vector
      LIMIT $2`,
-    [embStr, topK],
+    [openaiEmbStr, topK],
   );
 
   return {
@@ -317,13 +313,11 @@ async function vectorSearchVoyage(
 
 async function hybridSearchOpenAI(
   pool: ReturnType<typeof getPool>,
-  openai: OpenAIEmbeddings,
+  openaiEmbStr: string,
   query: string,
   topK: number,
 ): Promise<{ texts: string[]; latencyMs: number }> {
   const start = performance.now();
-  const embeddings = await openai.embedDocuments([query]);
-  const embStr = `[${embeddings[0]!.join(",")}]`;
 
   // RRF fusion of vector + BM25 (same approach as the production retriever)
   const { rows } = await pool.query<{ content: string }>(
@@ -351,7 +345,7 @@ async function hybridSearchOpenAI(
        LIMIT $3
      )
      SELECT content FROM fused`,
-    [embStr, query, topK],
+    [openaiEmbStr, query, topK],
   );
 
   return {
@@ -368,7 +362,7 @@ async function main(): Promise<void> {
   console.log("═══════════════════════════════════════════════════════════");
   console.log("  Embedding Model Benchmark");
   console.log(
-    `  OpenAI ${OPENAI_MODEL} (${OPENAI_DIMS}d) vs Voyage AI ${VOYAGE_MODEL} (${VOYAGE_DIMS}d)`,
+    `  OpenAI text-embedding-3-small (1536d) vs Voyage AI ${VOYAGE_MODEL} (${VOYAGE_DIMS}d)`,
   );
   console.log("═══════════════════════════════════════════════════════════\n");
 
@@ -379,7 +373,7 @@ async function main(): Promise<void> {
   }
 
   const pool = getPool();
-  const openai = createOpenAIEmbeddings();
+  const openai = createRawEmbeddings();
   const voyageApiKey = getVoyageApiKey();
 
   try {
@@ -414,7 +408,7 @@ async function main(): Promise<void> {
     );
 
     const results: TestResult[] = [];
-    const maxTopK = Math.max(...TOP_K_VALUES);
+    const maxTopK = K_LARGE;
 
     for (let i = 0; i < retrievalExamples.length; i++) {
       const example = retrievalExamples[i]!;
@@ -425,75 +419,36 @@ async function main(): Promise<void> {
         `  [${i + 1}/${retrievalExamples.length}] ${message.slice(0, 60)}...`,
       );
 
-      // Run all three search types
-      const openaiResult = await vectorSearchOpenAI(
-        pool,
-        openai,
-        message,
-        maxTopK,
-      );
-      const voyageResult = await vectorSearchVoyage(
-        pool,
-        voyageApiKey,
-        message,
-        maxTopK,
-      );
-      const hybridResult = await hybridSearchOpenAI(
-        pool,
-        openai,
-        message,
-        maxTopK,
-      );
+      // Embed with OpenAI once (used by both vector and hybrid search)
+      const openaiVec = await openai.embedQuery(message);
+      const openaiEmbStr = `[${openaiVec.join(",")}]`;
+
+      // Run all three searches in parallel
+      const [openaiResult, voyageResult, hybridResult] = await Promise.all([
+        vectorSearchOpenAI(pool, openaiEmbStr, maxTopK),
+        vectorSearchVoyage(pool, voyageApiKey, message, maxTopK),
+        hybridSearchOpenAI(pool, openaiEmbStr, message, maxTopK),
+      ]);
 
       results.push({
         query: message,
         topicDomain,
         expectedKeywords,
-        openai: {
-          recall5: computeRecall(openaiResult.texts, expectedKeywords, 5),
-          recall10: computeRecall(openaiResult.texts, expectedKeywords, 10),
-          latencyMs: openaiResult.latencyMs,
-          top5Keywords: extractKeywordsFound(
-            openaiResult.texts,
-            expectedKeywords,
-            5,
-          ),
-          top10Keywords: extractKeywordsFound(
-            openaiResult.texts,
-            expectedKeywords,
-            10,
-          ),
-        },
-        voyage: {
-          recall5: computeRecall(voyageResult.texts, expectedKeywords, 5),
-          recall10: computeRecall(voyageResult.texts, expectedKeywords, 10),
-          latencyMs: voyageResult.latencyMs,
-          top5Keywords: extractKeywordsFound(
-            voyageResult.texts,
-            expectedKeywords,
-            5,
-          ),
-          top10Keywords: extractKeywordsFound(
-            voyageResult.texts,
-            expectedKeywords,
-            10,
-          ),
-        },
-        openaiHybrid: {
-          recall5: computeRecall(hybridResult.texts, expectedKeywords, 5),
-          recall10: computeRecall(hybridResult.texts, expectedKeywords, 10),
-          latencyMs: hybridResult.latencyMs,
-          top5Keywords: extractKeywordsFound(
-            hybridResult.texts,
-            expectedKeywords,
-            5,
-          ),
-          top10Keywords: extractKeywordsFound(
-            hybridResult.texts,
-            expectedKeywords,
-            10,
-          ),
-        },
+        openai: buildModelResult(
+          openaiResult.texts,
+          expectedKeywords,
+          openaiResult.latencyMs,
+        ),
+        voyage: buildModelResult(
+          voyageResult.texts,
+          expectedKeywords,
+          voyageResult.latencyMs,
+        ),
+        openaiHybrid: buildModelResult(
+          hybridResult.texts,
+          expectedKeywords,
+          hybridResult.latencyMs,
+        ),
       });
 
       console.log(" done");
@@ -574,8 +529,8 @@ async function main(): Promise<void> {
     const output = {
       timestamp: new Date().toISOString(),
       config: {
-        openaiModel: OPENAI_MODEL,
-        openaiDims: OPENAI_DIMS,
+        openaiModel: "text-embedding-3-small",
+        openaiDims: 1536,
         voyageModel: VOYAGE_MODEL,
         voyageDims: VOYAGE_DIMS,
         sampleSize: chunks.length,
