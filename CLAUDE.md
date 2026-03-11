@@ -120,6 +120,7 @@ pnpm --filter @usopc/ingestion discovery:run  # Run source discovery pipeline
 pnpm --filter @usopc/evals eval       # Run LangSmith evaluations
 pnpm --filter @usopc/evals quality:seed      # Seed quality review dataset to LangSmith
 pnpm --filter @usopc/evals quality:run       # Run quality review scenarios
+pnpm --filter @usopc/evals benchmark:embeddings  # Compare OpenAI vs Voyage AI embeddings
 ```
 
 ### Key Conventions

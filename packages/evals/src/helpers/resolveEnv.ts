@@ -75,6 +75,19 @@ export function resolveEnv(): void {
     }
   }
 
+  // VOYAGEAI_API_KEY — used by Voyage AI embeddings (benchmark)
+  if (!process.env.VOYAGEAI_API_KEY) {
+    try {
+      process.env.VOYAGEAI_API_KEY = getOptionalSecretValue(
+        "VOYAGEAI_API_KEY",
+        "VoyageaiApiKey",
+        "",
+      );
+    } catch {
+      // Optional — only needed for embedding benchmark
+    }
+  }
+
   // LANGCHAIN_API_KEY — used by LangSmith client
   if (!process.env.LANGCHAIN_API_KEY) {
     try {

@@ -95,3 +95,11 @@ pnpm --filter @usopc/evals seed-langsmith              # Seed LangSmith datasets
 pnpm --filter @usopc/evals quality:seed                # Seed quality review dataset to LangSmith
 pnpm --filter @usopc/evals quality:run                 # Run quality review scenarios
 ```
+
+## Benchmarks (@usopc/evals)
+
+```bash
+pnpm --filter @usopc/evals benchmark:embeddings        # Compare OpenAI vs Voyage AI embeddings
+```
+
+Requires `sst secret set VoyageaiApiKey <key>`. Results are written to `packages/evals/output/embedding-benchmark-results.json`.
