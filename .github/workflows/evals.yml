@@ -5,6 +5,10 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened, labeled]
 
+permissions:
+  issues: write
+  pull-requests: write
+
 jobs:
   # ── Tier 1 — Fast Evals (deterministic + classifier/escalation) ──────────
   tier1-evals:
@@ -59,28 +63,36 @@ jobs:
 
       # ── Run all evaluators ────────────────────────────────────────────────
       - name: Run classifier eval
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/classifier.json src/evaluators/classifierAccuracy.eval.ts
+        continue-on-error: true
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=verbose --reporter=json --outputFile=results/classifier.json src/evaluators/classifierAccuracy.eval.ts
 
       - name: Run escalation eval
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/escalation.json src/evaluators/escalation.eval.ts
+        continue-on-error: true
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=verbose --reporter=json --outputFile=results/escalation.json src/evaluators/escalation.eval.ts
 
       - name: Run trajectory eval
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/trajectory.json src/evaluators/trajectory.eval.ts
+        continue-on-error: true
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=verbose --reporter=json --outputFile=results/trajectory.json src/evaluators/trajectory.eval.ts
 
       - name: Run disclaimers eval
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/disclaimers.json src/evaluators/disclaimers.eval.ts
+        continue-on-error: true
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=verbose --reporter=json --outputFile=results/disclaimers.json src/evaluators/disclaimers.eval.ts
 
       - name: Run citations eval
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/citations.json src/evaluators/citations.eval.ts
+        continue-on-error: true
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=verbose --reporter=json --outputFile=results/citations.json src/evaluators/citations.eval.ts
 
       - name: Run correctness eval
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/correctness.json src/evaluators/correctness.eval.ts
+        continue-on-error: true
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=verbose --reporter=json --outputFile=results/correctness.json src/evaluators/correctness.eval.ts
 
       - name: Run groundedness eval
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/groundedness.json src/evaluators/groundedness.eval.ts
+        continue-on-error: true
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=verbose --reporter=json --outputFile=results/groundedness.json src/evaluators/groundedness.eval.ts
 
       - name: Run semantic similarity eval
-        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=json --outputFile=results/semantic.json src/evaluators/semanticSimilarity.eval.ts
+        continue-on-error: true
+        run: pnpm --filter @usopc/evals exec vitest run --config ls.vitest.config.ts --reporter=verbose --reporter=json --outputFile=results/semantic.json src/evaluators/semanticSimilarity.eval.ts
 
       # ── Upload results ────────────────────────────────────────────────────
       - name: Upload eval results

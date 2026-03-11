@@ -23,7 +23,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 const examples = await fetchExamples(DATASET_NAMES.answerQuality);
 
-ls.describe("usopc-semantic-similarity", () => {
+ls.describe(DATASET_NAMES.answerQuality, () => {
   ls.test.each(examples)(
     "answer semantic similarity",
     async ({ inputs, referenceOutputs }) => {
