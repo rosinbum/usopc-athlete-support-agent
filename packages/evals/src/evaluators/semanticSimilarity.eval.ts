@@ -1,4 +1,5 @@
 import * as ls from "langsmith/vitest";
+import { expect } from "vitest";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { DATASET_NAMES } from "../config.js";
 import { runPipelineForAnswerEval } from "../helpers/pipeline.js";
@@ -36,7 +37,9 @@ ls.describe(DATASET_NAMES.answerQuality, () => {
       const referenceAnswer = String(referenceOutputs?.referenceAnswer ?? "");
       if (!referenceAnswer || !result.answer) {
         ls.logFeedback({ key: "semantic_similarity", score: 0 });
-        return;
+        expect.fail(
+          "missing answer or reference answer — cannot compute similarity",
+        );
       }
 
       const [answerEmbed, refEmbed] = await Promise.all([
@@ -46,6 +49,10 @@ ls.describe(DATASET_NAMES.answerQuality, () => {
 
       const similarity = cosineSimilarity(answerEmbed, refEmbed);
       ls.logFeedback({ key: "semantic_similarity", score: similarity });
+      expect(
+        similarity,
+        "semantic similarity must be >= 0.6",
+      ).toBeGreaterThanOrEqual(0.6);
     },
   );
 });

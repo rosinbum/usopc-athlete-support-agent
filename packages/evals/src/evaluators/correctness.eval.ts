@@ -1,4 +1,5 @@
 import * as ls from "langsmith/vitest";
+import { expect } from "vitest";
 import { createLLMAsJudge, CORRECTNESS_PROMPT } from "openevals";
 import { DATASET_NAMES } from "../config.js";
 import { runPipelineForAnswerEval } from "../helpers/pipeline.js";
@@ -26,7 +27,15 @@ ls.describe(DATASET_NAMES.answerQuality, () => {
       // openevals auto-wraps in langsmith/vitest test context — do not
       // double-wrap with ls.wrapEvaluator.  CORRECTNESS_PROMPT uses
       // {inputs}, {outputs}, and {reference_outputs} template variables.
-      await correctnessJudge({ inputs, outputs, referenceOutputs });
+      const judgeResult = await correctnessJudge({
+        inputs,
+        outputs,
+        referenceOutputs,
+      });
+      expect(
+        judgeResult.score,
+        "correctness score must be >= 0.4",
+      ).toBeGreaterThanOrEqual(0.4);
 
       // Deterministic conciseness
       const wordCount = result.answer.split(/\s+/).filter(Boolean).length;
@@ -36,6 +45,10 @@ ls.describe(DATASET_NAMES.answerQuality, () => {
           ? 1.0
           : Math.max(0, 1.0 - (wordCount - maxWords) / 200);
       ls.logFeedback({ key: "conciseness", score: concisenessScore });
+      expect(
+        concisenessScore,
+        "conciseness score must be >= 0.5",
+      ).toBeGreaterThanOrEqual(0.5);
     },
   );
 });
