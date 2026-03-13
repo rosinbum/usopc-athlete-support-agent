@@ -1,4 +1,5 @@
 import * as ls from "langsmith/vitest";
+import { expect } from "vitest";
 import { DATASET_NAMES } from "../config.js";
 import { runPipeline } from "../helpers/pipeline.js";
 import { fetchExamples } from "../helpers/fetchExamples.js";
@@ -33,10 +34,14 @@ ls.describe(DATASET_NAMES.answerQuality, () => {
 
     // citationsPresent: citations should exist when docs were retrieved
     if (hasRetrievedDocs) {
+      const citationsPresent = citations.length > 0;
       ls.logFeedback({
         key: "citations_present",
-        score: citations.length > 0 ? 1.0 : 0.0,
+        score: citationsPresent ? 1.0 : 0.0,
       });
+      expect(citationsPresent, "retrieved docs must produce citations").toBe(
+        true,
+      );
     } else {
       ls.logFeedback({
         key: "citations_present",
@@ -47,19 +52,23 @@ ls.describe(DATASET_NAMES.answerQuality, () => {
     if (citations.length > 0) {
       // citationsHaveUrls: fraction with non-empty url
       const withUrl = citations.filter((c) => c.url && c.url.length > 0).length;
+      const urlScore = withUrl / citations.length;
       ls.logFeedback({
         key: "citations_have_urls",
-        score: withUrl / citations.length,
+        score: urlScore,
       });
+      expect(urlScore, "all citations must have URLs").toBe(1.0);
 
       // citationsHaveSnippets: fraction with non-empty snippet
       const withSnippet = citations.filter(
         (c) => c.snippet && c.snippet.length > 0,
       ).length;
+      const snippetScore = withSnippet / citations.length;
       ls.logFeedback({
         key: "citations_have_snippets",
-        score: withSnippet / citations.length,
+        score: snippetScore,
       });
+      expect(snippetScore, "all citations must have snippets").toBe(1.0);
     }
   });
 });

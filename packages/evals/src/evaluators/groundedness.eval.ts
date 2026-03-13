@@ -1,4 +1,5 @@
 import * as ls from "langsmith/vitest";
+import { expect } from "vitest";
 import { createLLMAsJudge, RAG_GROUNDEDNESS_PROMPT } from "openevals";
 import { DATASET_NAMES } from "../config.js";
 import { runPipelineForAnswerEval } from "../helpers/pipeline.js";
@@ -24,9 +25,13 @@ ls.describe(DATASET_NAMES.answerQuality, () => {
     // openevals auto-wraps in langsmith/vitest test context — do not
     // double-wrap with ls.wrapEvaluator.  RAG_GROUNDEDNESS_PROMPT uses
     // {context} and {outputs} template variables.
-    await groundednessJudge({
+    const judgeResult = await groundednessJudge({
       outputs,
       context: result.context,
     });
+    expect(
+      judgeResult.score,
+      "groundedness score must be >= 0.4",
+    ).toBeGreaterThanOrEqual(0.4);
   });
 });

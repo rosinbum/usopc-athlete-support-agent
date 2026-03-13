@@ -1,4 +1,5 @@
 import * as ls from "langsmith/vitest";
+import { expect } from "vitest";
 import { getDisclaimer } from "@usopc/core";
 import type { TopicDomain } from "@usopc/core";
 import { DATASET_NAMES } from "../config.js";
@@ -47,6 +48,10 @@ ls.describe(DATASET_NAMES.answerQuality, () => {
       key: "disclaimer_present",
       score: hasDisclaimer ? 1.0 : 0.0,
     });
+    expect(
+      hasDisclaimer,
+      "non-clarification answer must include a disclaimer",
+    ).toBe(true);
 
     if (hasDisclaimer && domain) {
       // disclaimerCorrectDomain: the disclaimer text should match the domain
