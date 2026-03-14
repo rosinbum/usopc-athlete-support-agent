@@ -1,0 +1,550 @@
+{
+  "timestamp": "2026-03-13T15:20:27.024Z",
+  "config": {
+    "openaiModel": "text-embedding-3-small",
+    "openaiDims": 1536,
+    "voyageModel": "voyage-law-2",
+    "voyageDims": 1024,
+    "sampleSize": 500,
+    "testCases": 20
+  },
+  "summary": {
+    "openai": {
+      "avgRecall5": 0.7916666666666666,
+      "avgRecall10": 0.7916666666666666,
+      "avgLatencyMs": 54.25134580000049
+    },
+    "voyage": {
+      "avgRecall5": 0.8333333333333333,
+      "avgRecall10": 0.8624999999999998,
+      "avgLatencyMs": 169.62777285000047
+    },
+    "openaiHybrid": {
+      "avgRecall5": 0.7791666666666667,
+      "avgRecall10": 0.8083333333333332,
+      "avgLatencyMs": 61.90431054999972
+    }
+  },
+  "results": [
+    {
+      "query": "What are USA Swimming's Olympic team selection procedures?",
+      "topicDomain": "team_selection",
+      "expectedKeywords": ["selection", "procedures", "trials", "swimming"],
+      "openai": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 143.40291699999943,
+        "top5Keywords": ["selection", "procedures", "trials", "swimming"],
+        "top10Keywords": ["selection", "procedures", "trials", "swimming"]
+      },
+      "voyage": {
+        "recall5": 0.75,
+        "recall10": 1,
+        "latencyMs": 189.57991700000275,
+        "top5Keywords": ["selection", "procedures", "swimming"],
+        "top10Keywords": ["selection", "procedures", "trials", "swimming"]
+      },
+      "openaiHybrid": {
+        "recall5": 0.75,
+        "recall10": 1,
+        "latencyMs": 158.57291599999735,
+        "top5Keywords": ["selection", "trials", "swimming"],
+        "top10Keywords": ["selection", "procedures", "trials", "swimming"]
+      }
+    },
+    {
+      "query": "How does USA Track & Field select athletes for World Championships?",
+      "topicDomain": "team_selection",
+      "expectedKeywords": ["selection", "track", "field", "criteria"],
+      "openai": {
+        "recall5": 0.5,
+        "recall10": 0.5,
+        "latencyMs": 102.26962500000081,
+        "top5Keywords": ["selection", "criteria"],
+        "top10Keywords": ["selection", "criteria"]
+      },
+      "voyage": {
+        "recall5": 0.75,
+        "recall10": 0.75,
+        "latencyMs": 162.8302079999994,
+        "top5Keywords": ["selection", "track", "criteria"],
+        "top10Keywords": ["selection", "track", "criteria"]
+      },
+      "openaiHybrid": {
+        "recall5": 0.5,
+        "recall10": 0.5,
+        "latencyMs": 107.54587500000343,
+        "top5Keywords": ["selection", "criteria"],
+        "top10Keywords": ["selection", "criteria"]
+      }
+    },
+    {
+      "query": "What is the alternate selection process for gymnastics?",
+      "topicDomain": "team_selection",
+      "expectedKeywords": ["alternate", "selection", "gymnastics"],
+      "openai": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "latencyMs": 55.11829099999886,
+        "top5Keywords": ["selection", "gymnastics"],
+        "top10Keywords": ["selection", "gymnastics"]
+      },
+      "voyage": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "latencyMs": 165.52966600000218,
+        "top5Keywords": ["selection", "gymnastics"],
+        "top10Keywords": ["selection", "gymnastics"]
+      },
+      "openaiHybrid": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "latencyMs": 60.35700000000361,
+        "top5Keywords": ["selection", "gymnastics"],
+        "top10Keywords": ["selection", "gymnastics"]
+      }
+    },
+    {
+      "query": "How are wrestling team members replaced if they cannot compete?",
+      "topicDomain": "team_selection",
+      "expectedKeywords": ["replacement", "wrestling"],
+      "openai": {
+        "recall5": 0.5,
+        "recall10": 0.5,
+        "latencyMs": 76.09270800000377,
+        "top5Keywords": ["replacement"],
+        "top10Keywords": ["replacement"]
+      },
+      "voyage": {
+        "recall5": 0.5,
+        "recall10": 0.5,
+        "latencyMs": 193.82833299999766,
+        "top5Keywords": ["replacement"],
+        "top10Keywords": ["replacement"]
+      },
+      "openaiHybrid": {
+        "recall5": 0.5,
+        "recall10": 0.5,
+        "latencyMs": 76.38920899999357,
+        "top5Keywords": ["replacement"],
+        "top10Keywords": ["replacement"]
+      }
+    },
+    {
+      "query": "How does Section 9 arbitration work?",
+      "topicDomain": "dispute_resolution",
+      "expectedKeywords": ["section 9", "arbitration", "dispute"],
+      "openai": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 109.14229199999681,
+        "top5Keywords": ["section 9", "arbitration", "dispute"],
+        "top10Keywords": ["section 9", "arbitration", "dispute"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 148.55570799999987,
+        "top5Keywords": ["section 9", "arbitration", "dispute"],
+        "top10Keywords": ["section 9", "arbitration", "dispute"]
+      },
+      "openaiHybrid": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 112.18304199999693,
+        "top5Keywords": ["section 9", "arbitration", "dispute"],
+        "top10Keywords": ["section 9", "arbitration", "dispute"]
+      }
+    },
+    {
+      "query": "What are the grounds for filing a grievance against an NGB?",
+      "topicDomain": "dispute_resolution",
+      "expectedKeywords": ["grievance", "NGB"],
+      "openai": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 63.25483299999905,
+        "top5Keywords": ["grievance", "NGB"],
+        "top10Keywords": ["grievance", "NGB"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 174.78770900000382,
+        "top5Keywords": ["grievance", "NGB"],
+        "top10Keywords": ["grievance", "NGB"]
+      },
+      "openaiHybrid": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 82.75320900000224,
+        "top5Keywords": ["grievance", "NGB"],
+        "top10Keywords": ["grievance", "NGB"]
+      }
+    },
+    {
+      "query": "What is the appeals process after a Section 9 decision?",
+      "topicDomain": "dispute_resolution",
+      "expectedKeywords": ["appeal", "section 9"],
+      "openai": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 44.76695800000016,
+        "top5Keywords": ["appeal", "section 9"],
+        "top10Keywords": ["appeal", "section 9"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 165.9719580000019,
+        "top5Keywords": ["appeal", "section 9"],
+        "top10Keywords": ["appeal", "section 9"]
+      },
+      "openaiHybrid": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 47.0604170000006,
+        "top5Keywords": ["appeal", "section 9"],
+        "top10Keywords": ["appeal", "section 9"]
+      }
+    },
+    {
+      "query": "What is the SafeSport code of conduct?",
+      "topicDomain": "safesport",
+      "expectedKeywords": ["safesport", "code", "conduct"],
+      "openai": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 50.035250000000815,
+        "top5Keywords": ["safesport", "code", "conduct"],
+        "top10Keywords": ["safesport", "code", "conduct"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 164.5376249999972,
+        "top5Keywords": ["safesport", "code", "conduct"],
+        "top10Keywords": ["safesport", "code", "conduct"]
+      },
+      "openaiHybrid": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 99.56362499999523,
+        "top5Keywords": ["safesport", "code", "conduct"],
+        "top10Keywords": ["safesport", "code", "conduct"]
+      }
+    },
+    {
+      "query": "What types of misconduct does SafeSport investigate?",
+      "topicDomain": "safesport",
+      "expectedKeywords": ["misconduct", "safesport", "investigate"],
+      "openai": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 30.035875000001397,
+        "top5Keywords": ["misconduct", "safesport", "investigate"],
+        "top10Keywords": ["misconduct", "safesport", "investigate"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 210.49316700000054,
+        "top5Keywords": ["misconduct", "safesport", "investigate"],
+        "top10Keywords": ["misconduct", "safesport", "investigate"]
+      },
+      "openaiHybrid": {
+        "recall5": 0.6666666666666666,
+        "recall10": 1,
+        "latencyMs": 32.84916700000031,
+        "top5Keywords": ["misconduct", "safesport"],
+        "top10Keywords": ["misconduct", "safesport", "investigate"]
+      }
+    },
+    {
+      "query": "What are the mandatory reporting obligations for coaches?",
+      "topicDomain": "safesport",
+      "expectedKeywords": ["reporting", "mandatory", "coach"],
+      "openai": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "latencyMs": 53.96812499999942,
+        "top5Keywords": ["reporting", "mandatory"],
+        "top10Keywords": ["reporting", "mandatory"]
+      },
+      "voyage": {
+        "recall5": 0.6666666666666666,
+        "recall10": 1,
+        "latencyMs": 163.3918749999939,
+        "top5Keywords": ["reporting", "mandatory"],
+        "top10Keywords": ["reporting", "mandatory", "coach"]
+      },
+      "openaiHybrid": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "latencyMs": 51.740959000002476,
+        "top5Keywords": ["reporting", "mandatory"],
+        "top10Keywords": ["reporting", "mandatory"]
+      }
+    },
+    {
+      "query": "What is the prohibited substance list?",
+      "topicDomain": "anti_doping",
+      "expectedKeywords": ["prohibited", "substance"],
+      "openai": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 50.48383399999875,
+        "top5Keywords": ["prohibited", "substance"],
+        "top10Keywords": ["prohibited", "substance"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 164.8309999999983,
+        "top5Keywords": ["prohibited", "substance"],
+        "top10Keywords": ["prohibited", "substance"]
+      },
+      "openaiHybrid": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 73.8000419999953,
+        "top5Keywords": ["prohibited", "substance"],
+        "top10Keywords": ["prohibited", "substance"]
+      }
+    },
+    {
+      "query": "How do I apply for a TUE?",
+      "topicDomain": "anti_doping",
+      "expectedKeywords": ["therapeutic", "use", "exemption", "TUE"],
+      "openai": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 39.50145799999882,
+        "top5Keywords": ["therapeutic", "use", "exemption", "TUE"],
+        "top10Keywords": ["therapeutic", "use", "exemption", "TUE"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 168.95291700000234,
+        "top5Keywords": ["therapeutic", "use", "exemption", "TUE"],
+        "top10Keywords": ["therapeutic", "use", "exemption", "TUE"]
+      },
+      "openaiHybrid": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 49.588207999993756,
+        "top5Keywords": ["therapeutic", "use", "exemption", "TUE"],
+        "top10Keywords": ["therapeutic", "use", "exemption", "TUE"]
+      }
+    },
+    {
+      "query": "What are the whereabouts requirements for athletes in the testing pool?",
+      "topicDomain": "anti_doping",
+      "expectedKeywords": ["whereabouts", "testing"],
+      "openai": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 48.6654170000038,
+        "top5Keywords": ["whereabouts", "testing"],
+        "top10Keywords": ["whereabouts", "testing"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 156.37949999999546,
+        "top5Keywords": ["whereabouts", "testing"],
+        "top10Keywords": ["whereabouts", "testing"]
+      },
+      "openaiHybrid": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 50.12799999999697,
+        "top5Keywords": ["whereabouts", "testing"],
+        "top10Keywords": ["whereabouts", "testing"]
+      }
+    },
+    {
+      "query": "What are the citizenship requirements for competing on Team USA?",
+      "topicDomain": "eligibility",
+      "expectedKeywords": ["citizenship", "eligibility"],
+      "openai": {
+        "recall5": 0.5,
+        "recall10": 0.5,
+        "latencyMs": 22.984500000005937,
+        "top5Keywords": ["citizenship"],
+        "top10Keywords": ["citizenship"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 155.700874999995,
+        "top5Keywords": ["citizenship", "eligibility"],
+        "top10Keywords": ["citizenship", "eligibility"]
+      },
+      "openaiHybrid": {
+        "recall5": 0.5,
+        "recall10": 0.5,
+        "latencyMs": 25.69929200000479,
+        "top5Keywords": ["citizenship"],
+        "top10Keywords": ["citizenship"]
+      }
+    },
+    {
+      "query": "What are the age requirements for Olympic diving?",
+      "topicDomain": "eligibility",
+      "expectedKeywords": ["age", "eligibility", "diving"],
+      "openai": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "latencyMs": 54.87987499999872,
+        "top5Keywords": ["age", "eligibility"],
+        "top10Keywords": ["age", "eligibility"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 170.04733300000225,
+        "top5Keywords": ["age", "eligibility", "diving"],
+        "top10Keywords": ["age", "eligibility", "diving"]
+      },
+      "openaiHybrid": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 57.39866600000096,
+        "top5Keywords": ["age", "eligibility", "diving"],
+        "top10Keywords": ["age", "eligibility", "diving"]
+      }
+    },
+    {
+      "query": "What is the minimum athlete representation requirement on NGB boards?",
+      "topicDomain": "governance",
+      "expectedKeywords": ["athlete", "representation", "board"],
+      "openai": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 36.654999999998836,
+        "top5Keywords": ["athlete", "representation", "board"],
+        "top10Keywords": ["athlete", "representation", "board"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 148.65712500000518,
+        "top5Keywords": ["athlete", "representation", "board"],
+        "top10Keywords": ["athlete", "representation", "board"]
+      },
+      "openaiHybrid": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 43.54525000000285,
+        "top5Keywords": ["athlete", "representation", "board"],
+        "top10Keywords": ["athlete", "representation", "board"]
+      }
+    },
+    {
+      "query": "How are athlete representatives elected to the USOPC Board?",
+      "topicDomain": "governance",
+      "expectedKeywords": ["elected", "USOPC", "board"],
+      "openai": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 29.743625000002794,
+        "top5Keywords": ["elected", "USOPC", "board"],
+        "top10Keywords": ["elected", "USOPC", "board"]
+      },
+      "voyage": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 168.57266700000037,
+        "top5Keywords": ["elected", "USOPC", "board"],
+        "top10Keywords": ["elected", "USOPC", "board"]
+      },
+      "openaiHybrid": {
+        "recall5": 1,
+        "recall10": 1,
+        "latencyMs": 31.691959000003408,
+        "top5Keywords": ["elected", "USOPC", "board"],
+        "top10Keywords": ["elected", "USOPC", "board"]
+      }
+    },
+    {
+      "query": "What is the Athlete Bill of Rights?",
+      "topicDomain": "athlete_rights",
+      "expectedKeywords": ["athlete", "bill", "rights"],
+      "openai": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "latencyMs": 40.46220799999719,
+        "top5Keywords": ["athlete", "rights"],
+        "top10Keywords": ["athlete", "rights"]
+      },
+      "voyage": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "latencyMs": 160.92204100000527,
+        "top5Keywords": ["athlete", "rights"],
+        "top10Keywords": ["athlete", "rights"]
+      },
+      "openaiHybrid": {
+        "recall5": 0.6666666666666666,
+        "recall10": 0.6666666666666666,
+        "latencyMs": 42.489667000001646,
+        "top5Keywords": ["athlete", "rights"],
+        "top10Keywords": ["athlete", "rights"]
+      }
+    },
+    {
+      "query": "What are athletes' marketing and sponsorship rights?",
+      "topicDomain": "athlete_rights",
+      "expectedKeywords": ["marketing", "sponsorship", "rights"],
+      "openai": {
+        "recall5": 0.3333333333333333,
+        "recall10": 0.3333333333333333,
+        "latencyMs": 17.55554200000188,
+        "top5Keywords": ["rights"],
+        "top10Keywords": ["rights"]
+      },
+      "voyage": {
+        "recall5": 0.3333333333333333,
+        "recall10": 0.3333333333333333,
+        "latencyMs": 175.53354200000467,
+        "top5Keywords": ["rights"],
+        "top10Keywords": ["rights"]
+      },
+      "openaiHybrid": {
+        "recall5": 0.3333333333333333,
+        "recall10": 0.3333333333333333,
+        "latencyMs": 18.211833000001207,
+        "top5Keywords": ["rights"],
+        "top10Keywords": ["rights"]
+      }
+    },
+    {
+      "query": "How is Olympic broadcast revenue shared with athletes?",
+      "topicDomain": "athlete_rights",
+      "expectedKeywords": ["revenue", "broadcast", "athlete"],
+      "openai": {
+        "recall5": 0.3333333333333333,
+        "recall10": 0.3333333333333333,
+        "latencyMs": 16.008583000002545,
+        "top5Keywords": ["athlete"],
+        "top10Keywords": ["athlete"]
+      },
+      "voyage": {
+        "recall5": 0.3333333333333333,
+        "recall10": 0.3333333333333333,
+        "latencyMs": 183.45229100000142,
+        "top5Keywords": ["athlete"],
+        "top10Keywords": ["athlete"]
+      },
+      "openaiHybrid": {
+        "recall5": 0.3333333333333333,
+        "recall10": 0.3333333333333333,
+        "latencyMs": 16.51787499999773,
+        "top5Keywords": ["athlete"],
+        "top10Keywords": ["athlete"]
+      }
+    }
+  ]
+}
