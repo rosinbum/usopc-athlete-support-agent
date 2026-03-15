@@ -2,7 +2,7 @@
 
 /**
  * Embedding Model Benchmark: OpenAI text-embedding-3-small vs Voyage AI voyage-law-2
- * vs Google Gemini gemini-embedding-001
+ * vs Google Gemini gemini-embedding-002
  *
  * Compares retrieval quality (recall@5, recall@10) between the current OpenAI
  * embedding model, Voyage AI's legal-domain specialist model, and Google's
@@ -36,8 +36,8 @@ const VOYAGE_MODEL = "voyage-law-2";
 const VOYAGE_DIMS = 1024;
 const SAMPLE_SIZE = 500;
 const VOYAGE_BATCH_SIZE = 64; // Voyage API max batch size
-const GEMINI_MODEL = "gemini-embedding-001";
-const GEMINI_DIMS = 1536;
+const GEMINI_MODEL = "gemini-embedding-002";
+const GEMINI_DIMS = 3072;
 const GEMINI_BATCH_SIZE = 64;
 const GEMINI_MAX_RETRIES = 3;
 const GEMINI_BASE_DELAY_MS = 45_000; // Free tier resets ~every 60s
