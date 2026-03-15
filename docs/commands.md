@@ -99,7 +99,7 @@ pnpm --filter @usopc/evals quality:run                 # Run quality review scen
 ## Benchmarks (@usopc/evals)
 
 ```bash
-pnpm --filter @usopc/evals benchmark:embeddings        # Compare OpenAI vs Voyage AI embeddings
+pnpm --filter @usopc/evals benchmark:embeddings        # Compare OpenAI vs Voyage AI vs Gemini embeddings
 ```
 
-Requires `sst secret set VoyageaiApiKey <key>`. Results are written to `packages/evals/output/embedding-benchmark-results.json`.
+Requires `sst secret set VoyageaiApiKey <key>` and `sst secret set GoogleApiKey <key>`. Results are written to `packages/evals/output/embedding-benchmark-results.json`.
