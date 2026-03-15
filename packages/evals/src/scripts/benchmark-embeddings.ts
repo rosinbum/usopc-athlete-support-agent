@@ -2,13 +2,15 @@
 
 /**
  * Embedding Model Benchmark: OpenAI text-embedding-3-small vs Voyage AI voyage-law-2
+ * vs Google Gemini gemini-embedding-001
  *
  * Compares retrieval quality (recall@5, recall@10) between the current OpenAI
- * embedding model and Voyage AI's legal-domain specialist model.
+ * embedding model, Voyage AI's legal-domain specialist model, and Google's
+ * Gemini embedding model.
  *
- * Strategy: Creates a temporary pgvector table with voyage-law-2 embeddings
- * (1024 dims) from a sample of existing chunks, then runs the same retrieval
- * test cases against both models.
+ * Strategy: Creates temporary pgvector tables with alternative embeddings
+ * from a sample of existing chunks, then runs the same retrieval test cases
+ * against all models.
  *
  * Usage:
  *   pnpm --filter @usopc/evals benchmark:embeddings
@@ -34,6 +36,9 @@ const VOYAGE_MODEL = "voyage-law-2";
 const VOYAGE_DIMS = 1024;
 const SAMPLE_SIZE = 500;
 const VOYAGE_BATCH_SIZE = 64; // Voyage API max batch size
+const GEMINI_MODEL = "gemini-embedding-001";
+const GEMINI_DIMS = 1536;
+const GEMINI_BATCH_SIZE = 64;
 const K_SMALL = 5;
 const K_LARGE = 10;
 
@@ -53,6 +58,7 @@ interface TestResult {
   expectedKeywords: string[];
   openai: ModelResult;
   voyage: ModelResult;
+  gemini: ModelResult;
   openaiHybrid: ModelResult;
 }
 
@@ -167,6 +173,77 @@ async function embedWithVoyage(
 }
 
 // ---------------------------------------------------------------------------
+// Gemini Embedding client (direct REST — no SDK needed)
+// ---------------------------------------------------------------------------
+
+interface GeminiEmbedResponse {
+  embeddings: { values: number[] }[];
+}
+
+function getGeminiApiKey(): string {
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) {
+    console.error(
+      "✗ GOOGLE_API_KEY is not set. Run: sst secret set GoogleApiKey <key>",
+    );
+    process.exit(1);
+  }
+  return apiKey;
+}
+
+async function embedWithGemini(
+  apiKey: string,
+  texts: string[],
+  taskType: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY",
+): Promise<number[][]> {
+  const allEmbeddings: number[][] = [];
+
+  for (let i = 0; i < texts.length; i += GEMINI_BATCH_SIZE) {
+    const batch = texts.slice(i, i + GEMINI_BATCH_SIZE);
+
+    const requests = batch.map((text) => ({
+      model: `models/${GEMINI_MODEL}`,
+      content: { parts: [{ text }] },
+      taskType,
+      outputDimensionality: GEMINI_DIMS,
+    }));
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:batchEmbedContents`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({ requests }),
+      },
+    );
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(
+        `Gemini API error ${res.status} for batch at ${i}: ${body}`,
+      );
+    }
+
+    const response = (await res.json()) as GeminiEmbedResponse;
+
+    if (!response.embeddings) {
+      throw new Error(
+        `Gemini returned no embeddings for batch starting at ${i}`,
+      );
+    }
+
+    for (const item of response.embeddings) {
+      allEmbeddings.push(item.values);
+    }
+  }
+
+  return allEmbeddings;
+}
+
+// ---------------------------------------------------------------------------
 // DB operations
 // ---------------------------------------------------------------------------
 
@@ -258,6 +335,75 @@ async function dropVoyageTable(
   await pool.query("DROP TABLE IF EXISTS benchmark_chunks_voyage");
 }
 
+async function createGeminiTable(
+  pool: ReturnType<typeof getPool>,
+): Promise<void> {
+  await pool.query(`
+    DROP TABLE IF EXISTS benchmark_chunks_gemini;
+    CREATE TABLE benchmark_chunks_gemini (
+      id UUID PRIMARY KEY,
+      content TEXT NOT NULL,
+      metadata JSONB NOT NULL DEFAULT '{}',
+      embedding vector(${GEMINI_DIMS}) NOT NULL,
+      ngb_id TEXT GENERATED ALWAYS AS (metadata->>'ngbId') STORED,
+      topic_domain TEXT GENERATED ALWAYS AS (metadata->>'topicDomain') STORED,
+      content_tsv tsvector GENERATED ALWAYS AS (
+        setweight(to_tsvector('english', coalesce(metadata->>'documentTitle', '')), 'A') ||
+        setweight(to_tsvector('english', coalesce(metadata->>'sectionTitle', '')), 'B') ||
+        setweight(to_tsvector('english', coalesce(content, '')), 'C')
+      ) STORED
+    );
+    CREATE INDEX ON benchmark_chunks_gemini USING hnsw (embedding vector_cosine_ops)
+      WITH (m = 16, ef_construction = 64);
+    CREATE INDEX ON benchmark_chunks_gemini USING gin (content_tsv);
+    CREATE INDEX ON benchmark_chunks_gemini (ngb_id);
+    CREATE INDEX ON benchmark_chunks_gemini (topic_domain);
+  `);
+}
+
+async function insertGeminiChunks(
+  pool: ReturnType<typeof getPool>,
+  chunks: ChunkRow[],
+  embeddings: number[][],
+): Promise<void> {
+  const batchSize = 250;
+  for (let i = 0; i < chunks.length; i += batchSize) {
+    const batchChunks = chunks.slice(i, i + batchSize);
+    const batchEmbeddings = embeddings.slice(i, i + batchSize);
+
+    const values: string[] = [];
+    const params: unknown[] = [];
+    let paramIdx = 1;
+
+    for (let j = 0; j < batchChunks.length; j++) {
+      const chunk = batchChunks[j]!;
+      const emb = batchEmbeddings[j]!;
+      values.push(
+        `($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}::vector)`,
+      );
+      params.push(
+        chunk.id,
+        chunk.content,
+        JSON.stringify(chunk.metadata),
+        `[${emb.join(",")}]`,
+      );
+      paramIdx += 4;
+    }
+
+    await pool.query(
+      `INSERT INTO benchmark_chunks_gemini (id, content, metadata, embedding)
+       VALUES ${values.join(", ")}`,
+      params,
+    );
+  }
+}
+
+async function dropGeminiTable(
+  pool: ReturnType<typeof getPool>,
+): Promise<void> {
+  await pool.query("DROP TABLE IF EXISTS benchmark_chunks_gemini");
+}
+
 // ---------------------------------------------------------------------------
 // Search functions
 // ---------------------------------------------------------------------------
@@ -300,6 +446,34 @@ async function vectorSearchVoyage(
   const { rows } = await pool.query<{ content: string }>(
     `SELECT content
      FROM benchmark_chunks_voyage
+     ORDER BY embedding <=> $1::vector
+     LIMIT $2`,
+    [embStr, topK],
+  );
+
+  return {
+    texts: rows.map((r) => r.content),
+    latencyMs: performance.now() - start,
+  };
+}
+
+async function vectorSearchGemini(
+  pool: ReturnType<typeof getPool>,
+  geminiApiKey: string,
+  query: string,
+  topK: number,
+): Promise<{ texts: string[]; latencyMs: number }> {
+  const start = performance.now();
+  const geminiEmbeddings = await embedWithGemini(
+    geminiApiKey,
+    [query],
+    "RETRIEVAL_QUERY",
+  );
+  const embStr = `[${geminiEmbeddings[0]!.join(",")}]`;
+
+  const { rows } = await pool.query<{ content: string }>(
+    `SELECT content
+     FROM benchmark_chunks_gemini
      ORDER BY embedding <=> $1::vector
      LIMIT $2`,
     [embStr, topK],
@@ -362,7 +536,7 @@ async function main(): Promise<void> {
   console.log("═══════════════════════════════════════════════════════════");
   console.log("  Embedding Model Benchmark");
   console.log(
-    `  OpenAI text-embedding-3-small (1536d) vs Voyage AI ${VOYAGE_MODEL} (${VOYAGE_DIMS}d)`,
+    `  OpenAI text-embedding-3-small (1536d) vs Voyage AI ${VOYAGE_MODEL} (${VOYAGE_DIMS}d) vs Gemini ${GEMINI_MODEL} (${GEMINI_DIMS}d)`,
   );
   console.log("═══════════════════════════════════════════════════════════\n");
 
@@ -375,10 +549,11 @@ async function main(): Promise<void> {
   const pool = getPool();
   const openai = createRawEmbeddings();
   const voyageApiKey = getVoyageApiKey();
+  const geminiApiKey = getGeminiApiKey();
 
   try {
-    // Step 1: Sample chunks and embed with Voyage AI
-    console.log("[1/4] Preparing Voyage AI benchmark table...");
+    // Step 1: Sample chunks and embed with Voyage AI + Gemini
+    console.log("[1/4] Preparing benchmark tables...");
     const chunks = await sampleChunks(pool);
 
     if (chunks.length === 0) {
@@ -388,18 +563,29 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    console.log(`  Embedding ${chunks.length} chunks with ${VOYAGE_MODEL}...`);
     const chunkTexts = chunks.map((c) => c.content);
+
+    console.log(`  Embedding ${chunks.length} chunks with ${VOYAGE_MODEL}...`);
     const voyageEmbeddings = await embedWithVoyage(
       voyageApiKey,
       chunkTexts,
       "document",
     );
-    console.log("  Embeddings computed.");
+    console.log("  Voyage embeddings computed.");
 
-    console.log("  Creating temp table and inserting...");
+    console.log(`  Embedding ${chunks.length} chunks with ${GEMINI_MODEL}...`);
+    const geminiEmbeddings = await embedWithGemini(
+      geminiApiKey,
+      chunkTexts,
+      "RETRIEVAL_DOCUMENT",
+    );
+    console.log("  Gemini embeddings computed.");
+
+    console.log("  Creating temp tables and inserting...");
     await createVoyageTable(pool);
     await insertVoyageChunks(pool, chunks, voyageEmbeddings);
+    await createGeminiTable(pool);
+    await insertGeminiChunks(pool, chunks, geminiEmbeddings);
     console.log("  Done.\n");
 
     // Step 2: Run retrieval tests
@@ -423,12 +609,14 @@ async function main(): Promise<void> {
       const openaiVec = await openai.embedQuery(message);
       const openaiEmbStr = `[${openaiVec.join(",")}]`;
 
-      // Run all three searches in parallel
-      const [openaiResult, voyageResult, hybridResult] = await Promise.all([
-        vectorSearchOpenAI(pool, openaiEmbStr, maxTopK),
-        vectorSearchVoyage(pool, voyageApiKey, message, maxTopK),
-        hybridSearchOpenAI(pool, openaiEmbStr, message, maxTopK),
-      ]);
+      // Run all four searches in parallel
+      const [openaiResult, voyageResult, geminiResult, hybridResult] =
+        await Promise.all([
+          vectorSearchOpenAI(pool, openaiEmbStr, maxTopK),
+          vectorSearchVoyage(pool, voyageApiKey, message, maxTopK),
+          vectorSearchGemini(pool, geminiApiKey, message, maxTopK),
+          hybridSearchOpenAI(pool, openaiEmbStr, message, maxTopK),
+        ]);
 
       results.push({
         query: message,
@@ -443,6 +631,11 @@ async function main(): Promise<void> {
           voyageResult.texts,
           expectedKeywords,
           voyageResult.latencyMs,
+        ),
+        gemini: buildModelResult(
+          geminiResult.texts,
+          expectedKeywords,
+          geminiResult.latencyMs,
         ),
         openaiHybrid: buildModelResult(
           hybridResult.texts,
@@ -471,6 +664,11 @@ async function main(): Promise<void> {
         avgRecall10: avg(results.map((r) => r.voyage.recall10)),
         avgLatencyMs: avg(results.map((r) => r.voyage.latencyMs)),
       },
+      gemini: {
+        avgRecall5: avg(results.map((r) => r.gemini.recall5)),
+        avgRecall10: avg(results.map((r) => r.gemini.recall10)),
+        avgLatencyMs: avg(results.map((r) => r.gemini.latencyMs)),
+      },
       openaiHybrid: {
         avgRecall5: avg(results.map((r) => r.openaiHybrid.recall5)),
         avgRecall10: avg(results.map((r) => r.openaiHybrid.recall10)),
@@ -480,25 +678,25 @@ async function main(): Promise<void> {
 
     // Print comparison table
     console.log(
-      "┌──────────────────────────────┬───────────┬───────────┬────────────┐",
+      "┌──────────────────────────────┬───────────┬───────────┬───────────┬────────────┐",
     );
     console.log(
-      "│ Metric                       │ OpenAI    │ Voyage    │ OpenAI+BM25│",
+      "│ Metric                       │ OpenAI    │ Voyage    │ Gemini    │ OpenAI+BM25│",
     );
     console.log(
-      "├──────────────────────────────┼───────────┼───────────┼────────────┤",
+      "├──────────────────────────────┼───────────┼───────────┼───────────┼────────────┤",
     );
     console.log(
-      `│ Avg Recall@5                 │ ${(summary.openai.avgRecall5 * 100).toFixed(1).padStart(6)}%  │ ${(summary.voyage.avgRecall5 * 100).toFixed(1).padStart(6)}%  │ ${(summary.openaiHybrid.avgRecall5 * 100).toFixed(1).padStart(7)}%  │`,
+      `│ Avg Recall@5                 │ ${(summary.openai.avgRecall5 * 100).toFixed(1).padStart(6)}%  │ ${(summary.voyage.avgRecall5 * 100).toFixed(1).padStart(6)}%  │ ${(summary.gemini.avgRecall5 * 100).toFixed(1).padStart(6)}%  │ ${(summary.openaiHybrid.avgRecall5 * 100).toFixed(1).padStart(7)}%  │`,
     );
     console.log(
-      `│ Avg Recall@10                │ ${(summary.openai.avgRecall10 * 100).toFixed(1).padStart(6)}%  │ ${(summary.voyage.avgRecall10 * 100).toFixed(1).padStart(6)}%  │ ${(summary.openaiHybrid.avgRecall10 * 100).toFixed(1).padStart(7)}%  │`,
+      `│ Avg Recall@10                │ ${(summary.openai.avgRecall10 * 100).toFixed(1).padStart(6)}%  │ ${(summary.voyage.avgRecall10 * 100).toFixed(1).padStart(6)}%  │ ${(summary.gemini.avgRecall10 * 100).toFixed(1).padStart(6)}%  │ ${(summary.openaiHybrid.avgRecall10 * 100).toFixed(1).padStart(7)}%  │`,
     );
     console.log(
-      `│ Avg Latency (ms)             │ ${summary.openai.avgLatencyMs.toFixed(0).padStart(7)}  │ ${summary.voyage.avgLatencyMs.toFixed(0).padStart(7)}  │ ${summary.openaiHybrid.avgLatencyMs.toFixed(0).padStart(8)}  │`,
+      `│ Avg Latency (ms)             │ ${summary.openai.avgLatencyMs.toFixed(0).padStart(7)}  │ ${summary.voyage.avgLatencyMs.toFixed(0).padStart(7)}  │ ${summary.gemini.avgLatencyMs.toFixed(0).padStart(7)}  │ ${summary.openaiHybrid.avgLatencyMs.toFixed(0).padStart(8)}  │`,
     );
     console.log(
-      "└──────────────────────────────┴───────────┴───────────┴────────────┘",
+      "└──────────────────────────────┴───────────┴───────────┴───────────┴────────────┘",
     );
 
     // Per-query detail
@@ -506,15 +704,20 @@ async function main(): Promise<void> {
     for (const r of results) {
       const oai = (r.openai.recall5 * 100).toFixed(0).padStart(3);
       const voy = (r.voyage.recall5 * 100).toFixed(0).padStart(3);
+      const gem = (r.gemini.recall5 * 100).toFixed(0).padStart(3);
       const hyb = (r.openaiHybrid.recall5 * 100).toFixed(0).padStart(3);
+      const scores = [
+        { name: "OpenAI", val: r.openai.recall5 },
+        { name: "Voyage", val: r.voyage.recall5 },
+        { name: "Gemini", val: r.gemini.recall5 },
+      ];
+      const best = scores.reduce((a, b) => (b.val > a.val ? b : a));
       const winner =
-        r.voyage.recall5 > r.openai.recall5
-          ? " << Voyage wins"
-          : r.openai.recall5 > r.voyage.recall5
-            ? " << OpenAI wins"
-            : "";
+        scores.filter((s) => s.val === best.val).length === scores.length
+          ? ""
+          : ` << ${best.name} wins`;
       console.log(
-        `  ${r.query.slice(0, 55).padEnd(55)} OAI:${oai}% VOY:${voy}% HYB:${hyb}%${winner}`,
+        `  ${r.query.slice(0, 50).padEnd(50)} OAI:${oai}% VOY:${voy}% GEM:${gem}% HYB:${hyb}%${winner}`,
       );
     }
 
@@ -533,6 +736,8 @@ async function main(): Promise<void> {
         openaiDims: 1536,
         voyageModel: VOYAGE_MODEL,
         voyageDims: VOYAGE_DIMS,
+        geminiModel: GEMINI_MODEL,
+        geminiDims: GEMINI_DIMS,
         sampleSize: chunks.length,
         testCases: retrievalExamples.length,
       },
@@ -544,8 +749,9 @@ async function main(): Promise<void> {
     console.log(`  Results written to ${outputPath}`);
 
     // Cleanup
-    console.log("\n  Dropping temp table...");
+    console.log("\n  Dropping temp tables...");
     await dropVoyageTable(pool);
+    await dropGeminiTable(pool);
     console.log("  Done.\n");
 
     console.log("═══════════════════════════════════════════════════════════");
@@ -555,6 +761,7 @@ async function main(): Promise<void> {
     // Ensure cleanup on error
     try {
       await dropVoyageTable(pool);
+      await dropGeminiTable(pool);
     } catch {
       // Ignore cleanup errors
     }
