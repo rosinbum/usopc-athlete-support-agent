@@ -39,6 +39,8 @@ const VOYAGE_BATCH_SIZE = 64; // Voyage API max batch size
 const GEMINI_MODEL = "gemini-embedding-001";
 const GEMINI_DIMS = 1536;
 const GEMINI_BATCH_SIZE = 64;
+const GEMINI_MAX_RETRIES = 3;
+const GEMINI_BASE_DELAY_MS = 45_000; // Free tier resets ~every 60s
 const K_SMALL = 5;
 const K_LARGE = 10;
 
@@ -208,28 +210,41 @@ async function embedWithGemini(
       outputDimensionality: GEMINI_DIMS,
     }));
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:batchEmbedContents`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
+    let response: GeminiEmbedResponse | undefined;
+    for (let attempt = 0; attempt <= GEMINI_MAX_RETRIES; attempt++) {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:batchEmbedContents`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body: JSON.stringify({ requests }),
         },
-        body: JSON.stringify({ requests }),
-      },
-    );
+      );
 
-    if (!res.ok) {
+      if (res.ok) {
+        response = (await res.json()) as GeminiEmbedResponse;
+        break;
+      }
+
+      if (res.status === 429 && attempt < GEMINI_MAX_RETRIES) {
+        const delayMs = GEMINI_BASE_DELAY_MS * 2 ** attempt;
+        console.warn(
+          `  ⏳ Gemini rate-limited (batch at ${i}), retrying in ${(delayMs / 1000).toFixed(0)}s (attempt ${attempt + 1}/${GEMINI_MAX_RETRIES})...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
       const body = await res.text();
       throw new Error(
         `Gemini API error ${res.status} for batch at ${i}: ${body}`,
       );
     }
 
-    const response = (await res.json()) as GeminiEmbedResponse;
-
-    if (!response.embeddings) {
+    if (!response?.embeddings) {
       throw new Error(
         `Gemini returned no embeddings for batch starting at ${i}`,
       );
