@@ -25,11 +25,11 @@
     "seed-langsmith": "pnpm --filter @usopc/evals seed-langsmith"
   },
   "devDependencies": {
-    "@types/node": "^25.3.3",
+    "@types/node": "^25.5.0",
     "@vitest/coverage-v8": "^2.1.9",
     "node-pg-migrate": "^8.0.4",
     "prettier": "^3.4.2",
-    "sst": "4.1.10",
+    "sst": "4.3.9",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   },
