@@ -95,7 +95,7 @@ jobs:
           aws-region: us-east-1
 
       - name: Run database migrations
-        run: npx sst shell --stage staging -- npx tsx scripts/run-migrations.ts
+        run: npx sst shell --stage staging --print-logs -- npx tsx scripts/run-migrations.ts
 
       - name: Deploy to staging
         id: deploy
