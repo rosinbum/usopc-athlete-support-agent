@@ -48,7 +48,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Use webpack for ESM .js extension resolution in workspace packages
+  // ESM .js extension resolution — used when building with --webpack flag
   webpack: (config) => {
     config.resolve.extensionAlias = {
       ".js": [".ts", ".tsx", ".js"],
