@@ -7,7 +7,10 @@ export default $config({
       removal: input?.stage === "production" ? "retain" : "remove",
       home: "aws",
       providers: {
-        aws: { region: "us-east-1", profile: "default" },
+        aws: {
+          region: "us-east-1",
+          ...(process.env.CI ? {} : { profile: "default" }),
+        },
       },
     };
   },
