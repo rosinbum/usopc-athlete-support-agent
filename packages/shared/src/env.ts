@@ -37,8 +37,11 @@ const LOCAL_DEV_DATABASE_URL =
  * Resolution order:
  *   1. `DATABASE_URL` environment variable (set directly or via .env)
  *   2. SST Secret binding (`Resource.DatabaseUrl.value`)
- *   3. In development mode, falls back to the standard local Docker URL.
- *   4. Throws if neither source is available.
+ *   3. SST resource env var directly (`SST_RESOURCE_DatabaseUrl`) — fallback
+ *      when the Resource proxy fails (e.g. `sst shell` + `tsx`)
+ *   4. In explicit development mode (`NODE_ENV=development`), falls back to
+ *      the standard local Docker URL.
+ *   5. Throws if no source is available.
  */
 export function getDatabaseUrl(): string {
   const directUrl = process.env.DATABASE_URL;
@@ -51,7 +54,19 @@ export function getDatabaseUrl(): string {
       .DatabaseUrl;
     return secret.value;
   } catch {
-    if (isDevelopment()) {
+    // Resource proxy may fail in sst shell + tsx context — check raw env var
+    const sstRaw = process.env.SST_RESOURCE_DatabaseUrl;
+    if (sstRaw) {
+      try {
+        return JSON.parse(sstRaw).value;
+      } catch {
+        // malformed JSON — fall through
+      }
+    }
+
+    // Only fall back to localhost when NODE_ENV is explicitly "development",
+    // not when it is undefined (e.g. CI environments).
+    if (process.env.NODE_ENV === "development") {
       return LOCAL_DEV_DATABASE_URL;
     }
     throw new Error(
