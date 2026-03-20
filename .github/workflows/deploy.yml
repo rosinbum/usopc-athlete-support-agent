@@ -95,7 +95,10 @@ jobs:
           aws-region: us-east-1
 
       - name: Run database migrations
-        run: npx sst shell --stage staging --print-logs -- ./node_modules/.bin/tsx scripts/run-migrations.ts
+        run: |
+          DB_URL=$(npx sst secret list --stage staging 2>/dev/null | grep '^DatabaseUrl=' | cut -d= -f2-)
+          echo "::add-mask::$DB_URL"
+          DATABASE_URL="$DB_URL" ./node_modules/.bin/tsx scripts/run-migrations.ts
 
       - name: Deploy to staging
         id: deploy
@@ -140,7 +143,10 @@ jobs:
           aws-region: us-east-1
 
       - name: Run database migrations
-        run: npx sst shell --stage production -- ./node_modules/.bin/tsx scripts/run-migrations.ts
+        run: |
+          DB_URL=$(npx sst secret list --stage production 2>/dev/null | grep '^DatabaseUrl=' | cut -d= -f2-)
+          echo "::add-mask::$DB_URL"
+          DATABASE_URL="$DB_URL" ./node_modules/.bin/tsx scripts/run-migrations.ts
 
       - name: Deploy to production
         id: deploy
