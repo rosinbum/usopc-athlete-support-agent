@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@types/pg": "^8.18.0",
-    "sst": "4.1.10",
+    "sst": "4.5.1",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   }
