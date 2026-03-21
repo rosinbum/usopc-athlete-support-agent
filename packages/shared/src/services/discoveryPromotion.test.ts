@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, type Mock } from "vitest";
-import type { DiscoveredSource } from "@usopc/shared";
-import { sendDiscoveryToSources } from "./send-to-sources.js";
+import type { DiscoveredSource } from "../entities/DiscoveredSourceEntity.js";
+import { sendDiscoveryToSources } from "./discoveryPromotion.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

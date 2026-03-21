@@ -139,10 +139,41 @@ export default $config({
       },
     });
 
+    // Ingestion queue — created before DiscoveryFeedWorker so it can be linked
+    // conditionally. Worker subscriber + crons are production-only (below).
+    let ingestionQueue: sst.aws.Queue | undefined;
+    let ingestionDlq: sst.aws.Queue | undefined;
+    let alarmTopic: aws.sns.Topic | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let monitoringRefs: Record<string, any> | undefined;
+
+    if (isProd) {
+      // Dead-letter queue (must also be FIFO to match main queue)
+      ingestionDlq = new sst.aws.Queue("IngestionDLQ", {
+        fifo: true,
+      });
+
+      // Main ingestion queue
+      ingestionQueue = new sst.aws.Queue("IngestionQueue", {
+        fifo: {
+          contentBasedDeduplication: true,
+        },
+        visibilityTimeout: "15 minutes",
+        dlq: {
+          queue: ingestionDlq.arn,
+          retry: 2,
+        },
+      });
+    }
+
     const discoveryFeedWorkerSub = discoveryFeedQueue.subscribe(
       {
         handler: "packages/ingestion/src/discoveryFeedWorker.handler",
-        link: [...linkables, appTable],
+        link: [
+          ...linkables,
+          appTable,
+          ...(ingestionQueue ? [ingestionQueue] : []),
+        ],
         timeout: "10 minutes",
         memory: "512 MB",
       },
@@ -153,11 +184,6 @@ export default $config({
 
     // Source discovery (weekly) - production only
     // Document ingestion (weekly) - production only
-    // Declared before Web so the queue can be linked conditionally
-    let ingestionQueue: sst.aws.Queue | undefined;
-    let alarmTopic: aws.sns.Topic | undefined;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let monitoringRefs: Record<string, any> | undefined;
 
     if (isProd) {
       const discoveryCron = new sst.aws.Cron("DiscoveryCron", {
@@ -184,25 +210,8 @@ export default $config({
         },
       });
 
-      // Dead-letter queue (must also be FIFO to match main queue)
-      const ingestionDlq = new sst.aws.Queue("IngestionDLQ", {
-        fifo: true,
-      });
-
-      // Main ingestion queue
-      ingestionQueue = new sst.aws.Queue("IngestionQueue", {
-        fifo: {
-          contentBasedDeduplication: true,
-        },
-        visibilityTimeout: "15 minutes",
-        dlq: {
-          queue: ingestionDlq.arn,
-          retry: 2,
-        },
-      });
-
       // Worker: processes one source per SQS message
-      const ingestionWorkerSub = ingestionQueue.subscribe(
+      const ingestionWorkerSub = ingestionQueue!.subscribe(
         {
           handler: "packages/ingestion/src/worker.handler",
           link: [...linkables, appTable, documentsBucket],
@@ -368,7 +377,7 @@ export default $config({
         alarmDescription: "Ingestion DLQ has messages",
         namespace: "AWS/SQS",
         metricName: "ApproximateNumberOfMessagesVisible",
-        dimensions: { QueueName: ingestionDlq.nodes.queue.name },
+        dimensions: { QueueName: ingestionDlq!.nodes.queue.name },
         statistic: "Sum",
         period: 300,
         evaluationPeriods: 1,
@@ -403,7 +412,7 @@ export default $config({
         ingestionWorkerFn: ingestionWorkerSub.nodes.function.name,
         ingestionCronFn: ingestionCron.nodes.function.name,
         discoveryDlqName: discoveryFeedDlq.nodes.queue.name,
-        ingestionDlqName: ingestionDlq.nodes.queue.name,
+        ingestionDlqName: ingestionDlq!.nodes.queue.name,
         tableName: appTable.name,
       };
     }
