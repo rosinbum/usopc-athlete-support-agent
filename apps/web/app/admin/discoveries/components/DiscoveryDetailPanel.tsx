@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   XCircle,
   Upload,
+  RefreshCw,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -148,6 +149,17 @@ export function DiscoveryDetailPanel({
     }
   }
 
+  async function handleReprocess() {
+    setActionError(null);
+    try {
+      await triggerAction({ action: "reprocess" });
+      await mutate();
+      onMutate();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Reprocess failed");
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
@@ -272,6 +284,15 @@ export function DiscoveryDetailPanel({
           {badge.label}
         </span>
       ),
+      ...(discovery.lastError
+        ? {
+            lastError: (
+              <span className="text-red-600 text-sm">
+                {discovery.lastError}
+              </span>
+            ),
+          }
+        : {}),
       reviewedAt: formatDateTime(discovery.reviewedAt, "N/A"),
       reviewedBy: discovery.reviewedBy ?? "N/A",
       rejectionReason: discovery.rejectionReason ?? "N/A",
@@ -390,6 +411,21 @@ export function DiscoveryDetailPanel({
                 <Upload className="w-4 h-4" />
               )}
               Send to Sources
+            </button>
+          )}
+
+          {isPending && (
+            <button
+              onClick={handleReprocess}
+              disabled={actionLoading}
+              className="px-4 py-2 text-sm rounded-lg font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 flex items-center gap-1"
+            >
+              {actionLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              Reprocess
             </button>
           )}
         </div>

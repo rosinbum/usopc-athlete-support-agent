@@ -9,6 +9,7 @@ import {
   Clock,
   Eye,
   Upload,
+  RefreshCw,
 } from "lucide-react";
 import type { DiscoveryStatus } from "@usopc/shared";
 import { SlidePanel } from "../components/SlidePanel.js";
@@ -338,6 +339,32 @@ export function DiscoveriesAdminClient() {
     }
   }
 
+  async function bulkReprocess(ids?: string[]) {
+    setActionError(null);
+    try {
+      const data = await triggerBulk({
+        action: "reprocess",
+        ...(ids ? { ids } : {}),
+      });
+      const parts: string[] = [];
+      if (data && data.queued && data.queued > 0)
+        parts.push(`${data.queued} queued for reprocessing`);
+      if (data && data.skipped && data.skipped > 0)
+        parts.push(`${data.skipped} skipped (not stuck)`);
+      if (data && data.failed && data.failed > 0)
+        parts.push(`${data.failed} failed`);
+      window.alert(
+        parts.length > 0
+          ? `Reprocess: ${parts.join(", ")}`
+          : "No stuck discoveries to reprocess",
+      );
+      setSelected(new Set());
+      await mutate();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Reprocess failed");
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Sort handler
   // -------------------------------------------------------------------------
@@ -487,21 +514,37 @@ export function DiscoveriesAdminClient() {
         </button>
       </div>
 
-      {/* Send All Approved to Sources */}
-      {stats.approvedUnlinked > 0 && (
+      {/* Bulk action buttons */}
+      {(stats.approvedUnlinked > 0 || stats.pendingReview > 0) && (
         <div className="flex items-center gap-3 mb-4">
-          <button
-            onClick={() => bulkSendToSources()}
-            disabled={bulkLoading}
-            className="px-4 py-2 text-sm rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
-          >
-            {bulkLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Upload className="w-4 h-4" />
-            )}
-            Send All Approved to Sources ({stats.approvedUnlinked})
-          </button>
+          {stats.approvedUnlinked > 0 && (
+            <button
+              onClick={() => bulkSendToSources()}
+              disabled={bulkLoading}
+              className="px-4 py-2 text-sm rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {bulkLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Upload className="w-4 h-4" />
+              )}
+              Send All Approved to Sources ({stats.approvedUnlinked})
+            </button>
+          )}
+          {stats.pendingReview > 0 && (
+            <button
+              onClick={() => bulkReprocess()}
+              disabled={bulkLoading}
+              className="px-4 py-2 text-sm rounded-lg font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {bulkLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              Reprocess All Stuck ({stats.pendingReview})
+            </button>
+          )}
         </div>
       )}
 
@@ -597,6 +640,14 @@ export function DiscoveriesAdminClient() {
           >
             <Upload className="w-3 h-3" />
             Send to Sources
+          </button>
+          <button
+            onClick={() => bulkReprocess(Array.from(selected))}
+            disabled={bulkLoading}
+            className="px-3 py-1 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50 flex items-center gap-1"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Reprocess
           </button>
           {bulkLoading && <Loader2 className="w-4 h-4 animate-spin" />}
         </div>
