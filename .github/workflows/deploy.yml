@@ -43,8 +43,9 @@ jobs:
           # Wait up to 10 minutes for CI check runs to complete
           for i in $(seq 1 60); do
             # Get check runs excluding our own deploy checks
+            # Exclude deploy checks and comprehensive evals (slow, non-blocking)
             CHECKS_JSON=$(gh api "repos/${{ github.repository }}/commits/${COMMIT_SHA}/check-runs" \
-              --jq '[.check_runs[] | select(.name != "Verify CI passed" and .name != "Deploy to Staging" and .name != "Deploy to Production")]')
+              --jq '[.check_runs[] | select(.name != "Verify CI passed" and .name != "Deploy to Staging" and .name != "Deploy to Production" and .name != "Tier 2 — Comprehensive Evals" and .name != "Check for agent changes")]')
 
             TOTAL=$(echo "$CHECKS_JSON" | jq 'length')
             COMPLETED=$(echo "$CHECKS_JSON" | jq '[.[] | select(.status == "completed")] | length')

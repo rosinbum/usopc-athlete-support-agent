@@ -32,11 +32,24 @@ jobs:
 
       - id: diff
         run: |
-          # Always run on tags or manual dispatch
-          if [[ "${{ github.event_name }}" != "schedule" ]]; then
+          # Always run on manual dispatch
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+
+          # For tags: only run if agent code changed since previous tag
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            PREV_TAG=$(git tag --sort=-creatordate | grep '^v' | sed -n '2p')
+            if [ -z "$PREV_TAG" ]; then
+              echo "has_changes=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            CHANGED=$(git diff --name-only "$PREV_TAG"...HEAD -- packages/core/ packages/evals/ | grep -c . || true)
+            echo "has_changes=$([[ $CHANGED -gt 0 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           # For nightly: skip if no agent code changed in last 24h
           CHANGED=$(git log --since="24 hours ago" --name-only --pretty=format: -- packages/core/ packages/evals/ | grep -c . || true)
           echo "has_changes=$([[ $CHANGED -gt 0 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
