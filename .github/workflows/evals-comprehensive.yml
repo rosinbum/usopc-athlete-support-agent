@@ -15,6 +15,9 @@ on:
         required: false
         default: "canary"
 
+permissions:
+  contents: read
+
 jobs:
   # ── Check if agent code changed since last successful run ────────────────
   check-changes:
