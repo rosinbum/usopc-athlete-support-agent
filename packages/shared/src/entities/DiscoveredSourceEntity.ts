@@ -44,6 +44,7 @@ export interface DiscoveredSource {
   reviewedBy: string | null;
   rejectionReason: string | null;
   sourceConfigId: string | null;
+  lastError: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -71,6 +72,11 @@ export interface CreateDiscoveredSourceInput {
  * GSIs:
  * - gsi1: Query discoveries by status and date (gsi1pk: Discovery#{status}, gsi1sk: ${discoveredAt})
  */
+export const REPROCESSABLE_STATUSES: ReadonlySet<DiscoveryStatus> = new Set([
+  "pending_metadata",
+  "pending_content",
+]);
+
 const ALL_STATUSES: DiscoveryStatus[] = [
   "pending_metadata",
   "pending_content",
@@ -118,6 +124,7 @@ export class DiscoveredSourceEntity {
       reviewedBy: (item.reviewedBy as string) ?? null,
       rejectionReason: (item.rejectionReason as string) ?? null,
       sourceConfigId: (item.sourceConfigId as string) ?? null,
+      lastError: (item.lastError as string) ?? null,
       createdAt: item.createdAt as string,
       updatedAt: item.updatedAt as string,
     };
@@ -171,6 +178,7 @@ export class DiscoveredSourceEntity {
       reviewedBy: null,
       rejectionReason: null,
       sourceConfigId: null,
+      lastError: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -388,6 +396,20 @@ export class DiscoveredSourceEntity {
       reviewedBy,
       rejectionReason: reason,
     });
+  }
+
+  /**
+   * Record an error message on a discovered source.
+   */
+  async recordError(id: string, error: string): Promise<void> {
+    await this.update(id, { lastError: error });
+  }
+
+  /**
+   * Clear any recorded error on a discovered source.
+   */
+  async clearError(id: string): Promise<void> {
+    await this.update(id, { lastError: null });
   }
 
   /**

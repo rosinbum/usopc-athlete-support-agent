@@ -3,6 +3,7 @@ import {
   createLogger,
   getSecretValue,
   DiscoveredSourceEntity,
+  REPROCESSABLE_STATUSES,
   createAppTable,
   normalizeUrl,
   urlToId,
@@ -63,10 +64,18 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
           autoApprovalThreshold,
         );
       } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
         logger.error(`Error processing URL: ${urlEntry.url}`, {
           url: urlEntry.url,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMsg,
         });
+        // Record error on DDB item so it's visible in admin UI
+        try {
+          const id = urlToId(normalizeUrl(urlEntry.url));
+          await entity.recordError(id, errorMsg);
+        } catch {
+          // Don't let error recording crash the loop
+        }
       }
     }
   }
@@ -85,6 +94,7 @@ async function processUrl(
   const domain = new URL(normalized).hostname;
 
   // Step 1: Create entry (conditional put for dedup)
+  let isReprocess = false;
   try {
     await entity.create({
       id,
@@ -96,13 +106,26 @@ async function processUrl(
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (msg.includes("Conditional")) {
-      logger.info("Skipping existing discovered URL", {
-        url: normalized,
-        id,
-      });
-      return;
+      // Check if the existing record is stuck and should be re-evaluated
+      const existing = await entity.getById(id);
+      if (existing && REPROCESSABLE_STATUSES.has(existing.status)) {
+        logger.info("Re-evaluating stuck URL", {
+          url: normalized,
+          id,
+          status: existing.status,
+        });
+        isReprocess = true;
+        // Fall through to evaluation pipeline
+      } else {
+        logger.info("Skipping existing discovered URL", {
+          url: normalized,
+          id,
+        });
+        return;
+      }
+    } else {
+      throw error;
     }
-    throw error;
   }
 
   // Step 2: Metadata evaluation
@@ -126,6 +149,7 @@ async function processUrl(
       url: normalized,
       confidence: metadataEval.confidence,
     });
+    if (isReprocess) await entity.clearError(id);
     return;
   }
 
@@ -170,6 +194,8 @@ async function processUrl(
     contentEval.description,
     autoApprovalThreshold,
   );
+
+  if (isReprocess) await entity.clearError(id);
 
   if (combinedConfidence >= autoApprovalThreshold) {
     logger.info(`URL auto-approved: ${normalized}`, {

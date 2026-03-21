@@ -33,6 +33,7 @@ function makeDiscovery(
     reviewedBy: "admin@test.com",
     rejectionReason: null,
     sourceConfigId: null,
+    lastError: null,
     createdAt: "2025-01-01T00:00:00Z",
     updatedAt: "2025-01-02T00:00:00Z",
     ...overrides,

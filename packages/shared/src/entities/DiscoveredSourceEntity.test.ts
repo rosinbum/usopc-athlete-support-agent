@@ -431,6 +431,39 @@ describe("DiscoveredSourceEntity", () => {
     });
   });
 
+  describe("recordError", () => {
+    it("should update lastError on a discovered source", async () => {
+      mockUpdate.mockResolvedValue(
+        internalItem({ lastError: "API credit exhausted" }),
+      );
+
+      await entity.recordError("abc123", "API credit exhausted");
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "abc123",
+          lastError: "API credit exhausted",
+        }),
+      );
+    });
+  });
+
+  describe("clearError", () => {
+    it("should clear lastError on a discovered source", async () => {
+      mockUpdate.mockResolvedValue(internalItem());
+
+      await entity.clearError("abc123");
+
+      // lastError: null is stripped by toInternal, so it should NOT appear
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.not.objectContaining({ lastError: "API credit exhausted" }),
+      );
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "abc123" }),
+      );
+    });
+  });
+
   describe("linkToSourceConfig", () => {
     it("should link to a source config", async () => {
       mockUpdate.mockResolvedValue(

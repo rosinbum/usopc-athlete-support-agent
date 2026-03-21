@@ -114,7 +114,7 @@ export interface DiscoveryFeedMessage {
   urls: Array<{
     url: string;
     title: string;
-    discoveryMethod: "agent" | "map" | "search";
+    discoveryMethod: "agent" | "map" | "search" | "manual";
     discoveredFrom: string;
   }>;
   autoApprovalThreshold?: number | undefined;
