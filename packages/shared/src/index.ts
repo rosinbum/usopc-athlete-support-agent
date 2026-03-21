@@ -83,6 +83,7 @@ export {
 } from "./entities/index.js";
 export {
   DiscoveredSourceEntity,
+  REPROCESSABLE_STATUSES,
   type DiscoveredSource,
   type CreateDiscoveredSourceInput,
   type DiscoveryMethod,

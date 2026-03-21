@@ -23,16 +23,27 @@ vi.mock("../../../../../lib/send-to-sources.js", () => ({
   sendDiscoveryToSources: vi.fn(),
 }));
 
+vi.mock("../../../../../lib/services/discovery-reprocess.js", () => ({
+  enqueueForReprocess: vi.fn().mockResolvedValue({ queued: 0, failed: 0 }),
+}));
+
+vi.mock("@usopc/shared", () => ({
+  REPROCESSABLE_STATUSES: new Set(["pending_metadata", "pending_content"]),
+  logger: { child: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() }) },
+}));
+
 import { auth } from "../../../../../auth.js";
 import { createDiscoveredSourceEntity } from "../../../../../lib/discovered-source.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 import { sendDiscoveryToSources } from "../../../../../lib/send-to-sources.js";
+import { enqueueForReprocess } from "../../../../../lib/services/discovery-reprocess.js";
 import { POST } from "./route.js";
 
 const mockAuth = vi.mocked(auth);
 const mockCreateEntity = vi.mocked(createDiscoveredSourceEntity);
 const mockCreateSCEntity = vi.mocked(createSourceConfigEntity);
 const mockSendToSources = vi.mocked(sendDiscoveryToSources);
+const mockEnqueue = vi.mocked(enqueueForReprocess);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -276,5 +287,93 @@ describe("POST /api/admin/discoveries/bulk", () => {
     expect(res.status).toBe(200);
     expect(body.created).toBe(1);
     expect(body.notApproved).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // reprocess
+  // -------------------------------------------------------------------------
+
+  it("bulk reprocess sends SQS messages for stuck discoveries", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com", role: "admin" as const },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getById: vi
+        .fn()
+        .mockResolvedValueOnce({
+          id: "d1",
+          status: "pending_metadata",
+          url: "https://example.com/1",
+          title: "Doc 1",
+        })
+        .mockResolvedValueOnce({
+          id: "d2",
+          status: "pending_content",
+          url: "https://example.com/2",
+          title: "Doc 2",
+        }),
+    } as never);
+    mockEnqueue.mockResolvedValueOnce({ queued: 2, failed: 0 });
+
+    const res = await POST(
+      jsonRequest({ action: "reprocess", ids: ["d1", "d2"] }),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.queued).toBe(2);
+    expect(body.failed).toBe(0);
+    expect(mockEnqueue).toHaveBeenCalledWith([
+      expect.objectContaining({ id: "d1" }),
+      expect.objectContaining({ id: "d2" }),
+    ]);
+  });
+
+  it("bulk reprocess skips approved discoveries when filtering by ids", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com", role: "admin" as const },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getById: vi.fn().mockResolvedValueOnce({
+        id: "d1",
+        status: "approved",
+        url: "https://example.com/1",
+        title: "Doc 1",
+      }),
+    } as never);
+
+    const res = await POST(jsonRequest({ action: "reprocess", ids: ["d1"] }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.queued).toBe(0);
+    expect(body.skipped).toBe(1);
+  });
+
+  it("bulk reprocess all fetches pending_metadata and pending_content", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com", role: "admin" as const },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getByStatus: vi
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            id: "d1",
+            status: "pending_metadata",
+            url: "https://example.com/1",
+            title: "Doc 1",
+          },
+        ])
+        .mockResolvedValueOnce([]),
+    } as never);
+    mockEnqueue.mockResolvedValueOnce({ queued: 1, failed: 0 });
+
+    const res = await POST(jsonRequest({ action: "reprocess" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.queued).toBe(1);
+    expect(mockEnqueue).toHaveBeenCalledTimes(1);
   });
 });

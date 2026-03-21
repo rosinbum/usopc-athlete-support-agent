@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { logger } from "@usopc/shared";
+import { REPROCESSABLE_STATUSES, logger } from "@usopc/shared";
 import { auth } from "../../../../../auth.js";
 
 const log = logger.child({ service: "admin-discoveries-bulk" });
@@ -9,6 +9,7 @@ import { createDiscoveredSourceEntity } from "../../../../../lib/discovered-sour
 import { apiError } from "../../../../../lib/apiResponse.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 import { sendDiscoveryToSources } from "../../../../../lib/send-to-sources.js";
+import { enqueueForReprocess } from "../../../../../lib/services/discovery-reprocess.js";
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -26,6 +27,10 @@ const bulkSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("send_to_sources"),
+    ids: z.array(z.string().min(1)).optional(),
+  }),
+  z.object({
+    action: z.literal("reprocess"),
     ids: z.array(z.string().min(1)).optional(),
   }),
 ]);
@@ -105,20 +110,51 @@ export async function POST(request: Request) {
     }
 
     // -----------------------------------------------------------------------
+    // reprocess
+    // -----------------------------------------------------------------------
+    if (action === "reprocess") {
+      let discoveries;
+
+      if (result.data.ids && result.data.ids.length > 0) {
+        const fetched = await Promise.all(
+          result.data.ids.map((id) => entity.getById(id)),
+        );
+        discoveries = fetched.filter(
+          (d): d is NonNullable<typeof d> =>
+            d !== null && REPROCESSABLE_STATUSES.has(d.status),
+        );
+      } else {
+        const [pm, pc] = await Promise.all([
+          entity.getByStatus("pending_metadata"),
+          entity.getByStatus("pending_content"),
+        ]);
+        discoveries = [...pm, ...pc];
+      }
+
+      const { queued, failed } = await enqueueForReprocess(discoveries);
+      const skipped =
+        result.data.ids && result.data.ids.length > 0
+          ? result.data.ids.length - discoveries.length
+          : 0;
+
+      return NextResponse.json({ queued, skipped, failed });
+    }
+
+    // -----------------------------------------------------------------------
     // approve / reject
     // -----------------------------------------------------------------------
     const session = await auth();
     const reviewedBy = session?.user?.email ?? "unknown";
-    const { ids } = result.data;
+    const { ids } = result.data as { ids: string[] };
 
     let succeeded = 0;
     let failed = 0;
 
     for (const id of ids) {
       try {
-        if (action === "approve") {
+        if (result.data.action === "approve") {
           await entity.approve(id, reviewedBy);
-        } else {
+        } else if (result.data.action === "reject") {
           await entity.reject(id, reviewedBy, result.data.reason);
         }
         succeeded++;

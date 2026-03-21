@@ -17,6 +17,7 @@ export {
 } from "./SourceConfigEntity.js";
 export {
   DiscoveredSourceEntity,
+  REPROCESSABLE_STATUSES,
   type DiscoveredSource,
   type CreateDiscoveredSourceInput,
   type DiscoveryMethod,

@@ -100,6 +100,7 @@ export const AppTableSchema = {
       reviewedBy: { type: String },
       rejectionReason: { type: String },
       sourceConfigId: { type: String }, // if approved and created
+      lastError: { type: String },
       createdAt: { type: String },
       updatedAt: { type: String },
     },
