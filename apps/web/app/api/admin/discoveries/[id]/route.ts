@@ -9,6 +9,7 @@ import { createDiscoveredSourceEntity } from "../../../../../lib/discovered-sour
 import { apiError } from "../../../../../lib/apiResponse.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 import { sendDiscoveryToSources } from "../../../../../lib/send-to-sources.js";
+import { triggerIngestion } from "../../../../../lib/services/source-service.js";
 import { enqueueForReprocess } from "../../../../../lib/services/discovery-reprocess.js";
 
 // ---------------------------------------------------------------------------
@@ -140,6 +141,27 @@ export async function PATCH(
 
     if (action === "approve") {
       await entity.approve(id, reviewedBy);
+
+      try {
+        const scEntity = createSourceConfigEntity();
+        const promoteResult = await sendDiscoveryToSources(
+          { ...existing, status: "approved" as const },
+          scEntity,
+          entity,
+        );
+        if (promoteResult.status === "created" && promoteResult.sourceConfig) {
+          try {
+            await triggerIngestion(promoteResult.sourceConfig);
+          } catch {
+            // IngestionQueue unavailable in dev — non-fatal
+          }
+        }
+      } catch (error) {
+        log.warn("Auto-promote after approval failed", {
+          discoveryId: id,
+          error: String(error),
+        });
+      }
     } else if (result.data.action === "reject") {
       await entity.reject(id, reviewedBy, result.data.reason);
     }

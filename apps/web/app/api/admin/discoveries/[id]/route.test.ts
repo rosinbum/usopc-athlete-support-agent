@@ -23,6 +23,10 @@ vi.mock("../../../../../lib/send-to-sources.js", () => ({
   sendDiscoveryToSources: vi.fn(),
 }));
 
+vi.mock("../../../../../lib/services/source-service.js", () => ({
+  triggerIngestion: vi.fn().mockResolvedValue({ triggered: true }),
+}));
+
 vi.mock("../../../../../lib/services/discovery-reprocess.js", () => ({
   enqueueForReprocess: vi.fn().mockResolvedValue({ queued: 1, failed: 0 }),
 }));
@@ -183,10 +187,14 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
     mockCreateEntity.mockReturnValueOnce({
       getById: vi
         .fn()
-        .mockResolvedValueOnce(SAMPLE_DISCOVERY)
-        .mockResolvedValueOnce(approved),
+        .mockResolvedValueOnce(SAMPLE_DISCOVERY) // initial existence check
+        .mockResolvedValueOnce(approved), // final response fetch
       approve: vi.fn().mockResolvedValueOnce(undefined),
     } as never);
+    mockSendToSources.mockResolvedValueOnce({
+      discoveryId: "disc-1",
+      status: "not_approved",
+    });
 
     const res = await PATCH(
       jsonRequest({ action: "approve" }),

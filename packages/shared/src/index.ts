@@ -132,3 +132,9 @@ export { normalizeUrl, urlToId } from "./url.js";
 export { getResource } from "./resources.js";
 
 export { ParamBuilder } from "./paramBuilder.js";
+
+export {
+  sendDiscoveryToSources,
+  type SendToSourcesResult,
+  type SendToSourcesOptions,
+} from "./services/discoveryPromotion.js";

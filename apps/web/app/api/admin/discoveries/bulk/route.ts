@@ -9,6 +9,7 @@ import { createDiscoveredSourceEntity } from "../../../../../lib/discovered-sour
 import { apiError } from "../../../../../lib/apiResponse.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 import { sendDiscoveryToSources } from "../../../../../lib/send-to-sources.js";
+import { triggerIngestion } from "../../../../../lib/services/source-service.js";
 import { enqueueForReprocess } from "../../../../../lib/services/discovery-reprocess.js";
 
 // ---------------------------------------------------------------------------
@@ -149,11 +150,39 @@ export async function POST(request: Request) {
 
     let succeeded = 0;
     let failed = 0;
+    let promoted = 0;
+
+    const scEntity =
+      result.data.action === "approve" ? createSourceConfigEntity() : undefined;
 
     for (const id of ids) {
       try {
         if (result.data.action === "approve") {
           await entity.approve(id, reviewedBy);
+
+          try {
+            const existing = await entity.getById(id);
+            if (existing && scEntity) {
+              const promoteResult = await sendDiscoveryToSources(
+                { ...existing, status: "approved" as const },
+                scEntity,
+                entity,
+              );
+              if (
+                promoteResult.status === "created" &&
+                promoteResult.sourceConfig
+              ) {
+                try {
+                  await triggerIngestion(promoteResult.sourceConfig);
+                } catch {
+                  // IngestionQueue unavailable in dev — non-fatal
+                }
+                promoted++;
+              }
+            }
+          } catch {
+            // Promotion failed — non-fatal, cron will catch up
+          }
         } else if (result.data.action === "reject") {
           await entity.reject(id, reviewedBy, result.data.reason);
         }
@@ -163,7 +192,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ succeeded, failed });
+    return NextResponse.json({ succeeded, failed, promoted });
   } catch (error) {
     log.error("Admin bulk discovery action error", { error: String(error) });
     return apiError("Failed to perform bulk action", 500);
