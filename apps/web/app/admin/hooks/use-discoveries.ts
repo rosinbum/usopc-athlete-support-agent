@@ -57,7 +57,7 @@ export function useDiscovery(id: string | null) {
 // ---------------------------------------------------------------------------
 
 interface DiscoveryActionArg {
-  action: "approve" | "reject" | "send_to_sources";
+  action: "approve" | "reject" | "send_to_sources" | "reprocess";
   reason?: string;
 }
 
@@ -75,7 +75,7 @@ export function useDiscoveryAction(id: string) {
 }
 
 interface BulkDiscoveryActionArg {
-  action: "approve" | "reject" | "send_to_sources";
+  action: "approve" | "reject" | "send_to_sources" | "reprocess";
   ids?: string[] | undefined;
   reason?: string | undefined;
 }
@@ -86,6 +86,8 @@ interface BulkDiscoveryResponse {
   duplicateUrl?: number;
   notApproved?: number;
   failed?: number;
+  queued?: number;
+  skipped?: number;
 }
 
 export function useBulkDiscoveryAction() {
