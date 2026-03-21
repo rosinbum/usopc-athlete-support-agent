@@ -33,6 +33,7 @@ const bulkSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("reprocess"),
     ids: z.array(z.string().min(1)).optional(),
+    erroredOnly: z.boolean().optional(),
   }),
 ]);
 
@@ -130,6 +131,10 @@ export async function POST(request: Request) {
           entity.getByStatus("pending_content"),
         ]);
         discoveries = [...pm, ...pc];
+
+        if (result.data.erroredOnly) {
+          discoveries = discoveries.filter((d) => d.lastError);
+        }
       }
 
       const { queued, failed } = await enqueueForReprocess(discoveries);

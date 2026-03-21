@@ -78,6 +78,7 @@ interface BulkDiscoveryActionArg {
   action: "approve" | "reject" | "send_to_sources" | "reprocess";
   ids?: string[] | undefined;
   reason?: string | undefined;
+  erroredOnly?: boolean | undefined;
 }
 
 interface BulkDiscoveryResponse {
