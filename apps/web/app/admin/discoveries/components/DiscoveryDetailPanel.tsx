@@ -10,6 +10,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  AlertCircle,
 } from "lucide-react";
 import type { DiscoveryStatus } from "@usopc/shared";
 import {
@@ -284,15 +285,6 @@ export function DiscoveryDetailPanel({
           {badge.label}
         </span>
       ),
-      ...(discovery.lastError
-        ? {
-            lastError: (
-              <span className="text-red-600 text-sm">
-                {discovery.lastError}
-              </span>
-            ),
-          }
-        : {}),
       reviewedAt: formatDateTime(discovery.reviewedAt, "N/A"),
       reviewedBy: discovery.reviewedBy ?? "N/A",
       rejectionReason: discovery.rejectionReason ?? "N/A",
@@ -339,6 +331,17 @@ export function DiscoveryDetailPanel({
           </span>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {discovery.lastError && (
+        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-red-800">Evaluation Error</p>
+            <p className="text-sm text-red-600 mt-1">{discovery.lastError}</p>
+          </div>
+        </div>
+      )}
 
       {/* Action Buttons */}
       {(isPending || canSendToSources || showApprove || showReject) && (
@@ -425,7 +428,7 @@ export function DiscoveryDetailPanel({
               ) : (
                 <RefreshCw className="w-4 h-4" />
               )}
-              Reprocess
+              Retry Evaluation
             </button>
           )}
         </div>
