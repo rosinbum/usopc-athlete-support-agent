@@ -14,10 +14,6 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
-    "Api": {
-      "type": "sst.aws.ApiGatewayV2"
-      "url": string
-    }
     "AppTable": {
       "name": string
       "type": "sst.aws.Dynamo"
@@ -26,9 +22,25 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
+    "AuthTable": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
     "ConversationMaxTurns": {
       "type": "sst.sst.Secret"
       "value": string
+    }
+    "DatabaseUrl": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "DiscoveryFeedDLQ": {
+      "type": "sst.aws.Queue"
+      "url": string
+    }
+    "DiscoveryFeedQueue": {
+      "type": "sst.aws.Queue"
+      "url": string
     }
     "DocumentsBucket": {
       "name": string
@@ -42,11 +54,19 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
+    "GoogleApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "LangchainApiKey": {
       "type": "sst.sst.Secret"
       "value": string
     }
     "OpenaiApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "ResendApiKey": {
       "type": "sst.sst.Secret"
       "value": string
     }
@@ -66,7 +86,7 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
-    "TrpcApiKey": {
+    "VoyageaiApiKey": {
       "type": "sst.sst.Secret"
       "value": string
     }

@@ -200,8 +200,12 @@ export default $config({
     ].join("");
 
     // Shared nodejs config for Lambdas that bundle pdf-parse / pdfjs-dist.
+    // - banner: stubs DOMMatrix/Path2D/ImageData before module load
+    // - install: moves pdfjs-dist to node_modules/ so pdf.worker.mjs is on disk
+    // - external: prevents bundling the native @napi-rs/canvas module
     const pdfjsNodejsConfig = {
       banner: pdfjsPolyfillBanner,
+      install: ["pdfjs-dist"],
       esbuild: { external: ["@napi-rs/canvas"] },
     };
 

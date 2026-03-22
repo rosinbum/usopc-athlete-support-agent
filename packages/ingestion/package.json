@@ -32,6 +32,7 @@
     "@usopc/shared": "workspace:*",
     "cheerio": "^1.0.0",
     "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^5.4.296",
     "pg": "^8.20.0",
     "zod": "^4.3.6"
   },
