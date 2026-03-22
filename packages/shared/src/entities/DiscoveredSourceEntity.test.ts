@@ -432,9 +432,9 @@ describe("DiscoveredSourceEntity", () => {
   });
 
   describe("recordError", () => {
-    it("should update lastError on a discovered source", async () => {
+    it("should update lastError and increment errorCount atomically", async () => {
       mockUpdate.mockResolvedValue(
-        internalItem({ lastError: "API credit exhausted" }),
+        internalItem({ lastError: "API credit exhausted", errorCount: 1 }),
       );
 
       await entity.recordError("abc123", "API credit exhausted");
@@ -444,6 +444,7 @@ describe("DiscoveredSourceEntity", () => {
           id: "abc123",
           lastError: "API credit exhausted",
         }),
+        { add: { errorCount: 1 } },
       );
     });
   });

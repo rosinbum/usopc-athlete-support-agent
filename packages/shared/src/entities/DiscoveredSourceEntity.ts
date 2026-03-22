@@ -405,13 +405,11 @@ export class DiscoveredSourceEntity {
    * Record an error message on a discovered source and increment errorCount.
    */
   async recordError(id: string, error: string): Promise<DiscoveredSource> {
-    await this.update(id, { lastError: error });
-    // Increment errorCount atomically via a second update since OneTable
-    // `update` doesn't support ADD expressions through the high-level API.
-    const result = await this.model.update({
-      id,
-      errorCount: { add: 1 },
-    } as never);
+    const now = new Date().toISOString();
+    const result = await this.model.update(
+      { id, lastError: error, updatedAt: now } as never,
+      { add: { errorCount: 1 } },
+    );
     return this.toExternal(result as unknown as Record<string, unknown>);
   }
 
