@@ -18,6 +18,26 @@ export default $config({
     const stage = $app.stage;
     const isProd = stage === "production";
 
+    // AWS AppRegistry — groups all resources under myApplications in the console
+    const appRegistry = new aws.servicecatalog.AppregistryApplication(
+      "AppRegistry",
+      {
+        name: `usopc-athlete-support-${stage}`,
+        description: `USOPC Athlete Support Agent (${stage})`,
+      },
+    );
+    const appTag = appRegistry.applicationTag;
+
+    /** Merge the AppRegistry applicationTag into a resource's tags. */
+    function withAppTag(existingTags: unknown) {
+      return $resolve([existingTags ?? {}, appTag]).apply(
+        ([existing, tag]) => ({
+          ...(existing as Record<string, string>),
+          ...(tag as Record<string, string>),
+        }),
+      );
+    }
+
     // Secrets
     const anthropicKey = new sst.Secret("AnthropicApiKey");
     const openaiKey = new sst.Secret("OpenaiApiKey");
@@ -49,7 +69,7 @@ export default $config({
         : undefined,
     );
 
-    const linkables: sst.Linkable<any>[] = [
+    const linkables = [
       anthropicKey,
       openaiKey,
       googleKey,
@@ -79,6 +99,7 @@ export default $config({
       transform: {
         table: (args) => {
           args.pointInTimeRecovery = { enabled: true };
+          args.tags = withAppTag(args.tags);
         },
       },
     });
@@ -96,11 +117,21 @@ export default $config({
         GSI1: { hashKey: "GSI1PK", rangeKey: "GSI1SK" },
       },
       ttl: "expires",
+      transform: {
+        table: (args) => {
+          args.tags = withAppTag(args.tags);
+        },
+      },
     });
 
     // S3 bucket for document storage (cache/archive)
     const documentsBucket = new sst.aws.Bucket("DocumentsBucket", {
       versioning: true,
+      transform: {
+        bucket: (args) => {
+          args.tags = withAppTag(args.tags);
+        },
+      },
     });
 
     // Custom domains — only for deployed stages (staging, production).
@@ -110,16 +141,19 @@ export default $config({
 
     // Slack bot webhook — $default catches /slack/events, /slack/commands,
     // and /slack/interactions so all Slack endpoints route to one Lambda.
-    const slackApi = new sst.aws.ApiGatewayV2("SlackApi", {
-      domain: isDeployed
+    const slackApi = new sst.aws.ApiGatewayV2(
+      "SlackApi",
+      isDeployed
         ? {
-            name: isProd
-              ? `slack.${domainZone}`
-              : `slack-${stage}.${domainZone}`,
-            dns: sst.aws.dns(),
+            domain: {
+              name: isProd
+                ? `slack.${domainZone}`
+                : `slack-${stage}.${domainZone}`,
+              dns: sst.aws.dns(),
+            },
           }
-        : undefined,
-    });
+        : {},
+    );
     const slackRoute = slackApi.route("$default", {
       handler: "apps/slack/src/index.handler",
       link: [...linkables, slackBotToken, slackSigningSecret, appTable],
@@ -130,12 +164,23 @@ export default $config({
     // Discovery feed queue — processes discovered URLs through the evaluation
     // pipeline asynchronously (metadata eval → content extraction → content eval).
     // Available in all stages so both the agent (Web) and discovery cron can publish.
-    const discoveryFeedDlq = new sst.aws.Queue("DiscoveryFeedDLQ");
+    const discoveryFeedDlq = new sst.aws.Queue("DiscoveryFeedDLQ", {
+      transform: {
+        queue: (args) => {
+          args.tags = withAppTag(args.tags);
+        },
+      },
+    });
     const discoveryFeedQueue = new sst.aws.Queue("DiscoveryFeedQueue", {
       visibilityTimeout: "10 minutes",
       dlq: {
         queue: discoveryFeedDlq.arn,
         retry: 2,
+      },
+      transform: {
+        queue: (args) => {
+          args.tags = withAppTag(args.tags);
+        },
       },
     });
 
@@ -151,6 +196,11 @@ export default $config({
       // Dead-letter queue (must also be FIFO to match main queue)
       ingestionDlq = new sst.aws.Queue("IngestionDLQ", {
         fifo: true,
+        transform: {
+          queue: (args) => {
+            args.tags = withAppTag(args.tags);
+          },
+        },
       });
 
       // Main ingestion queue
@@ -162,6 +212,11 @@ export default $config({
         dlq: {
           queue: ingestionDlq.arn,
           retry: 2,
+        },
+        transform: {
+          queue: (args) => {
+            args.tags = withAppTag(args.tags);
+          },
         },
       });
     }
@@ -434,12 +489,14 @@ export default $config({
         APP_URL: webDomain,
         EMAIL_FROM: `Athlete Support <noreply@${emailFromDomain}>`,
       },
-      domain: isDeployed
+      ...(isDeployed
         ? {
-            name: isProd ? domainZone : `${stage}.${domainZone}`,
-            dns: sst.aws.dns(),
+            domain: {
+              name: isProd ? domainZone : `${stage}.${domainZone}`,
+              dns: sst.aws.dns(),
+            },
           }
-        : undefined,
+        : {}),
       link: [
         ...linkables,
         conversationMaxTurns,
@@ -463,7 +520,7 @@ export default $config({
         alarmDescription: "Web Lambda errors > 5 in 5 minutes",
         namespace: "AWS/Lambda",
         metricName: "Errors",
-        dimensions: { FunctionName: web.nodes.server.nodes.function.name },
+        dimensions: { FunctionName: web.nodes.server!.nodes.function.name },
         statistic: "Sum",
         period: 300,
         evaluationPeriods: 1,
@@ -478,7 +535,7 @@ export default $config({
         alarmDescription: "Web Lambda p99 duration > 30s",
         namespace: "AWS/Lambda",
         metricName: "Duration",
-        dimensions: { FunctionName: web.nodes.server.nodes.function.name },
+        dimensions: { FunctionName: web.nodes.server!.nodes.function.name },
         extendedStatistic: "p99",
         period: 300,
         evaluationPeriods: 2,
@@ -499,7 +556,7 @@ export default $config({
         monitoringRefs.discoveryDlqName,
         monitoringRefs.ingestionDlqName,
         monitoringRefs.tableName,
-        web.nodes.server.nodes.function.name,
+        web.nodes.server!.nodes.function.name,
       ]).apply(
         ([
           slackFn,
