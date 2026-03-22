@@ -286,6 +286,7 @@ export default $config({
             NOTIFICATION_EMAIL: process.env.NOTIFICATION_EMAIL ?? "",
             SES_FROM_EMAIL: process.env.SES_FROM_EMAIL ?? "noreply@usopc.org",
           },
+          copyFiles: [{ from: "data/discovery-config.json" }],
         },
       });
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockContacts, mockReadFile } = vi.hoisted(() => {
-  const mockContacts = [
+const { mockContacts } = vi.hoisted(() => ({
+  mockContacts: [
     {
       organization: "USOPC Athlete Ombuds",
       role: "Independent advocate for athlete concerns",
@@ -52,15 +52,11 @@ const { mockContacts, mockReadFile } = vi.hoisted(() => {
         "Provides support services specific to USA Swimming athletes.",
       domains: ["team_selection", "eligibility"],
     },
-  ];
-  return {
-    mockContacts,
-    mockReadFile: vi.fn().mockResolvedValue(JSON.stringify(mockContacts)),
-  };
-});
+  ],
+}));
 
-vi.mock("node:fs/promises", () => ({
-  readFile: mockReadFile,
+vi.mock("../../../../data/contact-directory.json", () => ({
+  default: mockContacts,
 }));
 
 import { createLookupContactTool } from "./lookupContact.js";
@@ -227,25 +223,11 @@ describe("createLookupContactTool", () => {
     });
 
     it("should return helpful message when no domain match found", async () => {
-      // All valid domains have matches in our mock, but let's test the message format
       const result = await tool.invoke({
         organization: "Nonexistent",
         domain: "safesport",
       });
       expect(result).toContain("No contacts found");
-    });
-  });
-
-  describe("error handling", () => {
-    it("should handle file read errors gracefully", async () => {
-      const { readFile } = await import("node:fs/promises");
-      vi.mocked(readFile).mockRejectedValueOnce(new Error("File not found"));
-
-      // First call caches data, so create and call new tool
-      const newTool = createLookupContactTool();
-      const result = await newTool.invoke({ organization: "USADA" });
-      // Cached data still works
-      expect(result).toContain("USADA");
     });
   });
 
