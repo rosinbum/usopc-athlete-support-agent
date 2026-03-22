@@ -22,6 +22,7 @@ import { toIngestionSource } from "./cron.js";
 const logger = createLogger({ service: "discovery-feed-worker" });
 
 const DEFAULT_AUTO_APPROVAL_THRESHOLD = 0.7;
+const MAX_EXTRACTION_ERRORS = 3;
 
 /**
  * SQS-triggered Lambda handler that processes discovered URLs through the
@@ -78,7 +79,17 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
         // Record error on DDB item so it's visible in admin UI
         try {
           const id = urlToId(normalizeUrl(urlEntry.url));
-          await entity.recordError(id, errorMsg);
+          const updated = await entity.recordError(id, errorMsg);
+          if (updated.errorCount >= MAX_EXTRACTION_ERRORS) {
+            logger.warn(
+              `Rejecting URL after ${updated.errorCount} extraction errors: ${urlEntry.url}`,
+              { url: urlEntry.url, errorCount: updated.errorCount },
+            );
+            await entity.update(id, {
+              status: "rejected",
+              rejectionReason: `Permanently failed after ${updated.errorCount} extraction errors: ${errorMsg}`,
+            });
+          }
         } catch {
           // Don't let error recording crash the loop
         }
@@ -287,6 +298,7 @@ async function promoteAndEnqueue(
     rejectionReason: null,
     sourceConfigId: null,
     lastError: null,
+    errorCount: 0,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

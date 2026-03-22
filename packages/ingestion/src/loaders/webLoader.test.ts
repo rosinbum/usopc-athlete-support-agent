@@ -265,5 +265,56 @@ describe("loadWeb", () => {
 
       expect(docs[0]!.pageContent).toContain("Body content only");
     });
+
+    it("extracts content from ASP.NET WebForms pages wrapped in a form", async () => {
+      const html = `
+        <html>
+          <head><title>Anti-Doping | USA Track &amp; Field</title></head>
+          <body>
+            <form method="post" action="/governance/anti-doping" id="form">
+              <input type="hidden" name="__VIEWSTATE" value="abc123" />
+              <nav><a href="/">Home</a></nav>
+              <main>
+                <h1>Anti-Doping</h1>
+                <p>USATF is committed to clean sport.</p>
+              </main>
+              <footer>Copyright 2025</footer>
+            </form>
+          </body>
+        </html>
+      `;
+      mockFetchWithRetry.mockResolvedValueOnce(createMockResponse(html));
+
+      const docs = await loadWeb("https://usatf.org/governance/anti-doping");
+
+      expect(docs).toHaveLength(1);
+      expect(docs[0]!.pageContent).toContain("Anti-Doping");
+      expect(docs[0]!.pageContent).toContain("clean sport");
+      expect(docs[0]!.pageContent).not.toContain("Home");
+      expect(docs[0]!.pageContent).not.toContain("Copyright");
+    });
+
+    it("preserves content when page has both wrapper form and small forms", async () => {
+      const html = `
+        <html>
+          <body>
+            <form id="aspnetForm">
+              <main>
+                <p>Real content here</p>
+                <form class="search">
+                  <input type="text" />
+                  <button>Search</button>
+                </form>
+              </main>
+            </form>
+          </body>
+        </html>
+      `;
+      mockFetchWithRetry.mockResolvedValueOnce(createMockResponse(html));
+
+      const docs = await loadWeb("https://example.com/page.html");
+
+      expect(docs[0]!.pageContent).toContain("Real content here");
+    });
   });
 });
