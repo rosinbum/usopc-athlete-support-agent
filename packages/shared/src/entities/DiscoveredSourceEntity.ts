@@ -45,6 +45,7 @@ export interface DiscoveredSource {
   rejectionReason: string | null;
   sourceConfigId: string | null;
   lastError: string | null;
+  errorCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -125,6 +126,7 @@ export class DiscoveredSourceEntity {
       rejectionReason: (item.rejectionReason as string) ?? null,
       sourceConfigId: (item.sourceConfigId as string) ?? null,
       lastError: (item.lastError as string) ?? null,
+      errorCount: (item.errorCount as number) ?? 0,
       createdAt: item.createdAt as string,
       updatedAt: item.updatedAt as string,
     };
@@ -179,6 +181,7 @@ export class DiscoveredSourceEntity {
       rejectionReason: null,
       sourceConfigId: null,
       lastError: null,
+      errorCount: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -399,17 +402,22 @@ export class DiscoveredSourceEntity {
   }
 
   /**
-   * Record an error message on a discovered source.
+   * Record an error message on a discovered source and increment errorCount.
    */
-  async recordError(id: string, error: string): Promise<void> {
-    await this.update(id, { lastError: error });
+  async recordError(id: string, error: string): Promise<DiscoveredSource> {
+    const now = new Date().toISOString();
+    const result = await this.model.update(
+      { id, lastError: error, updatedAt: now } as never,
+      { add: { errorCount: 1 } },
+    );
+    return this.toExternal(result as unknown as Record<string, unknown>);
   }
 
   /**
-   * Clear any recorded error on a discovered source.
+   * Clear any recorded error on a discovered source and reset errorCount.
    */
   async clearError(id: string): Promise<void> {
-    await this.update(id, { lastError: null });
+    await this.update(id, { lastError: null, errorCount: 0 });
   }
 
   /**

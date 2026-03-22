@@ -101,6 +101,7 @@ export const AppTableSchema = {
       rejectionReason: { type: String },
       sourceConfigId: { type: String }, // if approved and created
       lastError: { type: String },
+      errorCount: { type: Number, default: 0 },
       createdAt: { type: String },
       updatedAt: { type: String },
     },
