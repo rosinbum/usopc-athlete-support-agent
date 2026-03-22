@@ -147,7 +147,7 @@ export default $config({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let monitoringRefs: Record<string, any> | undefined;
 
-    if (isProd) {
+    if (isDeployed) {
       // Dead-letter queue (must also be FIFO to match main queue)
       ingestionDlq = new sst.aws.Queue("IngestionDLQ", {
         fifo: true,
@@ -182,10 +182,9 @@ export default $config({
       },
     );
 
-    // Source discovery (weekly) - production only
-    // Document ingestion (weekly) - production only
+    // Source discovery, document ingestion, monitoring — deployed stages only
 
-    if (isProd) {
+    if (isDeployed) {
       const discoveryCron = new sst.aws.Cron("DiscoveryCron", {
         schedule: "cron(0 2 ? * MON *)", // Every Monday at 2 AM UTC
         job: {
@@ -458,7 +457,7 @@ export default $config({
     });
 
     // Web Lambda alarms + CloudWatch dashboard (needs web to be declared)
-    if (isProd && alarmTopic && monitoringRefs) {
+    if (isDeployed && alarmTopic && monitoringRefs) {
       // Web/Next.js server Lambda alarms
       new aws.cloudwatch.MetricAlarm("WebErrorsAlarm", {
         alarmDescription: "Web Lambda errors > 5 in 5 minutes",
@@ -662,7 +661,7 @@ export default $config({
       );
 
       new aws.cloudwatch.Dashboard("MonitoringDashboard", {
-        dashboardName: "usopc-athlete-support-production",
+        dashboardName: `usopc-athlete-support-${stage}`,
         dashboardBody: dashboardBody,
       });
     }
