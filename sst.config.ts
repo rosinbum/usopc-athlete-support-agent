@@ -184,6 +184,27 @@ export default $config({
       },
     });
 
+    // Polyfill browser globals that pdfjs-dist (via pdf-parse) expects at
+    // module load time. @napi-rs/canvas can't load on Lambda, so we stub the
+    // minimum surface area needed for text extraction (no rendering).
+    const pdfjsPolyfillBanner = [
+      `if(typeof globalThis.DOMMatrix==="undefined"){`,
+      `globalThis.DOMMatrix=class DOMMatrix{`,
+      `constructor(){this.a=1;this.b=0;this.c=0;this.d=1;this.e=0;this.f=0}`,
+      `multiplySelf(){return this}preMultiplySelf(){return this}`,
+      `translate(){return this}scale(){return this}invertSelf(){return this}`,
+      `static fromMatrix(){return new DOMMatrix()}};`,
+      `globalThis.Path2D=class Path2D{addPath(){}};`,
+      `globalThis.ImageData=class ImageData{`,
+      `constructor(w,h){this.width=w;this.height=h;this.data=new Uint8ClampedArray(w*h*4)}}}`,
+    ].join("");
+
+    // Shared nodejs config for Lambdas that bundle pdf-parse / pdfjs-dist.
+    const pdfjsNodejsConfig = {
+      banner: pdfjsPolyfillBanner,
+      esbuild: { external: ["@napi-rs/canvas"] },
+    };
+
     // Ingestion queue — created before DiscoveryFeedWorker so it can be linked
     // conditionally. Worker subscriber + crons are production-only (below).
     let ingestionQueue: sst.aws.Queue | undefined;
@@ -271,6 +292,7 @@ export default $config({
           link: [...linkables, appTable, documentsBucket],
           timeout: "15 minutes",
           memory: "1024 MB",
+          nodejs: pdfjsNodejsConfig,
         },
         {
           batch: { size: 1 },
@@ -285,6 +307,7 @@ export default $config({
           link: [...linkables, ingestionQueue, appTable, documentsBucket],
           timeout: "5 minutes",
           memory: "512 MB",
+          nodejs: pdfjsNodejsConfig,
         },
       });
 
