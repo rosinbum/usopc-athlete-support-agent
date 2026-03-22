@@ -1,10 +1,8 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { readFile } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { TopicDomain } from "../types/index.js";
 import { logger } from "@usopc/shared";
+import contactDirectoryData from "../../../../data/contact-directory.json";
 
 const TOPIC_DOMAINS = [
   "team_selection",
@@ -44,33 +42,8 @@ interface ContactEntry {
   domains: TopicDomain[];
 }
 
-/** Cached contacts loaded from the JSON file. */
-let cachedContacts: ContactEntry[] | null = null;
-
-function getDataFilePath(): string {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  return resolve(
-    __dirname,
-    "..",
-    "..",
-    "..",
-    "..",
-    "data",
-    "contact-directory.json",
-  );
-}
-
-async function loadContacts(): Promise<ContactEntry[]> {
-  if (cachedContacts) {
-    return cachedContacts;
-  }
-
-  const filePath = getDataFilePath();
-  const raw = await readFile(filePath, "utf-8");
-  cachedContacts = JSON.parse(raw) as ContactEntry[];
-  return cachedContacts;
-}
+/** Contacts bundled at build time from data/contact-directory.json. */
+const contacts: ContactEntry[] = contactDirectoryData as ContactEntry[];
 
 function formatContact(contact: ContactEntry): string {
   const lines: string[] = [
@@ -108,9 +81,7 @@ export function createLookupContactTool() {
       log.debug("Looking up contact", { organization, domain });
 
       try {
-        const contacts = await loadContacts();
-
-        let matches = contacts;
+        let matches: ContactEntry[] = [...contacts];
 
         // Filter by domain if specified
         if (domain) {
