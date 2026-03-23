@@ -549,7 +549,9 @@ export default $config({
         authTable,
         documentsBucket,
         discoveryFeedQueue,
+        discoveryFeedDlq,
         ...(ingestionQueue ? [ingestionQueue] : []),
+        ...(ingestionDlq ? [ingestionDlq] : []),
       ],
     });
 
