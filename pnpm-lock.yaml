@@ -112,6 +112,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1002.0
         version: 3.1002.0
+      '@tavily/core':
+        specifier: ^0.7.2
+        version: 0.7.2
       '@usopc/core':
         specifier: workspace:*
         version: link:../../packages/core
