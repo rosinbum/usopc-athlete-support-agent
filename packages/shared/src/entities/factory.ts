@@ -7,6 +7,7 @@ import { DiscoveredSourceEntity } from "./DiscoveredSourceEntity.js";
 import { InviteEntity } from "./InviteEntity.js";
 import { FeedbackEntity } from "./FeedbackEntity.js";
 import { AccessRequestEntity } from "./AccessRequestEntity.js";
+import { DiscoveryRunEntity } from "./DiscoveryRunEntity.js";
 import { getResource } from "../resources.js";
 
 const tableCache = new Map<string, Table<typeof AppTableSchema>>();
@@ -61,6 +62,14 @@ export function createAccessRequestEntity(
   tableName?: string,
 ): AccessRequestEntity {
   return new AccessRequestEntity(
+    getOrCreateAppTable(tableName ?? getAppTableName()),
+  );
+}
+
+export function createDiscoveryRunEntity(
+  tableName?: string,
+): DiscoveryRunEntity {
+  return new DiscoveryRunEntity(
     getOrCreateAppTable(tableName ?? getAppTableName()),
   );
 }
