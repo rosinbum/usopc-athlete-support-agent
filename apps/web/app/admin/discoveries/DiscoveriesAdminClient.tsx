@@ -11,6 +11,7 @@ import {
   Upload,
   RefreshCw,
   AlertCircle,
+  Compass,
 } from "lucide-react";
 import type { DiscoveryStatus } from "@usopc/shared";
 import { SlidePanel } from "../components/SlidePanel.js";
@@ -21,6 +22,7 @@ import { DiscoveryDetailPanel } from "./components/DiscoveryDetailPanel.js";
 import {
   useDiscoveries,
   useBulkDiscoveryAction,
+  useRunDiscovery,
 } from "../hooks/use-discoveries.js";
 
 // ---------------------------------------------------------------------------
@@ -133,6 +135,12 @@ export function DiscoveriesAdminClient() {
 
   const { trigger: triggerBulk, isMutating: bulkLoading } =
     useBulkDiscoveryAction();
+
+  const {
+    trigger: runDiscovery,
+    isMutating: isDiscovering,
+    data: discoveryResult,
+  } = useRunDiscovery();
 
   const error = actionError || (fetchError ? fetchError.message : null);
 
@@ -439,6 +447,40 @@ export function DiscoveriesAdminClient() {
 
   return (
     <div>
+      <div className="flex mb-6">
+        <button
+          onClick={async () => {
+            try {
+              await runDiscovery();
+              await mutate();
+            } catch {
+              // error is surfaced via the hook
+            }
+          }}
+          disabled={isDiscovering}
+          className="ml-auto px-4 py-2 text-sm rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+        >
+          {isDiscovering ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Compass className="w-4 h-4" />
+          )}
+          {isDiscovering ? "Discovering..." : "Run Discovery"}
+        </button>
+      </div>
+
+      {discoveryResult && !isDiscovering && !error && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+          Discovery complete: {discoveryResult.discovered} discovered,{" "}
+          {discoveryResult.enqueued} enqueued, {discoveryResult.skipped} skipped
+          {discoveryResult.errors > 0 && (
+            <span className="text-red-600">
+              , {discoveryResult.errors} errors
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <button

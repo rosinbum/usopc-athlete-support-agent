@@ -102,3 +102,27 @@ export function useBulkDiscoveryAction() {
 
   return { trigger, isMutating, error };
 }
+
+// ---------------------------------------------------------------------------
+// Discovery run hook
+// ---------------------------------------------------------------------------
+
+interface RunDiscoveryResponse {
+  success: boolean;
+  discovered: number;
+  enqueued: number;
+  skipped: number;
+  errors: number;
+}
+
+export function useRunDiscovery() {
+  const { trigger, isMutating, data, error } = useSWRMutation(
+    "/api/admin/discovery/run",
+    (url: string) =>
+      mutationFetcher<RunDiscoveryResponse>(url, {
+        arg: { method: "POST" },
+      }),
+  );
+
+  return { trigger, isMutating, data, error };
+}
