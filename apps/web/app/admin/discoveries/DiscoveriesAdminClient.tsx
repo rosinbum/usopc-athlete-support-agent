@@ -447,9 +447,7 @@ export function DiscoveriesAdminClient() {
 
   return (
     <div>
-      {/* Header with Run Discovery button */}
-      <div className="flex items-center justify-between mb-6">
-        <div />
+      <div className="flex mb-6">
         <button
           onClick={async () => {
             try {
@@ -460,7 +458,7 @@ export function DiscoveriesAdminClient() {
             }
           }}
           disabled={isDiscovering}
-          className="px-4 py-2 text-sm rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+          className="ml-auto px-4 py-2 text-sm rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
         >
           {isDiscovering ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -471,8 +469,7 @@ export function DiscoveriesAdminClient() {
         </button>
       </div>
 
-      {/* Discovery result banner */}
-      {discoveryResult && !isDiscovering && (
+      {discoveryResult && !isDiscovering && !error && (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
           Discovery complete: {discoveryResult.discovered} discovered,{" "}
           {discoveryResult.enqueued} enqueued, {discoveryResult.skipped} skipped
