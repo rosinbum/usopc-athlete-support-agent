@@ -7,7 +7,19 @@ interface QueueStats {
   inFlight: number;
 }
 
-interface JobsDashboardResponse {
+export interface LatestDiscoveryRun {
+  status: "running" | "completed" | "failed" | "timed_out";
+  triggeredBy: string;
+  startedAt: string;
+  completedAt?: string;
+  discovered?: number;
+  enqueued?: number;
+  skipped?: number;
+  errors?: number;
+  errorMessage?: string;
+}
+
+interface MonitoringDashboardResponse {
   queues: {
     discoveryFeed: QueueStats | null;
     discoveryFeedDlq: QueueStats | null;
@@ -21,20 +33,21 @@ interface JobsDashboardResponse {
     approved: number;
     rejected: number;
   };
+  latestDiscoveryRun: LatestDiscoveryRun | null;
   timestamp: string;
 }
 
-export function useJobs() {
-  const { data, error, isLoading, mutate } = useSWR<JobsDashboardResponse>(
-    "/api/admin/jobs",
-    fetcher,
-    { refreshInterval: 10_000 },
-  );
+export function useMonitoring() {
+  const { data, error, isLoading, mutate } =
+    useSWR<MonitoringDashboardResponse>("/api/admin/monitoring", fetcher, {
+      refreshInterval: 10_000,
+    });
 
   return {
     queues: data?.queues ?? null,
     recentJobs: data?.recentJobs ?? [],
     discoveryPipeline: data?.discoveryPipeline ?? null,
+    latestDiscoveryRun: data?.latestDiscoveryRun ?? null,
     timestamp: data?.timestamp ?? null,
     isLoading,
     error,

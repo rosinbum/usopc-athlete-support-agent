@@ -4,13 +4,14 @@ import {
   logger,
   createIngestionLogEntity,
   createDiscoveredSourceEntity,
+  createDiscoveryRunEntity,
   getResource,
   type DiscoveryStatus,
 } from "@usopc/shared";
 import { requireAdmin } from "../../../../lib/admin-api.js";
 import { apiError } from "../../../../lib/apiResponse.js";
 
-const log = logger.child({ service: "admin-jobs" });
+const log = logger.child({ service: "admin-monitoring" });
 
 const sqs = new SQSClient({});
 
@@ -73,7 +74,7 @@ async function getDiscoveryCounts(
 }
 
 // ---------------------------------------------------------------------------
-// GET — jobs dashboard data
+// GET — monitoring dashboard data
 // ---------------------------------------------------------------------------
 
 export async function GET() {
@@ -90,6 +91,7 @@ export async function GET() {
       ingestionDlq,
       recentJobs,
       discoveryPipeline,
+      rawDiscoveryRun,
     ] = await Promise.all([
       getQueueStats("DiscoveryFeedQueue"),
       getQueueStats("DiscoveryFeedDLQ"),
@@ -99,7 +101,19 @@ export async function GET() {
         .getRecent(50)
         .catch(() => []),
       getDiscoveryCounts(discoveryEntity),
+      createDiscoveryRunEntity()
+        .getLatest()
+        .catch(() => null),
     ]);
+
+    // Detect stale "running" status (Lambda timed out before updating)
+    const STALE_THRESHOLD_MS = 45_000; // 30s Lambda timeout + 15s buffer
+    const latestDiscoveryRun =
+      rawDiscoveryRun?.status === "running" &&
+      Date.now() - new Date(rawDiscoveryRun.startedAt).getTime() >
+        STALE_THRESHOLD_MS
+        ? { ...rawDiscoveryRun, status: "timed_out" as const }
+        : rawDiscoveryRun;
 
     return NextResponse.json({
       queues: {
@@ -110,10 +124,11 @@ export async function GET() {
       },
       recentJobs,
       discoveryPipeline,
+      latestDiscoveryRun,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    log.error("Admin jobs dashboard error", { error: String(error) });
-    return apiError("Failed to fetch jobs data", 500);
+    log.error("Admin monitoring dashboard error", { error: String(error) });
+    return apiError("Failed to fetch monitoring data", 500);
   }
 }

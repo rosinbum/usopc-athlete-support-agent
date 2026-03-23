@@ -166,6 +166,23 @@ export const AppTableSchema = {
       completedAt: { type: String },
       createdAt: { type: String },
     },
+    DiscoveryRun: {
+      pk: { type: String, value: "DiscoveryRun#latest" },
+      sk: { type: String, value: "DiscoveryRun" },
+      status: {
+        type: String,
+        required: true,
+        enum: ["running", "completed", "failed"] as const,
+      },
+      triggeredBy: { type: String, required: true },
+      startedAt: { type: String, required: true },
+      completedAt: { type: String },
+      discovered: { type: Number },
+      enqueued: { type: Number },
+      skipped: { type: Number },
+      errors: { type: Number },
+      errorMessage: { type: String },
+    },
     Prompt: {
       pk: { type: String, value: "Prompt#${name}" },
       sk: { type: String, value: "Prompt" },

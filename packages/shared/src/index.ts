@@ -118,6 +118,11 @@ export {
   type AccessRequestStatus,
   type CreateAccessRequestInput,
 } from "./entities/index.js";
+export {
+  createDiscoveryRunEntity,
+  DiscoveryRunEntity,
+  type DiscoveryRun,
+} from "./entities/index.js";
 export type {
   OlympicProgram,
   OrgStatus,

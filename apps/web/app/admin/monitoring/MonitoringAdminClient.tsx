@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { IngestionLog } from "@usopc/shared";
 import {
   Loader2,
   RefreshCw,
@@ -10,7 +11,10 @@ import {
   Activity,
 } from "lucide-react";
 import { formatDateTime } from "../../../lib/format-date.js";
-import { useJobs } from "../hooks/use-jobs.js";
+import {
+  useMonitoring,
+  type LatestDiscoveryRun,
+} from "../hooks/use-monitoring.js";
 
 // ---------------------------------------------------------------------------
 // Queue card
@@ -82,9 +86,7 @@ function PipelineCard({
 // Status badge
 // ---------------------------------------------------------------------------
 
-type IngestionStatus = "pending" | "in_progress" | "completed" | "failed";
-
-function statusStyle(status: IngestionStatus): string {
+function statusStyle(status: IngestionLog["status"]): string {
   switch (status) {
     case "pending":
       return "bg-gray-100 text-gray-700";
@@ -97,7 +99,7 @@ function statusStyle(status: IngestionStatus): string {
   }
 }
 
-function StatusBadge({ status }: { status: IngestionStatus }) {
+function StatusBadge({ status }: { status: IngestionLog["status"] }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusStyle(status)}`}
@@ -108,19 +110,132 @@ function StatusBadge({ status }: { status: IngestionStatus }) {
 }
 
 // ---------------------------------------------------------------------------
+// Discovery status indicators
+// ---------------------------------------------------------------------------
+
+function DiscoveryRunCard({ run }: { run: LatestDiscoveryRun | null }) {
+  if (!run) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500 mb-4">
+        <span className="inline-flex rounded-full h-2.5 w-2.5 bg-gray-300" />
+        No discovery runs recorded
+      </div>
+    );
+  }
+
+  if (run.status === "running") {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800 mb-4">
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+        </span>
+        Discovery run in progress — triggered by {run.triggeredBy}
+      </div>
+    );
+  }
+
+  if (run.status === "completed") {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800 mb-4">
+        <span className="inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+        Last run completed {formatDateTime(run.completedAt ?? null)} —{" "}
+        {run.discovered} discovered, {run.enqueued} enqueued, {run.skipped}{" "}
+        skipped
+        {(run.errors ?? 0) > 0 && (
+          <span className="text-red-600 ml-1">, {run.errors} errors</span>
+        )}
+      </div>
+    );
+  }
+
+  if (run.status === "failed") {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800 mb-4">
+        <span className="inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+        Last run failed {formatDateTime(run.completedAt ?? null)} — by{" "}
+        {run.triggeredBy}
+        {run.errorMessage && (
+          <span className="truncate max-w-[300px]" title={run.errorMessage}>
+            : {run.errorMessage}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // timed_out
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-2 text-sm text-yellow-800 mb-4">
+      <span className="inline-flex rounded-full h-2.5 w-2.5 bg-yellow-500" />
+      Last run timed out (started {formatDateTime(run.startedAt)}) — by{" "}
+      {run.triggeredBy}
+    </div>
+  );
+}
+
+function QueueActivityIndicator({
+  queues,
+  discoveryPipeline,
+}: {
+  queues: {
+    discoveryFeed: { visible: number; inFlight: number } | null;
+  } | null;
+  discoveryPipeline: {
+    pending_metadata: number;
+    pending_content: number;
+  } | null;
+}) {
+  const queueActive =
+    queues?.discoveryFeed &&
+    (queues.discoveryFeed.visible > 0 || queues.discoveryFeed.inFlight > 0);
+  const evaluating =
+    discoveryPipeline &&
+    (discoveryPipeline.pending_metadata > 0 ||
+      discoveryPipeline.pending_content > 0);
+
+  if (queueActive) {
+    const { visible, inFlight } = queues!.discoveryFeed!;
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800 mb-4">
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
+        </span>
+        Worker processing — {visible} queued, {inFlight} in flight
+      </div>
+    );
+  }
+
+  if (evaluating) {
+    const count =
+      discoveryPipeline!.pending_metadata + discoveryPipeline!.pending_content;
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-2 text-sm text-yellow-800 mb-4">
+        <span className="inline-flex rounded-full h-2.5 w-2.5 bg-yellow-400" />
+        Evaluation in progress — {count} sources being evaluated
+      </div>
+    );
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
-export function JobsAdminClient() {
+export function MonitoringAdminClient() {
   const {
     queues,
     recentJobs,
     discoveryPipeline,
+    latestDiscoveryRun,
     timestamp,
     isLoading,
     error,
     mutate,
-  } = useJobs();
+  } = useMonitoring();
   const [secondsAgo, setSecondsAgo] = useState(0);
 
   // Tick "last refreshed" counter
@@ -143,7 +258,7 @@ export function JobsAdminClient() {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-        <span className="ml-2 text-gray-500">Loading jobs data...</span>
+        <span className="ml-2 text-gray-500">Loading monitoring data...</span>
       </div>
     );
   }
@@ -216,6 +331,11 @@ export function JobsAdminClient() {
           <Activity className="h-5 w-5 text-gray-500" />
           Discovery Pipeline
         </h2>
+        <DiscoveryRunCard run={latestDiscoveryRun} />
+        <QueueActivityIndicator
+          queues={queues}
+          discoveryPipeline={discoveryPipeline}
+        />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <PipelineCard
             label="Pending Metadata"
@@ -240,16 +360,16 @@ export function JobsAdminClient() {
         </div>
       </section>
 
-      {/* Section 3: Recent jobs */}
+      {/* Section 3: Recent ingestion activity */}
       <section>
         <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
           <Clock className="h-5 w-5 text-gray-500" />
-          Recent Ingestion Jobs
+          Recent Ingestion Activity
         </h2>
 
         {recentJobs.length === 0 ? (
           <p className="text-gray-400 text-sm py-8 text-center">
-            No recent ingestion jobs found.
+            No recent ingestion activity.
           </p>
         ) : (
           <div className="overflow-x-auto rounded-lg border">
@@ -305,9 +425,16 @@ export function JobsAdminClient() {
                     <td className="px-4 py-2 text-right tabular-nums">
                       {job.chunksCount ?? "—"}
                     </td>
-                    <td className="px-4 py-2 max-w-[200px] truncate text-red-600">
+                    <td
+                      className={`px-4 py-2 ${job.errorMessage ? "text-red-600" : "text-gray-400"}`}
+                    >
                       {job.errorMessage ? (
-                        <span title={job.errorMessage}>{job.errorMessage}</span>
+                        <span
+                          className="block max-w-[300px] truncate cursor-help"
+                          title={job.errorMessage}
+                        >
+                          {job.errorMessage}
+                        </span>
                       ) : (
                         "—"
                       )}

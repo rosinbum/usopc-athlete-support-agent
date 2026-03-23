@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
 
-import { JobsAdminClient } from "./JobsAdminClient.js";
+import { MonitoringAdminClient } from "./MonitoringAdminClient.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -32,7 +32,6 @@ const DASHBOARD_RESPONSE = {
       sourceId: "src-1",
       sourceUrl: "https://example.com/doc.pdf",
       status: "completed" as const,
-      contentHash: "abc123",
       chunksCount: 12,
       startedAt: "2026-03-20T10:00:00.000Z",
       completedAt: "2026-03-20T10:05:00.000Z",
@@ -53,6 +52,16 @@ const DASHBOARD_RESPONSE = {
     approved: 15,
     rejected: 8,
   },
+  latestDiscoveryRun: {
+    status: "completed" as const,
+    triggeredBy: "admin@example.com",
+    startedAt: "2026-03-20T10:00:00.000Z",
+    completedAt: "2026-03-20T10:00:25.000Z",
+    discovered: 150,
+    enqueued: 120,
+    skipped: 30,
+    errors: 0,
+  },
   timestamp: new Date().toISOString(),
 };
 
@@ -60,11 +69,11 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("JobsAdminClient", () => {
+describe("MonitoringAdminClient", () => {
   it("renders loading state initially", () => {
-    global.fetch = vi.fn().mockReturnValue(new Promise(() => {})); // never resolves
-    renderWithSWR(<JobsAdminClient />);
-    expect(screen.getByText("Loading jobs data...")).toBeInTheDocument();
+    global.fetch = vi.fn().mockReturnValue(new Promise(() => {}));
+    renderWithSWR(<MonitoringAdminClient />);
+    expect(screen.getByText("Loading monitoring data...")).toBeInTheDocument();
   });
 
   it("renders queue stats after loading", async () => {
@@ -73,15 +82,14 @@ describe("JobsAdminClient", () => {
       json: () => Promise.resolve(DASHBOARD_RESPONSE),
     });
 
-    renderWithSWR(<JobsAdminClient />);
+    renderWithSWR(<MonitoringAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("Discovery Feed")).toBeInTheDocument();
     });
 
-    // Queue counts
-    expect(screen.getByText("3")).toBeInTheDocument(); // discovery visible
-    expect(screen.getByText("5")).toBeInTheDocument(); // ingestion visible
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
   });
 
   it("renders discovery pipeline counts", async () => {
@@ -90,25 +98,95 @@ describe("JobsAdminClient", () => {
       json: () => Promise.resolve(DASHBOARD_RESPONSE),
     });
 
-    renderWithSWR(<JobsAdminClient />);
+    renderWithSWR(<MonitoringAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("Pending Metadata")).toBeInTheDocument();
     });
 
     expect(screen.getByText("4")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("15")).toBeInTheDocument();
     expect(screen.getByText("8")).toBeInTheDocument();
   });
 
-  it("renders recent jobs table", async () => {
+  it("shows worker processing status when queue has messages", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(DASHBOARD_RESPONSE),
     });
 
-    renderWithSWR(<JobsAdminClient />);
+    renderWithSWR(<MonitoringAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Worker processing/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows completed discovery run", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(DASHBOARD_RESPONSE),
+    });
+
+    renderWithSWR(<MonitoringAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Last run completed/)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/150 discovered/)).toBeInTheDocument();
+    expect(screen.getByText(/120 enqueued/)).toBeInTheDocument();
+  });
+
+  it("shows running discovery run", async () => {
+    const runningResponse = {
+      ...DASHBOARD_RESPONSE,
+      latestDiscoveryRun: {
+        status: "running" as const,
+        triggeredBy: "admin@example.com",
+        startedAt: new Date().toISOString(),
+      },
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(runningResponse),
+    });
+
+    renderWithSWR(<MonitoringAdminClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Discovery run in progress/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows no discovery runs recorded when null", async () => {
+    const noRunResponse = {
+      ...DASHBOARD_RESPONSE,
+      latestDiscoveryRun: null,
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(noRunResponse),
+    });
+
+    renderWithSWR(<MonitoringAdminClient />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/No discovery runs recorded/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("renders recent activity table", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(DASHBOARD_RESPONSE),
+    });
+
+    renderWithSWR(<MonitoringAdminClient />);
 
     await waitFor(() => {
       expect(
@@ -119,7 +197,7 @@ describe("JobsAdminClient", () => {
     expect(screen.getByText("completed")).toBeInTheDocument();
     expect(screen.getByText("failed")).toBeInTheDocument();
     expect(screen.getByText("Connection timeout")).toBeInTheDocument();
-    expect(screen.getByText("12")).toBeInTheDocument(); // chunks count
+    expect(screen.getByText("12")).toBeInTheDocument();
   });
 
   it("handles null queues (dev environment)", async () => {
@@ -138,7 +216,7 @@ describe("JobsAdminClient", () => {
       json: () => Promise.resolve(devResponse),
     });
 
-    renderWithSWR(<JobsAdminClient />);
+    renderWithSWR(<MonitoringAdminClient />);
 
     await waitFor(() => {
       expect(screen.getAllByText("N/A").length).toBeGreaterThanOrEqual(3);
@@ -152,7 +230,7 @@ describe("JobsAdminClient", () => {
       json: () => Promise.resolve({ error: "Internal server error" }),
     });
 
-    renderWithSWR(<JobsAdminClient />);
+    renderWithSWR(<MonitoringAdminClient />);
 
     await waitFor(() => {
       expect(screen.getByText("Internal server error")).toBeInTheDocument();
@@ -161,7 +239,7 @@ describe("JobsAdminClient", () => {
     expect(screen.getByText("Retry")).toBeInTheDocument();
   });
 
-  it("shows empty state when no recent jobs", async () => {
+  it("shows empty state when no recent activity", async () => {
     const emptyResponse = {
       ...DASHBOARD_RESPONSE,
       recentJobs: [],
@@ -172,11 +250,11 @@ describe("JobsAdminClient", () => {
       json: () => Promise.resolve(emptyResponse),
     });
 
-    renderWithSWR(<JobsAdminClient />);
+    renderWithSWR(<MonitoringAdminClient />);
 
     await waitFor(() => {
       expect(
-        screen.getByText("No recent ingestion jobs found."),
+        screen.getByText("No recent ingestion activity."),
       ).toBeInTheDocument();
     });
   });
