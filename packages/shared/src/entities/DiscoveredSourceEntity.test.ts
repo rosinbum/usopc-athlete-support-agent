@@ -102,7 +102,7 @@ describe("DiscoveredSourceEntity", () => {
           id: "abc123",
           status: "pending_metadata",
         }),
-        { exists: null },
+        { exists: false },
       );
     });
 

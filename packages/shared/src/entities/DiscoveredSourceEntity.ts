@@ -192,7 +192,7 @@ export class DiscoveredSourceEntity {
     });
 
     await this.model.create(this.toInternal(discovery) as never, {
-      exists: null,
+      exists: false,
     });
     return discovery;
   }
