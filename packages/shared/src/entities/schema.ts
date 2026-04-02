@@ -100,6 +100,8 @@ export const AppTableSchema = {
       reviewedBy: { type: String },
       rejectionReason: { type: String },
       sourceConfigId: { type: String }, // if approved and created
+      lastError: { type: String },
+      errorCount: { type: Number, default: 0 },
       createdAt: { type: String },
       updatedAt: { type: String },
     },
@@ -163,6 +165,23 @@ export const AppTableSchema = {
       startedAt: { type: String, required: true },
       completedAt: { type: String },
       createdAt: { type: String },
+    },
+    DiscoveryRun: {
+      pk: { type: String, value: "DiscoveryRun#latest" },
+      sk: { type: String, value: "DiscoveryRun" },
+      status: {
+        type: String,
+        required: true,
+        enum: ["running", "completed", "failed"] as const,
+      },
+      triggeredBy: { type: String, required: true },
+      startedAt: { type: String, required: true },
+      completedAt: { type: String },
+      discovered: { type: Number },
+      enqueued: { type: Number },
+      skipped: { type: Number },
+      errors: { type: Number },
+      errorMessage: { type: String },
     },
     Prompt: {
       pk: { type: String, value: "Prompt#${name}" },

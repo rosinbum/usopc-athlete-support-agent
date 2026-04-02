@@ -102,7 +102,7 @@ describe("DiscoveredSourceEntity", () => {
           id: "abc123",
           status: "pending_metadata",
         }),
-        { exists: null },
+        { exists: false },
       );
     });
 
@@ -427,6 +427,40 @@ describe("DiscoveredSourceEntity", () => {
           reviewedBy: "admin@example.com",
           rejectionReason: "Not relevant",
         }),
+      );
+    });
+  });
+
+  describe("recordError", () => {
+    it("should update lastError and increment errorCount atomically", async () => {
+      mockUpdate.mockResolvedValue(
+        internalItem({ lastError: "API credit exhausted", errorCount: 1 }),
+      );
+
+      await entity.recordError("abc123", "API credit exhausted");
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "abc123",
+          lastError: "API credit exhausted",
+        }),
+        { add: { errorCount: 1 } },
+      );
+    });
+  });
+
+  describe("clearError", () => {
+    it("should clear lastError on a discovered source", async () => {
+      mockUpdate.mockResolvedValue(internalItem());
+
+      await entity.clearError("abc123");
+
+      // lastError: null is stripped by toInternal, so it should NOT appear
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.not.objectContaining({ lastError: "API credit exhausted" }),
+      );
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "abc123" }),
       );
     });
   });

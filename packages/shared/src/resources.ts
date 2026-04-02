@@ -4,7 +4,9 @@ interface AppResources {
   AppTable: { name: string };
   AuthTable: { name: string };
   IngestionQueue: { url: string };
+  IngestionDLQ: { url: string };
   DiscoveryFeedQueue: { url: string };
+  DiscoveryFeedDLQ: { url: string };
   DocumentsBucket: { name: string };
 }
 

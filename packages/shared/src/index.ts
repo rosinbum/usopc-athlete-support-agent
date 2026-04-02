@@ -83,6 +83,7 @@ export {
 } from "./entities/index.js";
 export {
   DiscoveredSourceEntity,
+  REPROCESSABLE_STATUSES,
   type DiscoveredSource,
   type CreateDiscoveredSourceInput,
   type DiscoveryMethod,
@@ -117,6 +118,11 @@ export {
   type AccessRequestStatus,
   type CreateAccessRequestInput,
 } from "./entities/index.js";
+export {
+  createDiscoveryRunEntity,
+  DiscoveryRunEntity,
+  type DiscoveryRun,
+} from "./entities/index.js";
 export type {
   OlympicProgram,
   OrgStatus,
@@ -131,3 +137,9 @@ export { normalizeUrl, urlToId } from "./url.js";
 export { getResource } from "./resources.js";
 
 export { ParamBuilder } from "./paramBuilder.js";
+
+export {
+  sendDiscoveryToSources,
+  type SendToSourcesResult,
+  type SendToSourcesOptions,
+} from "./services/discoveryPromotion.js";

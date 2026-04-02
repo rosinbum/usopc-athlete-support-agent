@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { logger } from "@usopc/shared";
+import { REPROCESSABLE_STATUSES, logger } from "@usopc/shared";
 import { auth } from "../../../../../auth.js";
 
 const log = logger.child({ service: "admin-discoveries" });
@@ -9,6 +9,8 @@ import { createDiscoveredSourceEntity } from "../../../../../lib/discovered-sour
 import { apiError } from "../../../../../lib/apiResponse.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 import { sendDiscoveryToSources } from "../../../../../lib/send-to-sources.js";
+import { triggerIngestion } from "../../../../../lib/services/source-service.js";
+import { enqueueForReprocess } from "../../../../../lib/services/discovery-reprocess.js";
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -25,6 +27,9 @@ const patchSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("send_to_sources"),
+  }),
+  z.object({
+    action: z.literal("reprocess"),
   }),
 ]);
 
@@ -114,6 +119,21 @@ export async function PATCH(
     }
 
     // -----------------------------------------------------------------------
+    // reprocess
+    // -----------------------------------------------------------------------
+    if (action === "reprocess") {
+      if (!REPROCESSABLE_STATUSES.has(existing.status)) {
+        return apiError(
+          "Only discoveries with pending_metadata or pending_content status can be reprocessed",
+          400,
+        );
+      }
+
+      await enqueueForReprocess([existing]);
+      return NextResponse.json({ queued: true, id });
+    }
+
+    // -----------------------------------------------------------------------
     // approve / reject
     // -----------------------------------------------------------------------
     const session = await auth();
@@ -121,7 +141,28 @@ export async function PATCH(
 
     if (action === "approve") {
       await entity.approve(id, reviewedBy);
-    } else {
+
+      try {
+        const scEntity = createSourceConfigEntity();
+        const promoteResult = await sendDiscoveryToSources(
+          { ...existing, status: "approved" as const },
+          scEntity,
+          entity,
+        );
+        if (promoteResult.status === "created" && promoteResult.sourceConfig) {
+          try {
+            await triggerIngestion(promoteResult.sourceConfig);
+          } catch {
+            // IngestionQueue unavailable in dev — non-fatal
+          }
+        }
+      } catch (error) {
+        log.warn("Auto-promote after approval failed", {
+          discoveryId: id,
+          error: String(error),
+        });
+      }
+    } else if (result.data.action === "reject") {
       await entity.reject(id, reviewedBy, result.data.reason);
     }
 

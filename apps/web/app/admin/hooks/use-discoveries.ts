@@ -57,7 +57,7 @@ export function useDiscovery(id: string | null) {
 // ---------------------------------------------------------------------------
 
 interface DiscoveryActionArg {
-  action: "approve" | "reject" | "send_to_sources";
+  action: "approve" | "reject" | "send_to_sources" | "reprocess";
   reason?: string;
 }
 
@@ -75,9 +75,10 @@ export function useDiscoveryAction(id: string) {
 }
 
 interface BulkDiscoveryActionArg {
-  action: "approve" | "reject" | "send_to_sources";
+  action: "approve" | "reject" | "send_to_sources" | "reprocess";
   ids?: string[] | undefined;
   reason?: string | undefined;
+  erroredOnly?: boolean | undefined;
 }
 
 interface BulkDiscoveryResponse {
@@ -86,6 +87,8 @@ interface BulkDiscoveryResponse {
   duplicateUrl?: number;
   notApproved?: number;
   failed?: number;
+  queued?: number;
+  skipped?: number;
 }
 
 export function useBulkDiscoveryAction() {
@@ -98,4 +101,28 @@ export function useBulkDiscoveryAction() {
   );
 
   return { trigger, isMutating, error };
+}
+
+// ---------------------------------------------------------------------------
+// Discovery run hook
+// ---------------------------------------------------------------------------
+
+interface RunDiscoveryResponse {
+  success: boolean;
+  discovered: number;
+  enqueued: number;
+  skipped: number;
+  errors: number;
+}
+
+export function useRunDiscovery() {
+  const { trigger, isMutating, data, error } = useSWRMutation(
+    "/api/admin/discovery/run",
+    (url: string) =>
+      mutationFetcher<RunDiscoveryResponse>(url, {
+        arg: { method: "POST" },
+      }),
+  );
+
+  return { trigger, isMutating, data, error };
 }

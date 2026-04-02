@@ -32,6 +32,7 @@
     "@usopc/shared": "workspace:*",
     "cheerio": "^1.0.0",
     "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^5.4.296",
     "pg": "^8.20.0",
     "zod": "^4.3.6"
   },
@@ -39,7 +40,7 @@
     "@smithy/util-stream": "^4.5.17",
     "@types/aws-lambda": "^8.10.161",
     "@types/pg": "^8.18.0",
-    "sst": "4.1.10",
+    "sst": "4.5.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"

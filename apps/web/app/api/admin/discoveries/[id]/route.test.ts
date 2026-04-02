@@ -23,16 +23,31 @@ vi.mock("../../../../../lib/send-to-sources.js", () => ({
   sendDiscoveryToSources: vi.fn(),
 }));
 
+vi.mock("../../../../../lib/services/source-service.js", () => ({
+  triggerIngestion: vi.fn().mockResolvedValue({ triggered: true }),
+}));
+
+vi.mock("../../../../../lib/services/discovery-reprocess.js", () => ({
+  enqueueForReprocess: vi.fn().mockResolvedValue({ queued: 1, failed: 0 }),
+}));
+
+vi.mock("@usopc/shared", () => ({
+  REPROCESSABLE_STATUSES: new Set(["pending_metadata", "pending_content"]),
+  logger: { child: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() }) },
+}));
+
 import { auth } from "../../../../../auth.js";
 import { createDiscoveredSourceEntity } from "../../../../../lib/discovered-source.js";
 import { createSourceConfigEntity } from "../../../../../lib/source-config.js";
 import { sendDiscoveryToSources } from "../../../../../lib/send-to-sources.js";
+import { enqueueForReprocess } from "../../../../../lib/services/discovery-reprocess.js";
 import { GET, PATCH } from "./route.js";
 
 const mockAuth = vi.mocked(auth);
 const mockCreateEntity = vi.mocked(createDiscoveredSourceEntity);
 const mockCreateSCEntity = vi.mocked(createSourceConfigEntity);
 const mockSendToSources = vi.mocked(sendDiscoveryToSources);
+const mockEnqueue = vi.mocked(enqueueForReprocess);
 
 const SAMPLE_DISCOVERY = {
   id: "disc-1",
@@ -172,10 +187,14 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
     mockCreateEntity.mockReturnValueOnce({
       getById: vi
         .fn()
-        .mockResolvedValueOnce(SAMPLE_DISCOVERY)
-        .mockResolvedValueOnce(approved),
+        .mockResolvedValueOnce(SAMPLE_DISCOVERY) // initial existence check
+        .mockResolvedValueOnce(approved), // final response fetch
       approve: vi.fn().mockResolvedValueOnce(undefined),
     } as never);
+    mockSendToSources.mockResolvedValueOnce({
+      discoveryId: "disc-1",
+      status: "not_approved",
+    });
 
     const res = await PATCH(
       jsonRequest({ action: "approve" }),
@@ -331,5 +350,87 @@ describe("PATCH /api/admin/discoveries/[id]", () => {
 
     expect(res.status).toBe(500);
     expect(body.error).toBe("DynamoDB error");
+  });
+
+  // -------------------------------------------------------------------------
+  // reprocess
+  // -------------------------------------------------------------------------
+
+  it("reprocess sends SQS message for pending_metadata discovery", async () => {
+    const pendingMetadata = { ...SAMPLE_DISCOVERY, status: "pending_metadata" };
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com", role: "admin" as const },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getById: vi.fn().mockResolvedValueOnce(pendingMetadata),
+    } as never);
+
+    const res = await PATCH(
+      jsonRequest({ action: "reprocess" }),
+      makeParams("disc-1"),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.queued).toBe(true);
+    expect(mockEnqueue).toHaveBeenCalledWith([
+      expect.objectContaining({ url: "https://example.com" }),
+    ]);
+  });
+
+  it("reprocess sends SQS message for pending_content discovery", async () => {
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com", role: "admin" as const },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getById: vi.fn().mockResolvedValueOnce(SAMPLE_DISCOVERY),
+    } as never);
+
+    const res = await PATCH(
+      jsonRequest({ action: "reprocess" }),
+      makeParams("disc-1"),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.queued).toBe(true);
+  });
+
+  it("reprocess returns 400 for approved discovery", async () => {
+    const approved = { ...SAMPLE_DISCOVERY, status: "approved" };
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com", role: "admin" as const },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getById: vi.fn().mockResolvedValueOnce(approved),
+    } as never);
+
+    const res = await PATCH(
+      jsonRequest({ action: "reprocess" }),
+      makeParams("disc-1"),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain("pending_metadata or pending_content");
+  });
+
+  it("reprocess returns 400 for rejected discovery", async () => {
+    const rejected = { ...SAMPLE_DISCOVERY, status: "rejected" };
+    mockAuth.mockResolvedValueOnce({
+      user: { email: "admin@test.com", role: "admin" as const },
+    } as never);
+    mockCreateEntity.mockReturnValueOnce({
+      getById: vi.fn().mockResolvedValueOnce(rejected),
+    } as never);
+
+    const res = await PATCH(
+      jsonRequest({ action: "reprocess" }),
+      makeParams("disc-1"),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain("pending_metadata or pending_content");
   });
 });

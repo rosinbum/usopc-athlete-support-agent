@@ -13,6 +13,7 @@ vi.mock("@usopc/shared", () => ({
   getSecretValue: vi.fn(() => "test-anthropic-key"),
   createAppTable: vi.fn(() => ({})),
   DiscoveredSourceEntity: vi.fn(),
+  REPROCESSABLE_STATUSES: new Set(["pending_metadata", "pending_content"]),
   normalizeUrl: vi.fn((url: string) => url),
   urlToId: vi.fn(() => "test-id-hash"),
 }));
@@ -94,6 +95,8 @@ function makeMockEntity() {
     approve: vi.fn(),
     reject: vi.fn(),
     linkToSourceConfig: vi.fn(),
+    recordError: vi.fn().mockResolvedValue({ errorCount: 1 }),
+    clearError: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -323,6 +326,106 @@ describe("discoveryFeedWorker", () => {
     expect(result.batchItemFailures).toEqual([{ itemIdentifier: "bad-msg" }]);
   });
 
+  it("records error on DDB item when metadata eval fails", async () => {
+    mockEntity.create.mockResolvedValue({});
+    mockEvalService.evaluateMetadata.mockRejectedValueOnce(
+      new Error("Anthropic API credit exhausted"),
+    );
+
+    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
+
+    await handler(event);
+
+    expect(mockEntity.recordError).toHaveBeenCalledWith(
+      "test-id-hash",
+      "Anthropic API credit exhausted",
+    );
+  });
+
+  it("re-evaluates existing pending_metadata record instead of skipping", async () => {
+    mockEntity.create.mockRejectedValueOnce(
+      new Error("Conditional check failed"),
+    );
+    mockEntity.getById.mockResolvedValueOnce({
+      id: "test-id-hash",
+      status: "pending_metadata",
+      url: "https://usopc.org/stuck",
+    });
+
+    const event = makeEvent([
+      makeMessage([{ url: "https://usopc.org/stuck" }]),
+    ]);
+
+    await handler(event);
+
+    expect(mockEvalService.evaluateMetadata).toHaveBeenCalled();
+  });
+
+  it("re-evaluates existing pending_content record instead of skipping", async () => {
+    mockEntity.create.mockRejectedValueOnce(
+      new Error("Conditional check failed"),
+    );
+    mockEntity.getById.mockResolvedValueOnce({
+      id: "test-id-hash",
+      status: "pending_content",
+      url: "https://usopc.org/stuck",
+    });
+
+    const event = makeEvent([
+      makeMessage([{ url: "https://usopc.org/stuck" }]),
+    ]);
+
+    await handler(event);
+
+    expect(mockEvalService.evaluateMetadata).toHaveBeenCalled();
+  });
+
+  it("still skips existing approved record", async () => {
+    mockEntity.create.mockRejectedValueOnce(
+      new Error("Conditional check failed"),
+    );
+    mockEntity.getById.mockResolvedValueOnce({
+      id: "test-id-hash",
+      status: "approved",
+      url: "https://usopc.org/approved",
+    });
+
+    const event = makeEvent([
+      makeMessage([{ url: "https://usopc.org/approved" }]),
+    ]);
+
+    await handler(event);
+
+    expect(mockEvalService.evaluateMetadata).not.toHaveBeenCalled();
+  });
+
+  it("clears error after successful re-evaluation of stuck URL", async () => {
+    mockEntity.create.mockRejectedValueOnce(
+      new Error("Conditional check failed"),
+    );
+    mockEntity.getById.mockResolvedValueOnce({
+      id: "test-id-hash",
+      status: "pending_metadata",
+      url: "https://usopc.org/stuck",
+    });
+
+    const event = makeEvent([
+      makeMessage([{ url: "https://usopc.org/stuck" }]),
+    ]);
+
+    await handler(event);
+
+    expect(mockEntity.clearError).toHaveBeenCalledWith("test-id-hash");
+  });
+
+  it("does not call clearError for fresh URLs", async () => {
+    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
+
+    await handler(event);
+
+    expect(mockEntity.clearError).not.toHaveBeenCalled();
+  });
+
   it("uses autoApprovalThreshold from message when provided", async () => {
     const event = makeEvent([
       makeMessage([{ url: "https://usopc.org/doc1" }], {
@@ -339,6 +442,47 @@ describe("discoveryFeedWorker", () => {
       expect.any(Object),
       expect.any(String),
       0.9,
+    );
+  });
+
+  it("rejects URL after MAX_EXTRACTION_ERRORS consecutive failures", async () => {
+    mockEntity.create.mockResolvedValue({});
+    mockEvalService.evaluateMetadata.mockRejectedValueOnce(
+      new Error("Content extraction failed"),
+    );
+    mockEntity.recordError.mockResolvedValueOnce({ errorCount: 3 });
+
+    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
+
+    await handler(event);
+
+    expect(mockEntity.recordError).toHaveBeenCalledWith(
+      "test-id-hash",
+      "Content extraction failed",
+    );
+    expect(mockEntity.update).toHaveBeenCalledWith("test-id-hash", {
+      status: "rejected",
+      rejectionReason: expect.stringContaining(
+        "Permanently failed after 3 extraction errors",
+      ),
+    });
+  });
+
+  it("does not reject URL when errorCount is below threshold", async () => {
+    mockEntity.create.mockResolvedValue({});
+    mockEvalService.evaluateMetadata.mockRejectedValueOnce(
+      new Error("Transient error"),
+    );
+    mockEntity.recordError.mockResolvedValueOnce({ errorCount: 2 });
+
+    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
+
+    await handler(event);
+
+    expect(mockEntity.recordError).toHaveBeenCalled();
+    expect(mockEntity.update).not.toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ status: "rejected" }),
     );
   });
 });

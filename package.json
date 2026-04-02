@@ -29,7 +29,8 @@
     "@vitest/coverage-v8": "^2.1.9",
     "node-pg-migrate": "^8.0.4",
     "prettier": "^3.4.2",
-    "sst": "4.1.10",
+    "sst": "4.5.1",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   },
@@ -42,7 +43,10 @@
       "h3": ">=1.15.5",
       "axios": ">=1.13.5",
       "rollup": ">=4.59.0",
-      "undici": ">=7.24.0"
+      "undici": ">=7.24.0",
+      "fast-xml-parser": ">=5.5.6",
+      "path-to-regexp": ">=8.4.0",
+      "handlebars": ">=4.7.9"
     },
     "patchedDependencies": {
       "@langchain/community": "patches/@langchain__community.patch"

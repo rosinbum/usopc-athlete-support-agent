@@ -9,6 +9,9 @@ import {
   Clock,
   Eye,
   Upload,
+  RefreshCw,
+  AlertCircle,
+  Compass,
 } from "lucide-react";
 import type { DiscoveryStatus } from "@usopc/shared";
 import { SlidePanel } from "../components/SlidePanel.js";
@@ -19,6 +22,7 @@ import { DiscoveryDetailPanel } from "./components/DiscoveryDetailPanel.js";
 import {
   useDiscoveries,
   useBulkDiscoveryAction,
+  useRunDiscovery,
 } from "../hooks/use-discoveries.js";
 
 // ---------------------------------------------------------------------------
@@ -132,6 +136,12 @@ export function DiscoveriesAdminClient() {
   const { trigger: triggerBulk, isMutating: bulkLoading } =
     useBulkDiscoveryAction();
 
+  const {
+    trigger: runDiscovery,
+    isMutating: isDiscovering,
+    data: discoveryResult,
+  } = useRunDiscovery();
+
   const error = actionError || (fetchError ? fetchError.message : null);
 
   // -------------------------------------------------------------------------
@@ -139,23 +149,36 @@ export function DiscoveriesAdminClient() {
   // -------------------------------------------------------------------------
 
   const stats = useMemo(() => {
-    const total = discoveries.length;
-    const pendingReview = discoveries.filter(
-      (d) => d.status === "pending_content" || d.status === "pending_metadata",
-    ).length;
-    const approved = discoveries.filter((d) => d.status === "approved").length;
-    const rejected = discoveries.filter((d) => d.status === "rejected").length;
-    const sentToSources = discoveries.filter((d) => d.sourceConfigId).length;
-    const approvedUnlinked = discoveries.filter(
-      (d) => d.status === "approved" && !d.sourceConfigId,
-    ).length;
+    let pendingReview = 0,
+      approved = 0,
+      rejected = 0,
+      sentToSources = 0,
+      approvedUnlinked = 0,
+      withErrors = 0;
+
+    for (const d of discoveries) {
+      const isPending =
+        d.status === "pending_content" || d.status === "pending_metadata";
+      if (isPending) {
+        pendingReview++;
+        if (d.lastError) withErrors++;
+      } else if (d.status === "approved") {
+        approved++;
+        if (!d.sourceConfigId) approvedUnlinked++;
+      } else if (d.status === "rejected") {
+        rejected++;
+      }
+      if (d.sourceConfigId) sentToSources++;
+    }
+
     return {
-      total,
+      total: discoveries.length,
       pendingReview,
       approved,
       rejected,
       sentToSources,
       approvedUnlinked,
+      withErrors,
     };
   }, [discoveries]);
 
@@ -338,6 +361,43 @@ export function DiscoveriesAdminClient() {
     }
   }
 
+  async function bulkReprocess(
+    opts: {
+      ids?: string[];
+      erroredOnly?: boolean;
+    } = {},
+  ) {
+    setActionError(null);
+    try {
+      const data = await triggerBulk({
+        action: "reprocess",
+        ...(opts.ids ? { ids: opts.ids } : {}),
+        ...(opts.erroredOnly ? { erroredOnly: true } : {}),
+      });
+      const parts: string[] = [];
+      const queuedLabel = opts.erroredOnly
+        ? "queued for retry"
+        : "queued for reprocessing";
+      if (data && data.queued && data.queued > 0)
+        parts.push(`${data.queued} ${queuedLabel}`);
+      if (!opts.erroredOnly && data && data.skipped && data.skipped > 0)
+        parts.push(`${data.skipped} skipped (not pending)`);
+      if (data && data.failed && data.failed > 0)
+        parts.push(`${data.failed} failed`);
+      const label = opts.erroredOnly ? "Retry Errored" : "Retry";
+      const fallback = opts.erroredOnly
+        ? "No errored discoveries to retry"
+        : "No pending discoveries to retry";
+      window.alert(
+        parts.length > 0 ? `${label}: ${parts.join(", ")}` : fallback,
+      );
+      if (!opts.erroredOnly) setSelected(new Set());
+      await mutate();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Retry failed");
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Sort handler
   // -------------------------------------------------------------------------
@@ -387,6 +447,40 @@ export function DiscoveriesAdminClient() {
 
   return (
     <div>
+      <div className="flex mb-6">
+        <button
+          onClick={async () => {
+            try {
+              await runDiscovery();
+              await mutate();
+            } catch {
+              // error is surfaced via the hook
+            }
+          }}
+          disabled={isDiscovering}
+          className="ml-auto px-4 py-2 text-sm rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+        >
+          {isDiscovering ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Compass className="w-4 h-4" />
+          )}
+          {isDiscovering ? "Discovering..." : "Run Discovery"}
+        </button>
+      </div>
+
+      {discoveryResult && !isDiscovering && !error && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+          Discovery complete: {discoveryResult.discovered} discovered,{" "}
+          {discoveryResult.enqueued} enqueued, {discoveryResult.skipped} skipped
+          {discoveryResult.errors > 0 && (
+            <span className="text-red-600">
+              , {discoveryResult.errors} errors
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <button
@@ -425,6 +519,12 @@ export function DiscoveriesAdminClient() {
             <span className="text-sm">Pending Review</span>
           </div>
           <p className="text-2xl font-bold">{stats.pendingReview}</p>
+          {stats.withErrors > 0 && (
+            <p className="text-xs text-red-500 flex items-center gap-1 mt-0.5">
+              <AlertCircle className="w-3 h-3" />
+              {stats.withErrors} with errors
+            </p>
+          )}
         </button>
 
         <button
@@ -487,21 +587,53 @@ export function DiscoveriesAdminClient() {
         </button>
       </div>
 
-      {/* Send All Approved to Sources */}
-      {stats.approvedUnlinked > 0 && (
+      {/* Bulk action buttons */}
+      {(stats.approvedUnlinked > 0 ||
+        stats.pendingReview > 0 ||
+        stats.withErrors > 0) && (
         <div className="flex items-center gap-3 mb-4">
-          <button
-            onClick={() => bulkSendToSources()}
-            disabled={bulkLoading}
-            className="px-4 py-2 text-sm rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
-          >
-            {bulkLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Upload className="w-4 h-4" />
-            )}
-            Send All Approved to Sources ({stats.approvedUnlinked})
-          </button>
+          {stats.approvedUnlinked > 0 && (
+            <button
+              onClick={() => bulkSendToSources()}
+              disabled={bulkLoading}
+              className="px-4 py-2 text-sm rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {bulkLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Upload className="w-4 h-4" />
+              )}
+              Send All Approved to Sources ({stats.approvedUnlinked})
+            </button>
+          )}
+          {stats.pendingReview > 0 && (
+            <button
+              onClick={() => bulkReprocess()}
+              disabled={bulkLoading}
+              className="px-4 py-2 text-sm rounded-lg font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {bulkLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              Retry Pending Evaluations ({stats.pendingReview})
+            </button>
+          )}
+          {stats.withErrors > 0 && (
+            <button
+              onClick={() => bulkReprocess({ erroredOnly: true })}
+              disabled={bulkLoading}
+              className="px-4 py-2 text-sm rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {bulkLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <AlertCircle className="w-4 h-4" />
+              )}
+              Retry Errored ({stats.withErrors})
+            </button>
+          )}
         </div>
       )}
 
@@ -597,6 +729,14 @@ export function DiscoveriesAdminClient() {
           >
             <Upload className="w-3 h-3" />
             Send to Sources
+          </button>
+          <button
+            onClick={() => bulkReprocess({ ids: Array.from(selected) })}
+            disabled={bulkLoading}
+            className="px-3 py-1 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50 flex items-center gap-1"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Retry Evaluation
           </button>
           {bulkLoading && <Loader2 className="w-4 h-4 animate-spin" />}
         </div>
@@ -704,6 +844,14 @@ export function DiscoveriesAdminClient() {
                     >
                       {badge.label}
                     </span>
+                    {d.lastError && (
+                      <span
+                        className="inline-block ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700"
+                        title={d.lastError}
+                      >
+                        Error
+                      </span>
+                    )}
                     {d.sourceConfigId && (
                       <span className="inline-block ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
                         Sent

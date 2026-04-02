@@ -70,7 +70,7 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}) {
           includeDomains: [...TRUSTED_DOMAINS],
         });
 
-        const response = await tavilySearch.invoke({ query });
+        const response = await tavilySearch.invoke(query);
 
         if (!response) {
           return "No web search results found. The query may be too specific or the trusted domains may not have relevant content. Try broadening your search.";

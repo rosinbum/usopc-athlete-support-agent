@@ -7,8 +7,10 @@ import {
   CheckCircle2,
   XCircle,
   Upload,
+  RefreshCw,
   ChevronLeft,
   ChevronRight,
+  AlertCircle,
 } from "lucide-react";
 import type { DiscoveryStatus } from "@usopc/shared";
 import {
@@ -145,6 +147,17 @@ export function DiscoveryDetailPanel({
       setActionError(
         err instanceof Error ? err.message : "Send to sources failed",
       );
+    }
+  }
+
+  async function handleReprocess() {
+    setActionError(null);
+    try {
+      await triggerAction({ action: "reprocess" });
+      await mutate();
+      onMutate();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Reprocess failed");
     }
   }
 
@@ -319,6 +332,17 @@ export function DiscoveryDetailPanel({
         </div>
       </div>
 
+      {/* Error Banner */}
+      {discovery.lastError && (
+        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-red-800">Evaluation Error</p>
+            <p className="text-sm text-red-600 mt-1">{discovery.lastError}</p>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       {(isPending || canSendToSources || showApprove || showReject) && (
         <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -390,6 +414,21 @@ export function DiscoveryDetailPanel({
                 <Upload className="w-4 h-4" />
               )}
               Send to Sources
+            </button>
+          )}
+
+          {isPending && (
+            <button
+              onClick={handleReprocess}
+              disabled={actionLoading}
+              className="px-4 py-2 text-sm rounded-lg font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 flex items-center gap-1"
+            >
+              {actionLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              Retry Evaluation
             </button>
           )}
         </div>

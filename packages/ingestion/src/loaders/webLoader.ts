@@ -22,7 +22,6 @@ const STRIP_SELECTORS = [
   ".cookie-banner",
   ".advertisement",
   "#cookie-notice",
-  "form",
   ".sidebar",
   "aside",
   "#sidebar",
@@ -87,6 +86,12 @@ export async function loadWeb(
   for (const selector of STRIP_SELECTORS) {
     $(selector).remove();
   }
+
+  // Unwrap <form> elements instead of removing them — ASP.NET WebForms sites
+  // wrap the entire <body> in a <form>, so removing it destroys all content.
+  $("form").each(function () {
+    $(this).replaceWith($(this).html() || "");
+  });
 
   // Try to locate the main content container; fall back to <body>
   let rootSelector = "body";

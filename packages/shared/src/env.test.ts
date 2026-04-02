@@ -141,9 +141,18 @@ describe("getDatabaseUrl", () => {
     );
   });
 
-  it("returns local dev default when NODE_ENV is unset and no other source", () => {
+  it("throws when NODE_ENV is unset and no other source (prevents silent localhost fallback in CI)", () => {
     delete process.env.DATABASE_URL;
     delete process.env.NODE_ENV;
+
+    expect(() => getDatabaseUrl()).toThrow(
+      "DATABASE_URL is not set and SST DatabaseUrl secret is not available",
+    );
+  });
+
+  it("returns local dev default when NODE_ENV is explicitly development", () => {
+    delete process.env.DATABASE_URL;
+    process.env.NODE_ENV = "development";
 
     expect(getDatabaseUrl()).toBe(
       "postgresql://postgres:postgres@localhost:5432/usopc_athlete_support",
