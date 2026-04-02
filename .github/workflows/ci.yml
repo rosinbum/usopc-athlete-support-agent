@@ -32,7 +32,7 @@ jobs:
       - run: pnpm --filter @usopc/web test -- --coverage
 
       - name: Download coverage baseline
-        uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
+        uses: dawidd6/action-download-artifact@8a338493df3d275e4a7a63bcff3b8fe97e51a927 # v19
         continue-on-error: true
         with:
           workflow: coverage-baseline.yml
