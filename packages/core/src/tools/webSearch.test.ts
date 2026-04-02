@@ -52,9 +52,7 @@ describe("createWebSearchTool", () => {
 
       await tool.invoke({ query: "team selection criteria" });
 
-      expect(mockInvoke).toHaveBeenCalledWith({
-        query: "team selection criteria",
-      });
+      expect(mockInvoke).toHaveBeenCalledWith("team selection criteria");
     });
 
     it("should return search results as JSON string", async () => {
