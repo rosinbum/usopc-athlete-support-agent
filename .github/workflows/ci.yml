@@ -23,7 +23,6 @@ jobs:
 
       - name: Audit dependencies
         run: pnpm audit --audit-level=high
-        continue-on-error: true
 
       - run: pnpm --filter @usopc/core test -- --coverage
       - run: pnpm --filter @usopc/shared test -- --coverage
