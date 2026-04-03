@@ -525,6 +525,10 @@ export default $config({
     // Next.js web app
     const web = new sst.aws.Nextjs("Web", {
       path: "apps/web",
+      server: {
+        timeout: "60 seconds",
+        memory: "1024 MB",
+      },
       environment: {
         APP_URL: webDomain,
         EMAIL_FROM: `Athlete Support <noreply@${emailFromDomain}>`,
