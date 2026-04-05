@@ -119,11 +119,11 @@ jobs:
           script: |
             export APP_DIR="$HOME/app"
             if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
-              "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}"
+              "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}" "staging"
             else
               # First deploy — clone and run
               git clone git@github.com:${{ github.repository }}.git "$APP_DIR"
-              "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}"
+              "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}" "staging"
             fi
 
       - name: Smoke test Web
@@ -184,10 +184,10 @@ jobs:
           script: |
             export APP_DIR="$HOME/app"
             if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
-              "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}"
+              "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}" "production"
             else
               git clone git@github.com:${{ github.repository }}.git "$APP_DIR"
-              "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}"
+              "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}" "production"
             fi
 
       - name: Smoke test Web
@@ -259,7 +259,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             export APP_DIR="$HOME/app"
-            "$APP_DIR/scripts/deploy-ec2.sh" "${{ steps.prev-tag.outputs.tag }}"
+            "$APP_DIR/scripts/deploy-ec2.sh" "${{ steps.prev-tag.outputs.tag }}" "production"
 
       - name: Smoke test Web
         run: |

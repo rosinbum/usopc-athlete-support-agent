@@ -3,11 +3,13 @@
 # Run directly on the EC2 instance, or via SSH from CI.
 #
 # Usage:
-#   ./scripts/deploy-ec2.sh              # deploy latest main
-#   ./scripts/deploy-ec2.sh v1.2.3       # deploy a specific tag
+#   ./scripts/deploy-ec2.sh                       # deploy latest main to production
+#   ./scripts/deploy-ec2.sh v1.2.3                # deploy a specific tag to production
+#   ./scripts/deploy-ec2.sh v1.2.3 staging        # deploy a tag to a specific stage
 set -euo pipefail
 
 TAG="${1:-}"
+STAGE="${2:-production}"
 REPO_URL="${REPO_URL:-git@github.com:rosinbum/usopc-athlete-support-agent.git}"
 APP_DIR="${APP_DIR:-$HOME/app}"
 
@@ -43,6 +45,11 @@ cp -r apps/web/public apps/web/.next/standalone/apps/web/public 2>/dev/null || t
 
 echo "==> Building Slack bot"
 pnpm --filter @usopc/slack build
+
+echo "==> Syncing SST environment bindings (stage: $STAGE)"
+"$APP_DIR/scripts/sync-sst-env.sh" "$STAGE"
+# shellcheck source=/dev/null
+set -a; source "$APP_DIR/.env.ec2"; set +a
 
 echo "==> Restarting PM2 processes"
 pm2 restart ecosystem.config.cjs --update-env 2>/dev/null || pm2 start ecosystem.config.cjs
