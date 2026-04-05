@@ -117,9 +117,14 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd ~/app
-            TAG="${{ github.ref_name }}"
-            ./scripts/deploy-ec2.sh "$TAG"
+            export APP_DIR="$HOME/app"
+            if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
+              "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}"
+            else
+              # First deploy — clone and run
+              git clone git@github.com:${{ github.repository }}.git "$APP_DIR"
+              "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}"
+            fi
 
       - name: Smoke test Web
         run: |
@@ -177,8 +182,13 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd ~/app
-            ./scripts/deploy-ec2.sh "${{ inputs.tag }}"
+            export APP_DIR="$HOME/app"
+            if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
+              "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}"
+            else
+              git clone git@github.com:${{ github.repository }}.git "$APP_DIR"
+              "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}"
+            fi
 
       - name: Smoke test Web
         run: |
@@ -248,10 +258,15 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd ~/app
-            ./scripts/deploy-ec2.sh "${{ steps.prev-tag.outputs.tag }}"
+            export APP_DIR="$HOME/app"
+            "$APP_DIR/scripts/deploy-ec2.sh" "${{ steps.prev-tag.outputs.tag }}"
 
       - name: Smoke test Web
         run: |
           curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
             "https://athlete-agent.rosinbum.org/api/health"
+
+      - name: Smoke test Slack
+        run: |
+          curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
+            "https://slack.athlete-agent.rosinbum.org/health"

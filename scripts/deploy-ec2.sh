@@ -8,7 +8,14 @@
 set -euo pipefail
 
 TAG="${1:-}"
-APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_URL="${REPO_URL:-git@github.com:rosinbum/usopc-athlete-support-agent.git}"
+APP_DIR="${APP_DIR:-$HOME/app}"
+
+# Clone on first deploy, otherwise just fetch
+if [ ! -d "$APP_DIR/.git" ]; then
+  echo "==> First deploy — cloning repo"
+  git clone "$REPO_URL" "$APP_DIR"
+fi
 
 cd "$APP_DIR"
 
