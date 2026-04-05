@@ -101,15 +101,19 @@ jobs:
           echo "::add-mask::$DB_URL"
           DATABASE_URL="$DB_URL" ./node_modules/.bin/tsx scripts/run-migrations.ts
 
-      # Phase 1: SST deploy (Lambda workers, crons, DynamoDB, SQS, S3)
+      # Phase 1: SST deploy (Lambda workers, crons, DynamoDB, SQS, S3, EC2 instance)
       - name: Deploy SST infrastructure
-        run: npx sst deploy --stage staging
+        id: sst
+        run: |
+          npx sst deploy --stage staging 2>&1 | tee deploy-output.txt
+          EC2_IP=$(grep -oP 'ec2PublicIp:\s+\K\S+' deploy-output.txt || true)
+          echo "ec2_ip=$EC2_IP" >> "$GITHUB_OUTPUT"
 
       # Phase 2: Deploy web + Slack to EC2 via SSH
       - name: Deploy apps to EC2
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ steps.sst.outputs.ec2_ip || secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
@@ -157,15 +161,19 @@ jobs:
           echo "::add-mask::$DB_URL"
           DATABASE_URL="$DB_URL" ./node_modules/.bin/tsx scripts/run-migrations.ts
 
-      # Phase 1: SST deploy (Lambda workers, crons, DynamoDB, SQS, S3)
+      # Phase 1: SST deploy (Lambda workers, crons, DynamoDB, SQS, S3, EC2 instance)
       - name: Deploy SST infrastructure
-        run: npx sst deploy --stage production
+        id: sst
+        run: |
+          npx sst deploy --stage production 2>&1 | tee deploy-output.txt
+          EC2_IP=$(grep -oP 'ec2PublicIp:\s+\K\S+' deploy-output.txt || true)
+          echo "ec2_ip=$EC2_IP" >> "$GITHUB_OUTPUT"
 
       # Phase 2: Deploy web + Slack to EC2 via SSH
       - name: Deploy apps to EC2
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ steps.sst.outputs.ec2_ip || secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
@@ -225,15 +233,18 @@ jobs:
 
       # Phase 1: Rollback SST infrastructure
       - name: Redeploy previous SST infrastructure
+        id: sst
         run: |
           echo "Deploying ${{ steps.prev-tag.outputs.tag }} to production"
-          npx sst deploy --stage production
+          npx sst deploy --stage production 2>&1 | tee deploy-output.txt
+          EC2_IP=$(grep -oP 'ec2PublicIp:\s+\K\S+' deploy-output.txt || true)
+          echo "ec2_ip=$EC2_IP" >> "$GITHUB_OUTPUT"
 
       # Phase 2: Rollback EC2 apps
       - name: Rollback EC2 apps
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ steps.sst.outputs.ec2_ip || secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |

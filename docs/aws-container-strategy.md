@@ -214,14 +214,12 @@ Alternatively, keep **CloudFront in front** and point the origin to the EC2 inst
 
 ### Environment Variables
 
-Secrets currently injected by SST `link` need to be loaded on the EC2 instance. Options:
+Secrets currently injected by SST `link` need to be loaded on the EC2 instance. The instance has an IAM role (provisioned by SST) with access to DynamoDB, SQS, S3, SSM, and CloudWatch. Options for loading secrets:
 
-1. **AWS Systems Manager Parameter Store** — store secrets as SecureString parameters, load at startup via a shell script or `dotenv`-style loader. Free for standard parameters.
-2. **AWS Secrets Manager** — same approach, $0.40/secret/month.
-3. **SST `sst shell`** — run `sst shell -- pm2 start ecosystem.config.cjs` to inject linked secrets as environment variables. Works if SST is installed on the instance.
+1. **SST `sst shell`** (recommended) — run `sst shell --stage production -- pm2 start ecosystem.config.cjs` to inject all linked secrets and resource bindings as environment variables. Works because SST is installed as a devDependency and the instance has SSM access.
+2. **`scripts/sync-sst-env.sh`** — extracts SST bindings into `.env.ec2`, then source it before starting PM2. Good for debugging or when `sst shell` is unavailable.
+3. **AWS Systems Manager Parameter Store** — store secrets as SecureString parameters, load at startup. Free for standard parameters.
 4. **`.env` file** — simplest, but requires secure handling (restricted permissions, not in git).
-
-Recommended: **Parameter Store** for production, **`.env` file** for staging/dev.
 
 ### Deployment
 
@@ -318,37 +316,33 @@ Compare this to the Fargate approach (~$115/month) or Fargate with Savings Plans
 
 ## Migration Plan
 
-### Phase 1: Provision and Configure EC2 (1 day)
+### Phase 1: SST Deploy — Provision EC2 Infrastructure
 
-- [ ] Launch t3.small in us-east-1, Amazon Linux 2023 or Ubuntu 24.04
-- [ ] Assign Elastic IP
-- [ ] Configure security group: 80, 443 inbound; outbound to Neon PostgreSQL, DynamoDB, SQS, external APIs
-- [ ] Install Node.js 20, pnpm, PM2, Nginx
-- [ ] Set up Let's Encrypt (certbot) or configure CloudFront origin
-- [ ] Clone repo, `pnpm install`, build both apps
-- [ ] Configure PM2 ecosystem file, enable startup
-- [ ] Configure Nginx reverse proxy with SSE-friendly settings
-- [ ] Load secrets (Parameter Store, `.env`, or `sst shell`)
+The EC2 instance, security group, IAM role, Elastic IP, and Route 53 records are all defined in `sst.config.ts` and provisioned automatically by `sst deploy`. The user data script installs Node.js 20, pnpm, PM2, and Nginx on first boot.
 
-### Phase 2: Validate Chat Streaming (1 day)
+**Prerequisites** (one-time manual steps):
 
-- [ ] Point a test subdomain at the EC2 instance
+- [ ] Set SSH public key: `sst secret set Ec2SshPublicKey "ssh-rsa ..." --stage production`
+- [ ] Add `EC2_SSH_KEY` (private key) to GitHub Actions secrets
+- [ ] Run `sst deploy --stage production` to provision the instance
+
+### Phase 2: First App Deploy + Validation
+
+- [ ] SSH to instance, clone repo, run `scripts/deploy-ec2.sh`
+- [ ] Configure Nginx with the template from `infra/ec2/nginx.conf`
+- [ ] Set up Let's Encrypt (certbot) for TLS certificates
 - [ ] Test chat endpoint — verify SSE streaming works end-to-end
 - [ ] Measure time-to-first-token (should be <1s vs. 2–5s with cold Lambda)
-- [ ] Test Slack bot on the same instance
 - [ ] Verify PM2 restarts on process crash
-- [ ] Test deploy script (git pull + rebuild + pm2 restart)
+- [ ] Test Slack bot on the same instance
 
-### Phase 3: DNS Cutover + Monitoring (1 day)
+### Phase 3: Monitoring Setup
 
-- [ ] Update DNS for `athlete-agent.rosinbum.org` to EC2 (or CloudFront → EC2)
 - [ ] Update Slack app URL to point to new Slack endpoint
 - [ ] Set up CloudWatch Agent for instance metrics
 - [ ] Set up Route 53 health check + SNS alarm
-- [ ] Remove `sst.aws.Nextjs` and `sst.aws.ApiGatewayV2` (Slack) from SST config
-- [ ] Keep old Lambda config commented out for easy rollback
 
-**Estimated total: 2–3 days.** The simplest migration path of all options.
+**Estimated total: 1–2 days.** Most infrastructure is automated via SST.
 
 ---
 

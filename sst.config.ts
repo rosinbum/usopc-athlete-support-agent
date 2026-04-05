@@ -474,6 +474,225 @@ export default $config({
       } // end if (isProd) monitoring
     }
 
+    // --- EC2 Instance for Web + Slack (deployed stages only) ---
+
+    let ec2PublicIp: string | undefined;
+
+    if (isDeployed) {
+      // SSH key pair — set with: sst secret set Ec2SshPublicKey "ssh-rsa ..." --stage production
+      const ec2SshPublicKey = new sst.Secret("Ec2SshPublicKey");
+
+      const keyPair = new aws.ec2.KeyPair("AppKeyPair", {
+        keyName: `usopc-athlete-support-${stage}`,
+        publicKey: ec2SshPublicKey.value,
+        tags: withAppTag({ Name: `usopc-athlete-support-${stage}` }),
+      });
+
+      // Security group — HTTP, HTTPS, SSH inbound; all outbound
+      const defaultVpc = aws.ec2.getVpcOutput({ default: true });
+
+      const sg = new aws.ec2.SecurityGroup("AppSg", {
+        vpcId: defaultVpc.id,
+        description: `USOPC Athlete Support EC2 (${stage})`,
+        ingress: [
+          {
+            protocol: "tcp",
+            fromPort: 22,
+            toPort: 22,
+            cidrBlocks: ["0.0.0.0/0"],
+            description: "SSH",
+          },
+          {
+            protocol: "tcp",
+            fromPort: 80,
+            toPort: 80,
+            cidrBlocks: ["0.0.0.0/0"],
+            description: "HTTP",
+          },
+          {
+            protocol: "tcp",
+            fromPort: 443,
+            toPort: 443,
+            cidrBlocks: ["0.0.0.0/0"],
+            description: "HTTPS",
+          },
+        ],
+        egress: [
+          {
+            protocol: "-1",
+            fromPort: 0,
+            toPort: 0,
+            cidrBlocks: ["0.0.0.0/0"],
+            description: "All outbound",
+          },
+        ],
+        tags: withAppTag({ Name: `usopc-athlete-support-${stage}` }),
+      });
+
+      // IAM role — grants EC2 access to DynamoDB, SQS, S3, SSM, CloudWatch
+      const ec2Role = new aws.iam.Role("AppEc2Role", {
+        assumeRolePolicy: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: { Service: "ec2.amazonaws.com" },
+              Action: "sts:AssumeRole",
+            },
+          ],
+        }),
+        tags: withAppTag({ Name: `usopc-athlete-support-${stage}` }),
+      });
+
+      // Scoped policy for our specific resources
+      const policyDoc = $resolve([
+        appTable.nodes.table.arn,
+        authTable.nodes.table.arn,
+        documentsBucket.nodes.bucket.arn,
+        discoveryFeedQueue.nodes.queue.arn,
+        discoveryFeedDlq.nodes.queue.arn,
+        ...(ingestionQueue ? [ingestionQueue.nodes.queue.arn] : []),
+        ...(ingestionDlq ? [ingestionDlq.nodes.queue.arn] : []),
+      ]).apply((arns) => {
+        const [appArn, authArn, bucketArn, ...queueArns] = arns;
+        return JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:BatchGetItem",
+                "dynamodb:BatchWriteItem",
+              ],
+              Resource: [
+                appArn,
+                `${appArn}/index/*`,
+                authArn,
+                `${authArn}/index/*`,
+              ],
+            },
+            {
+              Effect: "Allow",
+              Action: [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:ListBucket",
+              ],
+              Resource: [bucketArn, `${bucketArn}/*`],
+            },
+            {
+              Effect: "Allow",
+              Action: [
+                "sqs:SendMessage",
+                "sqs:ReceiveMessage",
+                "sqs:DeleteMessage",
+                "sqs:GetQueueAttributes",
+              ],
+              Resource: queueArns,
+            },
+          ],
+        });
+      });
+
+      new aws.iam.RolePolicy("AppEc2ResourcePolicy", {
+        role: ec2Role.name,
+        policy: policyDoc,
+      });
+
+      // SSM access (for `sst shell` to resolve secrets on the instance)
+      new aws.iam.RolePolicyAttachment("AppEc2Ssm", {
+        role: ec2Role.name,
+        policyArn: "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+      });
+
+      // CloudWatch Agent (for instance metrics)
+      new aws.iam.RolePolicyAttachment("AppEc2Cw", {
+        role: ec2Role.name,
+        policyArn: "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy",
+      });
+
+      const instanceProfile = new aws.iam.InstanceProfile("AppEc2Profile", {
+        role: ec2Role.name,
+      });
+
+      // Latest Amazon Linux 2023 AMI
+      const ami = aws.ec2.getAmiOutput({
+        mostRecent: true,
+        owners: ["amazon"],
+        filters: [
+          { name: "name", values: ["al2023-ami-2023.*-x86_64"] },
+          { name: "state", values: ["available"] },
+        ],
+      });
+
+      // Bootstrap script — installs system deps on first boot
+      const userData = [
+        "#!/bin/bash",
+        "set -e",
+        "dnf install -y nodejs20 nginx git",
+        "alternatives --install /usr/bin/node node /usr/bin/node-20 20",
+        "alternatives --install /usr/bin/npm npm /usr/bin/npm-20 20",
+        "corepack enable",
+        "corepack prepare pnpm@9 --activate",
+        "npm install -g pm2",
+        "mkdir -p /home/ec2-user/app",
+        "chown ec2-user:ec2-user /home/ec2-user/app",
+        "systemctl enable nginx",
+        "systemctl start nginx",
+        "env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user",
+      ].join("\n");
+
+      const instance = new aws.ec2.Instance("AppInstance", {
+        instanceType: "t3.small",
+        ami: ami.id,
+        keyName: keyPair.keyName,
+        vpcSecurityGroupIds: [sg.id],
+        iamInstanceProfile: instanceProfile.name,
+        userData,
+        rootBlockDevice: {
+          volumeSize: 20,
+          volumeType: "gp3",
+        },
+        tags: withAppTag({ Name: `usopc-athlete-support-${stage}` }),
+      });
+
+      // Elastic IP
+      const eip = new aws.ec2.Eip("AppEip", {
+        instance: instance.id,
+        tags: withAppTag({ Name: `usopc-athlete-support-${stage}` }),
+      });
+
+      ec2PublicIp = eip.publicIp;
+
+      // Route 53 DNS records pointing to the EIP
+      const zone = aws.route53.getZoneOutput({
+        name: "athlete-agent.rosinbum.org",
+      });
+
+      new aws.route53.Record("WebDnsRecord", {
+        zoneId: zone.zoneId,
+        name: isProd ? domainZone : `${stage}.${domainZone}`,
+        type: "A",
+        ttl: 300,
+        records: [eip.publicIp],
+      });
+
+      new aws.route53.Record("SlackDnsRecord", {
+        zoneId: zone.zoneId,
+        name: isProd ? `slack.${domainZone}` : `slack-${stage}.${domainZone}`,
+        type: "A",
+        ttl: 300,
+        records: [eip.publicIp],
+      });
+    }
+
     // Computed web domain and email sender for the Next.js app
     const webDomain = isDeployed
       ? `https://${isProd ? domainZone : `${stage}.${domainZone}`}`
@@ -706,6 +925,7 @@ export default $config({
         `https://${isProd ? `slack.${domainZone}` : `slack-${stage}.${domainZone}`}`,
       sourceConfigTableName: appTable.name,
       documentsBucketName: documentsBucket.name,
+      ...(ec2PublicIp ? { ec2PublicIp } : {}),
     };
   },
 });
