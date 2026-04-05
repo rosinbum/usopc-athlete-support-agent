@@ -59,7 +59,7 @@ The key insight: **only the chat endpoint needs always-warm containers.** Everyt
           rosinbum.org      │              │ rosinbum.org
                             │              │
                    ┌────────▼───┐   ┌──────▼───────┐
-                   │ Cloud Run  │   │ Cloud Run    │
+                   │ ECS        │   │ ECS          │
                    │ FARGATE    │   │ FARGATE      │
                    │ Web App    │   │ Slack Bot    │
                    │ (Next.js)  │   │ (Hono.js)   │
