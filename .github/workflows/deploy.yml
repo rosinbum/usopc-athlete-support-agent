@@ -101,23 +101,31 @@ jobs:
           echo "::add-mask::$DB_URL"
           DATABASE_URL="$DB_URL" ./node_modules/.bin/tsx scripts/run-migrations.ts
 
-      - name: Deploy to staging
-        id: deploy
-        run: |
-          npx sst deploy --stage staging 2>&1 | tee deploy-output.txt
-          WEB_URL=$(grep -oP 'webUrl:\s+\K\S+' deploy-output.txt || true)
-          if [ -z "$WEB_URL" ]; then
-            echo "::warning::Could not extract URLs from SST output. Smoke tests will be skipped."
-            echo "SST output:"
-            cat deploy-output.txt
-          fi
-          echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
+      # Phase 1: SST deploy (Lambda workers, crons, DynamoDB, SQS, S3)
+      - name: Deploy SST infrastructure
+        run: npx sst deploy --stage staging
+
+      # Phase 2: Deploy web + Slack to EC2 via SSH
+      - name: Deploy apps to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/app
+            TAG="${{ github.ref_name }}"
+            ./scripts/deploy-ec2.sh "$TAG"
 
       - name: Smoke test Web
-        if: steps.deploy.outputs.web_url != ''
         run: |
           curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
-            "${{ steps.deploy.outputs.web_url }}/api/health"
+            "https://staging.athlete-agent.rosinbum.org/api/health"
+
+      - name: Smoke test Slack
+        run: |
+          curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
+            "https://slack-staging.athlete-agent.rosinbum.org/health"
 
   deploy-production:
     name: Deploy to Production
@@ -149,23 +157,30 @@ jobs:
           echo "::add-mask::$DB_URL"
           DATABASE_URL="$DB_URL" ./node_modules/.bin/tsx scripts/run-migrations.ts
 
-      - name: Deploy to production
-        id: deploy
-        run: |
-          npx sst deploy --stage production 2>&1 | tee deploy-output.txt
-          WEB_URL=$(grep -oP 'webUrl:\s+\K\S+' deploy-output.txt || true)
-          if [ -z "$WEB_URL" ]; then
-            echo "::warning::Could not extract URLs from SST output. Smoke tests will be skipped."
-            echo "SST output:"
-            cat deploy-output.txt
-          fi
-          echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
+      # Phase 1: SST deploy (Lambda workers, crons, DynamoDB, SQS, S3)
+      - name: Deploy SST infrastructure
+        run: npx sst deploy --stage production
+
+      # Phase 2: Deploy web + Slack to EC2 via SSH
+      - name: Deploy apps to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/app
+            ./scripts/deploy-ec2.sh "${{ inputs.tag }}"
 
       - name: Smoke test Web
-        if: steps.deploy.outputs.web_url != ''
         run: |
           curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
-            "${{ steps.deploy.outputs.web_url }}/api/health"
+            "https://athlete-agent.rosinbum.org/api/health"
+
+      - name: Smoke test Slack
+        run: |
+          curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
+            "https://slack.athlete-agent.rosinbum.org/health"
 
   rollback-production:
     name: Rollback Production
@@ -208,21 +223,24 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
-      - name: Redeploy previous tag
-        id: deploy
+      # Phase 1: Rollback SST infrastructure
+      - name: Redeploy previous SST infrastructure
         run: |
           echo "Deploying ${{ steps.prev-tag.outputs.tag }} to production"
-          npx sst deploy --stage production 2>&1 | tee deploy-output.txt
-          WEB_URL=$(grep -oP 'webUrl:\s+\K\S+' deploy-output.txt || true)
-          if [ -z "$WEB_URL" ]; then
-            echo "::warning::Could not extract URLs from SST output. Smoke tests will be skipped."
-            echo "SST output:"
-            cat deploy-output.txt
-          fi
-          echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
+          npx sst deploy --stage production
+
+      # Phase 2: Rollback EC2 apps
+      - name: Rollback EC2 apps
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/app
+            ./scripts/deploy-ec2.sh "${{ steps.prev-tag.outputs.tag }}"
 
       - name: Smoke test Web
-        if: steps.deploy.outputs.web_url != ''
         run: |
           curl --fail --retry 5 --retry-delay 10 --retry-all-errors \
-            "${{ steps.deploy.outputs.web_url }}/api/health"
+            "https://athlete-agent.rosinbum.org/api/health"

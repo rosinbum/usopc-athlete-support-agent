@@ -11,14 +11,14 @@ This document outlines a strategy for moving latency-sensitive workloads from AW
 
 ### Cold Start Breakdown (Web Lambda)
 
-| Phase | Duration |
-|---|---|
-| Module load + env var setup | ~500–800 ms |
-| ChatAnthropic model init | ~200–400 ms |
-| Vector store + embedding model | ~300–500 ms |
-| Checkpointer + DB pool | ~100–200 ms |
-| Graph compilation | ~50–100 ms |
-| **Total cold start overhead** | **~1.2–2.2 seconds** |
+| Phase                          | Duration             |
+| ------------------------------ | -------------------- |
+| Module load + env var setup    | ~500–800 ms          |
+| ChatAnthropic model init       | ~200–400 ms          |
+| Vector store + embedding model | ~300–500 ms          |
+| Checkpointer + DB pool         | ~100–200 ms          |
+| Graph compilation              | ~50–100 ms           |
+| **Total cold start overhead**  | **~1.2–2.2 seconds** |
 
 With an always-on server, these initializations happen once at startup. All subsequent requests reuse the warm singletons — identical to how warm Lambda instances work, but guaranteed rather than opportunistic.
 
@@ -32,20 +32,20 @@ An EC2 instance running Node.js with PM2 solves the cold start problem completel
 
 ### What Moves to EC2
 
-| Component | Current | Proposed | Rationale |
-|---|---|---|---|
-| **Next.js web app** | Lambda via OpenNext (1024 MB, 60s) | **EC2** — Node.js + PM2 | Eliminates cold starts. Always-warm. No OpenNext adapter. |
-| **Slack bot** | Lambda + API Gateway (512 MB, 120s) | **EC2** — same instance | Slack requires ack within 3s; cold starts eat most of that budget. |
+| Component           | Current                             | Proposed                | Rationale                                                          |
+| ------------------- | ----------------------------------- | ----------------------- | ------------------------------------------------------------------ |
+| **Next.js web app** | Lambda via OpenNext (1024 MB, 60s)  | **EC2** — Node.js + PM2 | Eliminates cold starts. Always-warm. No OpenNext adapter.          |
+| **Slack bot**       | Lambda + API Gateway (512 MB, 120s) | **EC2** — same instance | Slack requires ack within 3s; cold starts eat most of that budget. |
 
 ### What Stays on Lambda
 
-| Component | Current Config | Rationale |
-|---|---|---|
-| Discovery feed worker | Lambda via SQS (512 MB, 10 min) | Event-driven, bursty, cold-start tolerant |
-| Ingestion worker | Lambda via SQS (1024 MB, 15 min) | Same — batch processing, no user-facing latency |
-| Discovery cron | Lambda via EventBridge (Mon 2 AM) | Periodic, short-lived. Lambda is cheapest. |
-| Ingestion cron | Lambda via EventBridge (weekly) | Same |
-| Checkpoint cleanup | Lambda via EventBridge (daily, 2 min) | Trivial workload |
+| Component             | Current Config                        | Rationale                                       |
+| --------------------- | ------------------------------------- | ----------------------------------------------- |
+| Discovery feed worker | Lambda via SQS (512 MB, 10 min)       | Event-driven, bursty, cold-start tolerant       |
+| Ingestion worker      | Lambda via SQS (1024 MB, 15 min)      | Same — batch processing, no user-facing latency |
+| Discovery cron        | Lambda via EventBridge (Mon 2 AM)     | Periodic, short-lived. Lambda is cheapest.      |
+| Ingestion cron        | Lambda via EventBridge (weekly)       | Same                                            |
+| Checkpoint cleanup    | Lambda via EventBridge (daily, 2 min) | Trivial workload                                |
 
 ### Architecture Diagram
 
@@ -57,7 +57,7 @@ An EC2 instance running Node.js with PM2 solves the cold start problem completel
                  └───────────────┬──────────────────┘
                                  │
                  ┌───────────────▼──────────────────┐
-                 │  EC2 Instance (t3.medium)        │
+                 │  EC2 Instance (t3.small)         │
                  │  PM2 process manager             │
                  │                                  │
                  │  ┌────────────┐ ┌─────────────┐  │
@@ -92,22 +92,22 @@ An EC2 instance running Node.js with PM2 solves the cold start problem completel
 
 ### Instance Selection
 
-| Instance | vCPUs | Memory | Monthly Cost | Notes |
-|---|---|---|---|---|
-| t3.small | 2 | 2 GB | ~$15 | Minimum viable for low traffic |
-| **t3.medium** | 2 | 4 GB | **~$30** | **Recommended — comfortable headroom for agent + Next.js** |
-| t3.large | 2 | 8 GB | ~$60 | If memory pressure is observed |
+| Instance     | vCPUs | Memory | Monthly Cost | Notes                                         |
+| ------------ | ----- | ------ | ------------ | --------------------------------------------- |
+| **t3.small** | 2     | 2 GB   | **~$15**     | **Selected — sufficient for current traffic** |
+| t3.medium    | 2     | 4 GB   | ~$30         | Upgrade if memory pressure is observed        |
+| t3.large     | 2     | 8 GB   | ~$60         | For significantly higher traffic              |
 
-The `t3.medium` is the sweet spot. The LangGraph agent is I/O-bound (waiting on Anthropic API), so CPU is rarely the bottleneck. 4 GB of memory provides room for the Next.js server, Slack bot, DB connection pool, and model singletons running concurrently.
+The `t3.small` is sufficient for current traffic levels. The LangGraph agent is I/O-bound (waiting on Anthropic API), so CPU is rarely the bottleneck. 2 GB of memory is enough for the Next.js standalone server (~800 MB limit), Slack bot (~400 MB limit), Nginx, and OS overhead. PM2 `max_memory_restart` thresholds prevent OOM.
 
-**With a 1-year Reserved Instance**, `t3.medium` drops to ~$19/month (37% savings).
+**With a 1-year Reserved Instance**, `t3.small` drops to ~$10/month (33% savings). Upgrade to `t3.medium` is a one-click instance type change if memory pressure is observed.
 
 ### Process Management with PM2
 
 PM2 keeps the Node.js processes running, restarts on crash, and manages logs.
 
 ```javascript
-// ecosystem.config.cjs
+// ecosystem.config.cjs (repo root)
 module.exports = {
   apps: [
     {
@@ -118,17 +118,17 @@ module.exports = {
         PORT: 3000,
       },
       instances: 1,
-      max_memory_restart: "1500M",
+      max_memory_restart: "800M",
     },
     {
       name: "slack",
-      script: "apps/slack/dist/index.js",
+      script: "apps/slack/dist/server.js",
       env: {
         NODE_ENV: "production",
         PORT: 3001,
       },
       instances: 1,
-      max_memory_restart: "500M",
+      max_memory_restart: "400M",
     },
   ],
 };
@@ -187,7 +187,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_for_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
@@ -204,7 +204,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_for_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
@@ -281,36 +281,36 @@ These components are unaffected by the migration:
 
 ### Current: All Lambda
 
-| Component | Estimated Monthly Cost |
-|---|---|
-| Web Lambda (1024 MB, ~75K invocations) | ~$13 |
-| Slack Lambda (512 MB, ~5K invocations) | ~$2 |
-| Worker Lambdas (event-driven) | ~$5 |
-| API Gateway | ~$3 |
-| **Total Lambda compute** | **~$23/month** |
+| Component                              | Estimated Monthly Cost |
+| -------------------------------------- | ---------------------- |
+| Web Lambda (1024 MB, ~75K invocations) | ~$13                   |
+| Slack Lambda (512 MB, ~5K invocations) | ~$2                    |
+| Worker Lambdas (event-driven)          | ~$5                    |
+| API Gateway                            | ~$3                    |
+| **Total Lambda compute**               | **~$23/month**         |
 
 ### Proposed: EC2 + Lambda Hybrid
 
-| Component | Estimated Monthly Cost |
-|---|---|
-| EC2 t3.medium (on-demand) | ~$30 |
-| Elastic IP | ~$4 |
-| Worker Lambdas (unchanged) | ~$5 |
-| **Total** | **~$39/month** |
+| Component                  | Estimated Monthly Cost |
+| -------------------------- | ---------------------- |
+| EC2 t3.small (on-demand)   | ~$15                   |
+| Elastic IP                 | ~$4                    |
+| Worker Lambdas (unchanged) | ~$5                    |
+| **Total**                  | **~$24/month**         |
 
 ### With Reserved Instance (1-year)
 
-| Component | Estimated Monthly Cost |
-|---|---|
-| EC2 t3.medium (reserved) | ~$19 |
-| Elastic IP | ~$4 |
-| Worker Lambdas | ~$5 |
-| **Total** | **~$28/month** |
+| Component               | Estimated Monthly Cost |
+| ----------------------- | ---------------------- |
+| EC2 t3.small (reserved) | ~$10                   |
+| Elastic IP              | ~$4                    |
+| Worker Lambdas          | ~$5                    |
+| **Total**               | **~$19/month**         |
 
 ### Cost Delta
 
-- **On-demand**: ~$16/month more than all-Lambda
-- **Reserved**: ~$5/month more (essentially cost-neutral)
+- **On-demand**: ~$1/month more than all-Lambda (essentially cost-neutral)
+- **Reserved**: ~$4/month less than all-Lambda
 
 Compare this to the Fargate approach (~$115/month) or Fargate with Savings Plans (~$70/month). EC2 is dramatically cheaper because there's no ALB ($20/month), no NAT Gateway ($32/month), and no container orchestration overhead.
 
@@ -320,7 +320,7 @@ Compare this to the Fargate approach (~$115/month) or Fargate with Savings Plans
 
 ### Phase 1: Provision and Configure EC2 (1 day)
 
-- [ ] Launch t3.medium in us-east-1, Amazon Linux 2023 or Ubuntu 24.04
+- [ ] Launch t3.small in us-east-1, Amazon Linux 2023 or Ubuntu 24.04
 - [ ] Assign Elastic IP
 - [ ] Configure security group: 80, 443 inbound; outbound to Neon PostgreSQL, DynamoDB, SQS, external APIs
 - [ ] Install Node.js 20, pnpm, PM2, Nginx
@@ -354,13 +354,13 @@ Compare this to the Fargate approach (~$115/month) or Fargate with Savings Plans
 
 ## Risks and Mitigations
 
-| Risk | Impact | Mitigation |
-|---|---|---|
-| Single point of failure (1 instance) | Downtime if instance dies | Route 53 health check auto-alerts. For HA, add a second instance behind an ALB (see Fargate upgrade path). |
-| OS patching | Security exposure if neglected | Enable automatic security updates (`unattended-upgrades` on Ubuntu, `dnf-automatic` on AL2023). Schedule monthly reboots during low-traffic window. |
-| No auto-scaling | Can't handle traffic spikes | For current traffic levels, a t3.medium handles it. If traffic grows significantly, upgrade to Fargate (see below). |
-| Manual deploys | Slower release cycle | Automate with GitHub Actions SSH deploy. Or use CodeDeploy for blue/green. |
-| Instance storage is ephemeral | App data lost on termination | All persistent data is in Neon PostgreSQL, DynamoDB, and S3 — nothing stored locally. App code is in git. |
+| Risk                                 | Impact                         | Mitigation                                                                                                                                          |
+| ------------------------------------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Single point of failure (1 instance) | Downtime if instance dies      | Route 53 health check auto-alerts. For HA, add a second instance behind an ALB (see Fargate upgrade path).                                          |
+| OS patching                          | Security exposure if neglected | Enable automatic security updates (`unattended-upgrades` on Ubuntu, `dnf-automatic` on AL2023). Schedule monthly reboots during low-traffic window. |
+| No auto-scaling                      | Can't handle traffic spikes    | For current traffic levels, a t3.medium handles it. If traffic grows significantly, upgrade to Fargate (see below).                                 |
+| Manual deploys                       | Slower release cycle           | Automate with GitHub Actions SSH deploy. Or use CodeDeploy for blue/green.                                                                          |
+| Instance storage is ephemeral        | App data lost on termination   | All persistent data is in Neon PostgreSQL, DynamoDB, and S3 — nothing stored locally. App code is in git.                                           |
 
 ---
 
@@ -400,6 +400,7 @@ const web = new sst.aws.Service("Web", {
 **Estimated Fargate cost**: ~$115/month on-demand, ~$70/month with Savings Plans (vs. ~$30–39/month for EC2). The trade-off is auto-scaling and HA in exchange for higher cost and complexity.
 
 Move to Fargate when:
+
 - Traffic exceeds what a single instance handles comfortably
 - You need zero-downtime deploys (rolling updates across multiple tasks)
 - You need auto-scaling for traffic spikes
@@ -409,17 +410,17 @@ Move to Fargate when:
 
 ## Comparison of All Options
 
-| Factor | Lambda (current) | EC2 (recommended) | ECS Fargate | GCP Cloud Run |
-|---|---|---|---|---|
-| Cold starts | 1.5–2.2s | None | None | None |
-| Monthly cost | ~$23 | ~$30–39 | ~$70–115 | ~$70–170 |
-| Operational complexity | Lowest | Low | Medium | Medium + cloud migration |
-| Auto-scaling | Automatic | Manual (resize instance) | Automatic | Automatic |
-| HA / redundancy | Automatic | Single instance (manual HA) | Multi-AZ automatic | Multi-zone automatic |
-| Deploy complexity | `sst deploy` | SSH + git pull + pm2 restart | `sst deploy` (Docker build) | `pulumi up` (Docker build) |
-| Migration effort | — | 2–3 days | 5–7 days | 5–8 weeks |
-| IaC change | — | Minimal (remove Nextjs construct) | Same SST | New tool (Pulumi) |
-| Streaming support | Lambda Response Streaming | Native HTTP | Native HTTP via ALB | Native HTTP |
+| Factor                 | Lambda (current)          | EC2 (recommended)                 | ECS Fargate                 | GCP Cloud Run              |
+| ---------------------- | ------------------------- | --------------------------------- | --------------------------- | -------------------------- |
+| Cold starts            | 1.5–2.2s                  | None                              | None                        | None                       |
+| Monthly cost           | ~$23                      | ~$19–24                           | ~$70–115                    | ~$70–170                   |
+| Operational complexity | Lowest                    | Low                               | Medium                      | Medium + cloud migration   |
+| Auto-scaling           | Automatic                 | Manual (resize instance)          | Automatic                   | Automatic                  |
+| HA / redundancy        | Automatic                 | Single instance (manual HA)       | Multi-AZ automatic          | Multi-zone automatic       |
+| Deploy complexity      | `sst deploy`              | SSH + git pull + pm2 restart      | `sst deploy` (Docker build) | `pulumi up` (Docker build) |
+| Migration effort       | —                         | 2–3 days                          | 5–7 days                    | 5–8 weeks                  |
+| IaC change             | —                         | Minimal (remove Nextjs construct) | Same SST                    | New tool (Pulumi)          |
+| Streaming support      | Lambda Response Streaming | Native HTTP                       | Native HTTP via ALB         | Native HTTP                |
 
 **Recommendation**: Start with EC2. It's the fastest path to eliminating cold starts at the lowest cost and complexity. Upgrade to Fargate later if you need auto-scaling or HA.
 

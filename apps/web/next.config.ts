@@ -37,6 +37,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   transpilePackages: ["@usopc/shared", "@usopc/core"],
   serverExternalPackages: ["sst"],
   async headers() {
