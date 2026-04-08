@@ -30,16 +30,16 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@langchain/core": "^1.1.31",
-    "@langchain/openai": "^1.2.12",
+    "@langchain/core": "^1.1.39",
+    "@langchain/openai": "^1.4.3",
     "@usopc/core": "workspace:*",
     "@usopc/shared": "workspace:*",
     "agentevals": "^0.0.7",
-    "langsmith": "^0.5.7",
-    "openevals": "^0.1.4"
+    "langsmith": "^0.5.16",
+    "openevals": "^0.2.0"
   },
   "devDependencies": {
-    "sst": "4.5.1",
+    "sst": "4.6.11",
     "tsx": "^4.19.0",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
