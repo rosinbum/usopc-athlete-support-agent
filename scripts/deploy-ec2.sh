@@ -11,16 +11,17 @@ set -euo pipefail
 TAG="${1:-}"
 STAGE="${2:-production}"
 REPO_URL="${REPO_URL:-git@github.com:rosinbum/usopc-athlete-support-agent.git}"
-APP_DIR="${APP_DIR:-$HOME/app}"
+APP_DIR="${APP_DIR:-/home/ec2-user/app}"
 
 # Ensure pnpm is available. corepack runs as root in userData so its cache
 # is inaccessible to ec2-user; install to a user-local directory instead.
-export PATH="$HOME/.local/bin:$PATH"
+# Use hardcoded path — $HOME may not be set in non-login SSH sessions.
+export PATH="/home/ec2-user/.local/bin:$PATH"
 if ! command -v pnpm &>/dev/null; then
-  echo "==> Installing pnpm to ~/.local"
+  echo "==> Installing pnpm to /home/ec2-user/.local"
   sudo rm -rf /usr/lib/nodejs20/lib/node_modules/pnpm 2>/dev/null || true
-  mkdir -p "$HOME/.local"
-  npm install --prefix "$HOME/.local" pnpm@9
+  mkdir -p /home/ec2-user/.local
+  npm install --prefix /home/ec2-user/.local pnpm@9
 fi
 
 # Clone on first deploy, otherwise just fetch
