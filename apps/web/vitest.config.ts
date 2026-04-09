@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "jsdom",
+    server: { deps: { inline: ["@usopc/shared", "@usopc/core"] } },
     setupFiles: ["./vitest.setup.ts"],
     globals: true,
     coverage: {

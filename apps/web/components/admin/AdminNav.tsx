@@ -1,8 +1,18 @@
-import type { Session } from "next-auth";
-import { signOut } from "../../auth.js";
+"use client";
 
-export default function AdminNav({ session }: { session: Session }) {
+import { useState, useEffect } from "react";
+import type { AppSession } from "../../server/session.js";
+
+export default function AdminNav({ session }: { session: AppSession }) {
   const user = session.user;
+  const [csrfToken, setCsrfToken] = useState("");
+
+  useEffect(() => {
+    fetch("/api/auth/csrf")
+      .then((r) => r.json())
+      .then((d) => setCsrfToken(d.csrfToken))
+      .catch(() => {});
+  }, []);
 
   return (
     <nav className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b px-4 sm:px-6 py-3 bg-white gap-2">
@@ -59,12 +69,8 @@ export default function AdminNav({ session }: { session: Session }) {
           </span>
         </div>
 
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/" });
-          }}
-        >
+        <form method="post" action="/api/auth/signout">
+          <input type="hidden" name="csrfToken" value={csrfToken} />
           <button
             type="submit"
             className="text-sm text-gray-500 hover:text-gray-700 transition-colors"

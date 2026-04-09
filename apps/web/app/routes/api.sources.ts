@@ -1,0 +1,223 @@
+import type { Route } from "./+types/api.sources.js";
+import { getPool, logger } from "@usopc/shared";
+
+const log = logger.child({ service: "sources-api" });
+
+interface DocumentRow {
+  source_url: string;
+  document_title: string;
+  document_type: string | null;
+  ngb_id: string | null;
+  topic_domain: string | null;
+  authority_level: string | null;
+  effective_date: string | null;
+  ingested_at: Date;
+  chunk_count: string;
+  s3_key: string | null;
+}
+
+interface CountRow {
+  total: string;
+}
+
+interface StatsRow {
+  total_documents: string;
+  total_organizations: string;
+  last_ingested_at: Date | null;
+}
+
+interface StatsResponse {
+  totalDocuments: number;
+  totalOrganizations: number;
+  lastIngestedAt: string | null;
+}
+
+const COL = {
+  source_url: "COALESCE(source_url, metadata->>'sourceUrl')",
+  document_title: "COALESCE(document_title, metadata->>'documentTitle')",
+  document_type: "COALESCE(document_type, metadata->>'documentType')",
+  ngb_id: "COALESCE(ngb_id, metadata->>'ngbId')",
+  topic_domain: "COALESCE(topic_domain, metadata->>'topicDomain')",
+  authority_level: "COALESCE(authority_level, metadata->>'authorityLevel')",
+} as const;
+
+const GROUP_BY_COLS = [
+  COL.source_url,
+  COL.document_title,
+  COL.document_type,
+  COL.ngb_id,
+  COL.topic_domain,
+  COL.authority_level,
+  "metadata->>'effectiveDate'",
+].join(", ");
+
+// ---------------------------------------------------------------------------
+// Stats cache — avoids full table scan on every call (30s TTL).
+// Per-instance in serverless; each Lambda container maintains its own cache.
+// ---------------------------------------------------------------------------
+
+const STATS_TTL_MS = 30_000;
+let statsCache: { data: StatsResponse; expires: number } | null = null;
+
+/**
+ * Escapes PostgreSQL ILIKE wildcard characters (%, _, \) in user-supplied input
+ * so they are treated as literals rather than pattern metacharacters.
+ * Use in conjunction with the ESCAPE '\' clause on the ILIKE predicate.
+ */
+function escapeIlike(input: string): string {
+  return input.replace(/[%_\\]/g, (ch) => `\\${ch}`);
+}
+
+export async function loader({ request }: Route.LoaderArgs) {
+  try {
+    const url = new URL(request.url);
+    const action = url.searchParams.get("action");
+
+    if (action === "stats") {
+      return await handleStats();
+    }
+
+    return await handleList(url);
+  } catch (error) {
+    log.error("Sources API error", { error: String(error) });
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+async function handleStats() {
+  if (statsCache && Date.now() < statsCache.expires) {
+    return Response.json(statsCache.data);
+  }
+
+  const db = getPool();
+
+  const result = await db.query<StatsRow>(`
+    SELECT
+      COUNT(DISTINCT ${COL.source_url}) as total_documents,
+      COUNT(DISTINCT ${COL.ngb_id}) as total_organizations,
+      MAX(ingested_at) as last_ingested_at
+    FROM document_chunks
+  `);
+
+  const row = result.rows[0];
+
+  const data = {
+    totalDocuments: parseInt(row?.total_documents ?? "0", 10),
+    totalOrganizations: parseInt(row?.total_organizations ?? "0", 10),
+    lastIngestedAt: row?.last_ingested_at?.toISOString() ?? null,
+  };
+
+  statsCache = { data, expires: Date.now() + STATS_TTL_MS };
+
+  return Response.json(data);
+}
+
+async function handleList(url: URL) {
+  const db = getPool();
+
+  const search = url.searchParams.get("search");
+  const documentType = url.searchParams.get("documentType");
+  const topicDomain = url.searchParams.get("topicDomain");
+  const ngbId = url.searchParams.get("ngbId");
+  const authorityLevel = url.searchParams.get("authorityLevel");
+  const page = parseInt(url.searchParams.get("page") ?? "1", 10);
+  const limit = Math.min(
+    parseInt(url.searchParams.get("limit") ?? "20", 10),
+    100,
+  );
+
+  const conditions: string[] = [];
+  const values: (string | number)[] = [];
+  let paramIndex = 1;
+
+  if (search) {
+    conditions.push(`${COL.document_title} ILIKE $${paramIndex} ESCAPE '\\'`);
+    values.push(`%${escapeIlike(search)}%`);
+    paramIndex++;
+  }
+
+  if (documentType) {
+    conditions.push(`${COL.document_type} = $${paramIndex}`);
+    values.push(documentType);
+    paramIndex++;
+  }
+
+  if (topicDomain) {
+    conditions.push(`${COL.topic_domain} = $${paramIndex}`);
+    values.push(topicDomain);
+    paramIndex++;
+  }
+
+  if (ngbId) {
+    conditions.push(`${COL.ngb_id} = $${paramIndex}`);
+    values.push(ngbId);
+    paramIndex++;
+  }
+
+  if (authorityLevel) {
+    conditions.push(`${COL.authority_level} = $${paramIndex}`);
+    values.push(authorityLevel);
+    paramIndex++;
+  }
+
+  const whereClause =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const offset = (page - 1) * limit;
+
+  // Run count and data queries in parallel — they share the same WHERE/GROUP BY
+  const [countResult, dataResult] = await Promise.all([
+    db.query<CountRow>(
+      `SELECT COUNT(*) as total FROM (
+        SELECT 1 FROM document_chunks ${whereClause}
+        GROUP BY ${GROUP_BY_COLS}
+      ) sub`,
+      values,
+    ),
+    db.query<DocumentRow>(
+      `
+      SELECT
+        ${COL.source_url} as source_url,
+        ${COL.document_title} as document_title,
+        ${COL.document_type} as document_type,
+        ${COL.ngb_id} as ngb_id,
+        ${COL.topic_domain} as topic_domain,
+        ${COL.authority_level} as authority_level,
+        metadata->>'effectiveDate' as effective_date,
+        MIN(ingested_at) as ingested_at,
+        COUNT(*) as chunk_count,
+        MAX(metadata->>'s3Key') as s3_key
+      FROM document_chunks
+      ${whereClause}
+      GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
+               ${COL.ngb_id}, ${COL.topic_domain}, ${COL.authority_level},
+               metadata->>'effectiveDate'
+      ORDER BY ingested_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `,
+      [...values, limit, offset],
+    ),
+  ]);
+
+  const total = parseInt(countResult.rows[0]?.total ?? "0", 10);
+  const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
+
+  // Strip internal fields (s3Key, ngbId, chunkCount) from unauthenticated response
+  const documents = dataResult.rows.map((row) => ({
+    sourceUrl: row.source_url,
+    documentTitle: row.document_title,
+    documentType: row.document_type,
+    topicDomain: row.topic_domain,
+    authorityLevel: row.authority_level,
+    effectiveDate: row.effective_date,
+    ingestedAt: row.ingested_at.toISOString(),
+  }));
+
+  return Response.json({
+    documents,
+    total,
+    page,
+    limit,
+    totalPages,
+  });
+}
