@@ -639,6 +639,7 @@ export default $config({
         "dnf install -y nodejs20 nginx git",
         "alternatives --install /usr/bin/node node /usr/bin/node-20 20",
         "alternatives --install /usr/bin/npm npm /usr/bin/npm-20 20",
+        "alternatives --install /usr/bin/npx npx /usr/bin/npx-20 20",
         // Install pnpm as ec2-user using global-prefix install so the binary
         // lands in ~/.local/bin (accessible to ec2-user at deploy time)
         "runuser -l ec2-user -c 'mkdir -p ~/.local && npm install -g --prefix ~/.local pnpm@9'",
