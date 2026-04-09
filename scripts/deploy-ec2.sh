@@ -23,7 +23,7 @@ if ! command -v pnpm &>/dev/null; then
     command -v pnpm &>/dev/null && break
     echo "  ...still waiting ($((i * 5))s)"
   done
-  command -v pnpm &>/dev/null || { echo "==> Installing pnpm via npm"; npm install -g pnpm@9; }
+  command -v pnpm &>/dev/null || { echo "==> Installing pnpm via npm"; sudo npm install -g pnpm@9; }
 fi
 
 # Clone on first deploy, otherwise just fetch
