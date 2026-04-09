@@ -13,6 +13,19 @@ STAGE="${2:-production}"
 REPO_URL="${REPO_URL:-git@github.com:rosinbum/usopc-athlete-support-agent.git}"
 APP_DIR="${APP_DIR:-$HOME/app}"
 
+# pnpm may not be in PATH when running via SSH, or userData may still be
+# running on a fresh instance. Wait up to 2 min, then install if missing.
+export PATH="/usr/local/bin:$PATH"
+if ! command -v pnpm &>/dev/null; then
+  echo "==> Waiting for pnpm (instance may still be bootstrapping)..."
+  for i in $(seq 1 24); do
+    sleep 5
+    command -v pnpm &>/dev/null && break
+    echo "  ...still waiting ($((i * 5))s)"
+  done
+  command -v pnpm &>/dev/null || { echo "==> Installing pnpm via npm"; npm install -g pnpm@9; }
+fi
+
 # Clone on first deploy, otherwise just fetch
 if [ ! -d "$APP_DIR/.git" ]; then
   echo "==> First deploy — cloning repo"
