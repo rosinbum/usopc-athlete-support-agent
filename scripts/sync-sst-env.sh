@@ -32,10 +32,14 @@ SST="$APP_DIR/node_modules/.bin/sst"
 echo "==> Installing SST platform binaries"
 "$SST" install
 
-"$SST" shell --print-logs --stage "$STAGE" -- env | grep '^SST_RESOURCE_' >> "$ENV_FILE"
+# Run sst shell without --print-logs. With --print-logs, SST mixes its
+# internal log lines into stdout alongside the actual env output, which
+# corrupts the env file with bare text fragments.  Logs go to
+# .sst/log/sst.log — check that file if sst shell fails unexpectedly.
+"$SST" shell --stage "$STAGE" -- env | grep '^SST_RESOURCE_' >> "$ENV_FILE"
 
 # Also extract the computed APP_URL and EMAIL_FROM if set
-"$SST" shell --print-logs --stage "$STAGE" -- env | grep -E '^(APP_URL|EMAIL_FROM)=' >> "$ENV_FILE" 2>/dev/null || true
+"$SST" shell --stage "$STAGE" -- env | grep -E '^(APP_URL|EMAIL_FROM)=' >> "$ENV_FILE" 2>/dev/null || true
 
 chmod 600 "$ENV_FILE"
 echo "==> Written to $ENV_FILE ($(wc -l < "$ENV_FILE") lines)"
