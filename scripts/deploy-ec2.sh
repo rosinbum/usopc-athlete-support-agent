@@ -48,8 +48,19 @@ fi
 echo "==> Installing dependencies"
 pnpm install --frozen-lockfile
 
+# Ensure swap is available — Next.js build exceeds 2GB RSS on a t3.small.
+# This is idempotent: a no-op if /swapfile already exists and is active.
+if ! swapon --show | grep -q /swapfile; then
+  echo "==> Creating 2GB swap file"
+  sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 status=progress
+  sudo chmod 600 /swapfile
+  sudo mkswap /swapfile
+  sudo swapon /swapfile
+  grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+fi
+
 echo "==> Building web app"
-pnpm --filter @usopc/web build
+NODE_OPTIONS="--max-old-space-size=3072" pnpm --filter @usopc/web build
 
 echo "==> Copying static assets to standalone directory"
 cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static

@@ -639,12 +639,18 @@ export default $config({
         "dnf install -y nodejs20 nginx git",
         "alternatives --install /usr/bin/node node /usr/bin/node-20 20",
         "alternatives --install /usr/bin/npm npm /usr/bin/npm-20 20",
-        // Install pnpm as ec2-user (corepack as root stores its cache under
-        // /root, making pnpm inaccessible to ec2-user at deploy time)
-        "runuser -l ec2-user -c 'mkdir -p ~/.local && npm install --prefix ~/.local pnpm@9'",
+        // Install pnpm as ec2-user using global-prefix install so the binary
+        // lands in ~/.local/bin (accessible to ec2-user at deploy time)
+        "runuser -l ec2-user -c 'mkdir -p ~/.local && npm install -g --prefix ~/.local pnpm@9'",
         "npm install -g pm2",
         "mkdir -p /home/ec2-user/app",
         "chown ec2-user:ec2-user /home/ec2-user/app",
+        // Create a 2GB swap file — Next.js build exceeds 2GB RSS on t3.small
+        "dd if=/dev/zero of=/swapfile bs=1M count=2048",
+        "chmod 600 /swapfile",
+        "mkswap /swapfile",
+        "swapon /swapfile",
+        "echo '/swapfile none swap sw 0 0' >> /etc/fstab",
         "systemctl enable nginx",
         "systemctl start nginx",
         "env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user",
