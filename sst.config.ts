@@ -139,27 +139,20 @@ export default $config({
     const isDeployed = isProd || stage === "staging";
     const domainZone = "athlete-agent.rosinbum.org";
 
-    // Slack bot webhook — $default catches /slack/events, /slack/commands,
-    // and /slack/interactions so all Slack endpoints route to one Lambda.
-    const slackApi = new sst.aws.ApiGatewayV2(
-      "SlackApi",
-      isDeployed
-        ? {
-            domain: {
-              name: isProd
-                ? `slack.${domainZone}`
-                : `slack-${stage}.${domainZone}`,
-              dns: sst.aws.dns(),
-            },
-          }
-        : {},
-    );
-    const slackRoute = slackApi.route("$default", {
-      handler: "apps/slack/src/index.handler",
-      link: [...linkables, slackBotToken, slackSigningSecret, appTable],
-      timeout: "120 seconds",
-      memory: "512 MB",
-    });
+    // Slack bot — Lambda + API Gateway for local dev only.
+    // Deployed stages (staging, production) run on EC2 with PM2.
+    let slackApiUrl: string | undefined;
+
+    if (!isDeployed) {
+      const slackApi = new sst.aws.ApiGatewayV2("SlackApi", {});
+      slackApi.route("$default", {
+        handler: "apps/slack/src/index.handler",
+        link: [...linkables, slackBotToken, slackSigningSecret, appTable],
+        timeout: "120 seconds",
+        memory: "512 MB",
+      });
+      slackApiUrl = slackApi.url;
+    }
 
     // Discovery feed queue — processes discovered URLs through the evaluation
     // pipeline asynchronously (metadata eval → content extraction → content eval).
@@ -353,36 +346,7 @@ export default $config({
           });
         }
 
-        // Slack Lambda alarms
-        new aws.cloudwatch.MetricAlarm("SlackErrorsAlarm", {
-          alarmDescription: "Slack Lambda errors > 5 in 5 minutes",
-          namespace: "AWS/Lambda",
-          metricName: "Errors",
-          dimensions: { FunctionName: slackRoute.nodes.function.name },
-          statistic: "Sum",
-          period: 300,
-          evaluationPeriods: 1,
-          threshold: 5,
-          comparisonOperator: "GreaterThanThreshold",
-          treatMissingData: "notBreaching",
-          alarmActions: [alarmTopic.arn],
-          okActions: [alarmTopic.arn],
-        });
-
-        new aws.cloudwatch.MetricAlarm("SlackDurationAlarm", {
-          alarmDescription: "Slack Lambda p99 duration > 100s",
-          namespace: "AWS/Lambda",
-          metricName: "Duration",
-          dimensions: { FunctionName: slackRoute.nodes.function.name },
-          extendedStatistic: "p99",
-          period: 300,
-          evaluationPeriods: 2,
-          threshold: 100_000, // milliseconds
-          comparisonOperator: "GreaterThanThreshold",
-          treatMissingData: "notBreaching",
-          alarmActions: [alarmTopic.arn],
-          okActions: [alarmTopic.arn],
-        });
+        // Web and Slack run on EC2 — no Lambda alarms for those.
 
         // Discovery feed worker alarm
         new aws.cloudwatch.MetricAlarm("DiscoveryWorkerErrorsAlarm", {
@@ -497,9 +461,8 @@ export default $config({
           okActions: [alarmTopic.arn],
         });
 
-        // Save references for dashboard (built after web is declared)
+        // Save references for dashboard (workers + crons only — web/slack run on EC2)
         monitoringRefs = {
-          slackFn: slackRoute.nodes.function.name,
           discoveryWorkerFn: discoveryFeedWorkerSub.nodes.function.name,
           discoveryCronFn: discoveryCron!.nodes.function.name,
           ingestionWorkerFn: ingestionWorkerSub.nodes.function.name,
@@ -509,6 +472,225 @@ export default $config({
           tableName: appTable.name,
         };
       } // end if (isProd) monitoring
+    }
+
+    // --- EC2 Instance for Web + Slack (deployed stages only) ---
+
+    let ec2PublicIp: string | undefined;
+
+    if (isDeployed) {
+      // SSH key pair — set with: sst secret set Ec2SshPublicKey "ssh-rsa ..." --stage production
+      const ec2SshPublicKey = new sst.Secret("Ec2SshPublicKey");
+
+      const keyPair = new aws.ec2.KeyPair("AppKeyPair", {
+        keyName: `usopc-athlete-support-${stage}`,
+        publicKey: ec2SshPublicKey.value,
+        tags: withAppTag({ Name: `usopc-athlete-support-${stage}` }),
+      });
+
+      // Security group — HTTP, HTTPS, SSH inbound; all outbound
+      const defaultVpc = aws.ec2.getVpcOutput({ default: true });
+
+      const sg = new aws.ec2.SecurityGroup("AppSg", {
+        vpcId: defaultVpc.id,
+        description: `USOPC Athlete Support EC2 (${stage})`,
+        ingress: [
+          {
+            protocol: "tcp",
+            fromPort: 22,
+            toPort: 22,
+            cidrBlocks: ["0.0.0.0/0"],
+            description: "SSH",
+          },
+          {
+            protocol: "tcp",
+            fromPort: 80,
+            toPort: 80,
+            cidrBlocks: ["0.0.0.0/0"],
+            description: "HTTP",
+          },
+          {
+            protocol: "tcp",
+            fromPort: 443,
+            toPort: 443,
+            cidrBlocks: ["0.0.0.0/0"],
+            description: "HTTPS",
+          },
+        ],
+        egress: [
+          {
+            protocol: "-1",
+            fromPort: 0,
+            toPort: 0,
+            cidrBlocks: ["0.0.0.0/0"],
+            description: "All outbound",
+          },
+        ],
+        tags: withAppTag({ Name: `usopc-athlete-support-${stage}` }),
+      });
+
+      // IAM role — grants EC2 access to DynamoDB, SQS, S3, SSM, CloudWatch
+      const ec2Role = new aws.iam.Role("AppEc2Role", {
+        assumeRolePolicy: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: { Service: "ec2.amazonaws.com" },
+              Action: "sts:AssumeRole",
+            },
+          ],
+        }),
+        tags: withAppTag({ Name: `usopc-athlete-support-${stage}` }),
+      });
+
+      // Scoped policy for our specific resources
+      const policyDoc = $resolve([
+        appTable.nodes.table.arn,
+        authTable.nodes.table.arn,
+        documentsBucket.nodes.bucket.arn,
+        discoveryFeedQueue.nodes.queue.arn,
+        discoveryFeedDlq.nodes.queue.arn,
+        ...(ingestionQueue ? [ingestionQueue.nodes.queue.arn] : []),
+        ...(ingestionDlq ? [ingestionDlq.nodes.queue.arn] : []),
+      ]).apply((arns) => {
+        const [appArn, authArn, bucketArn, ...queueArns] = arns;
+        return JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:BatchGetItem",
+                "dynamodb:BatchWriteItem",
+              ],
+              Resource: [
+                appArn,
+                `${appArn}/index/*`,
+                authArn,
+                `${authArn}/index/*`,
+              ],
+            },
+            {
+              Effect: "Allow",
+              Action: [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:ListBucket",
+              ],
+              Resource: [bucketArn, `${bucketArn}/*`],
+            },
+            {
+              Effect: "Allow",
+              Action: [
+                "sqs:SendMessage",
+                "sqs:ReceiveMessage",
+                "sqs:DeleteMessage",
+                "sqs:GetQueueAttributes",
+              ],
+              Resource: queueArns,
+            },
+          ],
+        });
+      });
+
+      new aws.iam.RolePolicy("AppEc2ResourcePolicy", {
+        role: ec2Role.name,
+        policy: policyDoc,
+      });
+
+      // SSM access (for `sst shell` to resolve secrets on the instance)
+      new aws.iam.RolePolicyAttachment("AppEc2Ssm", {
+        role: ec2Role.name,
+        policyArn: "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+      });
+
+      // CloudWatch Agent (for instance metrics)
+      new aws.iam.RolePolicyAttachment("AppEc2Cw", {
+        role: ec2Role.name,
+        policyArn: "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy",
+      });
+
+      const instanceProfile = new aws.iam.InstanceProfile("AppEc2Profile", {
+        role: ec2Role.name,
+      });
+
+      // Latest Amazon Linux 2023 AMI
+      const ami = aws.ec2.getAmiOutput({
+        mostRecent: true,
+        owners: ["amazon"],
+        filters: [
+          { name: "name", values: ["al2023-ami-2023.*-x86_64"] },
+          { name: "state", values: ["available"] },
+        ],
+      });
+
+      // Bootstrap script — installs system deps on first boot
+      const userData = [
+        "#!/bin/bash",
+        "set -e",
+        "dnf install -y nodejs20 nginx git",
+        "alternatives --install /usr/bin/node node /usr/bin/node-20 20",
+        "alternatives --install /usr/bin/npm npm /usr/bin/npm-20 20",
+        "corepack enable",
+        "corepack prepare pnpm@9 --activate",
+        "npm install -g pm2",
+        "mkdir -p /home/ec2-user/app",
+        "chown ec2-user:ec2-user /home/ec2-user/app",
+        "systemctl enable nginx",
+        "systemctl start nginx",
+        "env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user",
+      ].join("\n");
+
+      const instance = new aws.ec2.Instance("AppInstance", {
+        instanceType: "t3.small",
+        ami: ami.id,
+        keyName: keyPair.keyName,
+        vpcSecurityGroupIds: [sg.id],
+        iamInstanceProfile: instanceProfile.name,
+        userData,
+        rootBlockDevice: {
+          volumeSize: 20,
+          volumeType: "gp3",
+        },
+        tags: withAppTag({ Name: `usopc-athlete-support-${stage}` }),
+      });
+
+      // Elastic IP
+      const eip = new aws.ec2.Eip("AppEip", {
+        instance: instance.id,
+        tags: withAppTag({ Name: `usopc-athlete-support-${stage}` }),
+      });
+
+      ec2PublicIp = eip.publicIp;
+
+      // Route 53 DNS records pointing to the EIP
+      const zone = aws.route53.getZoneOutput({
+        name: "athlete-agent.rosinbum.org",
+      });
+
+      new aws.route53.Record("WebDnsRecord", {
+        zoneId: zone.zoneId,
+        name: isProd ? domainZone : `${stage}.${domainZone}`,
+        type: "A",
+        ttl: 300,
+        records: [eip.publicIp],
+      });
+
+      new aws.route53.Record("SlackDnsRecord", {
+        zoneId: zone.zoneId,
+        name: isProd ? `slack.${domainZone}` : `slack-${stage}.${domainZone}`,
+        type: "A",
+        ttl: 300,
+        records: [eip.publicIp],
+      });
     }
 
     // Computed web domain and email sender for the Next.js app
@@ -522,79 +704,45 @@ export default $config({
         : `${stage}.${domainZone}`
       : "localhost";
 
-    // Next.js web app
-    const web = new sst.aws.Nextjs("Web", {
-      path: "apps/web",
-      server: {
-        timeout: "60 seconds",
-        memory: "1024 MB",
-      },
-      environment: {
-        APP_URL: webDomain,
-        EMAIL_FROM: `Athlete Support <noreply@${emailFromDomain}>`,
-      },
-      ...(isDeployed
-        ? {
-            domain: {
-              name: isProd ? domainZone : `${stage}.${domainZone}`,
-              dns: sst.aws.dns(),
-            },
-          }
-        : {}),
-      link: [
-        ...linkables,
-        conversationMaxTurns,
-        authSecret,
-        gitHubClientId,
-        gitHubClientSecret,
-        adminEmails,
-        resendApiKey,
-        appTable,
-        authTable,
-        documentsBucket,
-        discoveryFeedQueue,
-        discoveryFeedDlq,
-        ...(ingestionQueue ? [ingestionQueue] : []),
-        ...(ingestionDlq ? [ingestionDlq] : []),
-      ],
-    });
+    // Next.js web app — Lambda + CloudFront for local dev only.
+    // Deployed stages (staging, production) run on EC2 with PM2.
+    let webUrl: string | undefined;
 
-    // Web Lambda alarms + CloudWatch dashboard (needs web to be declared)
+    if (!isDeployed) {
+      const web = new sst.aws.Nextjs("Web", {
+        path: "apps/web",
+        server: {
+          timeout: "60 seconds",
+          memory: "1024 MB",
+        },
+        environment: {
+          APP_URL: webDomain,
+          EMAIL_FROM: `Athlete Support <noreply@${emailFromDomain}>`,
+        },
+        link: [
+          ...linkables,
+          conversationMaxTurns,
+          authSecret,
+          gitHubClientId,
+          gitHubClientSecret,
+          adminEmails,
+          resendApiKey,
+          appTable,
+          authTable,
+          documentsBucket,
+          discoveryFeedQueue,
+          discoveryFeedDlq,
+          ...(ingestionQueue ? [ingestionQueue] : []),
+          ...(ingestionDlq ? [ingestionDlq] : []),
+        ],
+      });
+      webUrl = web.url;
+    }
+
+    // CloudWatch Dashboard — workers, crons, DLQs, DynamoDB only.
+    // Web and Slack run on EC2 (monitor via CloudWatch Agent + Route 53 health checks).
     if (isDeployed && alarmTopic && monitoringRefs) {
-      // Web/Next.js server Lambda alarms
-      new aws.cloudwatch.MetricAlarm("WebErrorsAlarm", {
-        alarmDescription: "Web Lambda errors > 5 in 5 minutes",
-        namespace: "AWS/Lambda",
-        metricName: "Errors",
-        dimensions: { FunctionName: web.nodes.server!.nodes.function.name },
-        statistic: "Sum",
-        period: 300,
-        evaluationPeriods: 1,
-        threshold: 5,
-        comparisonOperator: "GreaterThanThreshold",
-        treatMissingData: "notBreaching",
-        alarmActions: [alarmTopic.arn],
-        okActions: [alarmTopic.arn],
-      });
-
-      new aws.cloudwatch.MetricAlarm("WebDurationAlarm", {
-        alarmDescription: "Web Lambda p99 duration > 30s",
-        namespace: "AWS/Lambda",
-        metricName: "Duration",
-        dimensions: { FunctionName: web.nodes.server!.nodes.function.name },
-        extendedStatistic: "p99",
-        period: 300,
-        evaluationPeriods: 2,
-        threshold: 30_000, // milliseconds
-        comparisonOperator: "GreaterThanThreshold",
-        treatMissingData: "notBreaching",
-        alarmActions: [alarmTopic.arn],
-        okActions: [alarmTopic.arn],
-      });
-
-      // CloudWatch Dashboard (includes all lambdas + web)
       const dashboardBody = $resolve([
-        monitoringRefs.slackFn,
         monitoringRefs.discoveryWorkerFn,
         monitoringRefs.discoveryCronFn,
         monitoringRefs.ingestionWorkerFn,
@@ -602,10 +750,8 @@ export default $config({
         monitoringRefs.discoveryDlqName,
         monitoringRefs.ingestionDlqName,
         monitoringRefs.tableName,
-        web.nodes.server!.nodes.function.name,
       ]).apply(
         ([
-          slackFn,
           discoveryWorkerFn,
           discoveryCronFn,
           ingestionWorkerFn,
@@ -613,11 +759,10 @@ export default $config({
           discoveryDlqName,
           ingestionDlqName,
           tableName,
-          webFn,
         ]) =>
           JSON.stringify({
             widgets: [
-              // Row 1: Lambda Invocations + Lambda Errors
+              // Row 1: Lambda Invocations + Lambda Errors (workers + crons only)
               {
                 type: "metric",
                 x: 0,
@@ -627,9 +772,12 @@ export default $config({
                 properties: {
                   title: "Lambda Invocations",
                   metrics: [
-                    ["AWS/Lambda", "Invocations", "FunctionName", webFn],
-                    ["...", slackFn],
-                    ["...", discoveryWorkerFn],
+                    [
+                      "AWS/Lambda",
+                      "Invocations",
+                      "FunctionName",
+                      discoveryWorkerFn,
+                    ],
                     ["...", discoveryCronFn],
                     ["...", ingestionWorkerFn],
                     ["...", ingestionCronFn],
@@ -649,9 +797,7 @@ export default $config({
                 properties: {
                   title: "Lambda Errors",
                   metrics: [
-                    ["AWS/Lambda", "Errors", "FunctionName", webFn],
-                    ["...", slackFn],
-                    ["...", discoveryWorkerFn],
+                    ["AWS/Lambda", "Errors", "FunctionName", discoveryWorkerFn],
                     ["...", discoveryCronFn],
                     ["...", ingestionWorkerFn],
                     ["...", ingestionCronFn],
@@ -672,9 +818,12 @@ export default $config({
                 properties: {
                   title: "Lambda Duration p99",
                   metrics: [
-                    ["AWS/Lambda", "Duration", "FunctionName", webFn],
-                    ["...", slackFn],
-                    ["...", discoveryWorkerFn],
+                    [
+                      "AWS/Lambda",
+                      "Duration",
+                      "FunctionName",
+                      discoveryWorkerFn,
+                    ],
                     ["...", discoveryCronFn],
                     ["...", ingestionWorkerFn],
                     ["...", ingestionCronFn],
@@ -770,10 +919,13 @@ export default $config({
     }
 
     return {
-      webUrl: web.url,
-      slackUrl: slackApi.url,
+      webUrl: webUrl ?? webDomain,
+      slackUrl:
+        slackApiUrl ??
+        `https://${isProd ? `slack.${domainZone}` : `slack-${stage}.${domainZone}`}`,
       sourceConfigTableName: appTable.name,
       documentsBucketName: documentsBucket.name,
+      ...(ec2PublicIp ? { ec2PublicIp } : {}),
     };
   },
 });

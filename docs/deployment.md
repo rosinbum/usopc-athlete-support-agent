@@ -33,16 +33,48 @@ sst secret set ConversationMaxTurns <number> --stage production  # Default: 5
 
 ## 2. Deploy
 
+Deployment is two-phase: SST for Lambda infrastructure, then SSH for the EC2 apps.
+
+### Phase 1: SST Infrastructure (Lambda workers, crons, DynamoDB, SQS, S3)
+
 ```bash
 sst deploy --stage production
 ```
 
 This provisions:
 
-- Aurora Serverless v2 PostgreSQL cluster with pgvector
-- API Gateway + Lambda for Slack webhooks
-- CloudFront distribution + Lambda@Edge for the Next.js app
-- EventBridge + SQS + Lambda for the weekly ingestion pipeline
+- DynamoDB tables (AppTable, AuthTable)
+- S3 bucket (DocumentsBucket)
+- SQS queues (DiscoveryFeedQueue, IngestionQueue) with DLQs
+- EventBridge + Lambda for discovery cron, ingestion cron, checkpoint cleanup
+- SQS + Lambda for discovery feed worker, ingestion worker
+- CloudWatch alarms and dashboard
+
+### Phase 2: EC2 App Deploy (Next.js web app + Slack bot)
+
+The web app and Slack bot run on an EC2 instance (t3.small) with PM2 + Nginx. See [AWS Container Strategy](./aws-container-strategy.md) for the full architecture.
+
+```bash
+# Deploy from the EC2 instance
+./scripts/deploy-ec2.sh              # latest main
+./scripts/deploy-ec2.sh v1.2.3       # specific tag
+```
+
+Or from CI (automated via `.github/workflows/deploy.yml`):
+
+```bash
+# SSH to EC2 and run deploy script
+ssh ec2-user@<instance-ip> "cd ~/app && ./scripts/deploy-ec2.sh v1.2.3"
+```
+
+The deploy script: pulls code, installs deps, builds both apps, copies static assets, restarts PM2, and health-checks both endpoints.
+
+### Environment Variables on EC2
+
+SST resource bindings (DynamoDB table names, SQS queue URLs, secrets) must be available as environment variables on the EC2 instance. Two approaches:
+
+1. **`sst shell`** (recommended): `sst shell --stage production -- pm2 start ecosystem.config.cjs`
+2. **Sync to `.env.ec2`**: `./scripts/sync-sst-env.sh production`, then source before starting PM2
 
 ## 3. Run Initial Ingestion
 
@@ -55,14 +87,14 @@ After the first deployment, trigger the ingestion pipeline to populate the knowl
 
 ## Environment Outputs
 
-After deployment, SST outputs the service URLs. With custom domains configured (see [Deployment Procedure — Custom Domains](./deployment-procedure.md#custom-domains)):
+Production URLs (served by EC2 + Nginx):
 
 ```
-webUrl:   https://app.rosinbum.org
-slackUrl: https://slack.rosinbum.org
+webUrl:   https://athlete-agent.rosinbum.org
+slackUrl: https://slack.athlete-agent.rosinbum.org
 ```
 
-Without custom domains (local dev stages), raw AWS URLs are used:
+Local dev stages use SST Lambda emulation with raw AWS URLs:
 
 ```
 webUrl:   https://xxx.cloudfront.net
@@ -180,15 +212,14 @@ aws lambda invoke \
 
 ## Updating Model Configuration
 
-Model instances (`agentModel` for Sonnet, `classifierModel` for Haiku) are constructed once at Lambda cold start and reused for the container's lifetime. Config changes stored in DynamoDB are cached for 5 minutes by `getModelConfig()`, but the `ChatAnthropic` instances themselves are never recreated.
+Model instances (`agentModel` for Sonnet, `classifierModel` for Haiku) are constructed once at server startup and reused for the process lifetime. Config changes stored in DynamoDB are cached for 5 minutes by `getModelConfig()`, but the `ChatAnthropic` instances themselves are never recreated.
 
 **To apply model config changes (model name, temperature, maxTokens):**
 
 1. Update the config in DynamoDB (via admin UI or direct update)
-2. Force a cold start by redeploying: `sst deploy --stage production`
-3. Or wait for Lambda to naturally recycle containers (up to ~2 hours)
+2. Restart the PM2 processes: `pm2 restart all` (on the EC2 instance)
 
-**Note:** Changing just the DynamoDB config without a redeploy will **not** update the running model instances. The 5-minute config cache TTL only affects `getModelConfig()` calls, not already-constructed `ChatAnthropic` instances.
+**Note:** Changing just the DynamoDB config without a restart will **not** update the running model instances. The 5-minute config cache TTL only affects `getModelConfig()` calls, not already-constructed `ChatAnthropic` instances.
 
 ## Troubleshooting
 

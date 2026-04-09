@@ -6,6 +6,7 @@
   "main": "./src/index.ts",
   "scripts": {
     "build": "tsc",
+    "start": "node dist/server.js",
     "dev": "tsx watch src/dev.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
