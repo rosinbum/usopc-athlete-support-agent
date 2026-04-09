@@ -32,9 +32,7 @@ SST="$APP_DIR/node_modules/.bin/sst"
 echo "==> Installing SST platform binaries"
 "$SST" install
 
-# Capture raw sst shell output to a temp file for debugging.
-# This lets us see exactly what SST outputs before filtering — useful for
-# diagnosing cases where unexpected lines end up in .env.ec2.
+# Capture raw sst shell output to a temp file.
 SST_RAW=$(mktemp)
 trap 'rm -f "$SST_RAW"' EXIT
 
@@ -42,15 +40,16 @@ echo "==> Running: sst shell --stage $STAGE -- env"
 "$SST" shell --stage "$STAGE" -- env > "$SST_RAW"
 
 echo "==> Raw sst shell output: $(wc -l < "$SST_RAW") lines total"
-echo "==> First 10 lines of raw output:"
-head -10 "$SST_RAW" || true
-echo "==> Last 10 lines of raw output:"
-tail -10 "$SST_RAW" || true
-echo "==> Lines NOT matching SST_RESOURCE_|APP_URL|EMAIL_FROM (potential noise):"
-grep -v '^SST_RESOURCE_\|^APP_URL=\|^EMAIL_FROM=' "$SST_RAW" | grep -v '^$' || echo "(none — output is clean)"
 
-# Write filtered vars to env file
-grep '^SST_RESOURCE_' "$SST_RAW" >> "$ENV_FILE"
+# Write SST_RESOURCE_* vars to env file, single-quoting each value.
+# SST_RESOURCE_App contains spaces (e.g. {"name": "app", "stage": "staging" })
+# which bash word-splits on source if the value is unquoted — causing
+# "command not found" errors. Wrapping in single quotes prevents this.
+while IFS= read -r line; do
+  key="${line%%=*}"
+  value="${line#*=}"
+  printf "%s='%s'\n" "$key" "$value"
+done < <(grep '^SST_RESOURCE_' "$SST_RAW") >> "$ENV_FILE"
 
 # Also extract the computed APP_URL and EMAIL_FROM if set
 grep -E '^(APP_URL|EMAIL_FROM)=' "$SST_RAW" >> "$ENV_FILE" 2>/dev/null || true
