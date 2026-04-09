@@ -112,17 +112,24 @@ jobs:
       # Phase 2: Deploy web + Slack to EC2 via SSH
       - name: Deploy apps to EC2
         uses: appleboy/ssh-action@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           host: ${{ steps.sst.outputs.ec2_ip || secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: GITHUB_TOKEN
           script: |
             export APP_DIR="$HOME/app"
+            export REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+            # Rewrite SSH git URLs to HTTPS so git fetch works without a deploy key
+            git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
             if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
               "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}" "staging"
             else
-              # First deploy — clone and run
-              git clone git@github.com:${{ github.repository }}.git "$APP_DIR"
+              # First deploy — clean up any partial clone and retry with HTTPS
+              rm -rf "$APP_DIR"
+              git clone "$REPO_URL" "$APP_DIR"
               "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}" "staging"
             fi
 
@@ -177,16 +184,22 @@ jobs:
       # Phase 2: Deploy web + Slack to EC2 via SSH
       - name: Deploy apps to EC2
         uses: appleboy/ssh-action@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           host: ${{ steps.sst.outputs.ec2_ip || secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: GITHUB_TOKEN
           script: |
             export APP_DIR="$HOME/app"
+            export REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+            git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
             if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
               "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}" "production"
             else
-              git clone git@github.com:${{ github.repository }}.git "$APP_DIR"
+              rm -rf "$APP_DIR"
+              git clone "$REPO_URL" "$APP_DIR"
               "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}" "production"
             fi
 
@@ -253,12 +266,17 @@ jobs:
       # Phase 2: Rollback EC2 apps
       - name: Rollback EC2 apps
         uses: appleboy/ssh-action@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           host: ${{ steps.sst.outputs.ec2_ip || secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: GITHUB_TOKEN
           script: |
             export APP_DIR="$HOME/app"
+            export REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+            git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
             "$APP_DIR/scripts/deploy-ec2.sh" "${{ steps.prev-tag.outputs.tag }}" "production"
 
       - name: Smoke test Web
