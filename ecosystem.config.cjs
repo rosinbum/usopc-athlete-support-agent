@@ -5,7 +5,7 @@ module.exports = {
   apps: [
     {
       name: "web",
-      script: "apps/web/.next/standalone/server.js",
+      script: "apps/web/.next/standalone/apps/web/server.js",
       env: {
         NODE_ENV: "production",
         PORT: 3000,
