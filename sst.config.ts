@@ -596,6 +596,22 @@ export default $config({
               ],
               Resource: queueArns,
             },
+            // SST Pulumi state bucket — sst shell reads Pulumi state from S3
+            // to resolve resource bindings. The bucket has a random suffix so
+            // we match with a prefix wildcard; sst-state-* is unique to SST.
+            {
+              Effect: "Allow",
+              Action: [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:ListBucket",
+              ],
+              Resource: [
+                "arn:aws:s3:::sst-state-*",
+                "arn:aws:s3:::sst-state-*/*",
+              ],
+            },
           ],
         });
       });
