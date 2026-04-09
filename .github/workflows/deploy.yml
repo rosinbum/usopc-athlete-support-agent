@@ -131,7 +131,7 @@ jobs:
               echo "pnpm not found — installing to /home/ec2-user/.local"
               sudo rm -rf /usr/lib/nodejs20/lib/node_modules/pnpm 2>/dev/null || true
               mkdir -p /home/ec2-user/.local
-              npm install --prefix /home/ec2-user/.local pnpm@9
+              npm install -g --prefix /home/ec2-user/.local pnpm@9
             fi
             if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
               "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}" "staging"
@@ -209,7 +209,7 @@ jobs:
               echo "pnpm not found — installing to /home/ec2-user/.local"
               sudo rm -rf /usr/lib/nodejs20/lib/node_modules/pnpm 2>/dev/null || true
               mkdir -p /home/ec2-user/.local
-              npm install --prefix /home/ec2-user/.local pnpm@9
+              npm install -g --prefix /home/ec2-user/.local pnpm@9
             fi
             if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
               "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}" "production"
@@ -298,7 +298,7 @@ jobs:
               echo "pnpm not found — installing to /home/ec2-user/.local"
               sudo rm -rf /usr/lib/nodejs20/lib/node_modules/pnpm 2>/dev/null || true
               mkdir -p /home/ec2-user/.local
-              npm install --prefix /home/ec2-user/.local pnpm@9
+              npm install -g --prefix /home/ec2-user/.local pnpm@9
             fi
             "$APP_DIR/scripts/deploy-ec2.sh" "${{ steps.prev-tag.outputs.tag }}" "production"
 
