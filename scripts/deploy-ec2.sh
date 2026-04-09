@@ -48,6 +48,14 @@ fi
 echo "==> Installing dependencies"
 pnpm install --frozen-lockfile
 
+# Load SST environment bindings BEFORE building — Next.js accesses SST
+# resources during "Collecting page data" (static generation phase of
+# `next build`). The EC2 instance profile provides AWS credentials.
+echo "==> Syncing SST environment bindings (stage: $STAGE)"
+"$APP_DIR/scripts/sync-sst-env.sh" "$STAGE"
+# shellcheck source=/dev/null
+set -a; source "$APP_DIR/.env.ec2"; set +a
+
 # Ensure swap is available — Next.js build exceeds 2GB RSS on a t3.small.
 # This is idempotent: a no-op if /swapfile already exists and is active.
 if ! swapon --show | grep -q /swapfile; then
@@ -69,12 +77,7 @@ cp -r apps/web/public apps/web/.next/standalone/apps/web/public 2>/dev/null || t
 echo "==> Building Slack bot"
 pnpm --filter @usopc/slack build
 
-echo "==> Syncing SST environment bindings (stage: $STAGE)"
-"$APP_DIR/scripts/sync-sst-env.sh" "$STAGE"
-# shellcheck source=/dev/null
-set -a; source "$APP_DIR/.env.ec2"; set +a
-
-echo "==> Restarting PM2 processes"
+echo "==> Starting/restarting PM2 processes"
 pm2 restart ecosystem.config.cjs --update-env 2>/dev/null || pm2 start ecosystem.config.cjs
 
 echo "==> Waiting for processes to start"
