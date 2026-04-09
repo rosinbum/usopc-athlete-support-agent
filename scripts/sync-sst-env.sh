@@ -26,10 +26,16 @@ echo "" >> "$ENV_FILE"
 # Use node_modules/.bin/sst directly — npx may not be on PATH when running
 # via SSH on Amazon Linux 2023 (nodejs20 installs npx-20, not npx).
 SST="$APP_DIR/node_modules/.bin/sst"
-"$SST" shell --stage "$STAGE" -- env | grep '^SST_RESOURCE_' >> "$ENV_FILE"
+
+# Install SST platform binaries if not already present — they are not
+# committed to git and must be installed before `sst shell` can run.
+echo "==> Installing SST platform binaries"
+"$SST" install
+
+"$SST" shell --print-logs --stage "$STAGE" -- env | grep '^SST_RESOURCE_' >> "$ENV_FILE"
 
 # Also extract the computed APP_URL and EMAIL_FROM if set
-"$SST" shell --stage "$STAGE" -- env | grep -E '^(APP_URL|EMAIL_FROM)=' >> "$ENV_FILE" 2>/dev/null || true
+"$SST" shell --print-logs --stage "$STAGE" -- env | grep -E '^(APP_URL|EMAIL_FROM)=' >> "$ENV_FILE" 2>/dev/null || true
 
 chmod 600 "$ENV_FILE"
 echo "==> Written to $ENV_FILE ($(wc -l < "$ENV_FILE") lines)"
