@@ -154,14 +154,19 @@ jobs:
               mkdir -p /home/ec2-user/.local
               npm install -g --prefix /home/ec2-user/.local pnpm@9
             fi
-            if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
-              "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}" "staging"
+            # Always update the repo to the exact tag BEFORE calling deploy-ec2.sh.
+            # This ensures we run the CURRENT script, not a stale on-disk version
+            # from a previous (possibly failed or older) deploy.
+            if [ -d "$APP_DIR/.git" ]; then
+              git -C "$APP_DIR" fetch origin --tags
+              git -C "$APP_DIR" checkout "refs/tags/${{ github.ref_name }}"
             else
-              # First deploy — clean up any partial clone and retry with HTTPS
               rm -rf "$APP_DIR"
               git clone "$REPO_URL" "$APP_DIR"
-              "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}" "staging"
+              git -C "$APP_DIR" fetch origin --tags
+              git -C "$APP_DIR" checkout "refs/tags/${{ github.ref_name }}"
             fi
+            "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}" "staging"
 
       - name: Smoke test Web
         run: |
@@ -248,13 +253,16 @@ jobs:
               mkdir -p /home/ec2-user/.local
               npm install -g --prefix /home/ec2-user/.local pnpm@9
             fi
-            if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
-              "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}" "production"
+            if [ -d "$APP_DIR/.git" ]; then
+              git -C "$APP_DIR" fetch origin --tags
+              git -C "$APP_DIR" checkout "refs/tags/${{ inputs.tag }}"
             else
               rm -rf "$APP_DIR"
               git clone "$REPO_URL" "$APP_DIR"
-              "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}" "production"
+              git -C "$APP_DIR" fetch origin --tags
+              git -C "$APP_DIR" checkout "refs/tags/${{ inputs.tag }}"
             fi
+            "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}" "production"
 
       - name: Smoke test Web
         run: |
@@ -352,6 +360,15 @@ jobs:
               sudo rm -rf /usr/lib/nodejs20/lib/node_modules/pnpm 2>/dev/null || true
               mkdir -p /home/ec2-user/.local
               npm install -g --prefix /home/ec2-user/.local pnpm@9
+            fi
+            if [ -d "$APP_DIR/.git" ]; then
+              git -C "$APP_DIR" fetch origin --tags
+              git -C "$APP_DIR" checkout "refs/tags/${{ steps.prev-tag.outputs.tag }}"
+            else
+              rm -rf "$APP_DIR"
+              git clone "$REPO_URL" "$APP_DIR"
+              git -C "$APP_DIR" fetch origin --tags
+              git -C "$APP_DIR" checkout "refs/tags/${{ steps.prev-tag.outputs.tag }}"
             fi
             "$APP_DIR/scripts/deploy-ec2.sh" "${{ steps.prev-tag.outputs.tag }}" "production"
 
