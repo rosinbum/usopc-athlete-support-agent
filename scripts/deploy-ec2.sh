@@ -34,7 +34,7 @@ fi
 cd "$APP_DIR"
 
 echo "==> Fetching latest code"
-git fetch origin
+git fetch origin --tags
 
 if [ -n "$TAG" ]; then
   echo "==> Checking out tag $TAG"
