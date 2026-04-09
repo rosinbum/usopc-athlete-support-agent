@@ -124,6 +124,12 @@ jobs:
             export REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
             # Rewrite SSH git URLs to HTTPS so git fetch works without a deploy key
             git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
+            # Ensure pnpm is in PATH (corepack installs to /usr/local/bin as root)
+            export PATH="/usr/local/bin:$PATH"
+            if ! command -v pnpm &>/dev/null; then
+              echo "pnpm not found — installing via npm"
+              npm install -g pnpm@9
+            fi
             if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
               "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}" "staging"
             else
@@ -195,6 +201,11 @@ jobs:
             export APP_DIR="$HOME/app"
             export REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
             git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
+            export PATH="/usr/local/bin:$PATH"
+            if ! command -v pnpm &>/dev/null; then
+              echo "pnpm not found — installing via npm"
+              npm install -g pnpm@9
+            fi
             if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
               "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}" "production"
             else
@@ -277,6 +288,11 @@ jobs:
             export APP_DIR="$HOME/app"
             export REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
             git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
+            export PATH="/usr/local/bin:$PATH"
+            if ! command -v pnpm &>/dev/null; then
+              echo "pnpm not found — installing via npm"
+              npm install -g pnpm@9
+            fi
             "$APP_DIR/scripts/deploy-ec2.sh" "${{ steps.prev-tag.outputs.tag }}" "production"
 
       - name: Smoke test Web
