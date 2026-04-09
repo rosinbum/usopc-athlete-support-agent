@@ -128,7 +128,7 @@ jobs:
             export PATH="/usr/local/bin:$PATH"
             if ! command -v pnpm &>/dev/null; then
               echo "pnpm not found — installing via npm"
-              npm install -g pnpm@9
+              sudo npm install -g pnpm@9
             fi
             if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
               "$APP_DIR/scripts/deploy-ec2.sh" "${{ github.ref_name }}" "staging"
@@ -204,7 +204,7 @@ jobs:
             export PATH="/usr/local/bin:$PATH"
             if ! command -v pnpm &>/dev/null; then
               echo "pnpm not found — installing via npm"
-              npm install -g pnpm@9
+              sudo npm install -g pnpm@9
             fi
             if [ -f "$APP_DIR/scripts/deploy-ec2.sh" ]; then
               "$APP_DIR/scripts/deploy-ec2.sh" "${{ inputs.tag }}" "production"
@@ -291,7 +291,7 @@ jobs:
             export PATH="/usr/local/bin:$PATH"
             if ! command -v pnpm &>/dev/null; then
               echo "pnpm not found — installing via npm"
-              npm install -g pnpm@9
+              sudo npm install -g pnpm@9
             fi
             "$APP_DIR/scripts/deploy-ec2.sh" "${{ steps.prev-tag.outputs.tag }}" "production"
 
