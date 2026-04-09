@@ -109,6 +109,24 @@ jobs:
           EC2_IP=$(grep -oP 'ec2PublicIp:\s+\K\S+' deploy-output.txt || true)
           echo "ec2_ip=$EC2_IP" >> "$GITHUB_OUTPUT"
 
+      # Wait for SSH — needed when SST replaces the EC2 instance (userData
+      # changes force replacement; sshd starts after OS boot, not after Pulumi
+      # marks the instance "running").
+      - name: Wait for EC2 SSH to be ready
+        run: |
+          EC2_IP="${{ steps.sst.outputs.ec2_ip || secrets.EC2_HOST }}"
+          echo "Waiting for SSH on $EC2_IP (up to 10 min)..."
+          for i in $(seq 1 60); do
+            if nc -z -w5 "$EC2_IP" 22 2>/dev/null; then
+              echo "SSH is ready (attempt $i)"
+              exit 0
+            fi
+            echo "  ...not ready yet ($((i * 10))s elapsed)"
+            sleep 10
+          done
+          echo "Timed out waiting for EC2 SSH after 10 minutes"
+          exit 1
+
       # Phase 2: Deploy web + Slack to EC2 via SSH
       - name: Deploy apps to EC2
         uses: appleboy/ssh-action@v1
@@ -120,6 +138,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: GITHUB_TOKEN
           script: |
+            # On a fresh instance, block until cloud-init (userData) finishes.
+            # This ensures pnpm, git, and swap are all installed before we proceed.
+            sudo cloud-init status --wait 2>/dev/null || true
             export APP_DIR="/home/ec2-user/app"
             export REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
             # Rewrite SSH git URLs to HTTPS so git fetch works without a deploy key
@@ -190,6 +211,21 @@ jobs:
           EC2_IP=$(grep -oP 'ec2PublicIp:\s+\K\S+' deploy-output.txt || true)
           echo "ec2_ip=$EC2_IP" >> "$GITHUB_OUTPUT"
 
+      - name: Wait for EC2 SSH to be ready
+        run: |
+          EC2_IP="${{ steps.sst.outputs.ec2_ip || secrets.EC2_HOST }}"
+          echo "Waiting for SSH on $EC2_IP (up to 10 min)..."
+          for i in $(seq 1 60); do
+            if nc -z -w5 "$EC2_IP" 22 2>/dev/null; then
+              echo "SSH is ready (attempt $i)"
+              exit 0
+            fi
+            echo "  ...not ready yet ($((i * 10))s elapsed)"
+            sleep 10
+          done
+          echo "Timed out waiting for EC2 SSH after 10 minutes"
+          exit 1
+
       # Phase 2: Deploy web + Slack to EC2 via SSH
       - name: Deploy apps to EC2
         uses: appleboy/ssh-action@v1
@@ -201,6 +237,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: GITHUB_TOKEN
           script: |
+            sudo cloud-init status --wait 2>/dev/null || true
             export APP_DIR="/home/ec2-user/app"
             export REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
             git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
@@ -279,6 +316,21 @@ jobs:
           EC2_IP=$(grep -oP 'ec2PublicIp:\s+\K\S+' deploy-output.txt || true)
           echo "ec2_ip=$EC2_IP" >> "$GITHUB_OUTPUT"
 
+      - name: Wait for EC2 SSH to be ready
+        run: |
+          EC2_IP="${{ steps.sst.outputs.ec2_ip || secrets.EC2_HOST }}"
+          echo "Waiting for SSH on $EC2_IP (up to 10 min)..."
+          for i in $(seq 1 60); do
+            if nc -z -w5 "$EC2_IP" 22 2>/dev/null; then
+              echo "SSH is ready (attempt $i)"
+              exit 0
+            fi
+            echo "  ...not ready yet ($((i * 10))s elapsed)"
+            sleep 10
+          done
+          echo "Timed out waiting for EC2 SSH after 10 minutes"
+          exit 1
+
       # Phase 2: Rollback EC2 apps
       - name: Rollback EC2 apps
         uses: appleboy/ssh-action@v1
@@ -290,6 +342,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: GITHUB_TOKEN
           script: |
+            sudo cloud-init status --wait 2>/dev/null || true
             export APP_DIR="/home/ec2-user/app"
             export REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
             git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
