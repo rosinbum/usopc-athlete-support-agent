@@ -23,10 +23,13 @@ echo "# Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$ENV_FILE"
 echo "" >> "$ENV_FILE"
 
 # Extract all SST_RESOURCE_* env vars (resource bindings + secrets)
-npx sst shell --stage "$STAGE" -- env | grep '^SST_RESOURCE_' >> "$ENV_FILE"
+# Use node_modules/.bin/sst directly — npx may not be on PATH when running
+# via SSH on Amazon Linux 2023 (nodejs20 installs npx-20, not npx).
+SST="$APP_DIR/node_modules/.bin/sst"
+"$SST" shell --stage "$STAGE" -- env | grep '^SST_RESOURCE_' >> "$ENV_FILE"
 
 # Also extract the computed APP_URL and EMAIL_FROM if set
-npx sst shell --stage "$STAGE" -- env | grep -E '^(APP_URL|EMAIL_FROM)=' >> "$ENV_FILE" 2>/dev/null || true
+"$SST" shell --stage "$STAGE" -- env | grep -E '^(APP_URL|EMAIL_FROM)=' >> "$ENV_FILE" 2>/dev/null || true
 
 chmod 600 "$ENV_FILE"
 echo "==> Written to $ENV_FILE ($(wc -l < "$ENV_FILE") lines)"
