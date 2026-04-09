@@ -25,6 +25,14 @@ if ! command -v pnpm &>/dev/null; then
   npm install -g --prefix /home/ec2-user/.local pnpm@9
 fi
 
+# Ensure PM2 is available. PM2 is installed globally via userData but may not
+# be on PATH in non-login SSH sessions. Use the same user-local prefix as pnpm
+# so the binary lands in ~/.local/bin, which is already on PATH above.
+if ! command -v pm2 &>/dev/null; then
+  echo "==> PM2 not found — installing to /home/ec2-user/.local"
+  npm install -g --prefix /home/ec2-user/.local pm2
+fi
+
 # Clone on first deploy, otherwise just fetch
 if [ ! -d "$APP_DIR/.git" ]; then
   echo "==> First deploy — cloning repo"
