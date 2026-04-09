@@ -8,48 +8,48 @@ This document assesses what it would take to move the USOPC Athlete Support Agen
 
 ## Current AWS Infrastructure Summary
 
-| Component | AWS Service | Config |
-|---|---|---|
-| IaC | SST v3 (Pulumi under the hood) | TypeScript, 14 secrets, ~780 lines |
-| Web app | Lambda (Next.js via OpenNext) | 1024 MB, 60s timeout |
-| Slack bot | Lambda + API Gateway v2 | 512 MB, 120s timeout |
-| Ingestion workers | Lambda (SQS-triggered) | 512–1024 MB, 10–15 min timeout |
-| Cron jobs | Lambda + EventBridge | 3 scheduled functions (discovery, ingestion, cleanup) |
-| NoSQL | DynamoDB (3 tables, OneTable pattern) | AppTable, AuthTable + S3 DocumentsBucket |
-| SQL + vectors | PostgreSQL + pgvector (Neon) | 1536-dim embeddings, HNSW + BM25 |
-| Queues | SQS FIFO (2 queues + 2 DLQs) | Content-based dedup, 1 msg batch |
-| Object storage | S3 (versioned) | Content-addressed document archive |
-| CDN | CloudFront (via SST Nextjs) | Custom domains per stage |
-| Secrets | SST secrets (14 total) | PascalCase naming convention |
-| Auth | NextAuth v5 + DynamoDB adapter | GitHub OAuth + email magic-link |
-| Monitoring | CloudWatch (11 alarms, 1 dashboard) | SNS email notifications |
-| Email | SES | Discovery notifications |
-| CI/CD | GitHub Actions + AWS OIDC | Tag-triggered deploy, staging → prod |
+| Component         | AWS Service                           | Config                                                |
+| ----------------- | ------------------------------------- | ----------------------------------------------------- |
+| IaC               | SST v3 (Pulumi under the hood)        | TypeScript, 14 secrets, ~780 lines                    |
+| Web app           | Lambda (Next.js via OpenNext)         | 1024 MB, 60s timeout                                  |
+| Slack bot         | Lambda + API Gateway v2               | 512 MB, 120s timeout                                  |
+| Ingestion workers | Lambda (SQS-triggered)                | 512–1024 MB, 10–15 min timeout                        |
+| Cron jobs         | Lambda + EventBridge                  | 3 scheduled functions (discovery, ingestion, cleanup) |
+| NoSQL             | DynamoDB (3 tables, OneTable pattern) | AppTable, AuthTable + S3 DocumentsBucket              |
+| SQL + vectors     | PostgreSQL + pgvector (Neon)          | 1536-dim embeddings, HNSW + BM25                      |
+| Queues            | SQS FIFO (2 queues + 2 DLQs)          | Content-based dedup, 1 msg batch                      |
+| Object storage    | S3 (versioned)                        | Content-addressed document archive                    |
+| CDN               | CloudFront (via SST Nextjs)           | Custom domains per stage                              |
+| Secrets           | SST secrets (14 total)                | PascalCase naming convention                          |
+| Auth              | NextAuth v5 + DynamoDB adapter        | GitHub OAuth + email magic-link                       |
+| Monitoring        | CloudWatch (11 alarms, 1 dashboard)   | SNS email notifications                               |
+| Email             | SES                                   | Discovery notifications                               |
+| CI/CD             | GitHub Actions + AWS OIDC             | Tag-triggered deploy, staging → prod                  |
 
 ### Lambda Functions (8 total)
 
-| Function | Memory | Timeout | Trigger |
-|---|---|---|---|
-| Web (Next.js) | 1024 MB | 60s | HTTP |
-| Slack bot | 512 MB | 120s | API Gateway |
-| Discovery feed worker | 512 MB | 10 min | SQS |
-| Ingestion worker | 1024 MB | 15 min | SQS |
-| Discovery cron | 1024 MB | 15 min | EventBridge (Mon 2 AM) |
-| Ingestion cron | 512 MB | 5 min | EventBridge (weekly) |
-| Checkpoint cleanup | 256 MB | 2 min | EventBridge (daily) |
+| Function              | Memory  | Timeout | Trigger                |
+| --------------------- | ------- | ------- | ---------------------- |
+| Web (Next.js)         | 1024 MB | 60s     | HTTP                   |
+| Slack bot             | 512 MB  | 120s    | API Gateway            |
+| Discovery feed worker | 512 MB  | 10 min  | SQS                    |
+| Ingestion worker      | 1024 MB | 15 min  | SQS                    |
+| Discovery cron        | 1024 MB | 15 min  | EventBridge (Mon 2 AM) |
+| Ingestion cron        | 512 MB  | 5 min   | EventBridge (weekly)   |
+| Checkpoint cleanup    | 256 MB  | 2 min   | EventBridge (daily)    |
 
 ### Cold Start Analysis
 
 Estimated cold start timeline for the web Lambda (chat endpoint):
 
-| Phase | Duration |
-|---|---|
-| Module load + env var setup | ~500–800 ms |
-| ChatAnthropic model init | ~200–400 ms |
-| Vector store + embedding model | ~300–500 ms |
-| Checkpointer + DB pool | ~100–200 ms |
-| Graph compilation | ~50–100 ms |
-| **Total cold start overhead** | **~1.2–2.2 seconds** |
+| Phase                          | Duration             |
+| ------------------------------ | -------------------- |
+| Module load + env var setup    | ~500–800 ms          |
+| ChatAnthropic model init       | ~200–400 ms          |
+| Vector store + embedding model | ~300–500 ms          |
+| Checkpointer + DB pool         | ~100–200 ms          |
+| Graph compilation              | ~50–100 ms           |
+| **Total cold start overhead**  | **~1.2–2.2 seconds** |
 
 This happens before any LLM API call. Combined with the first Anthropic API round-trip (~1–3s), users experience 2–5 seconds before the first token appears on a cold start. There is currently no provisioned concurrency or warm-up strategy.
 
@@ -61,25 +61,25 @@ Additionally, the web Lambda has a 60-second timeout but the LangGraph agent has
 
 ### Service Mapping
 
-| Current (AWS) | Proposed (GCP) | Migration Effort |
-|---|---|---|
-| SST v3 | **Pulumi (TypeScript)** | High — full IaC rewrite |
-| Lambda (Next.js via OpenNext) | **Cloud Run** (container) | Medium — Dockerfile + `next start` |
-| Lambda (Slack bot) | **Cloud Run** (service) | Medium — containerize Hono app |
-| Lambda (SQS workers) | **Cloud Run + Pub/Sub push** | Medium — HTTP handler refactor |
-| Lambda (crons) | **Cloud Scheduler → Cloud Run** | Low — same logic, new trigger |
-| DynamoDB (OneTable) | **Firestore** | High — data model redesign |
-| PostgreSQL + pgvector (Neon) | **Cloud SQL for PostgreSQL** | Low — connection string swap |
-| SQS FIFO | **Pub/Sub** | Medium — push vs. poll model |
-| S3 | **Cloud Storage** | Low — API swap |
-| API Gateway v2 | **Cloud Load Balancer** | Low — Cloud Run has built-in HTTPS |
-| CloudFront | **Cloud CDN** (on Load Balancer) | Low — config-level change |
-| Secrets Manager / SST secrets | **Secret Manager** | Low — simpler and cheaper |
-| NextAuth DynamoDB adapter | **NextAuth Firestore adapter** | Medium — adapter swap |
-| CloudWatch alarms + dashboard | **Cloud Monitoring + Alerting** | Medium — equivalent concepts |
-| SES | **SendGrid or Mailgun** (GCP has no native SES) | Low — API swap |
-| EventBridge | **Cloud Scheduler** | Low — cron syntax identical |
-| SNS (alarm notifications) | **Pub/Sub + Cloud Monitoring** | Low — built into alerting |
+| Current (AWS)                 | Proposed (GCP)                                  | Migration Effort                   |
+| ----------------------------- | ----------------------------------------------- | ---------------------------------- |
+| SST v3                        | **Pulumi (TypeScript)**                         | High — full IaC rewrite            |
+| Lambda (Next.js via OpenNext) | **Cloud Run** (container)                       | Medium — Dockerfile + `next start` |
+| Lambda (Slack bot)            | **Cloud Run** (service)                         | Medium — containerize Hono app     |
+| Lambda (SQS workers)          | **Cloud Run + Pub/Sub push**                    | Medium — HTTP handler refactor     |
+| Lambda (crons)                | **Cloud Scheduler → Cloud Run**                 | Low — same logic, new trigger      |
+| DynamoDB (OneTable)           | **Firestore**                                   | High — data model redesign         |
+| PostgreSQL + pgvector (Neon)  | **Cloud SQL for PostgreSQL**                    | Low — connection string swap       |
+| SQS FIFO                      | **Pub/Sub**                                     | Medium — push vs. poll model       |
+| S3                            | **Cloud Storage**                               | Low — API swap                     |
+| API Gateway v2                | **Cloud Load Balancer**                         | Low — Cloud Run has built-in HTTPS |
+| CloudFront                    | **Cloud CDN** (on Load Balancer)                | Low — config-level change          |
+| Secrets Manager / SST secrets | **Secret Manager**                              | Low — simpler and cheaper          |
+| NextAuth DynamoDB adapter     | **NextAuth Firestore adapter**                  | Medium — adapter swap              |
+| CloudWatch alarms + dashboard | **Cloud Monitoring + Alerting**                 | Medium — equivalent concepts       |
+| SES                           | **SendGrid or Mailgun** (GCP has no native SES) | Low — API swap                     |
+| EventBridge                   | **Cloud Scheduler**                             | Low — cron syntax identical        |
+| SNS (alarm notifications)     | **Pub/Sub + Cloud Monitoring**                  | Low — built into alerting          |
 
 ### Architecture Diagram
 
@@ -128,14 +128,14 @@ Cloud Run is the centerpiece of this migration and directly solves the cold star
 
 **Why Cloud Run over Lambda:**
 
-| Factor | Lambda | Cloud Run |
-|---|---|---|
-| Concurrency | 1 request per instance | Up to 80–1000 per instance |
-| Cold start mitigation | Provisioned concurrency ($$$) | Min instances (~$3/mo per idle instance) |
-| Request timeout | 15 min hard cap | Up to 60 min (resets per chunk for streaming) |
-| Deployment | ZIP/container + OpenNext adapter | Standard Docker container |
-| Streaming | Lambda response streaming (complex) | Native HTTP chunked encoding |
-| GPU support | None | NVIDIA L4 GPUs (scale to zero) |
+| Factor                | Lambda                              | Cloud Run                                     |
+| --------------------- | ----------------------------------- | --------------------------------------------- |
+| Concurrency           | 1 request per instance              | Up to 80–1000 per instance                    |
+| Cold start mitigation | Provisioned concurrency ($$$)       | Min instances (~$3/mo per idle instance)      |
+| Request timeout       | 15 min hard cap                     | Up to 60 min (resets per chunk for streaming) |
+| Deployment            | ZIP/container + OpenNext adapter    | Standard Docker container                     |
+| Streaming             | Lambda response streaming (complex) | Native HTTP chunked encoding                  |
+| GPU support           | None                                | NVIDIA L4 GPUs (scale to zero)                |
 
 **Configuration for the chat service:**
 
@@ -145,11 +145,11 @@ service: web
 image: gcr.io/PROJECT/web:latest
 cpu: 1
 memory: 1Gi
-min-instances: 1          # Eliminates cold starts
-max-instances: 10         # Cost cap
-concurrency: 80           # Multiplex I/O-bound chat requests
-timeout: 300s             # 5 min (chunks reset timer)
-billing: instance-based   # Pay for full lifecycle (better for steady traffic)
+min-instances: 1 # Eliminates cold starts
+max-instances: 10 # Cost cap
+concurrency: 80 # Multiplex I/O-bound chat requests
+timeout: 300s # 5 min (chunks reset timer)
+billing: instance-based # Pay for full lifecycle (better for steady traffic)
 ```
 
 With `min-instances: 1`, the container stays warm. The model singletons, DB pool, and graph compilation persist across requests. Estimated idle cost: ~$3.24/month for memory-only charges on the warm instance.
@@ -181,6 +181,7 @@ For an AI chat app with streaming responses, instance-based billing is recommend
 This is the lowest-risk component of the migration. Cloud SQL is a managed PostgreSQL service with full pgvector support.
 
 **What transfers directly:**
+
 - All SQL schema and migrations (`scripts/migrations/`)
 - pgvector extension (`CREATE EXTENSION vector`)
 - HNSW indexes for cosine similarity search
@@ -189,6 +190,7 @@ This is the lowest-risk component of the migration. Cloud SQL is a managed Postg
 - Connection pooling via `pg` library (same `packages/shared/src/pool.ts`)
 
 **What changes:**
+
 - Connection string (swap Neon URL for Cloud SQL URL)
 - SSL configuration (Cloud SQL uses the Cloud SQL Auth Proxy or IAM-based auth instead of direct SSL)
 - Consider using Cloud SQL Auth Proxy as a sidecar in Cloud Run for secure connections without managing SSL certs
@@ -213,6 +215,7 @@ The proxy handles authentication, encryption, and connection management. The app
 **Future upgrade path — AlloyDB:**
 
 If vector search performance becomes a bottleneck at scale, Google's AlloyDB offers the ScaNN index (from Google Research):
+
 - Up to 10x faster vector queries than pgvector HNSW
 - 4x smaller memory footprint for vector indices
 - Same pgvector SQL syntax — migration from Cloud SQL is a connection string change
@@ -256,6 +259,7 @@ discoveryRuns/{runId}     → Run history
 ```
 
 **Migration steps:**
+
 1. Replace `packages/shared/src/entities/` — rewrite all entity definitions from OneTable/Electrodb to Firestore document references
 2. Replace `@aws-sdk/client-dynamodb` with `@google-cloud/firestore`
 3. Rewrite all access patterns — Firestore uses collection queries with composite indexes instead of GSIs
@@ -271,16 +275,19 @@ Given the moderate data volumes (source configs, sessions, etc.), consider conso
 The main conceptual shift: SQS is pull-based (consumers poll), Pub/Sub is push-based (delivers to HTTP endpoints).
 
 **Current SQS pattern:**
+
 ```
 Producer → SQS FIFO queue → Lambda subscriber (batch size 1)
 ```
 
 **Proposed Pub/Sub pattern:**
+
 ```
 Producer → Pub/Sub topic → Push subscription → Cloud Run service (HTTP POST)
 ```
 
 **What changes:**
+
 - Replace `@aws-sdk/client-sqs` with `@google-cloud/pubsub`
 - Worker Lambdas become Cloud Run services that accept HTTP POST requests
 - FIFO ordering: Pub/Sub supports ordering keys (equivalent to FIFO message group IDs)
@@ -299,9 +306,9 @@ export const handler = async (event: SQSEvent) => {
 };
 
 // After (Cloud Run HTTP handler)
-app.post('/process', async (req, res) => {
+app.post("/process", async (req, res) => {
   const message = req.body.message;
-  const data = JSON.parse(Buffer.from(message.data, 'base64').toString());
+  const data = JSON.parse(Buffer.from(message.data, "base64").toString());
   await processMessage(data);
   res.status(200).send(); // ACK
 });
@@ -312,6 +319,7 @@ app.post('/process', async (req, res) => {
 Near-identical capabilities. Migration is straightforward.
 
 **What changes:**
+
 - Replace `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` with `@google-cloud/storage`
 - Signed URLs: `file.getSignedUrl()` instead of `getSignedUrl(s3Client, command)`
 - Bucket naming: GCP bucket names are globally unique (same as S3)
@@ -343,14 +351,18 @@ const webService = new gcp.cloudrunv2.Service("web", {
   location: "us-central1",
   template: {
     scaling: { minInstanceCount: 1, maxInstanceCount: 10 },
-    containers: [{
-      image: "gcr.io/PROJECT/web:latest",
-      resources: { limits: { cpu: "1", memory: "1Gi" } },
-      envs: secrets.map(s => ({
-        name: s.envName,
-        valueSource: { secretKeyRef: { secret: s.secretId, version: "latest" } },
-      })),
-    }],
+    containers: [
+      {
+        image: "gcr.io/PROJECT/web:latest",
+        resources: { limits: { cpu: "1", memory: "1Gi" } },
+        envs: secrets.map((s) => ({
+          name: s.envName,
+          valueSource: {
+            secretKeyRef: { secret: s.secretId, version: "latest" },
+          },
+        })),
+      },
+    ],
   },
 });
 
@@ -367,13 +379,15 @@ const db = new gcp.sql.DatabaseInstance("postgres", {
 const ingestionTopic = new gcp.pubsub.Topic("ingestion");
 const ingestionSub = new gcp.pubsub.Subscription("ingestion-push", {
   topic: ingestionTopic.name,
-  pushConfig: { pushEndpoint: pulumi.interpolate`${workerService.uri}/process` },
+  pushConfig: {
+    pushEndpoint: pulumi.interpolate`${workerService.uri}/process`,
+  },
   deadLetterPolicy: { deadLetterTopic: dlqTopic.id, maxDeliveryAttempts: 3 },
 });
 
 // Cloud Scheduler (replaces EventBridge crons)
 const discoveryCron = new gcp.cloudscheduler.Job("discovery", {
-  schedule: "0 2 * * 1",  // Mon 2 AM
+  schedule: "0 2 * * 1", // Mon 2 AM
   httpTarget: {
     uri: pulumi.interpolate`${discoveryService.uri}/run`,
     httpMethod: "POST",
@@ -395,13 +409,13 @@ GitHub OAuth and Resend email magic-link providers are cloud-agnostic and requir
 
 ### 8. Monitoring and Alerting
 
-| AWS | GCP Equivalent |
-|---|---|
-| CloudWatch Metrics | Cloud Monitoring (built-in for Cloud Run) |
-| CloudWatch Alarms | Cloud Monitoring Alerting Policies |
-| CloudWatch Dashboard | Cloud Monitoring Dashboards |
+| AWS                     | GCP Equivalent                                  |
+| ----------------------- | ----------------------------------------------- |
+| CloudWatch Metrics      | Cloud Monitoring (built-in for Cloud Run)       |
+| CloudWatch Alarms       | Cloud Monitoring Alerting Policies              |
+| CloudWatch Dashboard    | Cloud Monitoring Dashboards                     |
 | SNS email notifications | Notification Channels (email, Slack, PagerDuty) |
-| CloudWatch Logs | Cloud Logging (auto-collected from Cloud Run) |
+| CloudWatch Logs         | Cloud Logging (auto-collected from Cloud Run)   |
 
 Cloud Run automatically emits request count, latency, instance count, and CPU/memory utilization metrics. No custom metric instrumentation needed for the basics.
 
@@ -508,17 +522,17 @@ The GitHub Actions workflows (`.github/workflows/`) need updates:
 
 ## Cost Comparison (Estimated)
 
-| Component | AWS (current estimate) | GCP (projected) | Notes |
-|---|---|---|---|
-| Compute (web) | Lambda: pay-per-invocation | Cloud Run: ~$25–50/mo (1 min instance + usage) | Eliminates cold starts |
-| Compute (workers) | Lambda: pay-per-invocation | Cloud Run: ~$5–15/mo (scale to zero) | Similar cost |
-| Database (SQL) | Neon Pro: ~$19–69/mo | Cloud SQL: ~$30–80/mo | Comparable |
-| Database (NoSQL) | DynamoDB: ~$5–15/mo | Firestore: ~$5–10/mo (or $0 if consolidated to PG) | Similar or free |
-| Queues | SQS: ~$1–5/mo | Pub/Sub: ~$1–5/mo | Comparable |
-| Storage | S3: ~$2–5/mo | Cloud Storage: ~$2–5/mo | Comparable |
-| Secrets | Secrets Manager: ~$6/mo (14 secrets) | Secret Manager: ~$1/mo (14 secrets) | GCP is cheaper |
-| CDN | CloudFront: ~$1–5/mo | Cloud CDN: ~$1–5/mo | Comparable |
-| **Total estimate** | **~$60–170/mo** | **~$70–170/mo** | Similar range |
+| Component          | AWS (current estimate)               | GCP (projected)                                    | Notes                  |
+| ------------------ | ------------------------------------ | -------------------------------------------------- | ---------------------- |
+| Compute (web)      | Lambda: pay-per-invocation           | Cloud Run: ~$25–50/mo (1 min instance + usage)     | Eliminates cold starts |
+| Compute (workers)  | Lambda: pay-per-invocation           | Cloud Run: ~$5–15/mo (scale to zero)               | Similar cost           |
+| Database (SQL)     | Neon Pro: ~$19–69/mo                 | Cloud SQL: ~$30–80/mo                              | Comparable             |
+| Database (NoSQL)   | DynamoDB: ~$5–15/mo                  | Firestore: ~$5–10/mo (or $0 if consolidated to PG) | Similar or free        |
+| Queues             | SQS: ~$1–5/mo                        | Pub/Sub: ~$1–5/mo                                  | Comparable             |
+| Storage            | S3: ~$2–5/mo                         | Cloud Storage: ~$2–5/mo                            | Comparable             |
+| Secrets            | Secrets Manager: ~$6/mo (14 secrets) | Secret Manager: ~$1/mo (14 secrets)                | GCP is cheaper         |
+| CDN                | CloudFront: ~$1–5/mo                 | Cloud CDN: ~$1–5/mo                                | Comparable             |
+| **Total estimate** | **~$60–170/mo**                      | **~$70–170/mo**                                    | Similar range          |
 
 The primary cost difference is Cloud Run's min-instance charge (~$3–5/mo per warm instance) in exchange for eliminating cold starts entirely.
 
@@ -526,14 +540,14 @@ The primary cost difference is Cloud Run's min-instance charge (~$3–5/mo per w
 
 ## Risks and Mitigations
 
-| Risk | Impact | Mitigation |
-|---|---|---|
-| DynamoDB → Firestore data model redesign | High effort, potential bugs | Consolidate to PostgreSQL instead |
-| SST → Pulumi IaC rewrite | High effort, no SST abstractions | Pulumi TypeScript preserves language; extract patterns from SST config |
-| LangGraph managed deployment | LangGraph Cloud "Bring Your Own Cloud" currently AWS-only | Self-host on Cloud Run (already the plan) |
-| Pub/Sub lacks native FIFO dedup | Potential duplicate processing | Implement idempotency at application level (already have content-hash dedup) |
-| Cloud CDN lacks WebSocket support | Chat streaming may need workaround | Use Server-Sent Events (already used) or put Cloudflare in front |
-| No native SES equivalent | Email notifications need new provider | Use SendGrid/Mailgun (simple API swap) |
+| Risk                                     | Impact                                                    | Mitigation                                                                   |
+| ---------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| DynamoDB → Firestore data model redesign | High effort, potential bugs                               | Consolidate to PostgreSQL instead                                            |
+| SST → Pulumi IaC rewrite                 | High effort, no SST abstractions                          | Pulumi TypeScript preserves language; extract patterns from SST config       |
+| LangGraph managed deployment             | LangGraph Cloud "Bring Your Own Cloud" currently AWS-only | Self-host on Cloud Run (already the plan)                                    |
+| Pub/Sub lacks native FIFO dedup          | Potential duplicate processing                            | Implement idempotency at application level (already have content-hash dedup) |
+| Cloud CDN lacks WebSocket support        | Chat streaming may need workaround                        | Use Server-Sent Events (already used) or put Cloudflare in front             |
+| No native SES equivalent                 | Email notifications need new provider                     | Use SendGrid/Mailgun (simple API swap)                                       |
 
 ---
 
