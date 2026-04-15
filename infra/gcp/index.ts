@@ -123,8 +123,12 @@ const dbInstance = new gcp.sql.DatabaseInstance(`${prefix}-db`, {
       { name: "cloudsql.enable_pgvector", value: "on" },
     ],
     ipConfiguration: {
-      ipv4Enabled: false,
-      privateNetwork: undefined, // Will use Cloud SQL Auth Proxy via Cloud Run
+      // Cloud SQL requires at least one connectivity option. Public IP is
+      // enabled here but Cloud Run connects via the Cloud SQL Auth Proxy
+      // over an encrypted internal channel (not the public internet), so
+      // there is no practical exposure. If tighter isolation is required
+      // later, switch to PSC (privateNetwork + private service connect).
+      ipv4Enabled: true,
     },
     insightsConfig: {
       queryInsightsEnabled: true,
