@@ -76,13 +76,25 @@ roles.forEach(
 // Artifact Registry
 // ---------------------------------------------------------------------------
 
-const registry = new gcp.artifactregistry.Repository(`${prefix}-registry`, {
-  repositoryId: `${prefix}-images`,
-  format: "DOCKER",
-  location: region,
-  project,
-  description: `Docker images for USOPC ${environment}`,
-});
+// `import` adopts the Artifact Registry repository into Pulumi state on first
+// `up`. The repo is created out-of-band via gcloud before the first deploy
+// because the build-image CI step needs somewhere to push before Pulumi runs
+// (chicken-and-egg on cold bootstrap). After one successful `up` the resource
+// is tracked in state and the import option is a no-op — safe to leave in
+// place, but can be removed in a future PR.
+const registry = new gcp.artifactregistry.Repository(
+  `${prefix}-registry`,
+  {
+    repositoryId: `${prefix}-images`,
+    format: "DOCKER",
+    location: region,
+    project,
+    description: `Docker images for USOPC ${environment}`,
+  },
+  {
+    import: `projects/${project}/locations/${region}/repositories/${prefix}-images`,
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Cloud SQL (PostgreSQL + pgvector)

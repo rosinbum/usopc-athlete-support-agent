@@ -62,6 +62,7 @@ jobs:
   build-image:
     needs: setup
     runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.environment }}
     permissions:
       contents: read
       id-token: write
@@ -100,6 +101,7 @@ jobs:
   migrate:
     needs: [setup, deploy]
     runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.environment }}
     permissions:
       contents: read
       id-token: write
@@ -194,6 +196,7 @@ jobs:
   smoke-test:
     needs: [setup, migrate]
     runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.environment }}
     permissions:
       contents: read
       id-token: write
