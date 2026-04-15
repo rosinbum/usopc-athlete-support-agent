@@ -30,6 +30,8 @@ const apis = [
   "artifactregistry.googleapis.com",
   "cloudscheduler.googleapis.com",
   "monitoring.googleapis.com",
+  // Provider needs this to list regions (warning-only today, but silencing).
+  "compute.googleapis.com",
 ];
 
 const enabledApis = apis.map(
@@ -106,6 +108,10 @@ const dbInstance = new gcp.sql.DatabaseInstance(`${prefix}-db`, {
   project,
   settings: {
     tier: dbTier,
+    // Pin to ENTERPRISE edition — db-custom-* tiers are only valid there.
+    // ENTERPRISE_PLUS (the new default on fresh projects) requires a
+    // different tier family (db-perf-optimized-N-*).
+    edition: "ENTERPRISE",
     availabilityType: environment === "production" ? "REGIONAL" : "ZONAL",
     backupConfiguration: {
       enabled: true,
