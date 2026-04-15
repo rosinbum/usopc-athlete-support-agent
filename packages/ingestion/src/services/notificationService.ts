@@ -72,7 +72,9 @@ export class NotificationService {
         const apiKey = getSecretValue("RESEND_API_KEY");
         this.resend = new Resend(apiKey);
       } catch {
-        logger.warn("Resend API key not available — email notifications disabled");
+        logger.warn(
+          "Resend API key not available — email notifications disabled",
+        );
       }
     }
 

@@ -163,15 +163,12 @@ const secretResources = secrets.map(
 // Grant the service account access to all secrets
 secretResources.forEach(
   (secret, i) =>
-    new gcp.secretmanager.SecretIamMember(
-      `${prefix}-secret-access-${i}`,
-      {
-        secretId: secret.secretId,
-        role: "roles/secretmanager.secretAccessor",
-        member: pulumi.interpolate`serviceAccount:${serviceAccount.email}`,
-        project,
-      },
-    ),
+    new gcp.secretmanager.SecretIamMember(`${prefix}-secret-access-${i}`, {
+      secretId: secret.secretId,
+      role: "roles/secretmanager.secretAccessor",
+      member: pulumi.interpolate`serviceAccount:${serviceAccount.email}`,
+      project,
+    }),
 );
 
 // ---------------------------------------------------------------------------

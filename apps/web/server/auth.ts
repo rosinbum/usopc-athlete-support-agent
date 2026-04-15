@@ -92,7 +92,8 @@ export const authConfig: AuthConfig = {
  * Convert Express request body to the format Auth expects.
  */
 function encodeBody(req: Request): string | undefined {
-  if (!req.body || req.method === "GET" || req.method === "HEAD") return undefined;
+  if (!req.body || req.method === "GET" || req.method === "HEAD")
+    return undefined;
   const contentType = req.headers["content-type"] ?? "";
   if (contentType.includes("application/x-www-form-urlencoded")) {
     return new URLSearchParams(req.body).toString();
@@ -108,7 +109,11 @@ function encodeBody(req: Request): string | undefined {
  * We avoid @auth/express's ExpressAuth because its toExpressResponse
  * has issues with Set-Cookie headers on Express 5.
  */
-export async function authHandler(req: Request, res: Response, _next: NextFunction) {
+export async function authHandler(
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+) {
   try {
     const protocol = req.protocol || "http";
     const host = req.get("host") || "localhost:3000";

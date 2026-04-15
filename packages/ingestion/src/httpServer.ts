@@ -54,54 +54,65 @@ app.post("/ingestion", async (req: express.Request, res: express.Response) => {
 // POST /discovery-feed — Pub/Sub push for discovery feed messages
 // ---------------------------------------------------------------------------
 
-app.post("/discovery-feed", async (req: express.Request, res: express.Response) => {
-  try {
-    const message = decodePubSubData<DiscoveryFeedMessage>(req);
-    await handleDiscoveryFeedMessage(message);
-    res.status(200).json({ status: "ok" });
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.error(`Discovery feed handler error: ${msg}`);
-    res.status(500).json({ error: msg });
-  }
-});
+app.post(
+  "/discovery-feed",
+  async (req: express.Request, res: express.Response) => {
+    try {
+      const message = decodePubSubData<DiscoveryFeedMessage>(req);
+      await handleDiscoveryFeedMessage(message);
+      res.status(200).json({ status: "ok" });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Discovery feed handler error: ${msg}`);
+      res.status(500).json({ error: msg });
+    }
+  },
+);
 
 // ---------------------------------------------------------------------------
 // POST /cron/discovery — Cloud Scheduler trigger
 // ---------------------------------------------------------------------------
 
-app.post("/cron/discovery", async (_req: express.Request, res: express.Response) => {
-  try {
-    await discoveryHandler();
-    res.status(200).json({ status: "ok" });
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.error(`Discovery cron error: ${msg}`);
-    res.status(500).json({ error: msg });
-  }
-});
+app.post(
+  "/cron/discovery",
+  async (_req: express.Request, res: express.Response) => {
+    try {
+      await discoveryHandler();
+      res.status(200).json({ status: "ok" });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Discovery cron error: ${msg}`);
+      res.status(500).json({ error: msg });
+    }
+  },
+);
 
 // ---------------------------------------------------------------------------
 // POST /cron/ingestion — Cloud Scheduler trigger
 // ---------------------------------------------------------------------------
 
-app.post("/cron/ingestion", async (_req: express.Request, res: express.Response) => {
-  try {
-    await cronHandler();
-    res.status(200).json({ status: "ok" });
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.error(`Ingestion cron error: ${msg}`);
-    res.status(500).json({ error: msg });
-  }
-});
+app.post(
+  "/cron/ingestion",
+  async (_req: express.Request, res: express.Response) => {
+    try {
+      await cronHandler();
+      res.status(200).json({ status: "ok" });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Ingestion cron error: ${msg}`);
+      res.status(500).json({ error: msg });
+    }
+  },
+);
 
 // ---------------------------------------------------------------------------
 // GET /health — health check
 // ---------------------------------------------------------------------------
 
 app.get("/health", (_req: express.Request, res: express.Response) => {
-  res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
+  res
+    .status(200)
+    .json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
 // ---------------------------------------------------------------------------

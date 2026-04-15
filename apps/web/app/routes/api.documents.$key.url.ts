@@ -28,7 +28,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       return Response.json({ error: "Invalid document key" }, { status: 400 });
     }
 
-    const storage = (_storage ??= createStorageService(getResource("DocumentsBucket").name));
+    const storage = (_storage ??= createStorageService(
+      getResource("DocumentsBucket").name,
+    ));
     const url = await storage.getSignedUrl(objectKey, 300);
 
     return Response.json({ url });

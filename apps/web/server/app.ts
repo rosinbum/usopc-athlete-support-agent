@@ -41,7 +41,9 @@ app.use((_req, res, next) => {
 // ---------------------------------------------------------------------------
 
 app.get("/api/health", (_req, res) => {
-  res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
+  res
+    .status(200)
+    .json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
 // ---------------------------------------------------------------------------
@@ -67,18 +69,20 @@ if (isDev) {
     "*splat",
     createRequestHandler({
       build: () =>
-        viteServer.ssrLoadModule(
-          "virtual:react-router/server-build",
-        ) as never,
+        viteServer.ssrLoadModule("virtual:react-router/server-build") as never,
     }),
   );
 } else {
   // Production: serve static assets + pre-built server bundle
   app.use(express.static("build/client", { maxAge: "1h" }));
+  // The server build is produced by `react-router build` at deploy time and
+  // doesn't exist during typecheck. Use a dynamic specifier so TS can't try
+  // to resolve it statically.
+  const serverBuildPath = "../build/server/index.js";
   app.all(
     "*splat",
     createRequestHandler({
-      build: () => import("../build/server/index.js") as never,
+      build: () => import(/* @vite-ignore */ serverBuildPath) as never,
     }),
   );
 }

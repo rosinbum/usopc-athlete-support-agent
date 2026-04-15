@@ -1,1 +1,11 @@
 pnpm-lock.yaml
+
+# Auto-generated
+**/.react-router/
+**/build/
+**/dist/
+**/coverage/
+**/.sst/
+**/.turbo/
+**/.next/
+**/.open-next/

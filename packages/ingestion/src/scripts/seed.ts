@@ -16,7 +16,12 @@
  */
 
 import { Pool } from "pg";
-import { getDatabaseUrl, getSecretValue, getResource, createLogger } from "@usopc/shared";
+import {
+  getDatabaseUrl,
+  getSecretValue,
+  getResource,
+  createLogger,
+} from "@usopc/shared";
 import { createRawEmbeddings, createVectorStore } from "@usopc/core";
 import { initDatabase, loadAllSources } from "./seed-db.js";
 import {

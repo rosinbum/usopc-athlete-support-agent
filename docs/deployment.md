@@ -161,21 +161,21 @@ pulumi preview --stack staging
 
 Create two environments in **Settings > Environments**:
 
-| Environment  | Protection Rules          |
-|-------------|---------------------------|
+| Environment  | Protection Rules                     |
+| ------------ | ------------------------------------ |
 | `staging`    | None (auto-deploy on push to `main`) |
-| `production` | Required reviewers        |
+| `production` | Required reviewers                   |
 
 ### Secrets
 
 Add these repository secrets (or environment-scoped secrets if using different values per environment):
 
-| Secret                          | Value                                                    |
-|---------------------------------|----------------------------------------------------------|
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Provider resource name from step 2f                     |
-| `GCP_SERVICE_ACCOUNT`            | `deploy@<project-id>.iam.gserviceaccount.com`           |
-| `PULUMI_ACCESS_TOKEN`            | Pulumi personal access token                             |
-| `DB_CONNECTION_NAME`             | `<project-id>:<region>:<instance-name>` (available after first Pulumi deploy) |
+| Secret                           | Value                                                                                          |
+| -------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Provider resource name from step 2f                                                            |
+| `GCP_SERVICE_ACCOUNT`            | `deploy@<project-id>.iam.gserviceaccount.com`                                                  |
+| `PULUMI_ACCESS_TOKEN`            | Pulumi personal access token                                                                   |
+| `DB_CONNECTION_NAME`             | `<project-id>:<region>:<instance-name>` (available after first Pulumi deploy)                  |
 | `DATABASE_URL`                   | `postgresql://app:<password>@localhost:5432/usopc_athlete_support` (used with Cloud SQL Proxy) |
 
 ## 5. First Deployment
@@ -273,26 +273,26 @@ Discovery sources are defined in `data/discovery-config.json`. See the file for 
 
 Pulumi (`infra/gcp/index.ts`) creates:
 
-| Resource | Purpose |
-|----------|---------|
-| Cloud Run (web, slack, worker) | Application services |
-| Cloud SQL (PostgreSQL 16 + pgvector) | Database with vector search |
-| Artifact Registry | Docker image storage |
-| Secret Manager | API keys and credentials |
-| Cloud Storage | Document storage |
-| Pub/Sub | Ingestion and discovery feed queues (with DLQs) |
-| Cloud Scheduler | Cron jobs for discovery and ingestion |
-| Monitoring + Alerting | Error rate and DLQ alerts |
+| Resource                             | Purpose                                         |
+| ------------------------------------ | ----------------------------------------------- |
+| Cloud Run (web, slack, worker)       | Application services                            |
+| Cloud SQL (PostgreSQL 16 + pgvector) | Database with vector search                     |
+| Artifact Registry                    | Docker image storage                            |
+| Secret Manager                       | API keys and credentials                        |
+| Cloud Storage                        | Document storage                                |
+| Pub/Sub                              | Ingestion and discovery feed queues (with DLQs) |
+| Cloud Scheduler                      | Cron jobs for discovery and ingestion           |
+| Monitoring + Alerting                | Error rate and DLQ alerts                       |
 
 ### Scaling
 
-| | Staging | Production |
-|---|---------|------------|
-| Cloud SQL | `db-custom-2-7680` (2 CPU, 7.5 GB) | `db-custom-4-15360` (4 CPU, 15 GB) |
-| Min instances | 0 | 1 |
-| Max instances | 2 | 10 |
-| DB availability | Zonal | Regional (HA) |
-| Deletion protection | Off | On |
+|                     | Staging                            | Production                         |
+| ------------------- | ---------------------------------- | ---------------------------------- |
+| Cloud SQL           | `db-custom-2-7680` (2 CPU, 7.5 GB) | `db-custom-4-15360` (4 CPU, 15 GB) |
+| Min instances       | 0                                  | 1                                  |
+| Max instances       | 2                                  | 10                                 |
+| DB availability     | Zonal                              | Regional (HA)                      |
+| Deletion protection | Off                                | On                                 |
 
 ## Troubleshooting
 

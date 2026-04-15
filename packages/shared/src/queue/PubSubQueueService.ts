@@ -42,9 +42,7 @@ export class PubSubQueueService implements QueueService {
     // Pub/Sub doesn't have a native batch API like SQS.
     // Publish concurrently and count failures.
     const results = await Promise.allSettled(
-      messages.map((m) =>
-        topic.publishMessage({ data: Buffer.from(m.body) }),
-      ),
+      messages.map((m) => topic.publishMessage({ data: Buffer.from(m.body) })),
     );
 
     for (const r of results) {

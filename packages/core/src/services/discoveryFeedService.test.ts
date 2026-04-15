@@ -72,10 +72,7 @@ describe("publishDiscoveredUrls", () => {
     await publishDiscoveredUrls(results, queueUrl);
 
     expect(mockSendMessage).toHaveBeenCalledTimes(1);
-    expect(mockSendMessage).toHaveBeenCalledWith(
-      queueUrl,
-      expect.any(String),
-    );
+    expect(mockSendMessage).toHaveBeenCalledWith(queueUrl, expect.any(String));
   });
 
   it("message body contains all URL fields", async () => {
