@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "dotenv -e ../../.env.local -- tsx server/app.ts",
     "build": "react-router build",
-    "start": "node server/app.js",
+    "start": "tsx server/app.ts",
     "typecheck": "react-router typegen && tsc --noEmit",
     "test": "vitest run"
   },

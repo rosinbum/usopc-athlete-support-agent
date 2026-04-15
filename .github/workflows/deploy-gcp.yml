@@ -55,26 +55,16 @@ jobs:
           fi
 
   # -----------------------------------------------------------------------
-  # Build and push Docker images
+  # Build and push a single unified Docker image. The web/slack/worker
+  # services share this image and differ only in their `command`/`args`
+  # set by Pulumi. See Dockerfile at the repo root.
   # -----------------------------------------------------------------------
-  build-images:
+  build-image:
     needs: setup
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
-    strategy:
-      matrix:
-        service:
-          - name: web
-            context: .
-            dockerfile: apps/web/Dockerfile
-          - name: slack
-            context: .
-            dockerfile: apps/slack/Dockerfile
-          - name: worker
-            context: .
-            dockerfile: packages/ingestion/Dockerfile
     steps:
       - uses: actions/checkout@v4
 
@@ -91,15 +81,15 @@ jobs:
 
       - name: Build and push
         run: |
-          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ needs.setup.outputs.project }}/usopc-${{ needs.setup.outputs.environment }}-images/${{ matrix.service.name }}"
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ needs.setup.outputs.project }}/usopc-${{ needs.setup.outputs.environment }}-images/app"
           SHA_TAG="${IMAGE}:${{ github.sha }}"
           LATEST_TAG="${IMAGE}:latest"
 
           docker build \
-            -f ${{ matrix.service.dockerfile }} \
+            -f Dockerfile \
             -t "$SHA_TAG" \
             -t "$LATEST_TAG" \
-            ${{ matrix.service.context }}
+            .
 
           docker push "$SHA_TAG"
           docker push "$LATEST_TAG"
@@ -157,7 +147,7 @@ jobs:
   # Deploy via Pulumi
   # -----------------------------------------------------------------------
   deploy:
-    needs: [setup, build-images]
+    needs: [setup, build-image]
     runs-on: ubuntu-latest
     environment: ${{ needs.setup.outputs.environment }}
     permissions:

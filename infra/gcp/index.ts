@@ -224,6 +224,10 @@ const discoveryFeedDlqTopic = new gcp.pubsub.Topic(
 
 const registryUrl = pulumi.interpolate`${region}-docker.pkg.dev/${project}/${registry.repositoryId}`;
 
+// All three Cloud Run services share one image; they're differentiated by the
+// `command` passed to the container. See Dockerfile at the repo root.
+const appImage = pulumi.interpolate`${registryUrl}/app:latest`;
+
 // Helper: build a secret env var referencing Secret Manager
 function secretEnv(envName: string, secretName: string) {
   return {
@@ -266,7 +270,10 @@ const webService = new gcp.cloudrunv2.Service(`${prefix}-web`, {
     volumes: [cloudSqlVolume],
     containers: [
       {
-        image: pulumi.interpolate`${registryUrl}/web:latest`,
+        image: appImage,
+        // Web — Express + React Router SSR, run via tsx.
+        command: ["tsx"],
+        args: ["apps/web/server/app.ts"],
         ports: [{ containerPort: 8080 }],
         resources: {
           limits: { cpu: "2", memory: "1Gi" },
@@ -315,7 +322,11 @@ const slackService = new gcp.cloudrunv2.Service(`${prefix}-slack`, {
     volumes: [cloudSqlVolume],
     containers: [
       {
-        image: pulumi.interpolate`${registryUrl}/slack:latest`,
+        image: appImage,
+        // Slack — compiled .js but imports @usopc/shared/core (.ts main), so
+        // tsx is required at runtime.
+        command: ["tsx"],
+        args: ["apps/slack/dist/server.js"],
         ports: [{ containerPort: 8080 }],
         resources: {
           limits: { cpu: "1", memory: "512Mi" },
@@ -348,7 +359,10 @@ const workerService = new gcp.cloudrunv2.Service(`${prefix}-worker`, {
     volumes: [cloudSqlVolume],
     containers: [
       {
-        image: pulumi.interpolate`${registryUrl}/worker:latest`,
+        image: appImage,
+        // Worker — same rationale as slack.
+        command: ["tsx"],
+        args: ["packages/ingestion/dist/httpServer.js"],
         ports: [{ containerPort: 8080 }],
         resources: {
           limits: { cpu: "2", memory: "2Gi" },

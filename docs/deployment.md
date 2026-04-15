@@ -201,10 +201,22 @@ Go to **Actions > Deploy to GCP > Run workflow** and select the environment.
 
 ### What the Workflow Does
 
-1. **build-images** — Builds and pushes Docker images (web, slack, worker) to Artifact Registry
-2. **migrate** — Runs database migrations via Cloud SQL Auth Proxy
-3. **deploy** — Runs `pulumi up` to create/update all GCP resources
+1. **build-image** — Builds and pushes a single unified Docker image (tagged `app:<sha>` and `app:latest`) to Artifact Registry. The web, slack, and worker Cloud Run services share this image; they differ only in the `command`/`args` Pulumi sets on each container.
+2. **deploy** — Runs `pulumi up` to create/update all GCP resources
+3. **migrate** — Runs database migrations via Cloud SQL Auth Proxy (after Cloud SQL exists)
 4. **smoke-test** — Curls `/api/health` (web) and `/health` (worker)
+
+### Why a single image?
+
+Projected traffic is low enough that three near-identical images would only add build time, CI cost, and drift risk. The root `Dockerfile` builds all packages; each Cloud Run service picks its entry point via `command`:
+
+| Service | Command                                     |
+| ------- | ------------------------------------------- |
+| web     | `tsx apps/web/server/app.ts`                |
+| slack   | `tsx apps/slack/dist/server.js`             |
+| worker  | `tsx packages/ingestion/dist/httpServer.js` |
+
+> `tsx` is installed globally in the image (`npm install -g tsx`). It's needed because `@usopc/shared` and `@usopc/core` keep `main` pointing at `src/index.ts` so local dev doesn't require a pre-build.
 
 ## 6. Populate Secret Manager
 
