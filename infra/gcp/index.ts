@@ -118,10 +118,10 @@ const dbInstance = new gcp.sql.DatabaseInstance(`${prefix}-db`, {
       startTime: "03:00",
       pointInTimeRecoveryEnabled: environment === "production",
     },
-    databaseFlags: [
-      // Enable pgvector via shared_preload_libraries
-      { name: "cloudsql.enable_pgvector", value: "on" },
-    ],
+    // pgvector is available on Cloud SQL for Postgres via
+    // `CREATE EXTENSION vector;` at the DB level — no instance flag
+    // needed. (The old `cloudsql.enable_pgvector` flag is not a real
+    // Cloud SQL flag name and was rejected at create time.)
     ipConfiguration: {
       // Cloud SQL requires at least one connectivity option. Public IP is
       // enabled here but Cloud Run connects via the Cloud SQL Auth Proxy
