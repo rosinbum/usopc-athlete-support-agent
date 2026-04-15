@@ -256,7 +256,7 @@ export async function ingestSource(
   source: IngestionSource,
   options: {
     openaiApiKey: string;
-    s3Key?: string | undefined;
+    storageKey?: string | undefined;
     content?: Buffer | undefined;
     vectorStore?: Awaited<ReturnType<typeof createVectorStore>> | undefined;
     rateLimiter?: TokenRateLimiter | undefined;
@@ -300,7 +300,9 @@ export async function ingestSource(
     const enriched = enrichMetadata(
       chunks,
       source,
-      options.s3Key !== undefined ? { s3Key: options.s3Key } : undefined,
+      options.storageKey !== undefined
+        ? { storageKey: options.storageKey }
+        : undefined,
     );
 
     // 5. Generate embeddings & store in pgvector (batched to respect TPM limits)

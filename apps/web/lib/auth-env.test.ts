@@ -23,10 +23,7 @@ describe("auth-env", () => {
     it("delegates to getSecretValue with correct params", () => {
       mockGetSecretValue.mockReturnValue("test-secret");
       const result = getAuthSecret();
-      expect(mockGetSecretValue).toHaveBeenCalledWith(
-        "AUTH_SECRET",
-        "AuthSecret",
-      );
+      expect(mockGetSecretValue).toHaveBeenCalledWith("AUTH_SECRET");
       expect(result).toBe("test-secret");
     });
   });
@@ -35,10 +32,7 @@ describe("auth-env", () => {
     it("delegates to getSecretValue with correct params", () => {
       mockGetSecretValue.mockReturnValue("github-id");
       const result = getGitHubClientId();
-      expect(mockGetSecretValue).toHaveBeenCalledWith(
-        "GITHUB_CLIENT_ID",
-        "GitHubClientId",
-      );
+      expect(mockGetSecretValue).toHaveBeenCalledWith("GITHUB_CLIENT_ID");
       expect(result).toBe("github-id");
     });
   });
@@ -47,10 +41,7 @@ describe("auth-env", () => {
     it("delegates to getSecretValue with correct params", () => {
       mockGetSecretValue.mockReturnValue("github-secret");
       const result = getGitHubClientSecret();
-      expect(mockGetSecretValue).toHaveBeenCalledWith(
-        "GITHUB_CLIENT_SECRET",
-        "GitHubClientSecret",
-      );
+      expect(mockGetSecretValue).toHaveBeenCalledWith("GITHUB_CLIENT_SECRET");
       expect(result).toBe("github-secret");
     });
   });

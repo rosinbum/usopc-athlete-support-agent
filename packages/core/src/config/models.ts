@@ -79,7 +79,7 @@ export async function getModelConfig(): Promise<ModelConfig> {
     cacheTimestamp = now;
     return cachedConfig;
   } catch {
-    // DynamoDB unavailable — use fallback defaults
+    // Database unavailable — use fallback defaults
     return MODEL_CONFIG;
   }
 }

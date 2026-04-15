@@ -1,34 +1,27 @@
-import { describe, it, expect, vi } from "vitest";
-
-vi.mock("sst", () => ({
-  Resource: {
-    AppTable: { name: "test-table" },
-    IngestionQueue: { url: "https://sqs.example.com/ingestion" },
-    DocumentsBucket: { name: "test-bucket" },
-    // DiscoveryFeedQueue intentionally omitted to test missing resource
-  },
-}));
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { getResource } from "./resources.js";
 
 describe("getResource", () => {
-  it("returns AppTable resource", () => {
-    expect(getResource("AppTable")).toEqual({ name: "test-table" });
+  beforeEach(() => {
+    vi.unstubAllEnvs();
   });
 
-  it("returns IngestionQueue resource", () => {
+  it("returns IngestionQueue from env", () => {
+    vi.stubEnv("INGESTION_QUEUE_URL", "https://sqs.example.com/ingestion");
     expect(getResource("IngestionQueue")).toEqual({
       url: "https://sqs.example.com/ingestion",
     });
   });
 
-  it("returns DocumentsBucket resource", () => {
+  it("returns DocumentsBucket from env", () => {
+    vi.stubEnv("DOCUMENTS_BUCKET_NAME", "test-bucket");
     expect(getResource("DocumentsBucket")).toEqual({ name: "test-bucket" });
   });
 
   it("throws when resource is missing", () => {
     expect(() => getResource("DiscoveryFeedQueue")).toThrow(
-      "SST Resource 'DiscoveryFeedQueue' not available",
+      "Resource 'DiscoveryFeedQueue' not available",
     );
   });
 });

@@ -1,15 +1,19 @@
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { logger, normalizeUrl, urlToId } from "@usopc/shared";
+import {
+  logger,
+  normalizeUrl,
+  urlToId,
+  createQueueService,
+} from "@usopc/shared";
 import type { WebSearchResult, DiscoveryFeedMessage } from "../types/index.js";
 
 export { normalizeUrl, urlToId };
 
 const log = logger.child({ service: "discovery-feed" });
-const sqs = new SQSClient({});
+const queueService = createQueueService();
 
 /**
  * Publishes discovered URLs from the researcher's web search results
- * to the DiscoveryFeedQueue for async evaluation by the worker Lambda.
+ * to the DiscoveryFeedQueue for async evaluation by the worker.
  *
  * - Never throws — logs all operations
  * - Returns immediately for empty input
@@ -19,6 +23,14 @@ export async function publishDiscoveredUrls(
   queueUrl: string,
 ): Promise<void> {
   if (results.length === 0) return;
+
+  // Local dev: skip publishing when queue isn't provisioned
+  if (!queueUrl || queueUrl === "placeholder") {
+    log.debug("Skipping discovery feed publish (queue not configured)", {
+      count: results.length,
+    });
+    return;
+  }
 
   const message: DiscoveryFeedMessage = {
     urls: results.map((r) => ({
@@ -31,12 +43,7 @@ export async function publishDiscoveredUrls(
   };
 
   try {
-    await sqs.send(
-      new SendMessageCommand({
-        QueueUrl: queueUrl,
-        MessageBody: JSON.stringify(message),
-      }),
-    );
+    await queueService.sendMessage(queueUrl, JSON.stringify(message));
 
     log.info("Published discovered URLs to queue", {
       count: results.length,

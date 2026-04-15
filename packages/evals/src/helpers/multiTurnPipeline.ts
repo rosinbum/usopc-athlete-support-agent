@@ -28,14 +28,14 @@ async function getRunner(): Promise<AgentRunner> {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
       throw new Error(
-        "runMultiTurnPipeline: DATABASE_URL is required. Run within `sst shell` to set environment variables.",
+        "runMultiTurnPipeline: DATABASE_URL is required. Set DATABASE_URL in .env.local.",
       );
     }
 
     const openaiApiKey = process.env.OPENAI_API_KEY;
     if (!openaiApiKey) {
       throw new Error(
-        "runMultiTurnPipeline: OPENAI_API_KEY is required. Run within `sst shell` to set environment variables.",
+        "runMultiTurnPipeline: OPENAI_API_KEY is required. Set OPENAI_API_KEY in .env.local.",
       );
     }
 

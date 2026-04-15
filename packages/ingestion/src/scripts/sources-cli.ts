@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * CLI for managing source configurations in DynamoDB.
+ * CLI for managing source configurations in PostgreSQL.
  *
  * Usage:
  *   pnpm sources list [--enabled-only] [--ngb <id>]
@@ -9,7 +9,7 @@
  *   pnpm sources disable <id>
  *   pnpm sources validate [--fix-broken]
  *
- * Requires SST context (run via `pnpm sources` which uses `sst shell`)
+ * Requires env vars from .env.local (run via `pnpm sources` which uses `dotenv -e .env.local`)
  */
 
 import {
@@ -150,8 +150,8 @@ async function showSource(id: string): Promise<void> {
   console.log(`  Last Content Hash:  ${source.lastContentHash ?? "None"}`);
   console.log(`  Consecutive Fails:  ${source.consecutiveFailures}`);
   console.log(`  Last Error:         ${source.lastError ?? "None"}`);
-  console.log(`  S3 Key:             ${source.s3Key ?? "None"}`);
-  console.log(`  S3 Version:         ${source.s3VersionId ?? "None"}`);
+  console.log(`  Storage Key:        ${source.storageKey ?? "None"}`);
+  console.log(`  Storage Version:    ${source.storageVersionId ?? "None"}`);
   console.log("");
   console.log("Timestamps:");
   console.log("─".repeat(50));

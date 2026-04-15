@@ -10,9 +10,10 @@ export {
 // DB helpers
 export { getLastContentHash, upsertIngestionStatus } from "./db.js";
 
-// Cron / Lambda handlers
+// Handlers
 export { handler as cronHandler, type IngestionMessage } from "./cron.js";
-export { handler as workerHandler } from "./worker.js";
+export { handleIngestionMessage } from "./worker.js";
+export { handleDiscoveryFeedMessage } from "./discoveryFeedWorker.js";
 
 // Loaders
 export { loadPdf } from "./loaders/pdfLoader.js";

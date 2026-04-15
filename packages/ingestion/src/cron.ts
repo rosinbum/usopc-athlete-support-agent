@@ -1,8 +1,12 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { createLogger, isProduction, type AuthorityLevel } from "@usopc/shared";
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { Resource } from "sst";
+import {
+  createLogger,
+  isProduction,
+  getResource,
+  createQueueService,
+  type AuthorityLevel,
+} from "@usopc/shared";
 import type { IngestionSource } from "./pipeline.js";
 import { getLastContentHash } from "./db.js";
 import {
@@ -73,7 +77,7 @@ async function loadSourceConfigsFromJson(): Promise<IngestionSource[]> {
 }
 
 /**
- * Convert a DynamoDB SourceConfig to an IngestionSource for pipeline compatibility.
+ * Convert a SourceConfig to an IngestionSource for pipeline compatibility.
  */
 export function toIngestionSource(config: SourceConfig): IngestionSource {
   return {
@@ -91,9 +95,9 @@ export function toIngestionSource(config: SourceConfig): IngestionSource {
 }
 
 /**
- * Load source configurations from DynamoDB (production).
+ * Load source configurations from the database (production).
  */
-async function loadSourceConfigsFromDynamoDB(): Promise<{
+async function loadSourceConfigsFromDB(): Promise<{
   sources: IngestionSource[];
   entity: ReturnType<typeof createSourceConfigEntity>;
 }> {
@@ -107,18 +111,17 @@ const MAX_CONSECUTIVE_FAILURES = 3;
 
 /**
  * Load all source configurations.
- * In production, loads from DynamoDB. Otherwise falls back to JSON files.
+ * In production, loads from the database. Otherwise falls back to JSON files.
  */
 export async function loadSourceConfigs(): Promise<{
   sources: IngestionSource[];
   entity?: ReturnType<typeof createSourceConfigEntity>;
 }> {
-  // Check for explicit flag to force DynamoDB even in dev
-  const useDynamoDB = isProduction() || process.env.USE_DYNAMODB === "true";
+  const useDB = isProduction() || process.env.USE_DB === "true";
 
-  if (useDynamoDB) {
-    logger.info("Loading source configs from DynamoDB");
-    return loadSourceConfigsFromDynamoDB();
+  if (useDB) {
+    logger.info("Loading source configs from database");
+    return loadSourceConfigsFromDB();
   }
 
   logger.info("Loading source configs from JSON files");
@@ -214,125 +217,112 @@ export async function processApprovedDiscoveries(
 }
 
 // ---------------------------------------------------------------------------
-// Coordinator Lambda handler
+// Coordinator handler
 // ---------------------------------------------------------------------------
 
 /**
- * EventBridge-triggered coordinator Lambda.
+ * Scheduled coordinator (triggered by Cloud Scheduler or manual invocation).
  *
- * Lightweight coordinator — only performs skip-logic and SQS enqueue.
- * Content fetching, hashing, S3 upload, and ingestion are handled by
- * the worker via `processSource()`.
+ * Lightweight coordinator — only performs skip-logic and queue enqueue.
+ * Content fetching, hashing, storage upload, and ingestion are handled
+ * by the worker via `processSource()`.
  *
  * 1. Processes newly approved discoveries and creates SourceConfigs (production only).
- * 2. Loads all enabled source configs (from DynamoDB in production, JSON files in dev).
+ * 2. Loads all enabled source configs (from database in production, JSON files in dev).
  * 3. Skips sources that have already been ingested or have too many failures.
- * 4. Enqueues eligible sources to the SQS FIFO queue for the worker to process.
+ * 4. Enqueues eligible sources to the ingestion queue for the worker to process.
  *
  * To re-ingest existing sources, use the admin UI (single or bulk) or the
  * CLI with --resume (content-change detection) or --force (unconditional).
  */
 export async function handler(): Promise<void> {
-  const sqs = new SQSClient({});
+  const queue = createQueueService();
   const ingestionLogEntity = createIngestionLogEntity();
 
-  try {
-    // Step 1: Process approved discoveries (production only)
-    if (isProduction()) {
-      const sourceConfigEntity = createSourceConfigEntity();
-      // Look back 14 days (deliberately overlapping the 7-day cron schedule)
-      // to tolerate scheduler drift. Idempotent — sourceConfigId check in
-      // processApprovedDiscoveries skips already-converted discoveries.
-      const lastRunTime = new Date(
-        Date.now() - 14 * 24 * 60 * 60 * 1000,
-      ).toISOString();
-      const createdCount = await processApprovedDiscoveries(
-        sourceConfigEntity,
-        lastRunTime,
-      );
-      logger.info(
-        `Processed approved discoveries: ${createdCount} SourceConfigs created`,
-      );
-    }
+  // Step 1: Process approved discoveries (production only)
+  if (isProduction()) {
+    const sourceConfigEntity = createSourceConfigEntity();
+    // Look back 14 days (deliberately overlapping the 7-day cron schedule)
+    // to tolerate scheduler drift. Idempotent — sourceConfigId check in
+    // processApprovedDiscoveries skips already-converted discoveries.
+    const lastRunTime = new Date(
+      Date.now() - 14 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const createdCount = await processApprovedDiscoveries(
+      sourceConfigEntity,
+      lastRunTime,
+    );
+    logger.info(
+      `Processed approved discoveries: ${createdCount} SourceConfigs created`,
+    );
+  }
 
-    // Step 2: Load source configs
-    const { sources, entity } = await loadSourceConfigs();
-    logger.info(`Loaded ${sources.length} source config(s)`);
+  // Step 2: Load source configs
+  const { sources, entity } = await loadSourceConfigs();
+  logger.info(`Loaded ${sources.length} source config(s)`);
 
-    let enqueued = 0;
-    let skipped = 0;
+  let enqueued = 0;
+  let skipped = 0;
 
-    const triggeredAt = new Date().toISOString();
+  const triggeredAt = new Date().toISOString();
 
-    for (const source of sources) {
-      try {
-        // -----------------------------------------------------------------
-        // Default: only ingest NEW (never-ingested) sources.
-        // Re-ingestion of existing sources requires an explicit trigger
-        // via the admin UI or CLI (--resume / --force).
-        // -----------------------------------------------------------------
-        if (entity) {
-          const config = await entity.getById(source.id);
+  for (const source of sources) {
+    try {
+      // -----------------------------------------------------------------
+      // Default: only ingest NEW (never-ingested) sources.
+      // Re-ingestion of existing sources requires an explicit trigger
+      // via the admin UI or CLI (--resume / --force).
+      // -----------------------------------------------------------------
+      if (entity) {
+        const config = await entity.getById(source.id);
 
-          // Skip sources with too many consecutive failures
-          if (
-            config &&
-            config.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
-          ) {
-            logger.warn(
-              `Skipping ${source.id} — ${config.consecutiveFailures} consecutive failures (reset via sources-cli)`,
-            );
-            skipped++;
-            continue;
-          }
-
-          // Skip sources that have already been successfully ingested
-          if (config?.lastIngestedAt) {
-            logger.info(`Skipping ${source.id} — already ingested`);
-            skipped++;
-            continue;
-          }
-        } else {
-          // JSON dev fallback: check DynamoDB for prior ingestion
-          const lastHash = await getLastContentHash(
-            ingestionLogEntity,
-            source.id,
+        // Skip sources with too many consecutive failures
+        if (config && config.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          logger.warn(
+            `Skipping ${source.id} — ${config.consecutiveFailures} consecutive failures (reset via sources-cli)`,
           );
-          if (lastHash) {
-            logger.info(`Skipping ${source.id} — already ingested`);
-            skipped++;
-            continue;
-          }
+          skipped++;
+          continue;
         }
 
-        // Enqueue for the worker (worker handles fetch/hash/S3/ingest)
-        const message: IngestionMessage = {
-          source,
-          triggeredAt,
-        };
-
-        await sqs.send(
-          new SendMessageCommand({
-            // @ts-expect-error - IngestionQueue exists at runtime from SST
-            QueueUrl: Resource.IngestionQueue.url,
-            MessageBody: JSON.stringify(message),
-            MessageGroupId: "ingestion",
-          }),
+        // Skip sources that have already been successfully ingested
+        if (config?.lastIngestedAt) {
+          logger.info(`Skipping ${source.id} — already ingested`);
+          skipped++;
+          continue;
+        }
+      } else {
+        // JSON dev fallback: check database for prior ingestion
+        const lastHash = await getLastContentHash(
+          ingestionLogEntity,
+          source.id,
         );
-
-        logger.info(`Enqueued ${source.id} for ingestion`);
-        enqueued++;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : "Unknown error";
-        logger.error(`Coordinator error for ${source.id}: ${msg}`);
-        skipped++;
+        if (lastHash) {
+          logger.info(`Skipping ${source.id} — already ingested`);
+          skipped++;
+          continue;
+        }
       }
-    }
 
-    logger.info(
-      `Coordinator complete: ${enqueued} enqueued, ${skipped} skipped`,
-    );
-  } finally {
-    // No pool cleanup needed — DynamoDB client handles its own connections
+      // Enqueue for the worker (worker handles fetch/hash/upload/ingest)
+      const message: IngestionMessage = {
+        source,
+        triggeredAt,
+      };
+
+      const queueUrl = getResource("IngestionQueue").url;
+      await queue.sendMessage(queueUrl, JSON.stringify(message), {
+        groupId: "ingestion",
+      });
+
+      logger.info(`Enqueued ${source.id} for ingestion`);
+      enqueued++;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      logger.error(`Coordinator error for ${source.id}: ${msg}`);
+      skipped++;
+    }
   }
+
+  logger.info(`Coordinator complete: ${enqueued} enqueued, ${skipped} skipped`);
 }

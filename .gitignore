@@ -6,6 +6,11 @@ dist/
 .next/
 .open-next/
 .turbo/
+build/
+
+# playwright / screenshots
+.playwright-mcp/
+*.png
 
 # SST
 .sst/

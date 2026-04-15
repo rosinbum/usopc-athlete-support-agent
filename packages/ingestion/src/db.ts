@@ -11,7 +11,7 @@ export async function getLastContentHash(
 }
 
 /**
- * Insert or update an ingestion status entry in DynamoDB.
+ * Insert or update an ingestion status entry in the database.
  *
  * Supported statuses: "ingesting", "completed", "failed", "quota_exceeded".
  * These are mapped to the IngestionLog entity statuses:

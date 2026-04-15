@@ -10,7 +10,7 @@
 
 import { resolveEnv } from "../helpers/resolveEnv.js";
 
-// Bridge SST Resource bindings → env vars before any SDK is loaded
+// Bridge secret env vars → env vars before any SDK is loaded
 resolveEnv();
 
 import { getLangSmithClient, DATASET_NAMES } from "../config.js";

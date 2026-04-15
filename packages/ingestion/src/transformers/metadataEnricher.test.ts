@@ -94,30 +94,34 @@ describe("enrichMetadata", () => {
     expect(enriched[2]!.metadata.chunkIndex).toBe(2);
   });
 
-  it("includes s3Key in metadata when provided via options", () => {
+  it("includes storageKey in metadata when provided via options", () => {
     const chunks = createChunks(2);
 
     const enriched = enrichMetadata(chunks, baseSource, {
-      s3Key: "sources/test-source/abc123.pdf",
+      storageKey: "sources/test-source/abc123.pdf",
     });
 
-    expect(enriched[0]!.metadata.s3Key).toBe("sources/test-source/abc123.pdf");
-    expect(enriched[1]!.metadata.s3Key).toBe("sources/test-source/abc123.pdf");
+    expect(enriched[0]!.metadata.storageKey).toBe(
+      "sources/test-source/abc123.pdf",
+    );
+    expect(enriched[1]!.metadata.storageKey).toBe(
+      "sources/test-source/abc123.pdf",
+    );
   });
 
-  it("does not include s3Key when not provided in options", () => {
+  it("does not include storageKey when not provided in options", () => {
     const chunks = createChunks(1);
 
     const enriched = enrichMetadata(chunks, baseSource);
 
-    expect(enriched[0]!.metadata.s3Key).toBeUndefined();
+    expect(enriched[0]!.metadata.storageKey).toBeUndefined();
   });
 
-  it("does not include s3Key when options.s3Key is undefined", () => {
+  it("does not include storageKey when options.storageKey is undefined", () => {
     const chunks = createChunks(1);
 
     const enriched = enrichMetadata(chunks, baseSource, {});
 
-    expect(enriched[0]!.metadata.s3Key).toBeUndefined();
+    expect(enriched[0]!.metadata.storageKey).toBeUndefined();
   });
 });

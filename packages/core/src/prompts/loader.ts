@@ -11,8 +11,8 @@ export function initPromptLoader(entity: PromptEntity): void {
 }
 
 /**
- * Load a prompt by name from DynamoDB with TTL cache.
- * Falls back to the provided default if DynamoDB is unavailable.
+ * Load a prompt by name from the database with TTL cache.
+ * Falls back to the provided default if the database is unavailable.
  */
 export async function loadPrompt(
   name: string,

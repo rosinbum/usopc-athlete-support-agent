@@ -1,14 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockChatAnthropic, mockChatOpenAI, mockChatGoogle } = vi.hoisted(
-  () => ({
+const { mockChatAnthropic, mockChatOpenAI, mockChatGoogle, mockChatVertexAI } =
+  vi.hoisted(() => ({
     mockChatAnthropic: vi
       .fn()
       .mockImplementation(() => ({ _type: "anthropic" })),
     mockChatOpenAI: vi.fn().mockImplementation(() => ({ _type: "openai" })),
     mockChatGoogle: vi.fn().mockImplementation(() => ({ _type: "google" })),
-  }),
-);
+    mockChatVertexAI: vi
+      .fn()
+      .mockImplementation(() => ({ _type: "google-vertex" })),
+  }));
 
 vi.mock("@langchain/anthropic", () => ({
   ChatAnthropic: mockChatAnthropic,
@@ -20,6 +22,10 @@ vi.mock("@langchain/openai", () => ({
 
 vi.mock("@langchain/google-genai", () => ({
   ChatGoogleGenerativeAI: mockChatGoogle,
+}));
+
+vi.mock("@langchain/google-vertexai", () => ({
+  ChatVertexAI: mockChatVertexAI,
 }));
 
 vi.mock("./models.js", () => ({
@@ -114,6 +120,27 @@ describe("createChatModel", () => {
     expect(mockChatGoogle).toHaveBeenCalledWith({
       model: "gemini-2.0-flash",
       maxOutputTokens: 2048,
+    });
+  });
+
+  it("creates ChatVertexAI for google-vertex provider", () => {
+    createChatModel({ model: "gemini-2.0-flash", provider: "google-vertex" });
+    expect(mockChatVertexAI).toHaveBeenCalledWith({
+      model: "gemini-2.0-flash",
+    });
+  });
+
+  it("maps maxTokens to maxOutputTokens for google-vertex", () => {
+    createChatModel({
+      model: "gemini-2.0-flash",
+      provider: "google-vertex",
+      maxTokens: 4096,
+      temperature: 0.2,
+    });
+    expect(mockChatVertexAI).toHaveBeenCalledWith({
+      model: "gemini-2.0-flash",
+      maxOutputTokens: 4096,
+      temperature: 0.2,
     });
   });
 

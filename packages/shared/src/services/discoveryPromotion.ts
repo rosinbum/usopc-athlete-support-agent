@@ -1,9 +1,7 @@
-import type { DiscoveredSource } from "../entities/DiscoveredSourceEntity.js";
-import type { DiscoveredSourceEntity } from "../entities/DiscoveredSourceEntity.js";
-import type {
-  SourceConfig,
-  SourceConfigEntity,
-} from "../entities/SourceConfigEntity.js";
+import type { DiscoveredSource } from "../entities/types.js";
+import type { DiscoveredSourceEntityPg as DiscoveredSourceEntity } from "../entities/pg/DiscoveredSourceEntityPg.js";
+import type { SourceConfig } from "../entities/types.js";
+import type { SourceConfigEntityPg as SourceConfigEntity } from "../entities/pg/SourceConfigEntityPg.js";
 import type { AuthorityLevel } from "../validation.js";
 
 // ---------------------------------------------------------------------------

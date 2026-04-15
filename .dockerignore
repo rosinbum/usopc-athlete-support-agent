@@ -1,0 +1,14 @@
+node_modules
+.git
+.sst
+.claude
+dist
+*.test.ts
+*.test.tsx
+*.spec.ts
+coverage
+.env*
+.github
+infra
+docs
+*.md

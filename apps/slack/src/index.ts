@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { handle } from "hono/aws-lambda";
+import { serve } from "@hono/node-server";
 import { z } from "zod";
 import { createLogger, createFeedbackEntity } from "@usopc/shared";
 import { verifySlackRequest } from "./middleware/verify.js";
@@ -158,7 +158,7 @@ app.post("/slack/interactions", async (c) => {
             threadTs,
           });
 
-          // Persist feedback to DynamoDB
+          // Persist feedback
           try {
             const feedbackEntity = createFeedbackEntity();
             await feedbackEntity.create({
@@ -208,4 +208,9 @@ app.post("/slack/interactions", async (c) => {
 });
 
 export { app };
-export const handler = handle(app);
+
+const port = parseInt(process.env.PORT ?? "3002", 10);
+
+serve({ fetch: app.fetch, port }, (info) => {
+  logger.info(`Slack bot server running on http://localhost:${info.port}`);
+});

@@ -1,0 +1,6 @@
+name: usopc-athlete-support
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: USOPC Athlete Support Agent — GCP Infrastructure

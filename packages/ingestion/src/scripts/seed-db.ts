@@ -116,7 +116,7 @@ async function main(): Promise<void> {
       return;
     }
 
-    const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
+    const openaiApiKey = getSecretValue("OPENAI_API_KEY");
 
     if (clear) {
       await clearDocuments(pool);

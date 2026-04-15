@@ -35,7 +35,7 @@ export function needsSsl(connectionString: string): boolean {
 /**
  * Returns a singleton database pool instance.
  * Uses getDatabaseUrl() to resolve the connection string from
- * DATABASE_URL env var or SST Secret binding.
+ * DATABASE_URL env var.
  * Enables SSL automatically for all non-local connections (SEC-2).
  */
 export function getPool(): Pool {

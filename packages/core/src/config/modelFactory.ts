@@ -1,6 +1,7 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatVertexAI } from "@langchain/google-vertexai";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { getModelConfig } from "./models.js";
 
@@ -14,7 +15,7 @@ export interface AgentModels {
 /**
  * Creates a chat model instance based on the provider in the config.
  *
- * Supports "anthropic" (default), "openai", and "google" providers.
+ * Supports "anthropic" (default), "openai", "google", and "google-vertex" providers.
  * Only this function (and this file) imports concrete provider classes.
  */
 export function createChatModel(config: {
@@ -32,6 +33,16 @@ export function createChatModel(config: {
       return new ChatOpenAI(opts);
     case "google":
       return new ChatGoogleGenerativeAI({
+        model: config.model,
+        ...(config.temperature !== undefined && {
+          temperature: config.temperature,
+        }),
+        ...(config.maxTokens !== undefined && {
+          maxOutputTokens: config.maxTokens,
+        }),
+      });
+    case "google-vertex":
+      return new ChatVertexAI({
         model: config.model,
         ...(config.temperature !== undefined && {
           temperature: config.temperature,

@@ -19,21 +19,8 @@ vi.mock("./db.js", () => ({
     mockUpsertIngestionStatus(...args),
 }));
 
-const mockSend = vi.fn();
-vi.mock("@aws-sdk/client-sqs", () => ({
-  SQSClient: vi.fn(() => ({ send: mockSend })),
-  SendMessageCommand: vi.fn((input: unknown) => ({ input })),
-}));
-
-vi.mock("sst", () => ({
-  Resource: {
-    IngestionQueue: {
-      url: "https://sqs.us-east-1.amazonaws.com/123/queue.fifo",
-    },
-  },
-}));
-
-const { mockLoggerInstance } = vi.hoisted(() => ({
+const { mockSendMessage, mockLoggerInstance } = vi.hoisted(() => ({
+  mockSendMessage: vi.fn().mockResolvedValue(undefined),
   mockLoggerInstance: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -45,6 +32,18 @@ const { mockLoggerInstance } = vi.hoisted(() => ({
 vi.mock("@usopc/shared", () => ({
   isProduction: () => false, // Always use JSON files in tests
   createLogger: () => mockLoggerInstance,
+  getResource: (key: string) => {
+    const resources: Record<string, unknown> = {
+      IngestionQueue: { url: "https://queue.example.com/ingestion" },
+    };
+    return resources[key];
+  },
+  createQueueService: () => ({
+    sendMessage: mockSendMessage,
+    sendMessageBatch: vi.fn().mockResolvedValue(0),
+    purge: vi.fn().mockResolvedValue(undefined),
+    getStats: vi.fn().mockResolvedValue(null),
+  }),
 }));
 
 // Mock the entities module
@@ -109,10 +108,10 @@ describe("cron handler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.SOURCES_DIR = "/fake/sources";
-    delete process.env.USE_DYNAMODB; // Ensure we use JSON files
+    delete process.env.USE_DB; // Ensure we use JSON files
 
     mockUpsertIngestionStatus.mockResolvedValue(undefined);
-    mockSend.mockResolvedValue({});
+    mockSendMessage.mockResolvedValue({});
 
     // Default: readdir returns one JSON file
     mockReaddir.mockResolvedValue(["source1.json"]);
@@ -132,26 +131,21 @@ describe("cron handler", () => {
 
     await handler();
 
-    expect(mockSend).toHaveBeenCalledOnce();
-
-    // Verify the SendMessageCommand was created with correct params
-    const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
-    expect(SendMessageCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        QueueUrl: "https://sqs.us-east-1.amazonaws.com/123/queue.fifo",
-        MessageGroupId: "ingestion",
-      }),
+    expect(mockSendMessage).toHaveBeenCalledOnce();
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      "https://queue.example.com/ingestion",
+      expect.any(String),
+      { groupId: "ingestion" },
     );
   });
 
-  it("includes source and triggeredAt in SQS message", async () => {
+  it("includes source and triggeredAt in queue message", async () => {
     mockGetLastContentHash.mockResolvedValueOnce(null);
 
     await handler();
 
-    const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
-    const callArgs = vi.mocked(SendMessageCommand).mock.calls[0]![0]!;
-    const body = JSON.parse(callArgs.MessageBody as string);
+    const messageBody = mockSendMessage.mock.calls[0]![1] as string;
+    const body = JSON.parse(messageBody);
     expect(body.source.id).toBe("src-1");
     expect(body.triggeredAt).toBeDefined();
   });
@@ -161,7 +155,7 @@ describe("cron handler", () => {
 
     await handler();
 
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
   it("handles mix of new and already-ingested sources", async () => {
@@ -198,26 +192,26 @@ describe("cron handler", () => {
 
     await handler();
 
-    expect(mockSend).toHaveBeenCalledOnce();
+    expect(mockSendMessage).toHaveBeenCalledOnce();
   });
 });
 
-describe("cron handler (DynamoDB mode)", () => {
+describe("cron handler (database mode)", () => {
   const originalEnv = process.env.SOURCES_DIR;
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.SOURCES_DIR = "/fake/sources";
-    process.env.USE_DYNAMODB = "true";
+    process.env.USE_DB = "true";
 
     mockUpsertIngestionStatus.mockResolvedValue(undefined);
-    mockSend.mockResolvedValue({});
+    mockSendMessage.mockResolvedValue({});
     mockMarkFailure.mockResolvedValue(undefined);
     mockMarkSuccess.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
-    delete process.env.USE_DYNAMODB;
+    delete process.env.USE_DB;
     if (originalEnv === undefined) {
       delete process.env.SOURCES_DIR;
     } else {
@@ -243,8 +237,8 @@ describe("cron handler (DynamoDB mode)", () => {
         lastContentHash: null,
         consecutiveFailures: 3,
         lastError: "fetch error",
-        s3Key: null,
-        s3VersionId: null,
+        storageKey: null,
+        storageVersionId: null,
         createdAt: "2025-01-01T00:00:00Z",
         updatedAt: "2025-01-01T00:00:00Z",
       },
@@ -264,8 +258,8 @@ describe("cron handler (DynamoDB mode)", () => {
         lastContentHash: null,
         consecutiveFailures: 0,
         lastError: null,
-        s3Key: null,
-        s3VersionId: null,
+        storageKey: null,
+        storageVersionId: null,
         createdAt: "2025-01-01T00:00:00Z",
         updatedAt: "2025-01-01T00:00:00Z",
       },
@@ -284,7 +278,7 @@ describe("cron handler (DynamoDB mode)", () => {
     await handler();
 
     // src-broken should be skipped, src-ok should be enqueued
-    expect(mockSend).toHaveBeenCalledOnce();
+    expect(mockSendMessage).toHaveBeenCalledOnce();
     expect(mockLoggerInstance.warn).toHaveBeenCalledWith(
       expect.stringContaining("Skipping src-broken"),
     );
@@ -308,8 +302,8 @@ describe("cron handler (DynamoDB mode)", () => {
         lastContentHash: "abc123",
         consecutiveFailures: 0,
         lastError: null,
-        s3Key: null,
-        s3VersionId: null,
+        storageKey: null,
+        storageVersionId: null,
         createdAt: "2025-01-01T00:00:00Z",
         updatedAt: "2025-01-01T00:00:00Z",
       },
@@ -322,6 +316,6 @@ describe("cron handler (DynamoDB mode)", () => {
 
     await handler();
 
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockSendMessage).not.toHaveBeenCalled();
   });
 });

@@ -1,12 +1,11 @@
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { getResource } from "@usopc/shared";
+import { getResource, createQueueService } from "@usopc/shared";
 import type { DiscoveryFeedMessage } from "@usopc/core";
 
-const sqs = new SQSClient({});
+const queue = createQueueService();
 
 /**
  * Send one or more discovered sources to the DiscoveryFeedQueue for
- * re-evaluation. Each discovery becomes a single SQS message with
+ * re-evaluation. Each discovery becomes a single message with
  * discoveryMethod "manual" and discoveredFrom "admin-reprocess".
  */
 export async function enqueueForReprocess(
@@ -27,12 +26,7 @@ export async function enqueueForReprocess(
         ],
         timestamp: new Date().toISOString(),
       };
-      return sqs.send(
-        new SendMessageCommand({
-          QueueUrl: queueUrl,
-          MessageBody: JSON.stringify(message),
-        }),
-      );
+      return queue.sendMessage(queueUrl, JSON.stringify(message));
     }),
   );
 

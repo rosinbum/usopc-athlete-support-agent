@@ -1,262 +1,345 @@
 # Production Deployment
 
-> **See also:** [Deployment Procedure](./deployment-procedure.md) for the CI/CD pipeline
-> (staging → approval gate → production) and [Incident Response](./incident-response.md)
-> for rollback and incident handling.
-
 ## Prerequisites
 
-- AWS account with appropriate permissions
-- SST CLI installed (`pnpm add -g sst`)
-- Production secrets configured
+- Two GCP projects created: `usopc-athlete-support-staging` and `usopc-athlete-support-prod`
+- `gcloud` CLI installed and authenticated
+- Pulumi CLI installed (`brew install pulumi/tap/pulumi` or `npm install -g pulumi`)
+- A Pulumi Cloud account (for state management)
+- GitHub repo with Actions enabled
 
-## 1. Set Production Secrets
+## 1. GCP Project Setup
 
-```bash
-sst secret set AnthropicApiKey <key> --stage production
-sst secret set OpenaiApiKey <key> --stage production
-sst secret set TavilyApiKey <key> --stage production
-sst secret set SlackBotToken <token> --stage production
-sst secret set SlackSigningSecret <secret> --stage production
-sst secret set AuthSecret <secret> --stage production
-sst secret set GitHubClientId <id> --stage production
-sst secret set GitHubClientSecret <secret> --stage production
-sst secret set AdminEmails <comma-separated-emails> --stage production
-```
+### Enable Required APIs
 
-Optional secrets:
+Run for each project:
 
 ```bash
-sst secret set LangchainApiKey <key> --stage production          # LangSmith tracing
-sst secret set ConversationMaxTurns <number> --stage production  # Default: 5
+PROJECT="usopc-athlete-support-staging"  # repeat with -prod
+
+for API in \
+  run.googleapis.com \
+  sqladmin.googleapis.com \
+  secretmanager.googleapis.com \
+  pubsub.googleapis.com \
+  storage.googleapis.com \
+  artifactregistry.googleapis.com \
+  cloudscheduler.googleapis.com \
+  monitoring.googleapis.com \
+  iam.googleapis.com \
+  iamcredentials.googleapis.com; do
+  gcloud services enable "$API" --project="$PROJECT"
+done
 ```
 
-## 2. Deploy
+> Pulumi also enables these APIs declaratively, but enabling them beforehand avoids chicken-and-egg issues on the first deploy.
 
-Deployment is two-phase: SST for Lambda infrastructure, then SSH for the EC2 apps.
+## 2. Workload Identity Federation (WIF)
 
-### Phase 1: SST Infrastructure (Lambda workers, crons, DynamoDB, SQS, S3)
+WIF lets GitHub Actions authenticate to GCP without long-lived service account keys. Set this up **once per GCP project**.
+
+### 2a. Create the Workload Identity Pool
 
 ```bash
-sst deploy --stage production
+PROJECT="usopc-athlete-support-staging"
+
+gcloud iam workload-identity-pools create "github-pool" \
+  --project="$PROJECT" \
+  --location="global" \
+  --display-name="GitHub Actions"
 ```
 
-This provisions:
-
-- DynamoDB tables (AppTable, AuthTable)
-- S3 bucket (DocumentsBucket)
-- SQS queues (DiscoveryFeedQueue, IngestionQueue) with DLQs
-- EventBridge + Lambda for discovery cron, ingestion cron, checkpoint cleanup
-- SQS + Lambda for discovery feed worker, ingestion worker
-- CloudWatch alarms and dashboard
-
-### Phase 2: EC2 App Deploy (Next.js web app + Slack bot)
-
-The web app and Slack bot run on an EC2 instance (t3.small) with PM2 + Nginx. See [AWS Container Strategy](./aws-container-strategy.md) for the full architecture.
+### 2b. Create the OIDC Provider
 
 ```bash
-# Deploy from the EC2 instance
-./scripts/deploy-ec2.sh              # latest main
-./scripts/deploy-ec2.sh v1.2.3       # specific tag
+gcloud iam workload-identity-pools providers create-oidc "github-provider" \
+  --project="$PROJECT" \
+  --location="global" \
+  --workload-identity-pool="github-pool" \
+  --display-name="GitHub" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository == 'rosinbum/usopc-athlete-support-agent'" \
+  --issuer-uri="https://token.actions.githubusercontent.com"
 ```
 
-Or from CI (automated via `.github/workflows/deploy.yml`):
+> Change `rosinbum/usopc-athlete-support-agent` to your actual `owner/repo`.
+
+### 2c. Create the Deploy Service Account
 
 ```bash
-# SSH to EC2 and run deploy script
-ssh ec2-user@<instance-ip> "cd ~/app && ./scripts/deploy-ec2.sh v1.2.3"
+gcloud iam service-accounts create deploy \
+  --project="$PROJECT" \
+  --display-name="GitHub Actions Deploy"
 ```
 
-The deploy script: pulls code, installs deps, builds both apps, copies static assets, restarts PM2, and health-checks both endpoints.
-
-### Environment Variables on EC2
-
-SST resource bindings (DynamoDB table names, SQS queue URLs, secrets) must be available as environment variables on the EC2 instance. Two approaches:
-
-1. **`sst shell`** (recommended): `sst shell --stage production -- pm2 start ecosystem.config.cjs`
-2. **Sync to `.env.ec2`**: `./scripts/sync-sst-env.sh production`, then source before starting PM2
-
-## 3. Run Initial Ingestion
-
-After the first deployment, trigger the ingestion pipeline to populate the knowledge base:
+### 2d. Grant Deployment Roles
 
 ```bash
-# Via AWS Console: manually invoke the IngestionCron Lambda
-# Or wait for the weekly scheduled trigger
+SA="deploy@${PROJECT}.iam.gserviceaccount.com"
+
+for ROLE in \
+  roles/artifactregistry.writer \
+  roles/run.admin \
+  roles/cloudsql.admin \
+  roles/pubsub.admin \
+  roles/storage.admin \
+  roles/secretmanager.admin \
+  roles/iam.serviceAccountUser \
+  roles/serviceusage.serviceUsageAdmin \
+  roles/monitoring.admin \
+  roles/cloudscheduler.admin; do
+  gcloud projects add-iam-policy-binding "$PROJECT" \
+    --member="serviceAccount:${SA}" \
+    --role="$ROLE"
+done
 ```
 
-## Environment Outputs
+### 2e. Bind WIF to the Service Account
 
-Production URLs (served by EC2 + Nginx):
-
-```
-webUrl:   https://athlete-agent.rosinbum.org
-slackUrl: https://slack.athlete-agent.rosinbum.org
-```
-
-Local dev stages use SST Lambda emulation with raw AWS URLs:
-
-```
-webUrl:   https://xxx.cloudfront.net
-slackUrl: https://xxx.execute-api.us-east-1.amazonaws.com
-```
-
-## 4. Configure Automated Source Discovery
-
-The source discovery system runs automatically every Monday at 2 AM UTC via EventBridge. It discovers new governance documents and evaluates them for relevance.
-
-### Budget Configuration
-
-Set budget limits to prevent unexpected costs:
+This allows GitHub Actions (and only your repo) to impersonate the deploy service account:
 
 ```bash
-# Tavily API monthly budget (credits)
-sst secret set TavilyMonthlyBudget 1000 --stage production
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT" --format="value(projectNumber)")
 
-# Anthropic API monthly budget (dollars)
-sst secret set AnthropicMonthlyBudget 10 --stage production
+gcloud iam service-accounts add-iam-policy-binding \
+  "deploy@${PROJECT}.iam.gserviceaccount.com" \
+  --project="$PROJECT" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-pool/attribute.repository/rosinbum/usopc-athlete-support-agent"
 ```
 
-**Defaults:**
-
-- Tavily: 1000 credits/month
-- Anthropic: $10/month
-
-The discovery Lambda checks budgets before running and will halt if exceeded.
-
-### Notification Configuration
-
-Configure optional notification channels for discovery results and alerts:
-
-#### Slack Notifications
+### 2f. Get the Provider Resource Name
 
 ```bash
-# Create Slack webhook (https://api.slack.com/messaging/webhooks)
-# Then set the webhook URL
-sst secret set SlackWebhookUrl <webhook-url> --stage production
+gcloud iam workload-identity-pools providers describe "github-provider" \
+  --project="$PROJECT" \
+  --location="global" \
+  --workload-identity-pool="github-pool" \
+  --format="value(name)"
 ```
 
-#### Email Notifications (via SES)
+Save this output — it goes into the `GCP_WORKLOAD_IDENTITY_PROVIDER` GitHub secret.
+
+**Repeat steps 2a-2f for the production project** (`usopc-athlete-support-prod`).
+
+## 3. Pulumi Setup
+
+### Initialize Stacks
 
 ```bash
-# Set notification email recipient
-sst secret set NotificationEmail admin@example.com --stage production
+cd infra/gcp
+npm install
 
-# Set from address (optional, defaults to noreply@usopc.org)
-sst secret set SesFromEmail notifications@example.com --stage production
+pulumi login  # authenticates with Pulumi Cloud
+
+pulumi stack init staging
+pulumi stack init production
 ```
 
-**Note:** Email addresses must be verified in AWS SES. In production, move SES out of sandbox mode.
-
-### Discovery Configuration
-
-Discovery sources are defined in `data/discovery-config.json`:
-
-```json
-{
-  "domains": ["teamusa.org", "usopc.org", "usatf.org"],
-  "searchQueries": ["USOPC team selection procedures"],
-  "maxResultsPerDomain": 20,
-  "maxResultsPerQuery": 10,
-  "autoApprovalThreshold": 0.85
-}
-```
-
-**Fields:**
-
-- `domains`: Domains to crawl using Tavily Map API
-- `searchQueries`: Search queries for Tavily Search API
-- `maxResultsPerDomain`: Max results per domain crawl (default: 20)
-- `maxResultsPerQuery`: Max results per search query (default: 10)
-- `autoApprovalThreshold`: Confidence threshold for auto-approval (0-1, default: 0.85)
-
-### Workflow
-
-1. **Discovery Lambda** runs every Monday at 2 AM UTC
-2. Checks budgets (Tavily and Anthropic)
-3. Discovers URLs from configured domains and search queries
-4. Evaluates each URL for relevance using LLM
-5. Stores results in DynamoDB with approval status
-6. Sends completion summary via configured channels
-7. **Ingestion Cron** (runs weekly) automatically creates SourceConfigs for approved discoveries
-8. New sources are ingested into the knowledge base
-
-### Manual Triggers
-
-Trigger discovery manually for testing or one-off runs:
+### Set the DB Password
 
 ```bash
-# Invoke the discovery Lambda directly
-aws lambda invoke \
-  --function-name usopc-athlete-support-production-DiscoveryCron \
-  --region us-east-1 \
-  /dev/null
+pulumi config set --secret usopc:dbPassword <staging-password> --stack staging
+pulumi config set --secret usopc:dbPassword <production-password> --stack production
 ```
 
-### Cost Estimates
+### (Optional) Set Alert Email
 
-**Tavily API:**
+```bash
+pulumi config set usopc:alertEmail your-email@example.com --stack staging
+```
 
-- Map endpoint: 5 credits per domain
-- Search endpoint: 1 credit per query
-- Example: 7 domains + 5 queries = 40 credits/week = ~160 credits/month
+### Preview Infrastructure
 
-**Anthropic API (Claude Sonnet 4):**
+```bash
+pulumi preview --stack staging
+```
 
-- Metadata evaluation: ~1000 input + 200 output tokens per URL
-- Content evaluation: ~2000 input + 500 output tokens per URL
-- Total per URL: ~3000 input + 700 output = ~$0.02
-- Example: 50 URLs/week = ~$1/week = ~$4/month
+## 4. GitHub Configuration
 
-**Total estimated monthly cost:** ~$5-10 (well within default budgets)
+### Environments
 
-## Updating Model Configuration
+Create two environments in **Settings > Environments**:
 
-Model instances (`agentModel` for Sonnet, `classifierModel` for Haiku) are constructed once at server startup and reused for the process lifetime. Config changes stored in DynamoDB are cached for 5 minutes by `getModelConfig()`, but the `ChatAnthropic` instances themselves are never recreated.
+| Environment  | Protection Rules                     |
+| ------------ | ------------------------------------ |
+| `staging`    | None (auto-deploy on push to `main`) |
+| `production` | Required reviewers                   |
 
-**To apply model config changes (model name, temperature, maxTokens):**
+### Secrets
 
-1. Update the config in DynamoDB (via admin UI or direct update)
-2. Restart the PM2 processes: `pm2 restart all` (on the EC2 instance)
+Add these repository secrets (or environment-scoped secrets if using different values per environment):
 
-**Note:** Changing just the DynamoDB config without a restart will **not** update the running model instances. The 5-minute config cache TTL only affects `getModelConfig()` calls, not already-constructed `ChatAnthropic` instances.
+| Secret                           | Value                                                                                          |
+| -------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Provider resource name from step 2f                                                            |
+| `GCP_SERVICE_ACCOUNT`            | `deploy@<project-id>.iam.gserviceaccount.com`                                                  |
+| `PULUMI_ACCESS_TOKEN`            | Pulumi personal access token                                                                   |
+| `DB_CONNECTION_NAME`             | `<project-id>:<region>:<instance-name>` (available after first Pulumi deploy)                  |
+| `DATABASE_URL`                   | `postgresql://app:<password>@localhost:5432/usopc_athlete_support` (used with Cloud SQL Proxy) |
+
+## 5. First Deployment
+
+### Option A: Automatic (via CI)
+
+Push to `main` to trigger a staging deploy:
+
+```bash
+git push origin main
+```
+
+Tag a release to trigger a production deploy:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+### Option B: Manual Trigger
+
+Go to **Actions > Deploy to GCP > Run workflow** and select the environment.
+
+### What the Workflow Does
+
+1. **build-images** — Builds and pushes Docker images (web, slack, worker) to Artifact Registry
+2. **migrate** — Runs database migrations via Cloud SQL Auth Proxy
+3. **deploy** — Runs `pulumi up` to create/update all GCP resources
+4. **smoke-test** — Curls `/api/health` (web) and `/health` (worker)
+
+## 6. Populate Secret Manager
+
+After the first Pulumi deploy creates the Secret Manager secrets, populate them with actual values:
+
+```bash
+PROJECT="usopc-athlete-support-staging"
+PREFIX="usopc-staging"
+
+# Required
+echo -n "postgresql://app:<password>@/usopc_athlete_support?host=/cloudsql/<connection-name>" | \
+  gcloud secrets versions add "${PREFIX}-DATABASE_URL" --data-file=- --project="$PROJECT"
+
+echo -n "<key>" | gcloud secrets versions add "${PREFIX}-OPENAI_API_KEY" --data-file=- --project="$PROJECT"
+echo -n "<key>" | gcloud secrets versions add "${PREFIX}-ANTHROPIC_API_KEY" --data-file=- --project="$PROJECT"
+echo -n "<secret>" | gcloud secrets versions add "${PREFIX}-AUTH_SECRET" --data-file=- --project="$PROJECT"
+echo -n "<id>" | gcloud secrets versions add "${PREFIX}-GITHUB_CLIENT_ID" --data-file=- --project="$PROJECT"
+echo -n "<secret>" | gcloud secrets versions add "${PREFIX}-GITHUB_CLIENT_SECRET" --data-file=- --project="$PROJECT"
+echo -n "user@example.com" | gcloud secrets versions add "${PREFIX}-ADMIN_EMAILS" --data-file=- --project="$PROJECT"
+
+# Slack
+echo -n "<token>" | gcloud secrets versions add "${PREFIX}-SLACK_BOT_TOKEN" --data-file=- --project="$PROJECT"
+echo -n "<secret>" | gcloud secrets versions add "${PREFIX}-SLACK_SIGNING_SECRET" --data-file=- --project="$PROJECT"
+echo -n "<token>" | gcloud secrets versions add "${PREFIX}-SLACK_APP_TOKEN" --data-file=- --project="$PROJECT"
+
+# Optional
+echo -n "<key>" | gcloud secrets versions add "${PREFIX}-TAVILY_API_KEY" --data-file=- --project="$PROJECT"
+echo -n "<key>" | gcloud secrets versions add "${PREFIX}-RESEND_API_KEY" --data-file=- --project="$PROJECT"
+echo -n "<key>" | gcloud secrets versions add "${PREFIX}-LANGSMITH_API_KEY" --data-file=- --project="$PROJECT"
+echo -n "<key>" | gcloud secrets versions add "${PREFIX}-VOYAGE_API_KEY" --data-file=- --project="$PROJECT"
+echo -n "<key>" | gcloud secrets versions add "${PREFIX}-GOOGLE_AI_API_KEY" --data-file=- --project="$PROJECT"
+```
+
+> The `DATABASE_URL` for Cloud Run uses the Unix socket path (`/cloudsql/<connection-name>`) since Cloud SQL Auth Proxy runs as a sidecar.
+
+## 7. Initial Data Ingestion
+
+After deployment, trigger ingestion to populate the vector database:
+
+```bash
+# Via Cloud Scheduler (trigger the ingestion cron manually)
+gcloud scheduler jobs run "usopc-staging-cron-ingestion" \
+  --project="usopc-athlete-support-staging" \
+  --location="us-central1"
+```
+
+Or wait for the automated schedule (daily at 3 AM UTC).
+
+## 8. Source Discovery
+
+Discovery runs automatically every Sunday at 2 AM UTC via Cloud Scheduler.
+
+### Manual Trigger
+
+```bash
+gcloud scheduler jobs run "usopc-staging-cron-discovery" \
+  --project="usopc-athlete-support-staging" \
+  --location="us-central1"
+```
+
+### Configuration
+
+Discovery sources are defined in `data/discovery-config.json`. See the file for domain lists and search query configuration.
+
+## Infrastructure Overview
+
+Pulumi (`infra/gcp/index.ts`) creates:
+
+| Resource                             | Purpose                                         |
+| ------------------------------------ | ----------------------------------------------- |
+| Cloud Run (web, slack, worker)       | Application services                            |
+| Cloud SQL (PostgreSQL 16 + pgvector) | Database with vector search                     |
+| Artifact Registry                    | Docker image storage                            |
+| Secret Manager                       | API keys and credentials                        |
+| Cloud Storage                        | Document storage                                |
+| Pub/Sub                              | Ingestion and discovery feed queues (with DLQs) |
+| Cloud Scheduler                      | Cron jobs for discovery and ingestion           |
+| Monitoring + Alerting                | Error rate and DLQ alerts                       |
+
+### Scaling
+
+|                     | Staging                            | Production                         |
+| ------------------- | ---------------------------------- | ---------------------------------- |
+| Cloud SQL           | `db-custom-2-7680` (2 CPU, 7.5 GB) | `db-custom-4-15360` (4 CPU, 15 GB) |
+| Min instances       | 0                                  | 1                                  |
+| Max instances       | 2                                  | 10                                 |
+| DB availability     | Zonal                              | Regional (HA)                      |
+| Deletion protection | Off                                | On                                 |
 
 ## Troubleshooting
 
-### Discovery Not Running
-
-Check the DiscoveryCron Lambda logs:
+### View Cloud Run Logs
 
 ```bash
-aws logs tail /aws/lambda/usopc-athlete-support-production-DiscoveryCron \
-  --follow \
-  --region us-east-1
+gcloud run services logs read "usopc-staging-web" \
+  --project="usopc-athlete-support-staging" \
+  --region="us-central1" \
+  --limit=50
 ```
 
-Common issues:
+### Check Service Health
 
-- Budget exceeded (check CloudWatch for budget alerts)
-- API keys expired or invalid
-- Network timeouts (increase Lambda timeout if needed)
+```bash
+WEB_URL=$(gcloud run services describe "usopc-staging-web" \
+  --project="usopc-athlete-support-staging" \
+  --region="us-central1" \
+  --format="value(status.url)")
 
-### Budget Alerts Not Received
+curl -sf "$WEB_URL/api/health"
+```
 
-1. Verify notification channels are configured (Slack webhook or SES email)
-2. Check Lambda logs for notification errors
-3. For email: ensure email addresses are verified in SES
-4. For Slack: test webhook URL manually
+### Connect to Cloud SQL Locally
 
-### Approved Discoveries Not Ingested
+```bash
+# Install Cloud SQL Auth Proxy
+brew install cloud-sql-proxy
 
-The ingestion cron processes approved discoveries automatically. Check:
+# Start proxy (get connection name from Pulumi output)
+cloud-sql-proxy "usopc-athlete-support-staging:us-central1:<instance-name>" --port 5432
 
-1. Verify discoveries have `status: "approved"` in DynamoDB
-2. Check IngestionCron Lambda logs for errors
-3. Ensure `sourceConfigId` is null (already linked discoveries are skipped)
+# Connect via psql in another terminal
+psql "postgresql://app:<password>@localhost:5432/usopc_athlete_support"
+```
 
-### High Costs
+### Re-deploy a Single Service
 
-1. Review usage metrics in CloudWatch
-2. Adjust budgets or reduce discovery frequency
-3. Narrow discovery scope (fewer domains/queries)
-4. Increase `autoApprovalThreshold` to reduce false positives
+Use the workflow dispatch trigger and select the environment, or push to `main` for staging.
+
+### DLQ Messages
+
+Check for failed Pub/Sub messages:
+
+```bash
+gcloud pubsub subscriptions pull "usopc-staging-ingestion-dlq-sub" \
+  --project="usopc-athlete-support-staging" \
+  --auto-ack \
+  --limit=10
+```

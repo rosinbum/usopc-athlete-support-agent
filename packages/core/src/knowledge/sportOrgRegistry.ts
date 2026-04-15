@@ -11,7 +11,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 let entityRef: SportOrgEntity | null = null;
 
 /**
- * Initialize the sport org registry with a DynamoDB entity reference.
+ * Initialize the sport org registry with a database entity reference.
  * Must be called before loadSportOrganizations().
  */
 export function initSportOrgRegistry(entity: SportOrgEntity): void {
@@ -21,7 +21,7 @@ export function initSportOrgRegistry(entity: SportOrgEntity): void {
 }
 
 /**
- * Loads sport organizations from DynamoDB via the SportOrgEntity.
+ * Loads sport organizations from the database via the SportOrgEntity.
  * Results are cached in memory with a 5-minute TTL.
  *
  * @returns Array of SportOrganization objects

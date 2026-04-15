@@ -1,12 +1,16 @@
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { createLogger, getResource, normalizeUrl } from "@usopc/shared";
+import {
+  createLogger,
+  getResource,
+  getSecretValue,
+  normalizeUrl,
+  createQueueService,
+} from "@usopc/shared";
 import type { DiscoveryFeedMessage } from "@usopc/core";
-import { Resource } from "sst";
 import { DiscoveryService } from "./services/discoveryService.js";
 import { DiscoveryConfig } from "./types.js";
 
 const logger = createLogger({ service: "discovery-orchestrator" });
-const sqs = new SQSClient({});
+const queueService = createQueueService();
 
 export interface DiscoveryStats {
   discovered: number;
@@ -209,12 +213,7 @@ export class DiscoveryOrchestrator {
     try {
       const queueUrl = getResource("DiscoveryFeedQueue").url;
 
-      await sqs.send(
-        new SendMessageCommand({
-          QueueUrl: queueUrl,
-          MessageBody: JSON.stringify(message),
-        }),
-      );
+      await queueService.sendMessage(queueUrl, JSON.stringify(message));
 
       this.stats.enqueued += newUrls.length;
       logger.info(`Enqueued ${newUrls.length} URLs to discovery feed`, {
@@ -238,12 +237,12 @@ export class DiscoveryOrchestrator {
 }
 
 /**
- * Factory function to create a DiscoveryOrchestrator with secrets loaded from SST.
+ * Factory function to create a DiscoveryOrchestrator with secrets from env.
  */
 export function createDiscoveryOrchestrator(
   config: Omit<OrchestratorConfig, "tavilyApiKey">,
 ): DiscoveryOrchestrator {
-  const tavilyApiKey = Resource.TavilyApiKey.value;
+  const tavilyApiKey = getSecretValue("TAVILY_API_KEY");
 
   return new DiscoveryOrchestrator({
     ...config,

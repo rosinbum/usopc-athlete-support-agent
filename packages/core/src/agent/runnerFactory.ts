@@ -40,16 +40,13 @@ async function initRunner(): Promise<AgentRunner> {
     await import("@usopc/shared");
 
   // Set env vars BEFORE importing @usopc/core modules (which load LangChain)
-  process.env.ANTHROPIC_API_KEY = getSecretValue(
-    "ANTHROPIC_API_KEY",
-    "AnthropicApiKey",
-  );
+  process.env.ANTHROPIC_API_KEY = getSecretValue("ANTHROPIC_API_KEY");
 
   // LangSmith tracing (optional)
   let langchainApiKey: string | undefined;
   try {
-    langchainApiKey = getSecretValue("LANGCHAIN_API_KEY", "LangchainApiKey");
-    log.info("Found LangSmith API key from SST secret");
+    langchainApiKey = getSecretValue("LANGCHAIN_API_KEY");
+    log.info("Found LangSmith API key");
   } catch {
     langchainApiKey = getOptionalEnv("LANGCHAIN_API_KEY");
     if (langchainApiKey) {
@@ -74,7 +71,7 @@ async function initRunner(): Promise<AgentRunner> {
 
   return await AgentRunner.create({
     databaseUrl: getDatabaseUrl(),
-    openaiApiKey: getSecretValue("OPENAI_API_KEY", "OpenaiApiKey"),
-    tavilyApiKey: getSecretValue("TAVILY_API_KEY", "TavilyApiKey"),
+    openaiApiKey: getSecretValue("OPENAI_API_KEY"),
+    tavilyApiKey: getSecretValue("TAVILY_API_KEY"),
   });
 }

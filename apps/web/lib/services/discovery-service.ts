@@ -1,16 +1,16 @@
-import { SQSClient, SendMessageBatchCommand } from "@aws-sdk/client-sqs";
 import {
   getResource,
   getSecretValue,
   normalizeUrl,
   logger,
+  createQueueService,
 } from "@usopc/shared";
 import type { DiscoveryFeedMessage } from "@usopc/core";
 import { tavily } from "@tavily/core";
 import discoveryConfig from "../../../../data/discovery-config.json";
 
 const log = logger.child({ service: "discovery-trigger" });
-const sqs = new SQSClient({});
+const queue = createQueueService();
 
 const CONCURRENCY = 10;
 
@@ -22,7 +22,7 @@ export interface DiscoveryStats {
 }
 
 export async function runDiscovery(): Promise<DiscoveryStats> {
-  const apiKey = getSecretValue("TAVILY_API_KEY", "TavilyApiKey");
+  const apiKey = getSecretValue("TAVILY_API_KEY");
   const client = tavily({ apiKey });
   const queueUrl = getResource("DiscoveryFeedQueue").url;
   const seenUrls = new Set<string>();
@@ -104,17 +104,15 @@ export async function runDiscovery(): Promise<DiscoveryStats> {
     },
   );
 
-  // Batch-send all messages to SQS (10 per batch)
+  // Batch-send all messages to queue (10 per batch)
   for (let i = 0; i < pendingMessages.length; i += 10) {
     const batch = pendingMessages.slice(i, i + 10);
-    await sqs.send(
-      new SendMessageBatchCommand({
-        QueueUrl: queueUrl,
-        Entries: batch.map((msg, idx) => ({
-          Id: String(i + idx),
-          MessageBody: JSON.stringify(msg),
-        })),
-      }),
+    await queue.sendMessageBatch(
+      queueUrl,
+      batch.map((msg, idx) => ({
+        id: String(i + idx),
+        body: JSON.stringify(msg),
+      })),
     );
   }
   for (const msg of pendingMessages) {

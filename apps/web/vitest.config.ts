@@ -2,9 +2,10 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react() as never],
   test: {
     environment: "jsdom",
+    server: { deps: { inline: ["@usopc/shared", "@usopc/core"] } },
     setupFiles: ["./vitest.setup.ts"],
     globals: true,
     coverage: {

@@ -1,5 +1,5 @@
-import { createLogger } from "@usopc/shared";
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import { createLogger, getSecretValue } from "@usopc/shared";
+import { Resend } from "resend";
 
 const logger = createLogger({ service: "notification-service" });
 
@@ -37,7 +37,7 @@ export interface BudgetAlert {
 export interface NotificationChannels {
   cloudWatch: boolean; // always enabled
   slack?: string | undefined; // webhook URL
-  email?: string | undefined; // SES email address
+  email?: string | undefined; // recipient email address
 }
 
 // ---------------------------------------------------------------------------
@@ -50,14 +50,14 @@ export interface NotificationChannels {
  * Features:
  * - CloudWatch Logs (always enabled via logger)
  * - Optional Slack webhook integration
- * - Optional SES email notifications
+ * - Optional Resend email notifications
  * - Discovery completion summaries
  * - Budget warnings and alerts
  * - Error notifications
  */
 export class NotificationService {
   private channels: NotificationChannels;
-  private sesClient: SESClient | null = null;
+  private resend: Resend | null = null;
 
   constructor(channels?: Partial<NotificationChannels>) {
     this.channels = {
@@ -66,9 +66,16 @@ export class NotificationService {
       email: channels?.email ?? process.env.NOTIFICATION_EMAIL,
     };
 
-    // Initialize SES client if email is configured
+    // Initialize Resend client if email is configured
     if (this.channels.email) {
-      this.sesClient = new SESClient({});
+      try {
+        const apiKey = getSecretValue("RESEND_API_KEY");
+        this.resend = new Resend(apiKey);
+      } catch {
+        logger.warn(
+          "Resend API key not available — email notifications disabled",
+        );
+      }
     }
 
     logger.info("Notification service initialized", {
@@ -98,7 +105,7 @@ export class NotificationService {
     }
 
     // Email
-    if (this.channels.email && this.sesClient) {
+    if (this.channels.email && this.resend) {
       await this.sendEmail(
         this.channels.email,
         "Source Discovery Run Complete",
@@ -169,7 +176,7 @@ export class NotificationService {
     }
 
     // Email
-    if (this.channels.email && this.sesClient) {
+    if (this.channels.email && this.resend) {
       await this.sendEmail(
         this.channels.email,
         `Budget ${alert.threshold === "critical" ? "CRITICAL" : "Warning"}: ${alert.service}`,
@@ -241,7 +248,7 @@ export class NotificationService {
     }
 
     // Email
-    if (this.channels.email && this.sesClient) {
+    if (this.channels.email && this.resend) {
       const message = `Error in ${context}\n\n${errorMessage}${stack ? `\n\nStack:\n${stack}` : ""}\n\nMetadata:\n${JSON.stringify(metadata, null, 2)}`;
       await this.sendEmail(this.channels.email, `Error: ${context}`, message);
     }
@@ -286,34 +293,23 @@ export class NotificationService {
   }
 
   /**
-   * Send email via AWS SES.
+   * Send email via Resend.
    */
   private async sendEmail(
     to: string,
     subject: string,
     body: string,
   ): Promise<void> {
-    if (!this.sesClient) return;
+    if (!this.resend) return;
 
     try {
-      const command = new SendEmailCommand({
-        Source: process.env.SES_FROM_EMAIL ?? "noreply@usopc.org",
-        Destination: {
-          ToAddresses: [to],
-        },
-        Message: {
-          Subject: {
-            Data: `[USOPC Discovery] ${subject}`,
-          },
-          Body: {
-            Text: {
-              Data: body,
-            },
-          },
-        },
+      await this.resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL ?? "noreply@usopc.org",
+        to: [to],
+        subject: `[USOPC Discovery] ${subject}`,
+        text: body,
       });
 
-      await this.sesClient.send(command);
       logger.info("Email notification sent", { to, subject });
     } catch (error) {
       logger.error("Failed to send email notification", {

@@ -1,4 +1,3 @@
-import { Resource } from "sst";
 import { z } from "zod";
 
 /**
@@ -35,13 +34,10 @@ const LOCAL_DEV_DATABASE_URL =
  * Returns the database connection URL.
  *
  * Resolution order:
- *   1. `DATABASE_URL` environment variable (set directly or via .env)
- *   2. SST Secret binding (`Resource.DatabaseUrl.value`)
- *   3. SST resource env var directly (`SST_RESOURCE_DatabaseUrl`) — fallback
- *      when the Resource proxy fails (e.g. `sst shell` + `tsx`)
- *   4. In explicit development mode (`NODE_ENV=development`), falls back to
+ *   1. `DATABASE_URL` environment variable (set via .env.local or Cloud Run env)
+ *   2. In explicit development mode (`NODE_ENV=development`), falls back to
  *      the standard local Docker URL.
- *   5. Throws if no source is available.
+ *   3. Throws if no source is available.
  */
 export function getDatabaseUrl(): string {
   const directUrl = process.env.DATABASE_URL;
@@ -49,90 +45,37 @@ export function getDatabaseUrl(): string {
     return directUrl;
   }
 
-  try {
-    const secret = (Resource as unknown as { DatabaseUrl: { value: string } })
-      .DatabaseUrl;
-    return secret.value;
-  } catch {
-    // Resource proxy may fail in sst shell + tsx context — check raw env var
-    const sstRaw = process.env.SST_RESOURCE_DatabaseUrl;
-    if (sstRaw) {
-      try {
-        return JSON.parse(sstRaw).value;
-      } catch {
-        // malformed JSON — fall through
-      }
-    }
-
-    // Only fall back to localhost when NODE_ENV is explicitly "development",
-    // not when it is undefined (e.g. CI environments).
-    if (process.env.NODE_ENV === "development") {
-      return LOCAL_DEV_DATABASE_URL;
-    }
-    throw new Error(
-      "DATABASE_URL is not set and SST DatabaseUrl secret is not available. " +
-        "Provide DATABASE_URL or deploy with SST resource bindings.",
-    );
+  // Only fall back to localhost when NODE_ENV is explicitly "development",
+  // not when it is undefined (e.g. CI environments).
+  if (process.env.NODE_ENV === "development") {
+    return LOCAL_DEV_DATABASE_URL;
   }
+  throw new Error(
+    "DATABASE_URL is not set. " +
+      "Provide DATABASE_URL via environment variable or .env.local file.",
+  );
 }
 
 /**
- * Resolve a secret value by checking a plain environment variable first, then
- * falling back to an SST v3 Resource binding.
- *
- * This allows the same code to work both locally (with a plain env var) and
- * under `sst shell` / SST-deployed Lambdas (with resource bindings).
+ * Resolve a secret value from an environment variable.
  */
-export function getSecretValue(
-  envKey: string,
-  sstResourceName?: string,
-): string {
-  // 1. Direct env var (highest priority)
+export function getSecretValue(envKey: string): string {
   const direct = process.env[envKey];
   if (direct) return direct;
 
-  // 2. SST Resource binding
-  if (sstResourceName) {
-    try {
-      const resource = (
-        Resource as unknown as Record<string, { value?: string }>
-      )[sstResourceName];
-      if (resource?.value) return resource.value;
-    } catch {
-      // Resource not available — fall through to error
-    }
-  }
-
-  const sources = [envKey];
-  if (sstResourceName) sources.push(`Resource.${sstResourceName}`);
-  throw new Error(`Missing required secret. Checked: ${sources.join(", ")}`);
+  throw new Error(`Missing required secret: ${envKey}`);
 }
 
 /**
- * Resolve an optional secret value by checking a plain environment variable
- * first, then falling back to an SST v3 Resource binding. Returns the default
- * value if neither is available.
- *
- * Use this for configuration values that have sensible defaults.
+ * Resolve an optional secret value from an environment variable.
+ * Returns the default value if not available.
  */
 export function getOptionalSecretValue(
   envKey: string,
-  sstResourceName: string,
   defaultValue: string,
 ): string {
-  // 1. Direct env var (highest priority)
   const direct = process.env[envKey];
   if (direct) return direct;
-
-  // 2. SST Resource binding
-  try {
-    const resource = (
-      Resource as unknown as Record<string, { value?: string }>
-    )[sstResourceName];
-    if (resource?.value) return resource.value;
-  } catch {
-    // Resource not available — fall through to default
-  }
 
   return defaultValue;
 }

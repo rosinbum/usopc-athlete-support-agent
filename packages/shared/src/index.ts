@@ -73,55 +73,68 @@ export {
   type Format,
 } from "./validation.js";
 
-export { AppTableSchema } from "./entities/index.js";
-export { createAppTable } from "./entities/index.js";
+// Entity factory functions
 export {
-  SourceConfigEntity,
+  createSourceConfigEntity,
+  createIngestionLogEntity,
+  createDiscoveredSourceEntity,
+  createInviteEntity,
+  createFeedbackEntity,
+  createAccessRequestEntity,
+  createDiscoveryRunEntity,
+} from "./entities/index.js";
+
+// Entity types
+export {
   type SourceConfig,
   type CreateSourceInput,
   type MarkSuccessOptions,
 } from "./entities/index.js";
 export {
-  DiscoveredSourceEntity,
   REPROCESSABLE_STATUSES,
   type DiscoveredSource,
   type CreateDiscoveredSourceInput,
   type DiscoveryMethod,
   type DiscoveryStatus,
 } from "./entities/index.js";
-export { SportOrgEntity } from "./entities/index.js";
-export { AgentModelEntity, type AgentModelConfig } from "./entities/index.js";
-export { IngestionLogEntity, type IngestionLog } from "./entities/index.js";
-export { PromptEntity, type PromptConfig } from "./entities/index.js";
+export { type AgentModelConfig } from "./entities/index.js";
+export { type IngestionLog } from "./entities/index.js";
+export { type PromptConfig } from "./entities/index.js";
+export { type Invite, type CreateInviteInput } from "./entities/index.js";
+export { type Feedback, type CreateFeedbackInput } from "./entities/index.js";
 export {
-  getAppTableName,
-  createSourceConfigEntity,
-  createIngestionLogEntity,
-  createDiscoveredSourceEntity,
-  createInviteEntity,
-  createFeedbackEntity,
-} from "./entities/index.js";
-export {
-  InviteEntity,
-  type Invite,
-  type CreateInviteInput,
-} from "./entities/index.js";
-export {
-  FeedbackEntity,
-  type Feedback,
-  type CreateFeedbackInput,
-} from "./entities/index.js";
-export {
-  createAccessRequestEntity,
-  AccessRequestEntity,
   type AccessRequest,
   type AccessRequestStatus,
   type CreateAccessRequestInput,
 } from "./entities/index.js";
+export { type DiscoveryRun } from "./entities/index.js";
+
+// PG entity classes (for direct construction)
 export {
-  createDiscoveryRunEntity,
-  DiscoveryRunEntity,
-  type DiscoveryRun,
+  SourceConfigEntityPg,
+  DiscoveredSourceEntityPg,
+  IngestionLogEntityPg,
+  InviteEntityPg,
+  FeedbackEntityPg,
+  AccessRequestEntityPg,
+  DiscoveryRunEntityPg,
+  AgentModelEntityPg,
+  PromptEntityPg,
+  SportOrgEntityPg,
+} from "./entities/index.js";
+
+// Backward-compatible type aliases (old class names → PG classes)
+export type {
+  SourceConfigEntityPg as SourceConfigEntity,
+  DiscoveredSourceEntityPg as DiscoveredSourceEntity,
+  IngestionLogEntityPg as IngestionLogEntity,
+  InviteEntityPg as InviteEntity,
+  FeedbackEntityPg as FeedbackEntity,
+  AccessRequestEntityPg as AccessRequestEntity,
+  DiscoveryRunEntityPg as DiscoveryRunEntity,
+  AgentModelEntityPg as AgentModelEntity,
+  PromptEntityPg as PromptEntity,
+  SportOrgEntityPg as SportOrgEntity,
 } from "./entities/index.js";
 export type {
   OlympicProgram,
@@ -137,6 +150,19 @@ export { normalizeUrl, urlToId } from "./url.js";
 export { getResource } from "./resources.js";
 
 export { ParamBuilder } from "./paramBuilder.js";
+
+export {
+  createStorageService,
+  GCSStorageService,
+  type StorageService,
+  type StoreDocumentResult,
+} from "./storage/index.js";
+
+export {
+  createQueueService,
+  PubSubQueueService,
+  type QueueService,
+} from "./queue/index.js";
 
 export {
   sendDiscoveryToSources,

@@ -17,12 +17,6 @@ vi.mock("@usopc/shared", () => ({
   isProduction: () => false,
 }));
 
-vi.mock("sst", () => ({
-  Resource: {
-    DocumentsBucket: { name: "test-bucket" },
-  },
-}));
-
 vi.mock("@usopc/core", () => ({
   createRawEmbeddings: vi.fn(() => ({})),
   createVectorStore: vi.fn(async () => ({ addVectors: vi.fn() })),
@@ -32,11 +26,6 @@ vi.mock("./seed-db.js", () => ({
   initDatabase: vi.fn(async () => {}),
   loadAllSources: vi.fn(async () => []),
   repoRoot: vi.fn(() => "/fake/root"),
-}));
-
-vi.mock("./seed-dynamodb.js", () => ({
-  seedSourceConfigs: vi.fn(async () => {}),
-  seedSportOrgs: vi.fn(async () => {}),
 }));
 
 vi.mock("../services/sourceProcessor.js", () => ({

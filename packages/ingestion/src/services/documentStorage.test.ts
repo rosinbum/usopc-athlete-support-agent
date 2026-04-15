@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Readable } from "node:stream";
-import { sdkStreamMixin } from "@smithy/util-stream";
+import type { StorageService } from "@usopc/shared";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -14,33 +13,27 @@ vi.mock("@usopc/shared", () => ({
     debug: vi.fn(),
     child: vi.fn(),
   }),
+  createStorageService: vi.fn(),
 }));
 
-const mockSend = vi.fn();
-vi.mock("@aws-sdk/client-s3", () => ({
-  S3Client: vi.fn(() => ({ send: mockSend })),
-  PutObjectCommand: vi.fn((input: unknown) => ({ _type: "put", input })),
-  GetObjectCommand: vi.fn((input: unknown) => ({ _type: "get", input })),
-  HeadObjectCommand: vi.fn((input: unknown) => ({ _type: "head", input })),
-}));
-
-// Import after mocks
 import { DocumentStorageService } from "./documentStorage.js";
-import {
-  PutObjectCommand,
-  GetObjectCommand,
-  HeadObjectCommand,
-} from "@aws-sdk/client-s3";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createMockS3Body(content: string): ReturnType<typeof sdkStreamMixin> {
-  const stream = new Readable();
-  stream.push(content);
-  stream.push(null);
-  return sdkStreamMixin(stream);
+function createMockStorage(): StorageService & {
+  storeDocument: ReturnType<typeof vi.fn>;
+  getDocument: ReturnType<typeof vi.fn>;
+  documentExists: ReturnType<typeof vi.fn>;
+  getSignedUrl: ReturnType<typeof vi.fn>;
+} {
+  return {
+    storeDocument: vi.fn().mockResolvedValue({ key: "", versionId: "v1" }),
+    getDocument: vi.fn().mockResolvedValue(Buffer.from("content")),
+    documentExists: vi.fn().mockResolvedValue(true),
+    getSignedUrl: vi.fn().mockResolvedValue("https://signed.url"),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -49,15 +42,17 @@ function createMockS3Body(content: string): ReturnType<typeof sdkStreamMixin> {
 
 describe("DocumentStorageService", () => {
   let service: DocumentStorageService;
+  let mockStorage: ReturnType<typeof createMockStorage>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new DocumentStorageService("test-bucket");
+    mockStorage = createMockStorage();
+    // Pass the mock storage as the second argument
+    service = new DocumentStorageService("test-bucket", mockStorage);
   });
 
   describe("buildKey", () => {
     it("generates correct key format", () => {
-      // Access private method via workaround
       const key = (service as any).buildKey("source-123", "abc123hash", "pdf");
       expect(key).toBe("sources/source-123/abc123hash.pdf");
     });
@@ -73,8 +68,11 @@ describe("DocumentStorageService", () => {
   });
 
   describe("storeDocument", () => {
-    it("uploads document to correct S3 key", async () => {
-      mockSend.mockResolvedValueOnce({ VersionId: "v1" });
+    it("uploads document to correct key", async () => {
+      mockStorage.storeDocument.mockResolvedValueOnce({
+        key: "sources/source-123/abc123hash.pdf",
+        versionId: "v1",
+      });
 
       const content = Buffer.from("document content");
       const result = await service.storeDocument(
@@ -86,30 +84,26 @@ describe("DocumentStorageService", () => {
 
       expect(result.key).toBe("sources/source-123/abc123hash.pdf");
       expect(result.versionId).toBe("v1");
-      expect(PutObjectCommand).toHaveBeenCalledWith({
-        Bucket: "test-bucket",
-        Key: "sources/source-123/abc123hash.pdf",
-        Body: content,
-        ContentType: "application/pdf",
-        Metadata: {},
-      });
+      expect(mockStorage.storeDocument).toHaveBeenCalledWith(
+        "sources/source-123/abc123hash.pdf",
+        content,
+        "application/pdf",
+        undefined,
+      );
     });
 
     it("sets correct content type for PDF", async () => {
-      mockSend.mockResolvedValueOnce({ VersionId: "v1" });
-
       await service.storeDocument("source", Buffer.from("data"), "hash", "pdf");
 
-      expect(PutObjectCommand).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ContentType: "application/pdf",
-        }),
+      expect(mockStorage.storeDocument).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Buffer),
+        "application/pdf",
+        undefined,
       );
     });
 
     it("sets correct content type for HTML", async () => {
-      mockSend.mockResolvedValueOnce({ VersionId: "v1" });
-
       await service.storeDocument(
         "source",
         Buffer.from("data"),
@@ -117,16 +111,15 @@ describe("DocumentStorageService", () => {
         "html",
       );
 
-      expect(PutObjectCommand).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ContentType: "text/html",
-        }),
+      expect(mockStorage.storeDocument).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Buffer),
+        "text/html",
+        undefined,
       );
     });
 
     it("sets correct content type for text", async () => {
-      mockSend.mockResolvedValueOnce({ VersionId: "v1" });
-
       await service.storeDocument(
         "source",
         Buffer.from("data"),
@@ -134,36 +127,36 @@ describe("DocumentStorageService", () => {
         "text",
       );
 
-      expect(PutObjectCommand).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ContentType: "text/plain",
-        }),
+      expect(mockStorage.storeDocument).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Buffer),
+        "text/plain",
+        undefined,
       );
     });
 
     it("includes custom metadata when provided", async () => {
-      mockSend.mockResolvedValueOnce({ VersionId: "v1" });
-
+      const meta = { sourceUrl: "https://example.com/doc.pdf", title: "Doc" };
       await service.storeDocument(
         "source",
         Buffer.from("data"),
         "hash",
         "pdf",
-        { sourceUrl: "https://example.com/doc.pdf", title: "Test Doc" },
+        meta,
       );
 
-      expect(PutObjectCommand).toHaveBeenCalledWith(
-        expect.objectContaining({
-          Metadata: {
-            sourceUrl: "https://example.com/doc.pdf",
-            title: "Test Doc",
-          },
-        }),
+      expect(mockStorage.storeDocument).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Buffer),
+        "application/pdf",
+        meta,
       );
     });
 
     it("returns undefined versionId when not provided", async () => {
-      mockSend.mockResolvedValueOnce({});
+      mockStorage.storeDocument.mockResolvedValueOnce({
+        key: "sources/source/hash.pdf",
+      });
 
       const result = await service.storeDocument(
         "source",
@@ -177,73 +170,39 @@ describe("DocumentStorageService", () => {
   });
 
   describe("getDocument", () => {
-    it("retrieves document content from S3", async () => {
-      const body = createMockS3Body("document content");
-      mockSend.mockResolvedValueOnce({ Body: body });
+    it("retrieves document content", async () => {
+      mockStorage.getDocument.mockResolvedValueOnce(
+        Buffer.from("document content"),
+      );
 
       const content = await service.getDocument(
         "sources/source-123/abc123hash.pdf",
       );
 
       expect(content.toString()).toBe("document content");
-      expect(GetObjectCommand).toHaveBeenCalledWith({
-        Bucket: "test-bucket",
-        Key: "sources/source-123/abc123hash.pdf",
-      });
-    });
-
-    it("throws error when body is missing", async () => {
-      mockSend.mockResolvedValueOnce({});
-
-      await expect(
-        service.getDocument("sources/source/hash.pdf"),
-      ).rejects.toThrow("No body in response");
+      expect(mockStorage.getDocument).toHaveBeenCalledWith(
+        "sources/source-123/abc123hash.pdf",
+      );
     });
   });
 
   describe("documentExists", () => {
     it("returns true when document exists", async () => {
-      mockSend.mockResolvedValueOnce({});
+      mockStorage.documentExists.mockResolvedValueOnce(true);
 
       const exists = await service.documentExists(
         "sources/source-123/abc123hash.pdf",
       );
 
       expect(exists).toBe(true);
-      expect(HeadObjectCommand).toHaveBeenCalledWith({
-        Bucket: "test-bucket",
-        Key: "sources/source-123/abc123hash.pdf",
-      });
     });
 
-    it("returns false when document does not exist (NotFound)", async () => {
-      const error = new Error("Not Found");
-      error.name = "NotFound";
-      mockSend.mockRejectedValueOnce(error);
+    it("returns false when document does not exist", async () => {
+      mockStorage.documentExists.mockResolvedValueOnce(false);
 
       const exists = await service.documentExists("sources/missing/hash.pdf");
 
       expect(exists).toBe(false);
-    });
-
-    it("returns false when document does not exist (NoSuchKey)", async () => {
-      const error = new Error("No Such Key");
-      error.name = "NoSuchKey";
-      mockSend.mockRejectedValueOnce(error);
-
-      const exists = await service.documentExists("sources/missing/hash.pdf");
-
-      expect(exists).toBe(false);
-    });
-
-    it("throws other errors", async () => {
-      const error = new Error("Access Denied");
-      error.name = "AccessDenied";
-      mockSend.mockRejectedValueOnce(error);
-
-      await expect(
-        service.documentExists("sources/protected/hash.pdf"),
-      ).rejects.toThrow("Access Denied");
     });
   });
 
@@ -268,14 +227,14 @@ describe("DocumentStorageService", () => {
 
     it("rejects empty sourceId", () => {
       expect(() => (service as any).buildKey("", "hash", "pdf")).toThrow(
-        "S3 key segment must not be empty",
+        "Storage key segment must not be empty",
       );
     });
 
     it("rejects sourceId with null bytes", () => {
       expect(() =>
         (service as any).buildKey("bad\x00source", "hash", "pdf"),
-      ).toThrow("S3 key segment must not contain null bytes");
+      ).toThrow("Storage key segment must not contain null bytes");
     });
 
     it("passes through valid sourceIds unchanged", () => {

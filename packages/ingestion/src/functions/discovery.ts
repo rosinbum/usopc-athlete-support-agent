@@ -8,9 +8,8 @@ import type {
   DiscoveryCompletionSummary,
   BudgetAlert,
 } from "../services/notificationService.js";
-import type { EventBridgeEvent } from "aws-lambda";
 
-const logger = createLogger({ service: "discovery-lambda" });
+const logger = createLogger({ service: "discovery" });
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,7 +29,7 @@ interface DiscoveryConfigFile {
 
 /**
  * Load discovery configuration from JSON file.
- * In production, this file is packaged with the Lambda.
+ * In production, this file is packaged with the container image.
  */
 async function loadDiscoveryConfig(): Promise<DiscoveryConfigFile> {
   const configPath =
@@ -54,11 +53,11 @@ async function loadDiscoveryConfig(): Promise<DiscoveryConfigFile> {
 }
 
 // ---------------------------------------------------------------------------
-// Lambda Handler
+// Handler
 // ---------------------------------------------------------------------------
 
 /**
- * EventBridge-triggered Lambda for automated source discovery.
+ * Scheduled discovery handler (triggered by Cloud Scheduler or manual invocation).
  *
  * Flow:
  * 1. Load discovery config from JSON file
@@ -68,25 +67,12 @@ async function loadDiscoveryConfig(): Promise<DiscoveryConfigFile> {
  * 5. Check budget status and send alerts if needed
  * 6. Send completion summary notification
  * 7. Handle errors gracefully with proper logging and notifications
- *
- * Environment Variables:
- * - DISCOVERY_CONFIG_PATH: Path to discovery-config.json (optional)
- * - TAVILY_MONTHLY_BUDGET: Tavily credits budget (default: 1000)
- * - ANTHROPIC_MONTHLY_BUDGET: Anthropic cost budget in dollars (default: $10)
- * - SLACK_WEBHOOK_URL: Slack webhook for notifications (optional)
- * - NOTIFICATION_EMAIL: Email for SES notifications (optional)
- * - SES_FROM_EMAIL: From address for SES emails (default: noreply@usopc.org)
  */
-export async function handler(
-  event: EventBridgeEvent<"Scheduled Event", unknown>,
-): Promise<void> {
+export async function handler(): Promise<void> {
   const startTime = Date.now();
   const errors: string[] = [];
 
-  logger.info("Discovery Lambda triggered", {
-    eventId: event.id,
-    time: event.time,
-  });
+  logger.info("Discovery handler triggered");
 
   // Initialize services
   const costTracker = createCostTracker();
@@ -132,7 +118,7 @@ export async function handler(
     // Load discovery configuration
     const config = await loadDiscoveryConfig();
 
-    // Create orchestrator (enqueue-only; evaluation happens in worker Lambda)
+    // Create orchestrator (enqueue-only; evaluation happens in discovery feed worker)
     const orchestrator = createDiscoveryOrchestrator({
       autoApprovalThreshold: config.autoApprovalThreshold,
       dryRun: false,
@@ -231,20 +217,19 @@ export async function handler(
     // Send completion notification
     await notificationService.sendDiscoveryCompletion(summary);
 
-    logger.info("Discovery Lambda complete", {
+    logger.info("Discovery handler complete", {
       summary,
       duration: Date.now() - startTime,
     });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    logger.error("Discovery Lambda failed", {
+    logger.error("Discovery handler failed", {
       error: errorMsg,
       duration: Date.now() - startTime,
     });
 
     // Send error notification
-    await notificationService.sendError("discovery-lambda", error as Error, {
-      eventId: event.id,
+    await notificationService.sendError("discovery", error as Error, {
       duration: Date.now() - startTime,
     });
 
