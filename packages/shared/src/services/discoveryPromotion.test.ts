@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, type Mock } from "vitest";
-import type { DiscoveredSource } from "../entities/DiscoveredSourceEntity.js";
+import type { DiscoveredSource } from "../entities/types.js";
 import { sendDiscoveryToSources } from "./discoveryPromotion.js";
 
 // ---------------------------------------------------------------------------

@@ -1,19 +1,17 @@
-import type { SQSBatchResponse, SQSEvent } from "aws-lambda";
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import {
   createLogger,
   getSecretValue,
   getResource,
-  DiscoveredSourceEntity,
+  createQueueService,
   REPROCESSABLE_STATUSES,
-  createAppTable,
   normalizeUrl,
   urlToId,
   sendDiscoveryToSources,
+  createDiscoveredSourceEntity,
+  type DiscoveredSourceEntity,
   type DiscoveredSource,
 } from "@usopc/shared";
 import type { DiscoveryFeedMessage } from "@usopc/core";
-import { Resource } from "sst";
 import { EvaluationService } from "./services/evaluationService.js";
 import { loadWeb } from "./loaders/webLoader.js";
 import { createSourceConfigEntity } from "./entities/index.js";
@@ -25,79 +23,59 @@ const DEFAULT_AUTO_APPROVAL_THRESHOLD = 0.7;
 const MAX_EXTRACTION_ERRORS = 3;
 
 /**
- * SQS-triggered Lambda handler that processes discovered URLs through the
- * full evaluation pipeline: metadata eval → content extraction → content eval.
+ * Process a discovery feed message containing URLs to evaluate.
  *
- * Each SQS message contains an array of URLs. Individual URL failures don't
- * block others. Only catastrophic errors (invalid JSON) report batch item failures.
+ * Each message contains an array of URLs. Individual URL failures don't
+ * block others — errors are recorded on the discovered source entry.
  */
-export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
-  const batchItemFailures: { itemIdentifier: string }[] = [];
-
-  const anthropicApiKey = getSecretValue(
-    "ANTHROPIC_API_KEY",
-    "AnthropicApiKey",
-  );
+export async function handleDiscoveryFeedMessage(
+  message: DiscoveryFeedMessage,
+): Promise<void> {
+  const anthropicApiKey = getSecretValue("ANTHROPIC_API_KEY");
   const evaluationService = new EvaluationService({ anthropicApiKey });
-  const table = createAppTable(Resource.AppTable.name);
-  const entity = new DiscoveredSourceEntity(table);
+  const entity = createDiscoveredSourceEntity();
 
-  for (const record of event.Records) {
-    let message: DiscoveryFeedMessage;
+  const autoApprovalThreshold =
+    message.autoApprovalThreshold ?? DEFAULT_AUTO_APPROVAL_THRESHOLD;
+
+  logger.info("Processing discovery feed message", {
+    urlCount: message.urls.length,
+    autoApprovalThreshold,
+  });
+
+  for (const urlEntry of message.urls) {
     try {
-      message = JSON.parse(record.body);
-    } catch {
-      logger.warn(
-        `Skipping malformed message ${record.messageId}: invalid JSON`,
+      await processUrl(
+        urlEntry,
+        entity,
+        evaluationService,
+        autoApprovalThreshold,
       );
-      batchItemFailures.push({ itemIdentifier: record.messageId });
-      continue;
-    }
-
-    const autoApprovalThreshold =
-      message.autoApprovalThreshold ?? DEFAULT_AUTO_APPROVAL_THRESHOLD;
-
-    logger.info("Processing discovery feed message", {
-      urlCount: message.urls.length,
-      autoApprovalThreshold,
-    });
-
-    for (const urlEntry of message.urls) {
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error(`Error processing URL: ${urlEntry.url}`, {
+        url: urlEntry.url,
+        error: errorMsg,
+      });
+      // Record error so it's visible in admin UI
       try {
-        await processUrl(
-          urlEntry,
-          entity,
-          evaluationService,
-          autoApprovalThreshold,
-        );
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        logger.error(`Error processing URL: ${urlEntry.url}`, {
-          url: urlEntry.url,
-          error: errorMsg,
-        });
-        // Record error on DDB item so it's visible in admin UI
-        try {
-          const id = urlToId(normalizeUrl(urlEntry.url));
-          const updated = await entity.recordError(id, errorMsg);
-          if (updated.errorCount >= MAX_EXTRACTION_ERRORS) {
-            logger.warn(
-              `Rejecting URL after ${updated.errorCount} extraction errors: ${urlEntry.url}`,
-              { url: urlEntry.url, errorCount: updated.errorCount },
-            );
-            await entity.update(id, {
-              status: "rejected",
-              rejectionReason: `Permanently failed after ${updated.errorCount} extraction errors: ${errorMsg}`,
-            });
-          }
-        } catch {
-          // Don't let error recording crash the loop
+        const id = urlToId(normalizeUrl(urlEntry.url));
+        const updated = await entity.recordError(id, errorMsg);
+        if (updated.errorCount >= MAX_EXTRACTION_ERRORS) {
+          logger.warn(
+            `Rejecting URL after ${updated.errorCount} extraction errors: ${urlEntry.url}`,
+            { url: urlEntry.url, errorCount: updated.errorCount },
+          );
+          await entity.update(id, {
+            status: "rejected",
+            rejectionReason: `Permanently failed after ${updated.errorCount} extraction errors: ${errorMsg}`,
+          });
         }
+      } catch {
+        // Don't let error recording crash the loop
       }
     }
   }
-
-  return { batchItemFailures };
 }
 
 async function processUrl(
@@ -272,7 +250,7 @@ async function promoteAndEnqueue(
   discoveredSourceEntity: DiscoveredSourceEntity,
   input: PromoteInput,
 ): Promise<void> {
-  // Build a DiscoveredSource from data already in scope (avoids DynamoDB read)
+  // Build a DiscoveredSource from data already in scope (avoids extra database read)
   const discovery: DiscoveredSource = {
     id: input.id,
     url: input.url,
@@ -313,16 +291,14 @@ async function promoteAndEnqueue(
   if (result.status === "created" && result.sourceConfig) {
     try {
       const queueUrl = getResource("IngestionQueue").url;
-      const sqs = new SQSClient({});
-      await sqs.send(
-        new SendMessageCommand({
-          QueueUrl: queueUrl,
-          MessageBody: JSON.stringify({
-            source: toIngestionSource(result.sourceConfig),
-            triggeredAt: new Date().toISOString(),
-          }),
-          MessageGroupId: "ingestion",
+      const queue = createQueueService();
+      await queue.sendMessage(
+        queueUrl,
+        JSON.stringify({
+          source: toIngestionSource(result.sourceConfig),
+          triggeredAt: new Date().toISOString(),
         }),
+        { groupId: "ingestion" },
       );
       logger.info(
         `Enqueued auto-approved discovery for ingestion: ${input.id}`,

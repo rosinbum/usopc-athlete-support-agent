@@ -1,4 +1,4 @@
-import { getSession as authGetSession } from "@auth/express";
+import { Auth } from "@auth/core";
 import { authConfig } from "./auth.js";
 
 export interface AppSession {
@@ -11,23 +11,36 @@ export interface AppSession {
 }
 
 /**
+ * Auth is disabled by default for local dev. Set REQUIRE_AUTH=true in
+ * production (e.g. Cloud Run env vars) to enforce authentication.
+ * Admin routes always require auth regardless of this setting.
+ */
+const AUTH_DISABLED = process.env.REQUIRE_AUTH !== "true";
+
+const ANONYMOUS_SESSION: AppSession = {
+  user: { email: "anonymous@local", name: "Anonymous", role: "athlete" },
+};
+
+/**
  * Get the current session from a Web Request object (used in React Router loaders/actions).
- * Converts the Web Request to the format expected by Auth.js.
+ * Calls @auth/core directly to read the JWT from cookies.
  */
 export async function getSession(request: Request): Promise<AppSession | null> {
-  // @auth/express getSession expects an Express-like request.
-  // We create a minimal adapter from the Web Request.
-  const url = new URL(request.url);
-  const expressLikeReq = {
-    headers: Object.fromEntries(request.headers.entries()),
-    method: request.method,
-    url: url.pathname + url.search,
-    query: Object.fromEntries(url.searchParams.entries()),
-    body: undefined,
-  };
+  if (AUTH_DISABLED) return ANONYMOUS_SESSION;
 
-  const session = await authGetSession(expressLikeReq as never, authConfig);
-  return session as AppSession | null;
+  const url = new URL(request.url);
+  const sessionUrl = `${url.protocol}//${url.host}/api/auth/session`;
+
+  const webRequest = new Request(sessionUrl, {
+    headers: { cookie: request.headers.get("cookie") ?? "" },
+  });
+
+  const response = await Auth(webRequest, authConfig);
+  if (response.status !== 200) return null;
+
+  const data = await response.json();
+  if (!data || !Object.keys(data).length) return null;
+  return data as AppSession;
 }
 
 /**
@@ -54,9 +67,12 @@ export function requireAdmin(
 } {
   requireAuth(session);
   if (session.user.role !== "admin") {
+    // Redirect to home, not login — the user IS authenticated, just not admin.
+    // Redirecting to /auth/login would cause a loop since the login page
+    // redirects authenticated users back to /admin.
     throw new Response(null, {
       status: 302,
-      headers: { Location: "/auth/login" },
+      headers: { Location: "/" },
     });
   }
 }

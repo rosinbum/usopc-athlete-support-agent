@@ -138,7 +138,7 @@ describe("processSource", () => {
     expect(result.status).toBe("completed");
     expect(result.chunksCount).toBe(10);
     expect(result.contentHash).toBeDefined();
-    expect(result.s3Key).toBe("sources/src-1/abc123.pdf");
+    expect(result.storageKey).toBe("sources/src-1/abc123.pdf");
 
     // Passes content buffer to ingestSource to avoid double-fetch
     expect(mockIngestSource).toHaveBeenCalledWith(
@@ -166,7 +166,7 @@ describe("processSource", () => {
     expect(calls[1]![3]).toBe("completed");
   });
 
-  it("updates DynamoDB on successful ingestion", async () => {
+  it("updates source config on successful ingestion", async () => {
     mockFetchResponse("content");
     mockIngestSource.mockResolvedValueOnce({
       sourceId: "src-1",
@@ -179,7 +179,7 @@ describe("processSource", () => {
     expect(mockSourceConfigEntity.markSuccess).toHaveBeenCalledWith(
       "src-1",
       expect.any(String),
-      expect.objectContaining({ s3Key: "sources/src-1/abc123.pdf" }),
+      expect.objectContaining({ storageKey: "sources/src-1/abc123.pdf" }),
     );
   });
 
@@ -197,7 +197,7 @@ describe("processSource", () => {
     );
   });
 
-  it("continues ingestion when S3 upload fails (non-fatal)", async () => {
+  it("continues ingestion when storage upload fails (non-fatal)", async () => {
     mockFetchResponse("content");
     mockDocumentExists.mockRejectedValueOnce(new Error("S3 down"));
     mockIngestSource.mockResolvedValueOnce({
@@ -209,11 +209,11 @@ describe("processSource", () => {
     const result = await processSource(makeOpts());
 
     expect(result.status).toBe("completed");
-    expect(result.s3Key).toBeUndefined();
+    expect(result.storageKey).toBeUndefined();
     expect(mockIngestSource).toHaveBeenCalled();
   });
 
-  it("skips S3 upload when document already exists", async () => {
+  it("skips storage upload when document already exists", async () => {
     mockFetchResponse("content");
     mockDocumentExists.mockResolvedValueOnce(true);
     mockIngestSource.mockResolvedValueOnce({
@@ -225,7 +225,7 @@ describe("processSource", () => {
     const result = await processSource(makeOpts());
 
     expect(result.status).toBe("completed");
-    expect(result.s3Key).toBe("sources/src-1/abc123.pdf");
+    expect(result.storageKey).toBe("sources/src-1/abc123.pdf");
     expect(mockStoreDocument).not.toHaveBeenCalled();
   });
 
@@ -240,7 +240,7 @@ describe("processSource", () => {
     );
   });
 
-  it("updates DynamoDB on failed ingestion", async () => {
+  it("updates source config on failed ingestion", async () => {
     mockFetchResponse("content");
     mockIngestSource.mockResolvedValueOnce({
       sourceId: "src-1",

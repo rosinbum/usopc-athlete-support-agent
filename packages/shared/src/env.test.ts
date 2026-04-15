@@ -1,18 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-
-// Use vi.hoisted to avoid hoisting issues with vi.mock
-const { mockResource } = vi.hoisted(() => ({
-  mockResource: {} as Record<string, unknown>,
-}));
-
-vi.mock("sst", () => ({
-  Resource: new Proxy(mockResource, {
-    get(target, prop: string | symbol) {
-      if (typeof prop === "string" && prop in target) return target[prop];
-      throw new Error(`Resource ${String(prop)} not found`);
-    },
-  }),
-}));
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import {
   getRequiredEnv,
@@ -98,8 +84,6 @@ describe("getDatabaseUrl", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    // Clear mock resource
-    Object.keys(mockResource).forEach((key) => delete mockResource[key]);
   });
 
   afterEach(() => {
@@ -111,28 +95,14 @@ describe("getDatabaseUrl", () => {
     expect(getDatabaseUrl()).toBe("postgresql://localhost:5432/test");
   });
 
-  it("returns SST Secret value when DATABASE_URL is not set", () => {
-    delete process.env.DATABASE_URL;
-    mockResource.DatabaseUrl = {
-      value:
-        "postgresql://user:pass@ep-cool-morning-123456.us-east-1.aws.neon.tech/mydb?sslmode=require",
-    };
-
-    expect(getDatabaseUrl()).toBe(
-      "postgresql://user:pass@ep-cool-morning-123456.us-east-1.aws.neon.tech/mydb?sslmode=require",
-    );
-  });
-
-  it("throws when neither DATABASE_URL nor SST Secret is available in production", () => {
+  it("throws when DATABASE_URL is not set in production", () => {
     delete process.env.DATABASE_URL;
     process.env.NODE_ENV = "production";
 
-    expect(() => getDatabaseUrl()).toThrow(
-      "DATABASE_URL is not set and SST DatabaseUrl secret is not available",
-    );
+    expect(() => getDatabaseUrl()).toThrow("DATABASE_URL is not set");
   });
 
-  it("returns local dev default when in development mode and no other source", () => {
+  it("returns local dev default when in development mode and no DATABASE_URL", () => {
     delete process.env.DATABASE_URL;
     process.env.NODE_ENV = "development";
 
@@ -141,22 +111,11 @@ describe("getDatabaseUrl", () => {
     );
   });
 
-  it("throws when NODE_ENV is unset and no other source (prevents silent localhost fallback in CI)", () => {
+  it("throws when NODE_ENV is unset and no DATABASE_URL (prevents silent localhost fallback in CI)", () => {
     delete process.env.DATABASE_URL;
     delete process.env.NODE_ENV;
 
-    expect(() => getDatabaseUrl()).toThrow(
-      "DATABASE_URL is not set and SST DatabaseUrl secret is not available",
-    );
-  });
-
-  it("returns local dev default when NODE_ENV is explicitly development", () => {
-    delete process.env.DATABASE_URL;
-    process.env.NODE_ENV = "development";
-
-    expect(getDatabaseUrl()).toBe(
-      "postgresql://postgres:postgres@localhost:5432/usopc_athlete_support",
-    );
+    expect(() => getDatabaseUrl()).toThrow("DATABASE_URL is not set");
   });
 
   it("prefers DATABASE_URL over local dev default", () => {
@@ -165,13 +124,6 @@ describe("getDatabaseUrl", () => {
 
     expect(getDatabaseUrl()).toBe("postgresql://custom:5433/other");
   });
-
-  it("prefers DATABASE_URL over SST Secret", () => {
-    process.env.DATABASE_URL = "postgresql://env-url/db";
-    mockResource.DatabaseUrl = { value: "postgresql://sst-secret-url/db" };
-
-    expect(getDatabaseUrl()).toBe("postgresql://env-url/db");
-  });
 });
 
 describe("getSecretValue", () => {
@@ -179,7 +131,6 @@ describe("getSecretValue", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    Object.keys(mockResource).forEach((key) => delete mockResource[key]);
   });
 
   afterEach(() => {
@@ -188,43 +139,15 @@ describe("getSecretValue", () => {
 
   it("returns env var value when set", () => {
     process.env.API_KEY = "env-secret";
-    expect(getSecretValue("API_KEY", "ApiKey")).toBe("env-secret");
+    expect(getSecretValue("API_KEY")).toBe("env-secret");
   });
 
-  it("returns SST Resource value when env var is not set", () => {
-    delete process.env.API_KEY;
-    mockResource.ApiKey = { value: "sst-secret" };
-
-    expect(getSecretValue("API_KEY", "ApiKey")).toBe("sst-secret");
-  });
-
-  it("prefers env var over SST Resource", () => {
-    process.env.API_KEY = "env-secret";
-    mockResource.ApiKey = { value: "sst-secret" };
-
-    expect(getSecretValue("API_KEY", "ApiKey")).toBe("env-secret");
-  });
-
-  it("throws when neither source has the secret", () => {
+  it("throws when env var is not set", () => {
     delete process.env.MISSING_SECRET;
-    // mockResource.MissingSecret not set
 
-    expect(() => getSecretValue("MISSING_SECRET", "MissingSecret")).toThrow(
-      "Missing required secret. Checked: MISSING_SECRET, Resource.MissingSecret",
+    expect(() => getSecretValue("MISSING_SECRET")).toThrow(
+      "Missing required secret: MISSING_SECRET",
     );
-  });
-
-  it("throws with only env key in message when no SST resource name provided", () => {
-    delete process.env.ONLY_ENV;
-
-    expect(() => getSecretValue("ONLY_ENV")).toThrow(
-      "Missing required secret. Checked: ONLY_ENV",
-    );
-  });
-
-  it("works without SST resource name parameter", () => {
-    process.env.ENV_ONLY_SECRET = "value";
-    expect(getSecretValue("ENV_ONLY_SECRET")).toBe("value");
   });
 });
 

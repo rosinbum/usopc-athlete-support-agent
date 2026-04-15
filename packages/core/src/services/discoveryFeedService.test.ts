@@ -1,12 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockSqsSend } = vi.hoisted(() => ({
-  mockSqsSend: vi.fn().mockResolvedValue({}),
-}));
-
-vi.mock("@aws-sdk/client-sqs", () => ({
-  SQSClient: vi.fn(() => ({ send: mockSqsSend })),
-  SendMessageCommand: vi.fn(),
+const { mockSendMessage } = vi.hoisted(() => ({
+  mockSendMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@usopc/shared", async (importOriginal) => {
@@ -21,14 +16,17 @@ vi.mock("@usopc/shared", async (importOriginal) => {
         debug: vi.fn(),
       }),
     },
+    createQueueService: () => ({
+      sendMessage: mockSendMessage,
+      sendMessageBatch: vi.fn(),
+      purge: vi.fn(),
+      getStats: vi.fn(),
+    }),
   };
 });
 
-import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import { publishDiscoveredUrls } from "./discoveryFeedService.js";
 import type { WebSearchResult } from "../types/index.js";
-
-const MockSendMessageCommand = vi.mocked(SendMessageCommand);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -58,26 +56,25 @@ describe("publishDiscoveredUrls", () => {
     vi.clearAllMocks();
   });
 
-  it("returns early for empty input without sending SQS message", async () => {
+  it("returns early for empty input without sending queue message", async () => {
     await publishDiscoveredUrls(
       [],
       "https://sqs.us-east-1.amazonaws.com/queue",
     );
 
-    expect(mockSqsSend).not.toHaveBeenCalled();
+    expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
-  it("sends SQS message with correct queue URL", async () => {
+  it("sends queue message with correct queue URL", async () => {
     const results = makeResults("https://usopc.org/doc1");
     const queueUrl = "https://sqs.us-east-1.amazonaws.com/test-queue";
 
     await publishDiscoveredUrls(results, queueUrl);
 
-    expect(mockSqsSend).toHaveBeenCalledTimes(1);
-    expect(MockSendMessageCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        QueueUrl: queueUrl,
-      }),
+    expect(mockSendMessage).toHaveBeenCalledTimes(1);
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      queueUrl,
+      expect.any(String),
     );
   });
 
@@ -92,8 +89,8 @@ describe("publishDiscoveredUrls", () => {
       "https://sqs.us-east-1.amazonaws.com/queue",
     );
 
-    const commandArg = MockSendMessageCommand.mock.calls[0]![0]!;
-    const body = JSON.parse(commandArg.MessageBody!);
+    const messageBody = mockSendMessage.mock.calls[0]![1] as string;
+    const body = JSON.parse(messageBody);
 
     expect(body.urls).toHaveLength(2);
     expect(body.urls[0]).toEqual({
@@ -111,8 +108,8 @@ describe("publishDiscoveredUrls", () => {
     expect(body.timestamp).toBeDefined();
   });
 
-  it("does not throw on SQS errors", async () => {
-    mockSqsSend.mockRejectedValueOnce(new Error("SQS error"));
+  it("does not throw on queue errors", async () => {
+    mockSendMessage.mockRejectedValueOnce(new Error("SQS error"));
     const results = makeResults("https://usopc.org/doc1");
 
     await expect(

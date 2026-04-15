@@ -18,7 +18,7 @@
 
 import { resolveEnv } from "../helpers/resolveEnv.js";
 
-// Bridge SST Resource bindings → env vars before any SDK is loaded
+// Bridge secret env vars → env vars before any SDK is loaded
 resolveEnv();
 
 import fs from "node:fs";
@@ -124,7 +124,7 @@ function getVoyageApiKey(): string {
   const apiKey = process.env.VOYAGEAI_API_KEY;
   if (!apiKey) {
     console.error(
-      "✗ VOYAGEAI_API_KEY is not set. Run: sst secret set VoyageaiApiKey <key>",
+      "✗ VOYAGEAI_API_KEY is not set. Set VOYAGEAI_API_KEY in .env.local.",
     );
     process.exit(1);
   }
@@ -186,7 +186,7 @@ function getGeminiApiKey(): string {
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
     console.error(
-      "✗ GOOGLE_API_KEY is not set. Run: sst secret set GoogleApiKey <key>",
+      "✗ GOOGLE_API_KEY is not set. Set GOOGLE_API_KEY in .env.local.",
     );
     process.exit(1);
   }

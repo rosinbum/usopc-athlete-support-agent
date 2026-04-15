@@ -130,7 +130,7 @@ function formatOrgResult(org: SportOrganization): string {
 
 /**
  * Creates the lookup_sport_org tool. Accepts a SportOrgEntity instance
- * to load organizations from DynamoDB.
+ * to load organizations from the database.
  */
 export function createLookupSportOrgTool(sportOrgEntity: SportOrgEntity) {
   return tool(

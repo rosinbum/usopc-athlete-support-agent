@@ -1,0 +1,241 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PROJECT_STAGING: usopc-athlete-support-staging
+  PROJECT_PRODUCTION: usopc-athlete-support-prod
+  REGION: us-central1
+  PULUMI_DIR: infra/gcp
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Determine environment
+  # -----------------------------------------------------------------------
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      project: ${{ steps.env.outputs.project }}
+      stack: ${{ steps.env.outputs.stack }}
+    steps:
+      - id: env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ inputs.environment }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            ENV="production"
+          else
+            ENV="staging"
+          fi
+          echo "environment=$ENV" >> "$GITHUB_OUTPUT"
+          if [[ "$ENV" == "production" ]]; then
+            echo "project=${{ env.PROJECT_PRODUCTION }}" >> "$GITHUB_OUTPUT"
+            echo "stack=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "project=${{ env.PROJECT_STAGING }}" >> "$GITHUB_OUTPUT"
+            echo "stack=staging" >> "$GITHUB_OUTPUT"
+          fi
+
+  # -----------------------------------------------------------------------
+  # Build and push Docker images
+  # -----------------------------------------------------------------------
+  build-images:
+    needs: setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      matrix:
+        service:
+          - name: web
+            context: .
+            dockerfile: apps/web/Dockerfile
+          - name: slack
+            context: .
+            dockerfile: apps/slack/Dockerfile
+          - name: worker
+            context: .
+            dockerfile: packages/ingestion/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ needs.setup.outputs.project }}/usopc-${{ needs.setup.outputs.environment }}-images/${{ matrix.service.name }}"
+          SHA_TAG="${IMAGE}:${{ github.sha }}"
+          LATEST_TAG="${IMAGE}:latest"
+
+          docker build \
+            -f ${{ matrix.service.dockerfile }} \
+            -t "$SHA_TAG" \
+            -t "$LATEST_TAG" \
+            ${{ matrix.service.context }}
+
+          docker push "$SHA_TAG"
+          docker push "$LATEST_TAG"
+
+  # -----------------------------------------------------------------------
+  # Run database migrations (after deploy so Cloud SQL instance exists)
+  # -----------------------------------------------------------------------
+  migrate:
+    needs: [setup, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install Cloud SQL Auth Proxy
+        run: |
+          curl -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.3/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run migrations
+        run: |
+          # Start Cloud SQL Proxy in background
+          CONNECTION_NAME="${{ secrets.DB_CONNECTION_NAME }}"
+          ./cloud-sql-proxy "$CONNECTION_NAME" --port 5432 &
+          sleep 3
+
+          # Run migrations
+          DATABASE_URL="${{ secrets.DATABASE_URL }}" pnpm db:migrate
+
+          # Stop proxy
+          kill %1
+
+  # -----------------------------------------------------------------------
+  # Deploy via Pulumi
+  # -----------------------------------------------------------------------
+  deploy:
+    needs: [setup, build-images]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Pulumi dependencies
+        run: npm install
+        working-directory: ${{ env.PULUMI_DIR }}
+
+      - name: Pulumi Preview
+        uses: pulumi/actions@v6
+        with:
+          command: preview
+          stack-name: ${{ needs.setup.outputs.stack }}
+          work-dir: ${{ env.PULUMI_DIR }}
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+
+      - name: Pulumi Up
+        uses: pulumi/actions@v6
+        with:
+          command: up
+          stack-name: ${{ needs.setup.outputs.stack }}
+          work-dir: ${{ env.PULUMI_DIR }}
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+
+  # -----------------------------------------------------------------------
+  # Smoke test
+  # -----------------------------------------------------------------------
+  smoke-test:
+    needs: [setup, migrate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get service URLs
+        id: urls
+        run: |
+          WEB_URL=$(gcloud run services describe "usopc-${{ needs.setup.outputs.environment }}-web" \
+            --region ${{ env.REGION }} \
+            --project ${{ needs.setup.outputs.project }} \
+            --format "value(status.url)")
+          WORKER_URL=$(gcloud run services describe "usopc-${{ needs.setup.outputs.environment }}-worker" \
+            --region ${{ env.REGION }} \
+            --project ${{ needs.setup.outputs.project }} \
+            --format "value(status.url)")
+          echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
+          echo "worker_url=$WORKER_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Health checks
+        run: |
+          echo "Checking web service..."
+          curl -sf "${{ steps.urls.outputs.web_url }}/api/health" || exit 1
+
+          echo "Checking worker service..."
+          curl -sf "${{ steps.urls.outputs.worker_url }}/health" || exit 1
+
+          echo "All health checks passed!"

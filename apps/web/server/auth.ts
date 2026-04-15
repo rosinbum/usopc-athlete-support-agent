@@ -1,10 +1,11 @@
-import { ExpressAuth, type ExpressAuthConfig } from "@auth/express";
+import { Auth } from "@auth/core";
+import type { AuthConfig } from "@auth/core";
 import GitHub from "@auth/express/providers/github";
 import Resend from "@auth/express/providers/resend";
-import { DynamoDBAdapter } from "@auth/dynamodb-adapter";
-import { DynamoDB } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocument } from "@aws-sdk/lib-dynamodb";
-import { createInviteEntity, getResource } from "@usopc/shared";
+import type { Provider } from "@auth/core/providers";
+import PostgresAdapter from "@auth/pg-adapter";
+import type { Request, Response, NextFunction } from "express";
+import { createInviteEntity, getPool } from "@usopc/shared";
 import {
   getAuthSecret,
   getGitHubClientId,
@@ -13,18 +14,9 @@ import {
   getResendApiKey,
 } from "../lib/auth-env.js";
 
-const dynamoClient = DynamoDBDocument.from(new DynamoDB(), {
-  marshallOptions: {
-    convertEmptyValues: true,
-    removeUndefinedValues: true,
-    convertClassInstanceToMap: true,
-  },
-});
-
-export const authConfig: ExpressAuthConfig = {
-  adapter: DynamoDBAdapter(dynamoClient, {
-    tableName: getResource("AuthTable").name,
-  }),
+export const authConfig: AuthConfig = {
+  basePath: "/api/auth",
+  adapter: PostgresAdapter(getPool()),
   providers: [
     GitHub({
       clientId: getGitHubClientId(),
@@ -34,7 +26,7 @@ export const authConfig: ExpressAuthConfig = {
       apiKey: getResendApiKey(),
       from: process.env.EMAIL_FROM ?? "Athlete Support <noreply@localhost>",
     }),
-  ],
+  ] as Provider[],
   session: { strategy: "jwt", maxAge: 24 * 60 * 60 },
   pages: { signIn: "/auth/login" },
   secret: getAuthSecret(),
@@ -97,7 +89,77 @@ export const authConfig: ExpressAuthConfig = {
 };
 
 /**
- * Express middleware for Auth.js routes.
- * Mount at "/api/auth" to handle /api/auth/signin, /api/auth/callback, etc.
+ * Convert Express request body to the format Auth expects.
  */
-export const authHandler = ExpressAuth(authConfig);
+function encodeBody(req: Request): string | undefined {
+  if (!req.body || req.method === "GET" || req.method === "HEAD") return undefined;
+  const contentType = req.headers["content-type"] ?? "";
+  if (contentType.includes("application/x-www-form-urlencoded")) {
+    return new URLSearchParams(req.body).toString();
+  }
+  if (contentType.includes("application/json")) {
+    return JSON.stringify(req.body);
+  }
+  return undefined;
+}
+
+/**
+ * Express middleware that calls @auth/core directly.
+ * We avoid @auth/express's ExpressAuth because its toExpressResponse
+ * has issues with Set-Cookie headers on Express 5.
+ */
+export async function authHandler(req: Request, res: Response, _next: NextFunction) {
+  try {
+    const protocol = req.protocol || "http";
+    const host = req.get("host") || "localhost:3000";
+    const url = `${protocol}://${host}${req.originalUrl}`;
+
+    // Build Web Request from Express request
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (typeof value === "string") {
+        headers.append(key, value);
+      } else if (Array.isArray(value)) {
+        for (const v of value) {
+          if (v) headers.append(key, v);
+        }
+      }
+    }
+
+    const reqBody = encodeBody(req);
+    const webRequest = new Request(url, {
+      method: req.method,
+      headers,
+      ...(reqBody !== undefined && { body: reqBody }),
+    });
+
+    // Call Auth.js core
+    const webResponse = await Auth(webRequest, authConfig);
+
+    // Convert Web Response to Express response
+    // Handle Set-Cookie specially via getSetCookie()
+    res.status(webResponse.status);
+
+    for (const [key, value] of webResponse.headers.entries()) {
+      if (key.toLowerCase() === "set-cookie") continue; // handle below
+      res.setHeader(key, value);
+    }
+
+    // Set cookies individually using getSetCookie()
+    const cookies = webResponse.headers.getSetCookie();
+    for (const cookie of cookies) {
+      res.appendHeader("set-cookie", cookie);
+    }
+
+    // Send body
+    const body = await webResponse.text();
+    if (body) {
+      res.send(body);
+    } else {
+      res.end();
+    }
+  } catch (error) {
+    console.error("[auth] Handler error:", error);
+    res.status(500).json({ error: "Internal auth error" });
+  }
+}

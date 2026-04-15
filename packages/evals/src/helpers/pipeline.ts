@@ -14,7 +14,7 @@ async function getRunner(): Promise<AgentRunner> {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
       throw new Error(
-        "DATABASE_URL is required. Run within `sst shell` to set environment variables.",
+        "DATABASE_URL is required. Set DATABASE_URL in .env.local.",
       );
     }
     sharedRunner = await AgentRunner.create({
@@ -35,7 +35,7 @@ async function getRunner(): Promise<AgentRunner> {
  * - ANTHROPIC_API_KEY (for classifier/synthesizer)
  * - TAVILY_API_KEY (optional, for web search fallback)
  *
- * Callers should run this within `sst shell` to get these env vars.
+ * Callers should set these env vars in .env.local.
  */
 export async function runPipeline(userMessage: string): Promise<{
   state: AgentState;

@@ -11,7 +11,7 @@ export interface SourceDocument {
   effectiveDate: string | null;
   ingestedAt: string;
   chunkCount: number;
-  s3Key?: string | null;
+  storageKey?: string | null;
 }
 
 interface SourceCardProps {
@@ -47,12 +47,12 @@ export function SourceCard({ source }: SourceCardProps) {
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {source.s3Key && (
+          {source.storageKey && (
             <button
               onClick={async () => {
                 try {
                   const res = await fetch(
-                    `/api/documents/${encodeURIComponent(source.s3Key!)}/url`,
+                    `/api/documents/${encodeURIComponent(source.storageKey!)}/url`,
                   );
                   if (!res.ok) throw new Error("Failed to get document URL");
                   const { url } = await res.json();

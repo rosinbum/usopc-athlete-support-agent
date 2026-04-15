@@ -7,5 +7,5 @@ if (process.env.NODE_ENV === "test") {
   delete process.env.NODE_ENV;
 }
 
-// Bridge SST Resource bindings to process.env before any eval runs.
+// Bridge secret env vars to process.env before any eval runs.
 resolveEnv();

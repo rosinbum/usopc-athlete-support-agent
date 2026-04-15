@@ -28,7 +28,7 @@ export interface Citation {
   effectiveDate?: string | undefined;
   snippet: string;
   authorityLevel?: AuthorityLevel | undefined;
-  s3Key?: string | undefined;
+  storageKey?: string | undefined;
 }
 
 export interface EscalationInfo {
@@ -65,7 +65,7 @@ export interface DocumentMetadata {
   effectiveDate?: string | undefined;
   ingestedAt?: string | undefined;
   authorityLevel?: AuthorityLevel | undefined;
-  s3Key?: string | undefined;
+  storageKey?: string | undefined;
   alternativeSources?: AlternativeSource[] | undefined;
 }
 

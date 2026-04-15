@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { handler } from "./discovery.js";
-import type { EventBridgeEvent } from "aws-lambda";
 
 // Mock dependencies
 vi.mock("node:fs/promises", () => ({
@@ -19,7 +18,7 @@ vi.mock("../services/notificationService.js", () => ({
   createNotificationService: vi.fn(),
 }));
 
-describe("Discovery Lambda", () => {
+describe("Discovery handler", () => {
   let mockOrchestrator: {
     discoverFromDomains: ReturnType<typeof vi.fn>;
     discoverFromSearchQueries: ReturnType<typeof vi.fn>;
@@ -37,18 +36,6 @@ describe("Discovery Lambda", () => {
     sendBudgetAlert: ReturnType<typeof vi.fn>;
     sendDiscoveryCompletion: ReturnType<typeof vi.fn>;
     sendError: ReturnType<typeof vi.fn>;
-  };
-
-  const mockEvent: EventBridgeEvent<"Scheduled Event", unknown> = {
-    id: "test-event-id",
-    version: "0",
-    account: "123456789012",
-    time: "2026-02-15T02:00:00Z",
-    region: "us-east-1",
-    resources: [],
-    source: "aws.events",
-    "detail-type": "Scheduled Event",
-    detail: {},
   };
 
   const mockConfig = {
@@ -159,7 +146,7 @@ describe("Discovery Lambda", () => {
 
   describe("successful execution", () => {
     it("should run discovery and send completion notification", async () => {
-      await handler(mockEvent);
+      await handler();
 
       // Should check budgets first
       expect(mockCostTracker.checkAllBudgets).toHaveBeenCalled();
@@ -192,7 +179,7 @@ describe("Discovery Lambda", () => {
     });
 
     it("should track Tavily costs correctly", async () => {
-      await handler(mockEvent);
+      await handler();
 
       // 2 map calls (2 domains)
       const mapCalls = vi
@@ -229,7 +216,7 @@ describe("Discovery Lambda", () => {
         },
       ]);
 
-      await handler(mockEvent);
+      await handler();
 
       expect(mockNotificationService.sendBudgetAlert).toHaveBeenCalledWith({
         service: "tavily",
@@ -260,7 +247,7 @@ describe("Discovery Lambda", () => {
         },
       ]);
 
-      await expect(handler(mockEvent)).rejects.toThrow("Budget exceeded");
+      await expect(handler()).rejects.toThrow("Budget exceeded");
 
       // Should send critical alert
       expect(mockNotificationService.sendBudgetAlert).toHaveBeenCalledWith({
@@ -285,7 +272,7 @@ describe("Discovery Lambda", () => {
         new Error("Domain discovery failed"),
       );
 
-      await handler(mockEvent);
+      await handler();
 
       // Should still run search queries
       expect(mockOrchestrator.discoverFromSearchQueries).toHaveBeenCalled();
@@ -303,7 +290,7 @@ describe("Discovery Lambda", () => {
         new Error("Search failed"),
       );
 
-      await handler(mockEvent);
+      await handler();
 
       // Should still send completion notification
       expect(
@@ -318,13 +305,13 @@ describe("Discovery Lambda", () => {
       );
     });
 
-    it("should send error notification if Lambda fails", async () => {
+    it("should send error notification if handler fails", async () => {
       // Trigger a fatal error in the outer try block (e.g. cost tracking fails)
       vi.mocked(mockCostTracker.getUsageStats).mockRejectedValue(
         new Error("Fatal error"),
       );
 
-      await expect(handler(mockEvent)).rejects.toThrow("Fatal error");
+      await expect(handler()).rejects.toThrow("Fatal error");
 
       expect(mockNotificationService.sendError).toHaveBeenCalled();
     });
@@ -336,7 +323,7 @@ describe("Discovery Lambda", () => {
 
       const { readFile } = await import("node:fs/promises");
 
-      await handler(mockEvent);
+      await handler();
 
       expect(readFile).toHaveBeenCalledWith(
         "/custom/path/config.json",
@@ -349,7 +336,7 @@ describe("Discovery Lambda", () => {
     it("should use default path if not set", async () => {
       const { readFile } = await import("node:fs/promises");
 
-      await handler(mockEvent);
+      await handler();
 
       expect(readFile).toHaveBeenCalled();
       const callPath = vi.mocked(readFile).mock.calls[0]![0] as string;

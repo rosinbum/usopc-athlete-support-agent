@@ -2,15 +2,15 @@ import { getSecretValue } from "@usopc/shared";
 import { z } from "zod";
 
 export function getAuthSecret(): string {
-  return getSecretValue("AUTH_SECRET", "AuthSecret");
+  return getSecretValue("AUTH_SECRET");
 }
 
 export function getGitHubClientId(): string {
-  return getSecretValue("GITHUB_CLIENT_ID", "GitHubClientId");
+  return getSecretValue("GITHUB_CLIENT_ID");
 }
 
 export function getGitHubClientSecret(): string {
-  return getSecretValue("GITHUB_CLIENT_SECRET", "GitHubClientSecret");
+  return getSecretValue("GITHUB_CLIENT_SECRET");
 }
 
 const emailListSchema = z.array(
@@ -18,7 +18,7 @@ const emailListSchema = z.array(
 );
 
 export function getAdminEmails(): string[] {
-  const raw = getSecretValue("ADMIN_EMAILS", "AdminEmails");
+  const raw = getSecretValue("ADMIN_EMAILS");
   const emails = raw
     .split(",")
     .map((e) => e.trim().toLowerCase())
@@ -27,5 +27,5 @@ export function getAdminEmails(): string[] {
 }
 
 export function getResendApiKey(): string {
-  return getSecretValue("RESEND_API_KEY", "ResendApiKey");
+  return getSecretValue("RESEND_API_KEY");
 }

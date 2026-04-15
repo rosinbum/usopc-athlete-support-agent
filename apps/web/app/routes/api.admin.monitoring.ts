@@ -1,10 +1,10 @@
 import type { Route } from "./+types/api.admin.monitoring.js";
-import { SQSClient, GetQueueAttributesCommand } from "@aws-sdk/client-sqs";
 import {
   logger,
   createIngestionLogEntity,
   createDiscoveredSourceEntity,
   createDiscoveryRunEntity,
+  createQueueService,
   getResource,
   type DiscoveryStatus,
 } from "@usopc/shared";
@@ -13,7 +13,7 @@ import { apiError } from "../../lib/apiResponse.js";
 
 const log = logger.child({ service: "admin-monitoring" });
 
-const sqs = new SQSClient({});
+const queueService = createQueueService();
 
 interface QueueStats {
   visible: number;
@@ -29,20 +29,7 @@ async function getQueueStats(
 ): Promise<QueueStats | null> {
   try {
     const url = getResource(resourceKey).url;
-    const result = await sqs.send(
-      new GetQueueAttributesCommand({
-        QueueUrl: url,
-        AttributeNames: [
-          "ApproximateNumberOfMessages",
-          "ApproximateNumberOfMessagesNotVisible",
-        ],
-      }),
-    );
-    const attrs = result.Attributes ?? {};
-    return {
-      visible: Number(attrs.ApproximateNumberOfMessages ?? 0),
-      inFlight: Number(attrs.ApproximateNumberOfMessagesNotVisible ?? 0),
-    };
+    return await queueService.getStats(url);
   } catch {
     return null;
   }

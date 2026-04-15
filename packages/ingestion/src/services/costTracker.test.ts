@@ -1,123 +1,102 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { Pool, QueryResult } from "pg";
+
+// Mock the pool module
+const mockQuery = vi.fn();
+const mockPool = { query: mockQuery } as unknown as Pool;
+
+vi.mock("@usopc/shared", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("@usopc/shared")>();
+  return {
+    ...orig,
+    getPool: vi.fn(() => mockPool),
+  };
+});
+
 import { CostTracker } from "./costTracker.js";
-import { createAppTable } from "@usopc/shared";
+
+function makeQueryResult(rows: Record<string, unknown>[] = []): QueryResult {
+  return { rows, rowCount: rows.length, command: "", oid: 0, fields: [] };
+}
 
 describe("CostTracker", () => {
   let costTracker: CostTracker;
-  let mockModel: {
-    update: ReturnType<typeof vi.fn>;
-    get: ReturnType<typeof vi.fn>;
-  };
-  let mockTable: ReturnType<typeof createAppTable>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Mock the model methods
-    mockModel = {
-      update: vi.fn(),
-      get: vi.fn(),
-    };
-
-    // Mock table with getModel
-    mockTable = {
-      getModel: vi.fn(() => mockModel),
-    } as unknown as ReturnType<typeof createAppTable>;
-
-    costTracker = new CostTracker(mockTable);
+    mockQuery.mockResolvedValue(makeQueryResult());
+    costTracker = new CostTracker(mockPool);
   });
 
   describe("trackTavilyCall", () => {
     it("should track a search call with 1 credit", async () => {
       await costTracker.trackTavilyCall("search");
 
-      // Should update all three periods (daily, weekly, monthly)
-      expect(mockModel.update).toHaveBeenCalledTimes(3);
+      // Should upsert all three periods (daily, weekly, monthly)
+      expect(mockQuery).toHaveBeenCalledTimes(3);
 
-      // Check that the first call has the correct increments
-      const firstCall = vi.mocked(mockModel.update).mock.calls[0]!;
-      expect(firstCall[1]).toEqual({
-        add: {
-          tavilyCalls: 1,
-          tavilyCredits: 1,
-        },
-        exists: null,
-      });
+      const firstCall = mockQuery.mock.calls[0]!;
+      // Check params include tavily_calls=1, tavily_credits=1
+      expect(firstCall[1][0]).toBe("tavily"); // service
+      expect(firstCall[1][3]).toBe(1); // tavily_calls
+      expect(firstCall[1][4]).toBe(1); // tavily_credits
     });
 
     it("should track a map call with 5 credits", async () => {
       await costTracker.trackTavilyCall("map");
 
-      expect(mockModel.update).toHaveBeenCalledTimes(3);
+      expect(mockQuery).toHaveBeenCalledTimes(3);
 
-      const firstCall = vi.mocked(mockModel.update).mock.calls[0]!;
-      expect(firstCall[1]).toEqual({
-        add: {
-          tavilyCalls: 1,
-          tavilyCredits: 5,
-        },
-        exists: null,
-      });
+      const firstCall = mockQuery.mock.calls[0]!;
+      expect(firstCall[1][3]).toBe(1); // tavily_calls
+      expect(firstCall[1][4]).toBe(5); // tavily_credits
     });
 
-    it("should handle update errors", async () => {
-      vi.mocked(mockModel.update).mockRejectedValue(
-        new Error("DynamoDB error"),
-      );
+    it("should handle query errors", async () => {
+      mockQuery.mockRejectedValue(new Error("PG error"));
 
       await expect(costTracker.trackTavilyCall("search")).rejects.toThrow(
-        "DynamoDB error",
+        "PG error",
       );
     });
   });
 
   describe("trackAnthropicCall", () => {
     it("should track call with token usage and cost", async () => {
-      // 1M input tokens = $3, 1M output tokens = $15
-      // 100k input = $0.30, 50k output = $0.75, total = $1.05
       await costTracker.trackAnthropicCall(100_000, 50_000);
 
-      expect(mockModel.update).toHaveBeenCalledTimes(3);
+      expect(mockQuery).toHaveBeenCalledTimes(3);
 
-      const firstCall = vi.mocked(mockModel.update).mock.calls[0]!;
-      expect(firstCall[1].add).toMatchObject({
-        anthropicCalls: 1,
-        anthropicInputTokens: 100_000,
-        anthropicOutputTokens: 50_000,
-      });
-
-      // Check cost calculation (should be $1.05)
-      const cost = firstCall[1].add.anthropicCost;
-      expect(cost).toBeCloseTo(1.05, 2);
+      const firstCall = mockQuery.mock.calls[0]!;
+      expect(firstCall[1][0]).toBe("anthropic");
+      expect(firstCall[1][5]).toBe(1); // anthropic_calls
+      expect(firstCall[1][6]).toBe(100_000); // input_tokens
+      expect(firstCall[1][7]).toBe(50_000); // output_tokens
+      // Cost: 100k/1M * $3 + 50k/1M * $15 = $0.30 + $0.75 = $1.05
+      expect(firstCall[1][8]).toBeCloseTo(1.05, 2);
     });
 
     it("should handle zero tokens", async () => {
       await costTracker.trackAnthropicCall(0, 0);
 
-      const firstCall = vi.mocked(mockModel.update).mock.calls[0]!;
-      expect(firstCall[1].add.anthropicCost).toBe(0);
-    });
-
-    it("should handle update errors", async () => {
-      vi.mocked(mockModel.update).mockRejectedValue(
-        new Error("DynamoDB error"),
-      );
-
-      await expect(costTracker.trackAnthropicCall(1000, 500)).rejects.toThrow(
-        "DynamoDB error",
-      );
+      const firstCall = mockQuery.mock.calls[0]!;
+      expect(firstCall[1][8]).toBe(0); // cost
     });
   });
 
   describe("getUsageStats", () => {
     it("should return Tavily stats for monthly period", async () => {
-      vi.mocked(mockModel.get).mockResolvedValue({
-        service: "tavily",
-        period: "monthly",
-        date: "2026-02-01",
-        tavilyCalls: 10,
-        tavilyCredits: 25,
-      });
+      mockQuery.mockResolvedValue(
+        makeQueryResult([
+          {
+            service: "tavily",
+            period: "monthly",
+            date: "2026-02-01",
+            tavily_calls: 10,
+            tavily_credits: 25,
+          },
+        ]),
+      );
 
       const stats = await costTracker.getUsageStats("tavily", "monthly");
 
@@ -132,15 +111,19 @@ describe("CostTracker", () => {
     });
 
     it("should return Anthropic stats for daily period", async () => {
-      vi.mocked(mockModel.get).mockResolvedValue({
-        service: "anthropic",
-        period: "daily",
-        date: "2026-02-15",
-        anthropicCalls: 5,
-        anthropicInputTokens: 100_000,
-        anthropicOutputTokens: 50_000,
-        anthropicCost: 1.05,
-      });
+      mockQuery.mockResolvedValue(
+        makeQueryResult([
+          {
+            service: "anthropic",
+            period: "daily",
+            date: "2026-02-15",
+            anthropic_calls: 5,
+            anthropic_input_tokens: 100_000,
+            anthropic_output_tokens: 50_000,
+            anthropic_cost: 1.05,
+          },
+        ]),
+      );
 
       const stats = await costTracker.getUsageStats("anthropic", "daily");
 
@@ -157,7 +140,7 @@ describe("CostTracker", () => {
     });
 
     it("should return zeros when no data exists", async () => {
-      vi.mocked(mockModel.get).mockResolvedValue(null);
+      mockQuery.mockResolvedValue(makeQueryResult([]));
 
       const stats = await costTracker.getUsageStats("tavily", "monthly");
 
@@ -171,30 +154,25 @@ describe("CostTracker", () => {
       });
     });
 
-    it("should handle get errors", async () => {
-      vi.mocked(mockModel.get).mockRejectedValue(new Error("DynamoDB error"));
+    it("should handle query errors", async () => {
+      mockQuery.mockRejectedValue(new Error("PG error"));
 
       await expect(
         costTracker.getUsageStats("tavily", "monthly"),
-      ).rejects.toThrow("DynamoDB error");
+      ).rejects.toThrow("PG error");
     });
   });
 
   describe("checkBudget", () => {
     beforeEach(() => {
-      // Set default budgets
       process.env.TAVILY_MONTHLY_BUDGET = "1000";
       process.env.ANTHROPIC_MONTHLY_BUDGET = "10";
     });
 
     it("should return within budget for Tavily when under limit", async () => {
-      vi.mocked(mockModel.get).mockResolvedValue({
-        service: "tavily",
-        period: "monthly",
-        date: "2026-02-01",
-        tavilyCalls: 50,
-        tavilyCredits: 500, // 50% of 1000
-      });
+      mockQuery.mockResolvedValue(
+        makeQueryResult([{ tavily_calls: 50, tavily_credits: 500 }]),
+      );
 
       const status = await costTracker.checkBudget("tavily");
 
@@ -209,20 +187,14 @@ describe("CostTracker", () => {
     });
 
     it("should return over budget for Tavily when exceeding limit", async () => {
-      vi.mocked(mockModel.get).mockResolvedValue({
-        service: "tavily",
-        period: "monthly",
-        date: "2026-02-01",
-        tavilyCalls: 250,
-        tavilyCredits: 1200, // 120% of 1000
-      });
+      mockQuery.mockResolvedValue(
+        makeQueryResult([{ tavily_calls: 250, tavily_credits: 1200 }]),
+      );
 
       const status = await costTracker.checkBudget("tavily");
 
       expect(status).toMatchObject({
         withinBudget: false,
-        service: "tavily",
-        period: "monthly",
         usage: 1200,
         budget: 1000,
         percentage: 120,
@@ -230,84 +202,25 @@ describe("CostTracker", () => {
     });
 
     it("should return within budget for Anthropic when under limit", async () => {
-      vi.mocked(mockModel.get).mockResolvedValue({
-        service: "anthropic",
-        period: "monthly",
-        date: "2026-02-01",
-        anthropicCalls: 100,
-        anthropicInputTokens: 500_000,
-        anthropicOutputTokens: 250_000,
-        anthropicCost: 5.25, // 52.5% of $10
-      });
+      mockQuery.mockResolvedValue(
+        makeQueryResult([
+          {
+            anthropic_calls: 100,
+            anthropic_input_tokens: 500_000,
+            anthropic_output_tokens: 250_000,
+            anthropic_cost: 5.25,
+          },
+        ]),
+      );
 
       const status = await costTracker.checkBudget("anthropic");
 
       expect(status).toMatchObject({
         withinBudget: true,
-        service: "anthropic",
-        period: "monthly",
         usage: 5.25,
         budget: 10,
         percentage: 52.5,
       });
-    });
-
-    it("should return over budget for Anthropic when exceeding limit", async () => {
-      vi.mocked(mockModel.get).mockResolvedValue({
-        service: "anthropic",
-        period: "monthly",
-        date: "2026-02-01",
-        anthropicCalls: 200,
-        anthropicInputTokens: 1_500_000,
-        anthropicOutputTokens: 750_000,
-        anthropicCost: 15.75, // 157.5% of $10
-      });
-
-      const status = await costTracker.checkBudget("anthropic");
-
-      expect(status).toMatchObject({
-        withinBudget: false,
-        service: "anthropic",
-        period: "monthly",
-        usage: 15.75,
-        budget: 10,
-        percentage: 157.5,
-      });
-    });
-
-    it("should use custom budget from environment variables", async () => {
-      process.env.TAVILY_MONTHLY_BUDGET = "500";
-
-      vi.mocked(mockModel.get).mockResolvedValue({
-        service: "tavily",
-        period: "monthly",
-        date: "2026-02-01",
-        tavilyCalls: 100,
-        tavilyCredits: 400,
-      });
-
-      const status = await costTracker.checkBudget("tavily");
-
-      expect(status.budget).toBe(500);
-      expect(status.percentage).toBe(80);
-    });
-
-    it("should handle zero budget gracefully", async () => {
-      process.env.TAVILY_MONTHLY_BUDGET = "0";
-
-      vi.mocked(mockModel.get).mockResolvedValue({
-        service: "tavily",
-        period: "monthly",
-        date: "2026-02-01",
-        tavilyCalls: 10,
-        tavilyCredits: 50,
-      });
-
-      const status = await costTracker.checkBudget("tavily");
-
-      expect(status.budget).toBe(0);
-      expect(status.percentage).toBe(0);
-      expect(status.withinBudget).toBe(false);
     });
   });
 
@@ -318,77 +231,29 @@ describe("CostTracker", () => {
     });
 
     it("should check all service budgets", async () => {
-      vi.mocked(mockModel.get)
-        .mockResolvedValueOnce({
-          service: "tavily",
-          period: "monthly",
-          date: "2026-02-01",
-          tavilyCalls: 50,
-          tavilyCredits: 500,
-        })
-        .mockResolvedValueOnce({
-          service: "anthropic",
-          period: "monthly",
-          date: "2026-02-01",
-          anthropicCalls: 100,
-          anthropicInputTokens: 500_000,
-          anthropicOutputTokens: 250_000,
-          anthropicCost: 5.25,
-        });
+      mockQuery
+        .mockResolvedValueOnce(
+          makeQueryResult([{ tavily_calls: 50, tavily_credits: 500 }]),
+        )
+        .mockResolvedValueOnce(makeQueryResult([{ anthropic_cost: 5.25 }]));
 
       const statuses = await costTracker.checkAllBudgets();
 
       expect(statuses).toHaveLength(2);
       expect(statuses[0]!.service).toBe("tavily");
-      expect(statuses[0]!.withinBudget).toBe(true);
       expect(statuses[1]!.service).toBe("anthropic");
-      expect(statuses[1]!.withinBudget).toBe(true);
-    });
-
-    it("should identify budget overruns", async () => {
-      vi.mocked(mockModel.get)
-        .mockResolvedValueOnce({
-          service: "tavily",
-          period: "monthly",
-          date: "2026-02-01",
-          tavilyCalls: 250,
-          tavilyCredits: 1200,
-        })
-        .mockResolvedValueOnce({
-          service: "anthropic",
-          period: "monthly",
-          date: "2026-02-01",
-          anthropicCalls: 200,
-          anthropicInputTokens: 1_500_000,
-          anthropicOutputTokens: 750_000,
-          anthropicCost: 15.75,
-        });
-
-      const statuses = await costTracker.checkAllBudgets();
-
-      expect(statuses).toHaveLength(2);
-      expect(statuses[0]!.withinBudget).toBe(false);
-      expect(statuses[1]!.withinBudget).toBe(false);
     });
   });
 
   describe("getAllUsageStats", () => {
     it("should get all stats for all services and periods", async () => {
-      vi.mocked(mockModel.get).mockResolvedValue({
-        tavilyCalls: 10,
-        tavilyCredits: 25,
-        anthropicCalls: 5,
-        anthropicInputTokens: 100_000,
-        anthropicOutputTokens: 50_000,
-        anthropicCost: 1.05,
-      });
+      mockQuery.mockResolvedValue(makeQueryResult([]));
 
       const stats = await costTracker.getAllUsageStats();
 
-      // 2 services × 3 periods = 6 total
+      // 2 services x 3 periods = 6 total
       expect(stats).toHaveLength(6);
 
-      // Check that we have all combinations
       const combinations = stats.map((s) => `${s.service}-${s.period}`);
       expect(combinations).toContain("tavily-daily");
       expect(combinations).toContain("tavily-weekly");

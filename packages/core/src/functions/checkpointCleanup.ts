@@ -43,7 +43,7 @@ async function ensureCreatedAtColumn(pool: pg.Pool): Promise<void> {
 }
 
 /**
- * Lambda handler that deletes checkpoint rows older than the retention period.
+ * Handler that deletes checkpoint rows older than the retention period.
  * Runs on a daily cron schedule. Creates its own pool to avoid contention
  * with the shared singleton pool.
  *

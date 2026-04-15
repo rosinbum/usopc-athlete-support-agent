@@ -1,8 +1,4 @@
-import { Resource } from "sst";
-
 interface AppResources {
-  AppTable: { name: string };
-  AuthTable: { name: string };
   IngestionQueue: { url: string };
   IngestionDLQ: { url: string };
   DiscoveryFeedQueue: { url: string };
@@ -11,15 +7,29 @@ interface AppResources {
 }
 
 /**
- * Type-safe accessor for SST Resource bindings.
+ * Type-safe accessor for resource bindings.
  *
- * Replaces scattered `Resource as unknown as { ... }` casts with a single
- * validated helper that throws a clear error when a resource is missing.
+ * Resources are injected as environment variables — set via .env.local
+ * (local dev) or Cloud Run env config (production).
  */
 export function getResource<K extends keyof AppResources>(
   key: K,
 ): AppResources[K] {
-  const r = (Resource as unknown as Partial<AppResources>)[key];
-  if (!r) throw new Error(`SST Resource '${key}' not available`);
-  return r;
+  const envMap: Record<
+    keyof AppResources,
+    () => AppResources[keyof AppResources]
+  > = {
+    IngestionQueue: () => ({ url: process.env.INGESTION_QUEUE_URL! }),
+    IngestionDLQ: () => ({ url: process.env.INGESTION_DLQ_URL! }),
+    DiscoveryFeedQueue: () => ({ url: process.env.DISCOVERY_FEED_QUEUE_URL! }),
+    DiscoveryFeedDLQ: () => ({ url: process.env.DISCOVERY_FEED_DLQ_URL! }),
+    DocumentsBucket: () => ({ name: process.env.DOCUMENTS_BUCKET_NAME! }),
+  };
+
+  const envGetter = envMap[key];
+  const value = envGetter();
+  const firstProp = Object.values(value)[0];
+  if (firstProp) return value as AppResources[K];
+
+  throw new Error(`Resource '${key}' not available (check env vars)`);
 }

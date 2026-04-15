@@ -31,7 +31,7 @@ export interface ToolDependencies {
   pool: Pool;
   /** Optional Tavily API key. Falls back to TAVILY_API_KEY env var. */
   tavilyApiKey?: string;
-  /** SportOrgEntity instance for DynamoDB sport organization lookups. */
+  /** SportOrgEntity instance for sport organization lookups. */
   sportOrgEntity: SportOrgEntity;
 }
 

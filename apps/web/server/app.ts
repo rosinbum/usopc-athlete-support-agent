@@ -4,8 +4,11 @@ import { authHandler } from "./auth.js";
 
 const app = express();
 
+// ---------------------------------------------------------------------------
 // Security headers
-const isDev = process.env.NODE_ENV === "development";
+// ---------------------------------------------------------------------------
+
+const isDev = process.env.NODE_ENV !== "production";
 app.use((_req, res, next) => {
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -26,24 +29,63 @@ app.use((_req, res, next) => {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self'",
-      "connect-src 'self' https:",
+      `connect-src 'self' https:${isDev ? " ws:" : ""}`,
       "frame-ancestors 'none'",
     ].join("; "),
   );
   next();
 });
 
+// ---------------------------------------------------------------------------
+// Health check — must be before the React Router catchall
+// ---------------------------------------------------------------------------
+
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
+});
+
+// ---------------------------------------------------------------------------
 // Auth.js routes — handles /api/auth/signin, /api/auth/callback, etc.
-app.use("/api/auth/*", authHandler);
+// ---------------------------------------------------------------------------
 
-// Static assets from the React Router client build
-app.use(express.static("build/client", { maxAge: "1h" }));
+// Body parsing for auth form submissions (signin, csrf)
+app.use("/api/auth", express.json(), express.urlencoded({ extended: true }));
+app.all("/api/auth/*splat", authHandler);
 
-// React Router SSR handler — catches everything else
-app.all(
-  "*",
-  createRequestHandler({ build: () => import("../build/server/index.js") }),
-);
+// ---------------------------------------------------------------------------
+// Dev vs Production setup
+// ---------------------------------------------------------------------------
+
+if (isDev) {
+  // Dev: use Vite middleware mode so HMR works AND Express handles auth
+  const vite = await import("vite");
+  const viteServer = await vite.createServer({
+    server: { middlewareMode: true },
+  });
+  app.use(viteServer.middlewares);
+  app.all(
+    "*splat",
+    createRequestHandler({
+      build: () =>
+        viteServer.ssrLoadModule(
+          "virtual:react-router/server-build",
+        ) as never,
+    }),
+  );
+} else {
+  // Production: serve static assets + pre-built server bundle
+  app.use(express.static("build/client", { maxAge: "1h" }));
+  app.all(
+    "*splat",
+    createRequestHandler({
+      build: () => import("../build/server/index.js") as never,
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Start server
+// ---------------------------------------------------------------------------
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {

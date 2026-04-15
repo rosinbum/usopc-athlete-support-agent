@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SQSEvent } from "aws-lambda";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -28,22 +27,7 @@ vi.mock("./db.js", () => ({
     mockUpsertIngestionStatus(...args),
 }));
 
-const mockSend = vi.fn();
-vi.mock("@aws-sdk/client-sqs", () => ({
-  SQSClient: vi.fn(() => ({ send: mockSend })),
-  PurgeQueueCommand: vi.fn((input: unknown) => ({ input })),
-}));
-
-vi.mock("sst", () => ({
-  Resource: {
-    IngestionQueue: {
-      url: "https://sqs.us-east-1.amazonaws.com/123/queue.fifo",
-    },
-    DocumentsBucket: {
-      name: "test-documents-bucket",
-    },
-  },
-}));
+const mockPurge = vi.fn().mockResolvedValue(undefined);
 
 // Mock the entities module (IngestionLogEntity + SourceConfigEntity factories)
 const mockCreate = vi.fn();
@@ -66,6 +50,19 @@ vi.mock("./entities/index.js", () => ({
 
 vi.mock("@usopc/shared", () => ({
   getSecretValue: () => "sk-test-key",
+  getResource: (key: string) => {
+    const resources: Record<string, unknown> = {
+      IngestionQueue: { url: "https://queue.example.com/ingestion" },
+      DocumentsBucket: { name: "test-documents-bucket" },
+    };
+    return resources[key];
+  },
+  createQueueService: () => ({
+    sendMessage: vi.fn(),
+    sendMessageBatch: vi.fn(),
+    purge: mockPurge,
+    getStats: vi.fn(),
+  }),
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),
@@ -76,45 +73,15 @@ vi.mock("@usopc/shared", () => ({
 }));
 
 // Import after mocks
-import { handler } from "./worker.js";
+import { handleIngestionMessage } from "./worker.js";
 import { QuotaExhaustedError } from "./pipeline.js";
+import type { IngestionMessage } from "./cron.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function makeSQSRecord(
-  body: string | Record<string, unknown>,
-  messageId = "msg-1",
-) {
-  return {
-    messageId,
-    receiptHandle: `receipt-${messageId}`,
-    body: typeof body === "string" ? body : JSON.stringify(body),
-    attributes: {
-      ApproximateReceiveCount: "1",
-      SentTimestamp: "0",
-      SenderId: "sender",
-      ApproximateFirstReceiveTimestamp: "0",
-    },
-    messageAttributes: {},
-    md5OfBody: "md5",
-    eventSource: "aws:sqs",
-    eventSourceARN: "arn:aws:sqs:us-east-1:123:queue",
-    awsRegion: "us-east-1",
-  };
-}
-
-function makeSQSEvent(
-  body: Record<string, unknown>,
-  messageId = "msg-1",
-): SQSEvent {
-  return {
-    Records: [makeSQSRecord(body, messageId)],
-  };
-}
-
-const MESSAGE_BODY = {
+const MESSAGE: IngestionMessage = {
   source: {
     id: "src-1",
     title: "Test",
@@ -133,53 +100,51 @@ const MESSAGE_BODY = {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("worker handler", () => {
+describe("handleIngestionMessage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUpsertIngestionStatus.mockResolvedValue(undefined);
-    mockSend.mockResolvedValue({});
+    mockPurge.mockResolvedValue({});
   });
 
-  it("calls processSource and returns empty failures on success", async () => {
+  it("calls processSource on success", async () => {
     mockProcessSource.mockResolvedValueOnce({
       status: "completed",
       chunksCount: 10,
       contentHash: "abc123",
-      s3Key: "sources/src-1/abc123.pdf",
+      storageKey: "sources/src-1/abc123.pdf",
     });
 
-    const result = await handler(makeSQSEvent(MESSAGE_BODY));
+    await handleIngestionMessage(MESSAGE);
 
-    expect(result).toEqual({ batchItemFailures: [] });
     expect(mockProcessSource).toHaveBeenCalledWith(
       expect.objectContaining({
-        source: MESSAGE_BODY.source,
+        source: MESSAGE.source,
         openaiApiKey: "sk-test-key",
         bucketName: "test-documents-bucket",
       }),
     );
   });
 
-  it("returns empty failures on graceful ingestion failure", async () => {
+  it("does not throw on graceful ingestion failure", async () => {
     mockProcessSource.mockResolvedValueOnce({
       status: "failed",
       chunksCount: 0,
       error: "load error",
     });
 
-    const result = await handler(makeSQSEvent(MESSAGE_BODY));
-
-    expect(result).toEqual({ batchItemFailures: [] });
+    await expect(handleIngestionMessage(MESSAGE)).resolves.toBeUndefined();
   });
 
-  it("purges queue and returns empty failures on QuotaExhaustedError", async () => {
+  it("purges queue and throws on QuotaExhaustedError", async () => {
     mockProcessSource.mockRejectedValueOnce(
       new QuotaExhaustedError("insufficient_quota"),
     );
 
-    const result = await handler(makeSQSEvent(MESSAGE_BODY));
+    await expect(handleIngestionMessage(MESSAGE)).rejects.toThrow(
+      "insufficient_quota",
+    );
 
-    expect(result).toEqual({ batchItemFailures: [] });
     expect(mockUpsertIngestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       "src-1",
@@ -187,97 +152,12 @@ describe("worker handler", () => {
       "quota_exceeded",
       { errorMessage: "insufficient_quota" },
     );
-    expect(mockSend).toHaveBeenCalledOnce();
+    expect(mockPurge).toHaveBeenCalledOnce();
   });
 
-  it("returns batchItemFailures with messageId on unexpected error", async () => {
+  it("throws on unexpected error", async () => {
     mockProcessSource.mockRejectedValueOnce(new Error("kaboom"));
 
-    const result = await handler(makeSQSEvent(MESSAGE_BODY, "msg-42"));
-
-    expect(result).toEqual({
-      batchItemFailures: [{ itemIdentifier: "msg-42" }],
-    });
-  });
-
-  it("processes multiple records in a single event", async () => {
-    const body2 = {
-      ...MESSAGE_BODY,
-      source: { ...MESSAGE_BODY.source, id: "src-2" },
-    };
-
-    mockProcessSource
-      .mockResolvedValueOnce({
-        status: "completed",
-        chunksCount: 5,
-      })
-      .mockResolvedValueOnce({
-        status: "completed",
-        chunksCount: 3,
-      });
-
-    const event: SQSEvent = {
-      Records: [
-        makeSQSRecord(MESSAGE_BODY, "msg-1"),
-        makeSQSRecord(body2, "msg-2"),
-      ],
-    };
-
-    const result = await handler(event);
-
-    expect(result).toEqual({ batchItemFailures: [] });
-    expect(mockProcessSource).toHaveBeenCalledTimes(2);
-  });
-
-  it("skips malformed messages and continues", async () => {
-    mockProcessSource.mockResolvedValueOnce({
-      status: "completed",
-      chunksCount: 5,
-    });
-
-    const event: SQSEvent = {
-      Records: [
-        makeSQSRecord("this is not json", "msg-bad"),
-        makeSQSRecord(MESSAGE_BODY, "msg-1"),
-      ],
-    };
-
-    const result = await handler(event);
-
-    expect(result).toEqual({ batchItemFailures: [] });
-    expect(mockProcessSource).toHaveBeenCalledTimes(1);
-  });
-
-  it("marks remaining records as failures on QuotaExhaustedError", async () => {
-    mockProcessSource.mockRejectedValueOnce(
-      new QuotaExhaustedError("quota hit"),
-    );
-
-    const body2 = {
-      ...MESSAGE_BODY,
-      source: { ...MESSAGE_BODY.source, id: "src-2" },
-    };
-    const body3 = {
-      ...MESSAGE_BODY,
-      source: { ...MESSAGE_BODY.source, id: "src-3" },
-    };
-
-    const event: SQSEvent = {
-      Records: [
-        makeSQSRecord(MESSAGE_BODY, "msg-1"),
-        makeSQSRecord(body2, "msg-2"),
-        makeSQSRecord(body3, "msg-3"),
-      ],
-    };
-
-    const result = await handler(event);
-
-    // The first record hit quota; remaining two should be batch failures
-    expect(result.batchItemFailures).toEqual([
-      { itemIdentifier: "msg-2" },
-      { itemIdentifier: "msg-3" },
-    ]);
-    expect(mockProcessSource).toHaveBeenCalledTimes(1);
-    expect(mockSend).toHaveBeenCalledOnce();
+    await expect(handleIngestionMessage(MESSAGE)).rejects.toThrow("kaboom");
   });
 });

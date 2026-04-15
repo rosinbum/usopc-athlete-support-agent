@@ -66,7 +66,7 @@ USAGE:
   pnpm --filter @usopc/ingestion discovery [OPTIONS]
 
 OPTIONS:
-  --dry-run          Run discovery without enqueuing to SQS (useful for testing)
+  --dry-run          Run discovery without enqueuing to queue (useful for testing)
   --domain <domain>  Discover from a specific domain only (e.g., "usaswimming.org")
   --query <query>    Discover from a specific search query only
   --json             Output results as JSON

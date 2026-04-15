@@ -9,13 +9,13 @@
  *   pnpm --filter @usopc/ingestion ingest --resume       # re-ingest sources whose content hash changed
  *   pnpm --filter @usopc/ingestion ingest --force        # re-ingest everything regardless of state
  *
- * Required config (via env var or SST secret):
+ * Required config (via env var):
  *   DATABASE_URL / SST Database  — PostgreSQL connection string
  *   OPENAI_API_KEY / OpenaiApiKey — OpenAI API key for embeddings
  */
 
 import { createHash } from "node:crypto";
-import { getSecretValue, createLogger } from "@usopc/shared";
+import { getSecretValue, getResource, createLogger } from "@usopc/shared";
 import type { IngestionSource } from "../pipeline.js";
 import {
   createSourceConfigEntity,
@@ -27,7 +27,6 @@ import {
   FetchWithRetryError,
 } from "../loaders/fetchWithRetry.js";
 import { processSource } from "../services/sourceProcessor.js";
-import { Resource } from "sst";
 
 const logger = createLogger({ service: "ingestion-cli" });
 
@@ -103,17 +102,17 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  const openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
+  const openaiApiKey = getSecretValue("OPENAI_API_KEY");
   const { sourceId, all, resume, force } = parseArgs();
 
-  // Load directly from DynamoDB so ingestion stats are always tracked.
-  // This script runs under `sst shell` (see package.json), so SST
-  // Resource bindings are always available.
+  // Load directly from database so ingestion stats are always tracked.
+  // This script loads env vars from .env.local (see package.json), so
+  // database and API key bindings are always available.
   const entity = createSourceConfigEntity();
   const ingestionLogEntity = createIngestionLogEntity();
   const configs = await entity.getAllEnabled();
   const sources: IngestionSource[] = configs.map(toIngestionSource);
-  logger.info(`Loaded ${sources.length} source configuration(s) from DynamoDB`);
+  logger.info(`Loaded ${sources.length} source configuration(s) from database`);
 
   if (sourceId) {
     const source = sources.find((s) => s.id === sourceId);
@@ -130,7 +129,7 @@ async function main(): Promise<void> {
     const result = await processSource({
       source,
       openaiApiKey,
-      bucketName: Resource.DocumentsBucket.name,
+      bucketName: getResource("DocumentsBucket").name,
       ingestionLogEntity,
       sourceConfigEntity: entity,
     });
@@ -232,7 +231,7 @@ async function main(): Promise<void> {
       const result = await processSource({
         source,
         openaiApiKey,
-        bucketName: Resource.DocumentsBucket.name,
+        bucketName: getResource("DocumentsBucket").name,
         ingestionLogEntity,
         sourceConfigEntity: entity,
       });

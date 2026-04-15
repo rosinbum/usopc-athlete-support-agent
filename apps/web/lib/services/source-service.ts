@@ -1,9 +1,9 @@
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import {
   deleteChunksBySourceId,
   updateChunkMetadataBySourceId,
   getResource,
   getPool,
+  createQueueService,
   type SourceConfig,
   type SourceConfigEntity,
 } from "@usopc/shared";
@@ -23,7 +23,7 @@ export const METADATA_FIELDS = new Set([
 ]);
 
 /**
- * Build the SQS message body for triggering document ingestion.
+ * Build the queue message body for triggering document ingestion.
  */
 export function buildIngestionMessage(source: SourceConfig) {
   return {
@@ -45,29 +45,27 @@ export function buildIngestionMessage(source: SourceConfig) {
 }
 
 /**
- * Send an ingestion message to SQS for a source.
+ * Send an ingestion message to the ingestion queue for a source.
  * Returns `{ triggered: true }` on success.
  * Throws if the queue is unavailable or send fails.
  */
+let _queue: ReturnType<typeof createQueueService> | undefined;
+
 export async function triggerIngestion(
   source: SourceConfig,
 ): Promise<{ triggered: boolean }> {
   const queueUrl = getResource("IngestionQueue").url;
   const message = buildIngestionMessage(source);
 
-  const sqs = new SQSClient({});
-  await sqs.send(
-    new SendMessageCommand({
-      QueueUrl: queueUrl,
-      MessageBody: JSON.stringify(message),
-      MessageGroupId: source.id,
-    }),
-  );
+  const queue = (_queue ??= createQueueService());
+  await queue.sendMessage(queueUrl, JSON.stringify(message), {
+    groupId: source.id,
+  });
   return { triggered: true };
 }
 
 /**
- * Delete a source — removes PG chunks first, then DynamoDB config.
+ * Delete a source — removes PG chunks first, then PG config.
  */
 export async function deleteSource(
   id: string,
@@ -81,7 +79,7 @@ export async function deleteSource(
 
 /**
  * Update a source — detects content vs metadata changes, orchestrates
- * chunk deletion/update, DynamoDB update, and optional re-ingestion.
+ * chunk deletion/update, PG update, and optional re-ingestion.
  */
 export async function updateSource(
   id: string,
@@ -106,7 +104,7 @@ export async function updateSource(
       await triggerIngestion(source);
       actions.reIngestionTriggered = true;
     } catch {
-      // SQS not available in dev — still proceed with the update
+      // Queue not available in dev — still proceed with the update
       actions.reIngestionTriggered = false;
     }
 

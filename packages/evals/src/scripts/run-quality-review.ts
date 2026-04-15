@@ -13,7 +13,7 @@
 
 import { resolveEnv } from "../helpers/resolveEnv.js";
 
-// Bridge SST Resource bindings → env vars before any SDK is loaded
+// Bridge secret env vars → env vars before any SDK is loaded
 resolveEnv();
 
 import net from "node:net";
@@ -33,7 +33,7 @@ import {
 async function checkDatabase(): Promise<void> {
   const url = process.env.DATABASE_URL;
   if (!url) {
-    console.error("✗ DATABASE_URL is not set. Run within `sst shell`.");
+    console.error("✗ DATABASE_URL is not set. Set DATABASE_URL in .env.local.");
     process.exit(1);
   }
 

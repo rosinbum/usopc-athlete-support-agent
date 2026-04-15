@@ -1,0 +1,13 @@
+config:
+  gcp:project: usopc-athlete-support-staging
+  gcp:region: us-central1
+  usopc:environment: staging
+  usopc:dbTier: db-custom-2-7680
+  usopc:minInstances: "0"
+  usopc:maxInstances: "2"
+  # Set via: pulumi config set --secret usopc:dbPassword <password> --stack staging
+  # usopc:dbPassword: <encrypted>
+
+  usopc:dbPassword:
+    secure: AAABANL6vUOxh5hG39krYoIoC6+ae17FAu7hnioLLREOEL+p7Em6hTHgDnX+j1sDIDgpVGS1rMBU8n/E6PNl5vwaCMMzm9QJ2d3jOw==
+  usopc:alertEmail: your-email@example.com

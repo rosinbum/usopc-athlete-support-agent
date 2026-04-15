@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SQSEvent } from "aws-lambda";
 import type { DiscoveryFeedMessage } from "@usopc/core";
+
+// Will be set in beforeEach
+const mockCreateDiscoveredSourceEntity = vi.fn();
 
 // Mock @usopc/shared
 vi.mock("@usopc/shared", () => ({
@@ -11,18 +13,22 @@ vi.mock("@usopc/shared", () => ({
     debug: vi.fn(),
   })),
   getSecretValue: vi.fn(() => "test-anthropic-key"),
-  createAppTable: vi.fn(() => ({})),
-  DiscoveredSourceEntity: vi.fn(),
+  getResource: vi.fn(() => ({ url: "https://queue.example.com/ingestion" })),
+  createDiscoveredSourceEntity: (...args: unknown[]) =>
+    mockCreateDiscoveredSourceEntity(...args),
+  createSourceConfigEntity: vi.fn(() => ({})),
   REPROCESSABLE_STATUSES: new Set(["pending_metadata", "pending_content"]),
   normalizeUrl: vi.fn((url: string) => url),
   urlToId: vi.fn(() => "test-id-hash"),
-}));
-
-// Mock SST Resource
-vi.mock("sst", () => ({
-  Resource: {
-    AppTable: { name: "test-table" },
-  },
+  sendDiscoveryToSources: vi
+    .fn()
+    .mockResolvedValue({ status: "created", sourceConfig: null }),
+  createQueueService: () => ({
+    sendMessage: vi.fn().mockResolvedValue(undefined),
+    sendMessageBatch: vi.fn().mockResolvedValue(0),
+    purge: vi.fn(),
+    getStats: vi.fn(),
+  }),
 }));
 
 // Mock EvaluationService
@@ -35,12 +41,24 @@ vi.mock("./loaders/webLoader.js", () => ({
   loadWeb: vi.fn(),
 }));
 
-import { DiscoveredSourceEntity, normalizeUrl } from "@usopc/shared";
+// Mock cron (toIngestionSource)
+vi.mock("./cron.js", () => ({
+  toIngestionSource: vi.fn((sc: unknown) => sc),
+}));
+
+// Mock entities
+vi.mock("./entities/index.js", () => ({
+  createSourceConfigEntity: vi.fn(() => ({
+    create: vi.fn(),
+    getAll: vi.fn().mockResolvedValue([]),
+  })),
+}));
+
+import { normalizeUrl } from "@usopc/shared";
 import { EvaluationService } from "./services/evaluationService.js";
 import { loadWeb } from "./loaders/webLoader.js";
-import { handler } from "./discoveryFeedWorker.js";
+import { handleDiscoveryFeedMessage } from "./discoveryFeedWorker.js";
 
-const MockDiscoveredSourceEntity = vi.mocked(DiscoveredSourceEntity);
 const MockEvaluationService = vi.mocked(EvaluationService);
 const mockLoadWeb = vi.mocked(loadWeb);
 const mockNormalizeUrl = vi.mocked(normalizeUrl);
@@ -48,22 +66,6 @@ const mockNormalizeUrl = vi.mocked(normalizeUrl);
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function makeEvent(messages: DiscoveryFeedMessage[]): SQSEvent {
-  return {
-    Records: messages.map((msg, i) => ({
-      messageId: `msg-${i}`,
-      receiptHandle: `handle-${i}`,
-      body: JSON.stringify(msg),
-      attributes: {} as any,
-      messageAttributes: {},
-      md5OfBody: "",
-      eventSource: "aws:sqs",
-      eventSourceARN: "arn:aws:sqs:us-east-1:000:queue",
-      awsRegion: "us-east-1",
-    })),
-  };
-}
 
 function makeMessage(
   urls: Array<{ url: string; title?: string }>,
@@ -136,7 +138,7 @@ describe("discoveryFeedWorker", () => {
     vi.clearAllMocks();
 
     mockEntity = makeMockEntity();
-    MockDiscoveredSourceEntity.mockImplementation(() => mockEntity as any);
+    mockCreateDiscoveredSourceEntity.mockReturnValue(mockEntity);
 
     mockEvalService = makeMockEvalService();
     MockEvaluationService.mockImplementation(() => mockEvalService as any);
@@ -148,22 +150,20 @@ describe("discoveryFeedWorker", () => {
     mockNormalizeUrl.mockImplementation((url) => url);
   });
 
-  it("parses SQS message body correctly", async () => {
-    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
-
-    await handler(event);
+  it("processes message URLs correctly", async () => {
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
 
     expect(mockEntity.create).toHaveBeenCalledTimes(1);
   });
 
   it("creates DiscoveredSource entries with correct fields", async () => {
-    const event = makeEvent([
+    await handleDiscoveryFeedMessage(
       makeMessage([
         { url: "https://usopc.org/doc1", title: "USOPC Selection" },
       ]),
-    ]);
-
-    await handler(event);
+    );
 
     expect(mockEntity.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -176,13 +176,11 @@ describe("discoveryFeedWorker", () => {
   });
 
   it("calls evaluateMetadata with URL, title, and extracted domain", async () => {
-    const event = makeEvent([
+    await handleDiscoveryFeedMessage(
       makeMessage([
         { url: "https://usopc.org/doc1", title: "USOPC Selection" },
       ]),
-    ]);
-
-    await handler(event);
+    );
 
     expect(mockEvalService.evaluateMetadata).toHaveBeenCalledWith(
       "https://usopc.org/doc1",
@@ -192,9 +190,9 @@ describe("discoveryFeedWorker", () => {
   });
 
   it("calls markMetadataEvaluated with LLM results", async () => {
-    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
-
-    await handler(event);
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
 
     expect(mockEntity.markMetadataEvaluated).toHaveBeenCalledWith(
       "test-id-hash",
@@ -214,9 +212,9 @@ describe("discoveryFeedWorker", () => {
       preliminaryDocumentType: "",
     });
 
-    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
-
-    await handler(event);
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
 
     expect(mockEntity.markMetadataEvaluated).toHaveBeenCalled();
     expect(mockLoadWeb).not.toHaveBeenCalled();
@@ -233,17 +231,17 @@ describe("discoveryFeedWorker", () => {
       preliminaryDocumentType: "",
     });
 
-    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
-
-    await handler(event);
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
 
     expect(mockLoadWeb).not.toHaveBeenCalled();
   });
 
   it("calls loadWeb, evaluateContent, markContentEvaluated for passing metadata", async () => {
-    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
-
-    await handler(event);
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
 
     expect(mockLoadWeb).toHaveBeenCalledWith("https://usopc.org/doc1");
     expect(mockEvalService.evaluateContent).toHaveBeenCalledWith(
@@ -271,11 +269,9 @@ describe("discoveryFeedWorker", () => {
       new Error("Conditional check failed"),
     );
 
-    const event = makeEvent([
+    await handleDiscoveryFeedMessage(
       makeMessage([{ url: "https://usopc.org/existing" }]),
-    ]);
-
-    await handler(event);
+    );
 
     expect(mockEvalService.evaluateMetadata).not.toHaveBeenCalled();
     expect(mockLoadWeb).not.toHaveBeenCalled();
@@ -283,17 +279,15 @@ describe("discoveryFeedWorker", () => {
 
   it("individual URL failures don't block others", async () => {
     mockEntity.create
-      .mockRejectedValueOnce(new Error("DynamoDB transient error"))
+      .mockRejectedValueOnce(new Error("Transient DB error"))
       .mockResolvedValueOnce({});
 
-    const event = makeEvent([
+    await handleDiscoveryFeedMessage(
       makeMessage([
         { url: "https://usopc.org/failing" },
         { url: "https://usopc.org/succeeding" },
       ]),
-    ]);
-
-    await handler(event);
+    );
 
     // Second URL should still be processed
     expect(mockEvalService.evaluateMetadata).toHaveBeenCalledTimes(1);
@@ -304,37 +298,15 @@ describe("discoveryFeedWorker", () => {
     );
   });
 
-  it("returns batchItemFailures for malformed JSON", async () => {
-    const event: SQSEvent = {
-      Records: [
-        {
-          messageId: "bad-msg",
-          receiptHandle: "handle",
-          body: "not json",
-          attributes: {} as any,
-          messageAttributes: {},
-          md5OfBody: "",
-          eventSource: "aws:sqs",
-          eventSourceARN: "arn:aws:sqs:us-east-1:000:queue",
-          awsRegion: "us-east-1",
-        },
-      ],
-    };
-
-    const result = await handler(event);
-
-    expect(result.batchItemFailures).toEqual([{ itemIdentifier: "bad-msg" }]);
-  });
-
-  it("records error on DDB item when metadata eval fails", async () => {
+  it("records error on DB item when metadata eval fails", async () => {
     mockEntity.create.mockResolvedValue({});
     mockEvalService.evaluateMetadata.mockRejectedValueOnce(
       new Error("Anthropic API credit exhausted"),
     );
 
-    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
-
-    await handler(event);
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
 
     expect(mockEntity.recordError).toHaveBeenCalledWith(
       "test-id-hash",
@@ -352,11 +324,9 @@ describe("discoveryFeedWorker", () => {
       url: "https://usopc.org/stuck",
     });
 
-    const event = makeEvent([
+    await handleDiscoveryFeedMessage(
       makeMessage([{ url: "https://usopc.org/stuck" }]),
-    ]);
-
-    await handler(event);
+    );
 
     expect(mockEvalService.evaluateMetadata).toHaveBeenCalled();
   });
@@ -371,11 +341,9 @@ describe("discoveryFeedWorker", () => {
       url: "https://usopc.org/stuck",
     });
 
-    const event = makeEvent([
+    await handleDiscoveryFeedMessage(
       makeMessage([{ url: "https://usopc.org/stuck" }]),
-    ]);
-
-    await handler(event);
+    );
 
     expect(mockEvalService.evaluateMetadata).toHaveBeenCalled();
   });
@@ -390,11 +358,9 @@ describe("discoveryFeedWorker", () => {
       url: "https://usopc.org/approved",
     });
 
-    const event = makeEvent([
+    await handleDiscoveryFeedMessage(
       makeMessage([{ url: "https://usopc.org/approved" }]),
-    ]);
-
-    await handler(event);
+    );
 
     expect(mockEvalService.evaluateMetadata).not.toHaveBeenCalled();
   });
@@ -409,31 +375,27 @@ describe("discoveryFeedWorker", () => {
       url: "https://usopc.org/stuck",
     });
 
-    const event = makeEvent([
+    await handleDiscoveryFeedMessage(
       makeMessage([{ url: "https://usopc.org/stuck" }]),
-    ]);
-
-    await handler(event);
+    );
 
     expect(mockEntity.clearError).toHaveBeenCalledWith("test-id-hash");
   });
 
   it("does not call clearError for fresh URLs", async () => {
-    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
-
-    await handler(event);
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
 
     expect(mockEntity.clearError).not.toHaveBeenCalled();
   });
 
   it("uses autoApprovalThreshold from message when provided", async () => {
-    const event = makeEvent([
+    await handleDiscoveryFeedMessage(
       makeMessage([{ url: "https://usopc.org/doc1" }], {
         autoApprovalThreshold: 0.9,
       }),
-    ]);
-
-    await handler(event);
+    );
 
     expect(mockEntity.markContentEvaluated).toHaveBeenCalledWith(
       expect.any(String),
@@ -452,9 +414,9 @@ describe("discoveryFeedWorker", () => {
     );
     mockEntity.recordError.mockResolvedValueOnce({ errorCount: 3 });
 
-    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
-
-    await handler(event);
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
 
     expect(mockEntity.recordError).toHaveBeenCalledWith(
       "test-id-hash",
@@ -475,9 +437,9 @@ describe("discoveryFeedWorker", () => {
     );
     mockEntity.recordError.mockResolvedValueOnce({ errorCount: 2 });
 
-    const event = makeEvent([makeMessage([{ url: "https://usopc.org/doc1" }])]);
-
-    await handler(event);
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
 
     expect(mockEntity.recordError).toHaveBeenCalled();
     expect(mockEntity.update).not.toHaveBeenCalledWith(

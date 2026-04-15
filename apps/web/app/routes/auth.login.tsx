@@ -9,6 +9,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const callbackUrl = url.searchParams.get("callbackUrl") ?? "/admin";
   if (session?.user?.email) {
+    // Don't redirect non-admin users to admin pages — they'd just bounce back
+    const isAdminUrl = callbackUrl.startsWith("/admin");
+    const isAdmin = (session.user as Record<string, unknown>).role === "admin";
+    if (isAdminUrl && !isAdmin) {
+      return redirect("/");
+    }
     return redirect(callbackUrl);
   }
   return {};

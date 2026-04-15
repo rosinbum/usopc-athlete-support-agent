@@ -1,20 +1,41 @@
 /**
  * Database migration runner.
  *
- * Resolves DATABASE_URL via SST Resource bindings (getDatabaseUrl from @usopc/shared)
+ * Resolves DATABASE_URL from environment (via .env.local or Cloud Run env)
  * and runs node-pg-migrate programmatically.
  *
- * Usage: sst shell --stage <stage> -- npx tsx scripts/run-migrations.ts
+ * On a fresh database (e.g. new Cloud SQL instance), the bootstrap schema
+ * (init-db.sql) is applied first to create extensions and base tables.
+ * All statements use IF NOT EXISTS, so this is a no-op on existing databases.
+ *
+ * Usage: dotenv -e .env.local -- npx tsx scripts/run-migrations.ts
  */
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runner } from "node-pg-migrate";
-import { getDatabaseUrl } from "@usopc/shared";
+import { getDatabaseUrl, getPool, closePool } from "@usopc/shared";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
+/**
+ * Execute init-db.sql to ensure extensions and base tables exist.
+ * All statements are IF NOT EXISTS, making this safe for existing databases.
+ */
+async function bootstrapSchema(): Promise<void> {
+  const sqlPath = resolve(__dirname, "init-db.sql");
+  const sql = await readFile(sqlPath, "utf-8");
+  const pool = getPool();
+  await pool.query(sql);
+  console.log("Bootstrap schema applied (init-db.sql).");
+  await closePool();
+}
+
 async function main(): Promise<void> {
   const databaseUrl = getDatabaseUrl();
+
+  await bootstrapSchema();
+
   console.log("Running database migrations...");
 
   const migrations = await runner({

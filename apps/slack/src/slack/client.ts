@@ -29,7 +29,7 @@ let client: WebClient | undefined;
 
 export function getSlackClient(): WebClient {
   if (!client) {
-    client = new WebClient(getSecretValue("SLACK_BOT_TOKEN", "SlackBotToken"));
+    client = new WebClient(getSecretValue("SLACK_BOT_TOKEN"));
   }
   return client;
 }

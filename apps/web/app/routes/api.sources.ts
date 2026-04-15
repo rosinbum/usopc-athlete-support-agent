@@ -186,7 +186,7 @@ async function handleList(url: URL) {
         metadata->>'effectiveDate' as effective_date,
         MIN(ingested_at) as ingested_at,
         COUNT(*) as chunk_count,
-        MAX(metadata->>'s3Key') as s3_key
+        MAX(metadata->>'storageKey') as storage_key
       FROM document_chunks
       ${whereClause}
       GROUP BY ${COL.source_url}, ${COL.document_title}, ${COL.document_type},
@@ -202,7 +202,7 @@ async function handleList(url: URL) {
   const total = parseInt(countResult.rows[0]?.total ?? "0", 10);
   const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
 
-  // Strip internal fields (s3Key, ngbId, chunkCount) from unauthenticated response
+  // Strip internal fields (storageKey, ngbId, chunkCount) from unauthenticated response
   const documents = dataResult.rows.map((row) => ({
     sourceUrl: row.source_url,
     documentTitle: row.document_title,

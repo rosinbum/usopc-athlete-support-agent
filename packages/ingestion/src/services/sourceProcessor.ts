@@ -30,8 +30,8 @@ export interface ProcessSourceResult {
   status: "completed" | "failed";
   chunksCount: number;
   contentHash?: string | undefined;
-  s3Key?: string | undefined;
-  s3VersionId?: string | undefined;
+  storageKey?: string | undefined;
+  storageVersionId?: string | undefined;
   error?: string | undefined;
 }
 
@@ -57,15 +57,15 @@ async function fetchContent(url: string): Promise<Buffer> {
 }
 
 /**
- * Upload content to S3. Returns key/versionId on success, undefined on
- * failure (non-fatal — ingestion proceeds without S3 archival).
+ * Upload content to cloud storage. Returns key/versionId on success, undefined
+ * on failure (non-fatal — ingestion proceeds without archival).
  */
-async function uploadToS3(
+async function uploadToStorage(
   bucketName: string,
   source: IngestionSource,
   content: Buffer,
   contentHash: string,
-): Promise<{ s3Key?: string; s3VersionId?: string }> {
+): Promise<{ storageKey?: string; storageVersionId?: string }> {
   try {
     const storage = new DocumentStorageService(bucketName);
     const expectedKey = storage.getKeyForSource(
@@ -76,9 +76,9 @@ async function uploadToS3(
 
     if (await storage.documentExists(expectedKey)) {
       logger.info(
-        `S3 document already exists for ${source.id}, skipping upload`,
+        `Document already exists in storage for ${source.id}, skipping upload`,
       );
-      return { s3Key: expectedKey };
+      return { storageKey: expectedKey };
     }
 
     const result = await storage.storeDocument(
@@ -89,22 +89,23 @@ async function uploadToS3(
       { title: source.title, documentType: source.documentType },
     );
     return {
-      s3Key: result.key,
+      storageKey: result.key,
       ...(result.versionId !== undefined
-        ? { s3VersionId: result.versionId }
+        ? { storageVersionId: result.versionId }
         : {}),
     };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown S3 error";
+    const msg =
+      error instanceof Error ? error.message : "Unknown storage error";
     logger.warn(
-      `S3 upload failed for ${source.id} — ingestion will continue: ${msg}`,
+      `Storage upload failed for ${source.id} — ingestion will continue: ${msg}`,
     );
     return {};
   }
 }
 
 /**
- * Best-effort DynamoDB source config update. Swallows errors so ingestion
+ * Best-effort source config update. Swallows errors so ingestion
  * flow is never interrupted by stats bookkeeping failures.
  */
 async function updateSourceConfig(
@@ -114,8 +115,8 @@ async function updateSourceConfig(
     | {
         type: "success";
         contentHash: string;
-        s3Key?: string | undefined;
-        s3VersionId?: string | undefined;
+        storageKey?: string | undefined;
+        storageVersionId?: string | undefined;
       }
     | { type: "failure"; error: string },
 ): Promise<void> {
@@ -123,9 +124,11 @@ async function updateSourceConfig(
   try {
     if (update.type === "success") {
       await entity.markSuccess(sourceId, update.contentHash, {
-        ...(update.s3Key !== undefined ? { s3Key: update.s3Key } : {}),
-        ...(update.s3VersionId !== undefined
-          ? { s3VersionId: update.s3VersionId }
+        ...(update.storageKey !== undefined
+          ? { storageKey: update.storageKey }
+          : {}),
+        ...(update.storageVersionId !== undefined
+          ? { storageVersionId: update.storageVersionId }
           : {}),
       });
     } else {
@@ -133,7 +136,7 @@ async function updateSourceConfig(
     }
   } catch (err) {
     logger.warn(
-      `Failed to update DynamoDB stats for ${sourceId}: ${err instanceof Error ? err.message : "Unknown error"}`,
+      `Failed to update source config stats for ${sourceId}: ${err instanceof Error ? err.message : "Unknown error"}`,
     );
   }
 }
@@ -144,10 +147,10 @@ async function updateSourceConfig(
 
 /**
  * Single code path for per-source ingestion:
- *   fetch → hash → S3 → mark ingesting → ingest → update DynamoDB
+ *   fetch → hash → upload → mark ingesting → ingest → update source config
  *
- * Re-throws {@link QuotaExhaustedError} so callers (e.g. the SQS worker)
- * can handle quota exhaustion at the batch level.
+ * Re-throws {@link QuotaExhaustedError} so callers can handle quota
+ * exhaustion at the batch level.
  */
 export async function processSource(
   opts: ProcessSourceOptions,
@@ -179,8 +182,8 @@ export async function processSource(
   // 2. Compute content hash
   const contentHash = hashBuffer(content);
 
-  // 3. Upload to S3 (non-fatal on failure)
-  const { s3Key, s3VersionId } = await uploadToS3(
+  // 3. Upload to storage (non-fatal on failure)
+  const { storageKey, storageVersionId } = await uploadToStorage(
     bucketName,
     source,
     content,
@@ -200,10 +203,10 @@ export async function processSource(
     openaiApiKey,
     content,
     vectorStore,
-    ...(s3Key !== undefined ? { s3Key } : {}),
+    ...(storageKey !== undefined ? { storageKey } : {}),
   });
 
-  // 6. Update DynamoDB status
+  // 6. Update source config status
   if (result.status === "completed") {
     await upsertIngestionStatus(
       ingestionLogEntity,
@@ -215,8 +218,8 @@ export async function processSource(
     await updateSourceConfig(sourceConfigEntity, source.id, {
       type: "success",
       contentHash,
-      s3Key,
-      s3VersionId,
+      storageKey,
+      storageVersionId,
     });
   } else {
     await upsertIngestionStatus(
@@ -236,8 +239,8 @@ export async function processSource(
     status: result.status,
     chunksCount: result.chunksCount,
     contentHash,
-    s3Key,
-    s3VersionId,
+    storageKey,
+    storageVersionId,
     error: result.error,
   };
 }

@@ -1,10 +1,10 @@
 import {
   createLogger,
-  createAppTable,
+  getPool,
   parseEnvInt,
   parseEnvFloat,
 } from "@usopc/shared";
-import { getAppTableName } from "../entities/index.js";
+import type { Pool } from "pg";
 
 const logger = createLogger({ service: "cost-tracker" });
 
@@ -62,16 +62,6 @@ const DEFAULT_ANTHROPIC_MONTHLY_BUDGET = 10; // dollars
 // Helper Functions
 // ---------------------------------------------------------------------------
 
-/**
- * Get the current date in ISO format (YYYY-MM-DD)
- */
-function getCurrentDate(): string {
-  return new Date().toISOString().split("T")[0]!;
-}
-
-/**
- * Get the start date for a given period
- */
 function getPeriodStart(period: "daily" | "weekly" | "monthly"): string {
   const now = new Date();
 
@@ -80,7 +70,6 @@ function getPeriodStart(period: "daily" | "weekly" | "monthly"): string {
   }
 
   if (period === "weekly") {
-    // Get Monday of current week
     const day = now.getDay();
     const diff = now.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(now.setDate(diff));
@@ -91,9 +80,6 @@ function getPeriodStart(period: "daily" | "weekly" | "monthly"): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
-/**
- * Calculate Anthropic API cost from token usage
- */
 function calculateAnthropicCost(
   inputTokens: number,
   outputTokens: number,
@@ -109,38 +95,13 @@ function calculateAnthropicCost(
 // CostTracker
 // ---------------------------------------------------------------------------
 
-/**
- * Service for tracking API usage costs and enforcing budgets.
- *
- * Features:
- * - Track Tavily API usage (calls and estimated credits)
- * - Track Anthropic API usage (calls, tokens, estimated cost)
- * - Store daily/weekly/monthly metrics in DynamoDB
- * - Budget threshold checks with environment variables
- * - Supports multiple periods for rollup queries
- */
 export class CostTracker {
-  private table: ReturnType<typeof createAppTable>;
-  private model;
+  private pool: Pool;
 
-  constructor(table?: ReturnType<typeof createAppTable>) {
-    if (table) {
-      this.table = table;
-    } else {
-      this.table = createAppTable(getAppTableName());
-    }
-
-    this.model = this.table.getModel("UsageMetric");
+  constructor(pool?: Pool) {
+    this.pool = pool ?? getPool();
   }
 
-  // ---------------------------------------------------------------------------
-  // Tracking Methods
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Track a Tavily API call.
-   * Automatically estimates credits based on the method (search = 1, map = 5).
-   */
   async trackTavilyCall(method: "search" | "map"): Promise<void> {
     const credits =
       method === "map" ? TAVILY_CREDITS_PER_MAP : TAVILY_CREDITS_PER_SEARCH;
@@ -156,9 +117,6 @@ export class CostTracker {
     });
   }
 
-  /**
-   * Track an Anthropic API call with token usage.
-   */
   async trackAnthropicCall(
     inputTokens: number,
     outputTokens: number,
@@ -182,9 +140,6 @@ export class CostTracker {
     });
   }
 
-  /**
-   * Increment usage metrics for all periods (daily, weekly, monthly).
-   */
   private async incrementMetrics(
     service: "tavily" | "anthropic",
     increments: {
@@ -204,16 +159,32 @@ export class CostTracker {
 
     for (const period of periods) {
       const date = getPeriodStart(period);
-      const pk = `Usage#${service}`;
-      const sk = `${period}#${date}`;
 
       try {
-        await this.model.update(
-          { service, period, date },
-          {
-            add: increments,
-            exists: null, // Create if doesn't exist
-          },
+        await this.pool.query(
+          `INSERT INTO usage_metrics (service, period, date,
+             tavily_calls, tavily_credits,
+             anthropic_calls, anthropic_input_tokens, anthropic_output_tokens, anthropic_cost)
+           VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT (service, period, date) DO UPDATE SET
+             tavily_calls = usage_metrics.tavily_calls + EXCLUDED.tavily_calls,
+             tavily_credits = usage_metrics.tavily_credits + EXCLUDED.tavily_credits,
+             anthropic_calls = usage_metrics.anthropic_calls + EXCLUDED.anthropic_calls,
+             anthropic_input_tokens = usage_metrics.anthropic_input_tokens + EXCLUDED.anthropic_input_tokens,
+             anthropic_output_tokens = usage_metrics.anthropic_output_tokens + EXCLUDED.anthropic_output_tokens,
+             anthropic_cost = usage_metrics.anthropic_cost + EXCLUDED.anthropic_cost,
+             updated_at = NOW()`,
+          [
+            service,
+            period,
+            date,
+            increments.tavilyCalls ?? 0,
+            increments.tavilyCredits ?? 0,
+            increments.anthropicCalls ?? 0,
+            increments.anthropicInputTokens ?? 0,
+            increments.anthropicOutputTokens ?? 0,
+            increments.anthropicCost ?? 0,
+          ],
         );
       } catch (error) {
         logger.error(`Error incrementing ${service} ${period} metrics`, {
@@ -227,16 +198,6 @@ export class CostTracker {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Budget Checks
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Check if current usage is within budget for a service.
-   * Uses environment variables for budget limits:
-   * - TAVILY_MONTHLY_BUDGET (default: 1000 credits)
-   * - ANTHROPIC_MONTHLY_BUDGET (default: $10)
-   */
   async checkBudget(service: "tavily" | "anthropic"): Promise<BudgetStatus> {
     const budget =
       service === "tavily"
@@ -276,9 +237,6 @@ export class CostTracker {
     };
   }
 
-  /**
-   * Check all service budgets and return status for each.
-   */
   async checkAllBudgets(): Promise<BudgetStatus[]> {
     const services: Array<"tavily" | "anthropic"> = ["tavily", "anthropic"];
     const results: BudgetStatus[] = [];
@@ -290,13 +248,6 @@ export class CostTracker {
     return results;
   }
 
-  // ---------------------------------------------------------------------------
-  // Query Methods
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Get usage statistics for a service and period.
-   */
   async getUsageStats(
     service: "tavily" | "anthropic",
     period: "daily" | "weekly" | "monthly",
@@ -304,30 +255,29 @@ export class CostTracker {
     const date = getPeriodStart(period);
 
     try {
-      const item = await this.model.get({ service, period, date });
+      const { rows } = await this.pool.query(
+        "SELECT * FROM usage_metrics WHERE service = $1 AND period = $2 AND date = $3::date",
+        [service, period, date],
+      );
 
-      const stats: UsageStats = {
-        service,
-        period,
-        date,
-      };
+      const stats: UsageStats = { service, period, date };
 
-      if (item) {
+      if (rows.length > 0) {
+        const row = rows[0];
         if (service === "tavily") {
           stats.tavily = {
-            calls: (item.tavilyCalls as number) ?? 0,
-            estimatedCredits: (item.tavilyCredits as number) ?? 0,
+            calls: (row.tavily_calls as number) ?? 0,
+            estimatedCredits: (row.tavily_credits as number) ?? 0,
           };
         } else {
           stats.anthropic = {
-            calls: (item.anthropicCalls as number) ?? 0,
-            inputTokens: (item.anthropicInputTokens as number) ?? 0,
-            outputTokens: (item.anthropicOutputTokens as number) ?? 0,
-            estimatedCost: (item.anthropicCost as number) ?? 0,
+            calls: (row.anthropic_calls as number) ?? 0,
+            inputTokens: (row.anthropic_input_tokens as number) ?? 0,
+            outputTokens: (row.anthropic_output_tokens as number) ?? 0,
+            estimatedCost: (row.anthropic_cost as number) ?? 0,
           };
         }
       } else {
-        // No data yet, return zeros
         if (service === "tavily") {
           stats.tavily = { calls: 0, estimatedCredits: 0 };
         } else {
@@ -352,9 +302,6 @@ export class CostTracker {
     }
   }
 
-  /**
-   * Get all usage statistics (all services, all periods).
-   */
   async getAllUsageStats(): Promise<UsageStats[]> {
     const services: Array<"tavily" | "anthropic"> = ["tavily", "anthropic"];
     const periods: Array<"daily" | "weekly" | "monthly"> = [
@@ -374,12 +321,6 @@ export class CostTracker {
   }
 }
 
-/**
- * Create a CostTracker instance.
- * Useful for dependency injection and testing.
- */
-export function createCostTracker(
-  table?: ReturnType<typeof createAppTable>,
-): CostTracker {
-  return new CostTracker(table);
+export function createCostTracker(pool?: Pool): CostTracker {
+  return new CostTracker(pool);
 }

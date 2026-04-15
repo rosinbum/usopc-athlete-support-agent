@@ -1,9 +1,9 @@
 import {
   createLogger,
-  createAppTable,
-  DiscoveredSourceEntity,
+  createDiscoveredSourceEntity,
+  getSecretValue,
+  type DiscoveredSourceEntity,
 } from "@usopc/shared";
-import { Resource } from "sst";
 import { DiscoveryService } from "./services/discoveryService.js";
 import { EvaluationService } from "./services/evaluationService.js";
 import { loadWeb } from "./loaders/webLoader.js";
@@ -27,7 +27,7 @@ export interface DiscoveryStats {
  * 2. Metadata Evaluation: Fast pre-filter
  * 3. Content Extraction: Load web content for relevant URLs
  * 4. Content Evaluation: Deep LLM analysis
- * 5. Storage: Save to DynamoDB with evaluation results
+ * 5. Storage: Save to database with evaluation results
  */
 export class DiscoveryCoordinator {
   private discoveryService: DiscoveryService;
@@ -46,8 +46,7 @@ export class DiscoveryCoordinator {
       anthropicApiKey: config.anthropicApiKey ?? "",
     });
 
-    const table = createAppTable(Resource.AppTable.name);
-    this.discoveredSourceEntity = new DiscoveredSourceEntity(table);
+    this.discoveredSourceEntity = createDiscoveredSourceEntity();
   }
 
   /**
@@ -274,13 +273,13 @@ export class DiscoveryCoordinator {
 }
 
 /**
- * Factory function to create a DiscoveryCoordinator with secrets loaded from SST.
+ * Factory function to create a DiscoveryCoordinator with secrets from env.
  */
 export function createDiscoveryCoordinator(
   config: Omit<DiscoveryConfig, "tavilyApiKey" | "anthropicApiKey">,
 ): DiscoveryCoordinator {
-  const tavilyApiKey = Resource.TavilyApiKey.value;
-  const anthropicApiKey = Resource.AnthropicApiKey.value;
+  const tavilyApiKey = getSecretValue("TAVILY_API_KEY");
+  const anthropicApiKey = getSecretValue("ANTHROPIC_API_KEY");
 
   return new DiscoveryCoordinator({
     ...config,

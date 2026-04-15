@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock @usopc/shared
+const { mockSendMessage } = vi.hoisted(() => ({
+  mockSendMessage: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@usopc/shared", () => ({
   createLogger: vi.fn(() => ({
     info: vi.fn(),
@@ -17,23 +20,13 @@ vi.mock("@usopc/shared", () => ({
     };
     return resources[key];
   }),
-}));
-
-// Mock SST Resource
-vi.mock("sst", () => ({
-  Resource: {
-    TavilyApiKey: { value: "test-tavily-key" },
-    DiscoveryFeedQueue: { url: "https://sqs.us-east-1.amazonaws.com/queue" },
-  },
-}));
-
-// Mock SQS
-const { mockSqsSend } = vi.hoisted(() => ({
-  mockSqsSend: vi.fn().mockResolvedValue({}),
-}));
-vi.mock("@aws-sdk/client-sqs", () => ({
-  SQSClient: vi.fn(() => ({ send: mockSqsSend })),
-  SendMessageCommand: vi.fn(),
+  getSecretValue: vi.fn(() => "test-tavily-key"),
+  createQueueService: () => ({
+    sendMessage: mockSendMessage,
+    sendMessageBatch: vi.fn(),
+    purge: vi.fn(),
+    getStats: vi.fn(),
+  }),
 }));
 
 // Mock DiscoveryService
@@ -42,11 +35,8 @@ vi.mock("./services/discoveryService.js", () => ({
 }));
 
 // Import after mocks
-import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import { DiscoveryOrchestrator } from "./discoveryOrchestrator.js";
 import { DiscoveryService } from "./services/discoveryService.js";
-
-const MockSendMessageCommand = vi.mocked(SendMessageCommand);
 
 describe("DiscoveryOrchestrator", () => {
   beforeEach(() => {
@@ -103,7 +93,7 @@ describe("DiscoveryOrchestrator", () => {
 
       expect(stats.discovered).toBe(0);
       expect(stats.enqueued).toBe(0);
-      expect(mockSqsSend).not.toHaveBeenCalled();
+      expect(mockSendMessage).not.toHaveBeenCalled();
     });
 
     it("should enqueue discovered URLs via SQS", async () => {
@@ -132,11 +122,10 @@ describe("DiscoveryOrchestrator", () => {
 
       expect(stats.discovered).toBe(1);
       expect(stats.enqueued).toBe(1);
-      expect(mockSqsSend).toHaveBeenCalledTimes(1);
-      expect(MockSendMessageCommand).toHaveBeenCalledWith(
-        expect.objectContaining({
-          QueueUrl: "https://sqs.us-east-1.amazonaws.com/queue",
-        }),
+      expect(mockSendMessage).toHaveBeenCalledTimes(1);
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        "https://sqs.us-east-1.amazonaws.com/queue",
+        expect.any(String),
       );
     });
 
@@ -240,12 +229,12 @@ describe("DiscoveryOrchestrator", () => {
 
       expect(stats.discovered).toBe(1);
       expect(stats.enqueued).toBe(1);
-      expect(mockSqsSend).toHaveBeenCalledTimes(1);
+      expect(mockSendMessage).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("dry run mode", () => {
-    it("should not send SQS messages in dry run", async () => {
+    it("should not send queue messages in dry run", async () => {
       vi.mocked(DiscoveryService).mockImplementation(
         () =>
           ({
@@ -272,7 +261,7 @@ describe("DiscoveryOrchestrator", () => {
 
       expect(stats.discovered).toBe(1);
       expect(stats.enqueued).toBe(1);
-      expect(mockSqsSend).not.toHaveBeenCalled();
+      expect(mockSendMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -292,7 +281,7 @@ describe("DiscoveryOrchestrator", () => {
     });
   });
 
-  describe("SQS message format", () => {
+  describe("Queue message format", () => {
     it("includes autoApprovalThreshold in message", async () => {
       vi.mocked(DiscoveryService).mockImplementation(
         () =>
@@ -317,8 +306,8 @@ describe("DiscoveryOrchestrator", () => {
 
       await orchestrator.discoverFromDomains(["usopc.org"], 10);
 
-      const commandArg = MockSendMessageCommand.mock.calls[0]![0]!;
-      const body = JSON.parse(commandArg.MessageBody!);
+      const messageBody = mockSendMessage.mock.calls[0]![1] as string;
+      const body = JSON.parse(messageBody);
       expect(body.autoApprovalThreshold).toBe(0.9);
       expect(body.urls).toHaveLength(1);
       expect(body.timestamp).toBeDefined();

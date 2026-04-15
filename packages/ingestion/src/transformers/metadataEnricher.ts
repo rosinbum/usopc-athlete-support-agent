@@ -12,7 +12,7 @@ const log = logger.child({ service: "metadata-enricher" });
 export function enrichMetadata(
   chunks: Document[],
   source: IngestionSource,
-  options?: { s3Key?: string | undefined } | undefined,
+  options?: { storageKey?: string | undefined } | undefined,
 ): Document[] {
   if (source.ngbId && !NGB_ID_SET.has(source.ngbId)) {
     log.warn(
@@ -38,7 +38,7 @@ export function enrichMetadata(
       chunkIndex: index,
       ingestedAt: new Date().toISOString(),
       authorityLevel: source.authorityLevel,
-      ...(options?.s3Key ? { s3Key: options.s3Key } : {}),
+      ...(options?.storageKey ? { storageKey: options.storageKey } : {}),
     },
   }));
 }

@@ -3,29 +3,22 @@
  * Unified seed script — initializes the full local dev environment.
  *
  * Sequence:
- *   1. PG schema init   — runs init-db.sql
- *   2. DynamoDB seed     — seeds source configs + sport organizations
- *   3. Document ingest   — optional, requires OPENAI_API_KEY
+ *   1. PG schema init   — runs init-db.sql + seeds source configs/sport orgs
+ *   2. Document ingest   — optional, requires OPENAI_API_KEY
  *
  * Usage:
  *   pnpm seed                     # full setup (ingest if API key available)
- *   pnpm seed -- --skip-ingest    # PG + DynamoDB only
- *   pnpm seed -- --force          # overwrite DynamoDB + re-ingest all
- *   pnpm seed -- --dry-run        # preview DynamoDB changes, skip ingest
+ *   pnpm seed -- --skip-ingest    # PG only
+ *   pnpm seed -- --force          # re-ingest all
+ *   pnpm seed -- --dry-run        # preview changes, skip ingest
  *
- * Requires SST context (run via `pnpm seed` which uses `sst shell`).
+ * Requires env vars (run via `pnpm seed` which uses `dotenv -e .env.local`).
  */
 
 import { Pool } from "pg";
-import { Resource } from "sst";
-import { getDatabaseUrl, getSecretValue, createLogger } from "@usopc/shared";
+import { getDatabaseUrl, getSecretValue, getResource, createLogger } from "@usopc/shared";
 import { createRawEmbeddings, createVectorStore } from "@usopc/core";
 import { initDatabase, loadAllSources } from "./seed-db.js";
-import {
-  seedSourceConfigs,
-  seedSportOrgs,
-  type CliOptions,
-} from "./seed-dynamodb.js";
 import {
   createIngestionLogEntity,
   createSourceConfigEntity,
@@ -84,31 +77,25 @@ async function main(): Promise<void> {
   // with the shared pool used by PGVectorStore during ingestion.
   await pool.end();
 
-  // Step 2: DynamoDB seed
-  logger.info("--- Step 2: DynamoDB seed ---");
-  const dynamoOptions: CliOptions = { dryRun, force };
-  await seedSourceConfigs(dynamoOptions);
-  await seedSportOrgs(dynamoOptions);
-
-  // Step 3: Document ingestion (optional)
+  // Step 2: Document ingestion (optional)
   if (dryRun) {
-    logger.info("--- Step 3: Skipping ingestion (--dry-run) ---");
+    logger.info("--- Step 2: Skipping ingestion (--dry-run) ---");
   } else if (skipIngest) {
-    logger.info("--- Step 3: Skipping ingestion (--skip-ingest) ---");
+    logger.info("--- Step 2: Skipping ingestion (--skip-ingest) ---");
   } else {
     let openaiApiKey: string | undefined;
     try {
-      openaiApiKey = getSecretValue("OPENAI_API_KEY", "OpenaiApiKey");
+      openaiApiKey = getSecretValue("OPENAI_API_KEY");
     } catch {
       // Key not available — skip gracefully
     }
 
     if (!openaiApiKey) {
       logger.warn(
-        "--- Step 3: Skipping ingestion (OPENAI_API_KEY not found) ---",
+        "--- Step 2: Skipping ingestion (OPENAI_API_KEY not found) ---",
       );
     } else {
-      logger.info("--- Step 3: Document ingestion ---");
+      logger.info("--- Step 2: Document ingestion ---");
       const sources = await loadAllSources();
       logger.info(`Loaded ${sources.length} source configuration(s)`);
 
@@ -137,7 +124,7 @@ async function main(): Promise<void> {
         const result = await processSource({
           source,
           openaiApiKey,
-          bucketName: Resource.DocumentsBucket.name,
+          bucketName: getResource("DocumentsBucket").name,
           ingestionLogEntity,
           sourceConfigEntity,
           vectorStore,

@@ -5,14 +5,24 @@ import type {
   BudgetAlert,
 } from "./notificationService.js";
 
-// Mock AWS SES
-vi.mock("@aws-sdk/client-ses", () => {
-  const mockSend = vi.fn();
-  return {
-    SESClient: vi.fn(() => ({ send: mockSend })),
-    SendEmailCommand: vi.fn((params) => params),
-  };
-});
+// Mock Resend
+const mockResendSend = vi.fn().mockResolvedValue({ data: { id: "test-id" } });
+vi.mock("resend", () => ({
+  Resend: vi.fn(() => ({
+    emails: { send: mockResendSend },
+  })),
+}));
+
+// Mock @usopc/shared
+vi.mock("@usopc/shared", () => ({
+  createLogger: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+  getSecretValue: () => "re_test_key",
+}));
 
 describe("NotificationService", () => {
   let service: NotificationService;
@@ -152,16 +162,16 @@ describe("NotificationService", () => {
     });
 
     it("should send email when configured", async () => {
-      // Create service first so SESClient constructor is called
       service = new NotificationService({ email: "admin@test.com" });
-
-      const { SESClient } = await import("@aws-sdk/client-ses");
-      const mockSend = vi.mocked(SESClient).mock.results[0]!.value.send;
-      vi.mocked(mockSend).mockResolvedValue({});
 
       await service.sendDiscoveryCompletion(mockSummary);
 
-      expect(mockSend).toHaveBeenCalled();
+      expect(mockResendSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: ["admin@test.com"],
+          subject: expect.stringContaining("Source Discovery Run Complete"),
+        }),
+      );
     });
   });
 

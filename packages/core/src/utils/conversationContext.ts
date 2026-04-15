@@ -16,7 +16,7 @@ const MAX_MESSAGE_LENGTH = 500;
 
 /**
  * Returns the maximum number of conversation turns to include in context.
- * Configurable via CONVERSATION_MAX_TURNS env var (set in sst.config.ts).
+ * Configurable via CONVERSATION_MAX_TURNS env var.
  */
 export function getMaxTurns(): number {
   return parseEnvInt("CONVERSATION_MAX_TURNS", DEFAULT_MAX_TURNS);

@@ -304,8 +304,8 @@ export function SourceDetailPanel({
       lastError: source.lastError ?? "None",
     },
     Storage: {
-      s3Key: source.s3Key ?? "\u2014",
-      s3VersionId: source.s3VersionId ?? "\u2014",
+      storageKey: source.storageKey ?? "\u2014",
+      storageVersionId: source.storageVersionId ?? "\u2014",
     },
     Timestamps: {
       createdAt: formatDateTime(source.createdAt),

@@ -8,12 +8,12 @@ export default defineConfig({
     // ESM .js extension resolution — mirrors the webpack extensionAlias from next.config.ts
     extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
   },
+  // Load .env.local from the monorepo root
+  envDir: "../..",
   server: {
     port: 3000,
   },
   ssr: {
-    // Don't bundle SST — it reads env vars at runtime
     noExternal: ["@usopc/shared", "@usopc/core"],
-    external: ["sst"],
   },
 });

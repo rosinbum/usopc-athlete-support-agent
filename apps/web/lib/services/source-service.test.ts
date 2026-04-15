@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockDeleteChunks = vi.fn().mockResolvedValue(0);
 const mockUpdateChunkMetadata = vi.fn().mockResolvedValue(0);
 
+const mockSendMessage = vi.fn().mockResolvedValue(undefined);
 vi.mock("@usopc/shared", () => ({
   deleteChunksBySourceId: (...args: unknown[]) => mockDeleteChunks(...args),
   updateChunkMetadataBySourceId: (...args: unknown[]) =>
@@ -14,18 +15,18 @@ vi.mock("@usopc/shared", () => ({
   getResource: vi.fn((key: string) => {
     if (key === "IngestionQueue")
       return { url: "https://sqs.us-east-1.amazonaws.com/test-queue" };
-    throw new Error(`SST Resource '${key}' not available`);
+    throw new Error(`Resource '${key}' not available`);
   }),
   getPool: () => "mock-pool",
+  createQueueService: () => ({
+    sendMessage: mockSendMessage,
+    sendMessageBatch: vi.fn(),
+    purge: vi.fn(),
+    getStats: vi.fn(),
+  }),
   logger: {
     child: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() })),
   },
-}));
-
-const mockSqsSend = vi.fn();
-vi.mock("@aws-sdk/client-sqs", () => ({
-  SQSClient: vi.fn(() => ({ send: mockSqsSend })),
-  SendMessageCommand: vi.fn((input: unknown) => input),
 }));
 
 import {
@@ -53,8 +54,8 @@ const SAMPLE_SOURCE = {
   lastContentHash: null,
   consecutiveFailures: 0,
   lastError: null,
-  s3Key: null,
-  s3VersionId: null,
+  storageKey: null,
+  storageVersionId: null,
   createdAt: "2025-01-01T00:00:00Z",
   updatedAt: "2025-01-01T00:00:00Z",
 };
@@ -100,17 +101,17 @@ describe("triggerIngestion", () => {
     vi.clearAllMocks();
   });
 
-  it("sends SQS message and returns triggered: true", async () => {
-    mockSqsSend.mockResolvedValueOnce({});
+  it("sends queue message and returns triggered: true", async () => {
+    mockSendMessage.mockResolvedValueOnce({});
 
     const result = await triggerIngestion(SAMPLE_SOURCE);
 
     expect(result).toEqual({ triggered: true });
-    expect(mockSqsSend).toHaveBeenCalledOnce();
+    expect(mockSendMessage).toHaveBeenCalledOnce();
   });
 
-  it("throws when SQS send fails", async () => {
-    mockSqsSend.mockRejectedValueOnce(new Error("SQS error"));
+  it("throws when queue send fails", async () => {
+    mockSendMessage.mockRejectedValueOnce(new Error("SQS error"));
 
     await expect(triggerIngestion(SAMPLE_SOURCE)).rejects.toThrow("SQS error");
   });
@@ -213,7 +214,7 @@ describe("updateSource", () => {
       update: vi.fn().mockResolvedValueOnce(updated),
     } as never;
     mockDeleteChunks.mockResolvedValueOnce(10);
-    mockSqsSend.mockResolvedValueOnce({});
+    mockSendMessage.mockResolvedValueOnce({});
 
     const result = await updateSource(
       "usopc-bylaws",
@@ -225,7 +226,7 @@ describe("updateSource", () => {
     expect(result.actions.chunksDeleted).toBe(10);
     expect(result.actions.reIngestionTriggered).toBe(true);
     expect(mockDeleteChunks).toHaveBeenCalledWith("mock-pool", "usopc-bylaws");
-    expect(mockSqsSend).toHaveBeenCalledOnce();
+    expect(mockSendMessage).toHaveBeenCalledOnce();
   });
 
   it("content-affecting change wins over metadata change", async () => {
@@ -238,7 +239,7 @@ describe("updateSource", () => {
       update: vi.fn().mockResolvedValueOnce(updated),
     } as never;
     mockDeleteChunks.mockResolvedValueOnce(3);
-    mockSqsSend.mockResolvedValueOnce({});
+    mockSendMessage.mockResolvedValueOnce({});
 
     const result = await updateSource(
       "usopc-bylaws",
@@ -252,13 +253,13 @@ describe("updateSource", () => {
     expect(mockUpdateChunkMetadata).not.toHaveBeenCalled();
   });
 
-  it("proceeds with update when SQS fails for content change", async () => {
+  it("proceeds with update when queue fails for content change", async () => {
     const updated = { ...SAMPLE_SOURCE, url: "https://example.com/new.pdf" };
     const entity = {
       update: vi.fn().mockResolvedValueOnce(updated),
     } as never;
     mockDeleteChunks.mockResolvedValueOnce(2);
-    mockSqsSend.mockRejectedValueOnce(new Error("SQS unavailable"));
+    mockSendMessage.mockRejectedValueOnce(new Error("SQS unavailable"));
 
     const result = await updateSource(
       "usopc-bylaws",

@@ -6,7 +6,7 @@ const logger = createLogger({ service: "invite-guard" });
 /**
  * Checks whether a Slack user is on the invite list by looking up their
  * email address via the Slack users.info API and checking against the
- * DynamoDB InviteEntity.
+ * InviteEntity.
  *
  * Requires the `users:read.email` scope on the bot token.
  *

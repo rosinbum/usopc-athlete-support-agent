@@ -102,7 +102,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     return Response.json({ source }, { status: 201 });
   } catch (error) {
-    // DynamoDB ConditionalCheckFailedException means ID already exists
+    // Unique constraint violation means ID already exists
     if (
       error instanceof Error &&
       error.name === "ConditionalCheckFailedException"
