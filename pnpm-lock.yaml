@@ -108,6 +108,12 @@ importers:
       '@fontsource-variable/inter':
         specifier: ^5.2.8
         version: 5.2.8
+      '@google-cloud/pubsub':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@google-cloud/storage':
+        specifier: ^7.19.0
+        version: 7.19.0
       '@react-router/express':
         specifier: ^7.14.0
         version: 7.14.0(express@5.2.1)(react-router@7.14.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3)
@@ -9042,7 +9048,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.14.0)
+      retry-axios: 2.6.0(axios@1.14.0(debug@4.4.3))
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -10208,7 +10214,7 @@ snapshots:
 
   resolve-pkg-maps@1.0.0: {}
 
-  retry-axios@2.6.0(axios@1.14.0):
+  retry-axios@2.6.0(axios@1.14.0(debug@4.4.3)):
     dependencies:
       axios: 1.14.0(debug@4.4.3)
 
