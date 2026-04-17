@@ -1,7 +1,7 @@
 import type { Route } from "./+types/api.admin.discoveries.$id.js";
 import { z } from "zod";
 import { REPROCESSABLE_STATUSES, logger } from "@usopc/shared";
-import { getSession } from "../../server/session.js";
+import { getAdminSession } from "../../server/session.js";
 
 const log = logger.child({ service: "admin-discoveries" });
 import { createDiscoveredSourceEntity } from "../../lib/discovered-source.js";
@@ -16,7 +16,7 @@ import { enqueueForReprocess } from "../../lib/services/discovery-reprocess.js";
 // ---------------------------------------------------------------------------
 
 async function requireAdmin(request: Request) {
-  const session = await getSession(request);
+  const session = await getAdminSession(request);
   if (!session?.user?.email) return apiError("Unauthorized", 401);
   if (session.user.role !== "admin") return apiError("Forbidden", 403);
   return null;
@@ -140,7 +140,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     // -----------------------------------------------------------------------
     // approve / reject
     // -----------------------------------------------------------------------
-    const session = await getSession(request);
+    const session = await getAdminSession(request);
     const reviewedBy = session?.user?.email ?? "unknown";
 
     if (patchAction === "approve") {

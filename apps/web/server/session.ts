@@ -27,7 +27,22 @@ const ANONYMOUS_SESSION: AppSession = {
  */
 export async function getSession(request: Request): Promise<AppSession | null> {
   if (AUTH_DISABLED) return ANONYMOUS_SESSION;
+  return readAuthSession(request);
+}
 
+/**
+ * Like getSession, but ignores REQUIRE_AUTH — always hits @auth/core so
+ * the anonymous shim never masks the real session. Use for admin-gated
+ * loaders/actions so /admin keeps requiring a real GitHub login even
+ * when REQUIRE_AUTH=false.
+ */
+export async function getAdminSession(
+  request: Request,
+): Promise<AppSession | null> {
+  return readAuthSession(request);
+}
+
+async function readAuthSession(request: Request): Promise<AppSession | null> {
   const url = new URL(request.url);
   const sessionUrl = `${url.protocol}//${url.host}/api/auth/session`;
 

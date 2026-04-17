@@ -8,7 +8,7 @@ import {
   getResource,
   type DiscoveryStatus,
 } from "@usopc/shared";
-import { getSession } from "../../server/session.js";
+import { getAdminSession } from "../../server/session.js";
 import { apiError } from "../../lib/apiResponse.js";
 
 const log = logger.child({ service: "admin-monitoring" });
@@ -65,7 +65,7 @@ async function getDiscoveryCounts(
 // ---------------------------------------------------------------------------
 
 async function requireAdmin(request: Request) {
-  const session = await getSession(request);
+  const session = await getAdminSession(request);
   if (!session?.user?.email) return apiError("Unauthorized", 401);
   if (session.user.role !== "admin") return apiError("Forbidden", 403);
   return null;
