@@ -223,10 +223,13 @@ jobs:
 
       - name: Health checks
         run: |
+          # Web is public (allUsers invoker), no auth needed.
           echo "Checking web service..."
           curl -sf "${{ steps.urls.outputs.web_url }}/api/health" || exit 1
 
+          # Worker is private — use an identity token from the deploy SA.
+          TOKEN=$(gcloud auth print-identity-token --audiences="${{ steps.urls.outputs.worker_url }}")
           echo "Checking worker service..."
-          curl -sf "${{ steps.urls.outputs.worker_url }}/health" || exit 1
+          curl -sf -H "Authorization: Bearer $TOKEN" "${{ steps.urls.outputs.worker_url }}/health" || exit 1
 
           echo "All health checks passed!"
