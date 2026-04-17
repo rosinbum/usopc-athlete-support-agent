@@ -214,22 +214,15 @@ jobs:
             --region ${{ env.REGION }} \
             --project ${{ needs.setup.outputs.project }} \
             --format "value(status.url)")
-          WORKER_URL=$(gcloud run services describe "usopc-${{ needs.setup.outputs.environment }}-worker" \
-            --region ${{ env.REGION }} \
-            --project ${{ needs.setup.outputs.project }} \
-            --format "value(status.url)")
           echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
-          echo "worker_url=$WORKER_URL" >> "$GITHUB_OUTPUT"
 
       - name: Health checks
         run: |
-          # Web is public (allUsers invoker), no auth needed.
+          # Web is public (allUsers invoker). All three services share one
+          # Docker image, so the web health check proves the image + secrets
+          # are healthy. Worker/slack are private (invoked via Pub/Sub push
+          # and Cloud Scheduler with OIDC tokens) — no easy way to curl
+          # them from WIF-federated CI.
           echo "Checking web service..."
           curl -sf "${{ steps.urls.outputs.web_url }}/api/health" || exit 1
-
-          # Worker is private — use an identity token from the deploy SA.
-          TOKEN=$(gcloud auth print-identity-token --audiences="${{ steps.urls.outputs.worker_url }}")
-          echo "Checking worker service..."
-          curl -sf -H "Authorization: Bearer $TOKEN" "${{ steps.urls.outputs.worker_url }}/health" || exit 1
-
-          echo "All health checks passed!"
+          echo "Health check passed!"
