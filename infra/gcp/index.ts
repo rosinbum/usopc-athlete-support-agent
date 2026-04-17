@@ -308,7 +308,7 @@ const webService = new gcp.cloudrunv2.Service(`${prefix}-web`, {
         volumeMounts: [cloudSqlMount],
         envs: [
           { name: "NODE_ENV", value: "production" },
-          { name: "REQUIRE_AUTH", value: "true" },
+          { name: "REQUIRE_AUTH", value: "false" },
           { name: "STORAGE_PROVIDER", value: "gcs" },
           { name: "QUEUE_PROVIDER", value: "pubsub" },
           {

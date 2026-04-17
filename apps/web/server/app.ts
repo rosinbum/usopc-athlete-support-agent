@@ -1,6 +1,13 @@
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import express from "express";
 import { createRequestHandler } from "@react-router/express";
 import { authHandler } from "./auth.js";
+
+// Resolve paths relative to this file so the server works regardless of
+// process.cwd() (Cloud Run runs `tsx apps/web/server/app.ts` from /app).
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const webRoot = resolve(__dirname, "..");
 
 const app = express();
 
@@ -74,11 +81,11 @@ if (isDev) {
   );
 } else {
   // Production: serve static assets + pre-built server bundle
-  app.use(express.static("build/client", { maxAge: "1h" }));
+  app.use(express.static(resolve(webRoot, "build/client"), { maxAge: "1h" }));
   // The server build is produced by `react-router build` at deploy time and
   // doesn't exist during typecheck. Use a dynamic specifier so TS can't try
   // to resolve it statically.
-  const serverBuildPath = "../build/server/index.js";
+  const serverBuildPath = resolve(webRoot, "build/server/index.js");
   app.all(
     "*splat",
     createRequestHandler({
