@@ -248,7 +248,12 @@ const registryUrl = pulumi.interpolate`${region}-docker.pkg.dev/${project}/${reg
 
 // All three Cloud Run services share one image; they're differentiated by the
 // `command` passed to the container. See Dockerfile at the repo root.
-const appImage = pulumi.interpolate`${registryUrl}/app:latest`;
+//
+// Pin to the commit SHA so Cloud Run forces a new revision on every deploy.
+// Referencing `:latest` would leave Pulumi seeing an unchanged string even as
+// the underlying digest moves, so no revision would be created.
+const imageTag = process.env.IMAGE_TAG ?? "latest";
+const appImage = pulumi.interpolate`${registryUrl}/app:${imageTag}`;
 
 // Helper: build a secret env var referencing Secret Manager
 function secretEnv(envName: string, secretName: string) {
