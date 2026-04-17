@@ -329,6 +329,7 @@ const webService = new gcp.cloudrunv2.Service(`${prefix}-web`, {
           secretEnv("GITHUB_CLIENT_SECRET", "GITHUB_CLIENT_SECRET"),
           secretEnv("ADMIN_EMAILS", "ADMIN_EMAILS"),
           secretEnv("RESEND_API_KEY", "RESEND_API_KEY"),
+          secretEnv("TAVILY_API_KEY", "TAVILY_API_KEY"),
         ],
       },
     ],
