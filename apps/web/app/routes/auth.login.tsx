@@ -2,10 +2,10 @@ import { redirect } from "react-router";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import type { Route } from "./+types/auth.login";
-import { getSession } from "../../server/session.js";
+import { getAdminSession } from "../../server/session.js";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const session = await getSession(request);
+  const session = await getAdminSession(request);
   const url = new URL(request.url);
   const callbackUrl = url.searchParams.get("callbackUrl") ?? "/admin";
   if (session?.user?.email) {

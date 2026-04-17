@@ -1,13 +1,13 @@
 import type { Route } from "./+types/api.admin.discovery.run.js";
 import { logger, createDiscoveryRunEntity } from "@usopc/shared";
-import { getSession } from "../../server/session.js";
+import { getAdminSession } from "../../server/session.js";
 import { apiError } from "../../lib/apiResponse.js";
 import { runDiscovery } from "../../lib/services/discovery-service.js";
 
 const log = logger.child({ service: "admin-discovery-run" });
 
 export async function action({ request }: Route.ActionArgs) {
-  const session = await getSession(request);
+  const session = await getAdminSession(request);
   if (!session?.user?.email) return apiError("Unauthorized", 401);
   if (session.user.role !== "admin") return apiError("Forbidden", 403);
 

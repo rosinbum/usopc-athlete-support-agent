@@ -10,7 +10,7 @@ import {
 } from "@usopc/shared";
 
 const log = logger.child({ service: "admin-sources" });
-import { getSession } from "../../server/session.js";
+import { getAdminSession } from "../../server/session.js";
 import { createSourceConfigEntity } from "../../lib/source-config.js";
 import { apiError } from "../../lib/apiResponse.js";
 import {
@@ -23,7 +23,7 @@ import {
 // ---------------------------------------------------------------------------
 
 async function requireAdmin(request: Request) {
-  const session = await getSession(request);
+  const session = await getAdminSession(request);
   if (!session?.user?.email) return apiError("Unauthorized", 401);
   if (session.user.role !== "admin") return apiError("Forbidden", 403);
   return null;

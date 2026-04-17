@@ -1,5 +1,5 @@
 import type { Route } from "./+types/api.admin.invites.js";
-import { getSession } from "../../server/session.js";
+import { getAdminSession } from "../../server/session.js";
 import { sendInviteEmail } from "../../lib/send-invite-email.js";
 import { createInviteEntity, logger } from "@usopc/shared";
 import { z } from "zod";
@@ -11,7 +11,7 @@ const log = logger.child({ route: "admin/invites" });
 // ---------------------------------------------------------------------------
 
 async function requireAdmin(request: Request) {
-  const session = await getSession(request);
+  const session = await getAdminSession(request);
   if (!session?.user?.email)
     return {
       denied: Response.json({ error: "Unauthorized" }, { status: 401 }),
@@ -84,7 +84,7 @@ export async function action({ request }: Route.ActionArgs) {
 
 async function handlePost(
   request: Request,
-  session: NonNullable<Awaited<ReturnType<typeof getSession>>>,
+  session: NonNullable<Awaited<ReturnType<typeof getAdminSession>>>,
 ) {
   let body: unknown;
   try {
@@ -158,7 +158,7 @@ async function handleDelete(request: Request) {
 
 async function handlePatch(
   request: Request,
-  session: NonNullable<Awaited<ReturnType<typeof getSession>>>,
+  session: NonNullable<Awaited<ReturnType<typeof getAdminSession>>>,
 ) {
   let body: unknown;
   try {
