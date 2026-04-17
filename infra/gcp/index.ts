@@ -330,6 +330,16 @@ const webService = new gcp.cloudrunv2.Service(`${prefix}-web`, {
   },
 });
 
+// Allow unauthenticated access to the web service — the app handles its
+// own auth (GitHub OAuth) and needs to be reachable from browsers.
+new gcp.cloudrunv2.ServiceIamMember(`${prefix}-web-public`, {
+  name: webService.name,
+  location: region,
+  project,
+  role: "roles/run.invoker",
+  member: "allUsers",
+});
+
 // Slack bot
 const slackService = new gcp.cloudrunv2.Service(`${prefix}-slack`, {
   name: `${prefix}-slack`,
