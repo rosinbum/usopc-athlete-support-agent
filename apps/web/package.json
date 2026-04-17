@@ -27,6 +27,7 @@
     "@usopc/shared": "workspace:*",
     "ai": "^6.0.0",
     "express": "^5.2.1",
+    "google-auth-library": "^10.0.0",
     "highlight.js": "^11.11.1",
     "isbot": "^5",
     "lucide-react": "^0.577.0",
