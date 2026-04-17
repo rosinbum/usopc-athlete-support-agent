@@ -15,5 +15,17 @@ export default defineConfig({
   },
   ssr: {
     noExternal: ["@usopc/shared", "@usopc/core"],
+    // Google Cloud SDKs use CommonJS internals (__dirname, dynamic requires)
+    // that break when bundled into ESM. Keep them external so Node loads them
+    // from node_modules with CJS resolution at runtime.
+    external: [
+      "@google-cloud/pubsub",
+      "@google-cloud/storage",
+      "google-gax",
+      "google-auth-library",
+      "google-proto-files",
+      "@grpc/grpc-js",
+      "@grpc/proto-loader",
+    ],
   },
 });
