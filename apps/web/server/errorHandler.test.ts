@@ -25,13 +25,11 @@ describe("webErrorHandler", () => {
     jsonSpy = vi.fn();
     sendSpy = vi.fn();
     typeSpy = vi.fn().mockImplementation(() => ({ send: sendSpy }));
-    statusSpy = vi
-      .fn()
-      .mockImplementation(() => ({
-        json: jsonSpy,
-        type: typeSpy,
-        send: sendSpy,
-      }));
+    statusSpy = vi.fn().mockImplementation(() => ({
+      json: jsonSpy,
+      type: typeSpy,
+      send: sendSpy,
+    }));
 
     res = {
       headersSent: false,
