@@ -240,6 +240,28 @@ const discoveryFeedDlqTopic = new gcp.pubsub.Topic(
   },
 );
 
+// DLQ retention subscriptions — Pub/Sub retains messages per-subscription, not
+// per-topic, so without these any message delivered to a DLQ topic is dropped
+// immediately. Pull subscriptions let us inspect or replay dead-lettered
+// payloads via `gcloud pubsub subscriptions pull` or a custom script.
+new gcp.pubsub.Subscription(`${prefix}-ingestion-dlq-sub`, {
+  name: `${prefix}-ingestion-dlq-sub`,
+  topic: ingestionDlqTopic.name,
+  project,
+  ackDeadlineSeconds: 60,
+  messageRetentionDuration: "604800s", // 7 days (Pub/Sub max)
+  expirationPolicy: { ttl: "" }, // never expire
+});
+
+new gcp.pubsub.Subscription(`${prefix}-discovery-feed-dlq-sub`, {
+  name: `${prefix}-discovery-feed-dlq-sub`,
+  topic: discoveryFeedDlqTopic.name,
+  project,
+  ackDeadlineSeconds: 60,
+  messageRetentionDuration: "604800s",
+  expirationPolicy: { ttl: "" },
+});
+
 // ---------------------------------------------------------------------------
 // Cloud Run Services
 // ---------------------------------------------------------------------------
