@@ -383,6 +383,13 @@ const slackService = new gcp.cloudrunv2.Service(`${prefix}-slack`, {
 });
 
 // Worker (consolidated ingestion + discovery)
+//
+// Discovery-feed handlers load full webpage content into memory while running
+// LLM calls. The Cloud Run default concurrency (80) meant each instance could
+// be asked to process dozens of requests in parallel off ~2 GiB shared memory,
+// which triggered SIGABRT (OOM) and ~30% 503s during discovery runs. We pin
+// concurrency low enough that each in-flight request gets a realistic memory
+// slice, and bump total memory so scrape + LLM state comfortably fits.
 const workerService = new gcp.cloudrunv2.Service(`${prefix}-worker`, {
   name: `${prefix}-worker`,
   location: region,
@@ -394,6 +401,7 @@ const workerService = new gcp.cloudrunv2.Service(`${prefix}-worker`, {
       maxInstanceCount: maxInstances,
     },
     timeout: "900s", // 15 minutes for long ingestion tasks
+    maxInstanceRequestConcurrency: 10,
     volumes: [cloudSqlVolume],
     containers: [
       {
@@ -403,7 +411,7 @@ const workerService = new gcp.cloudrunv2.Service(`${prefix}-worker`, {
         args: ["packages/ingestion/dist/httpServer.js"],
         ports: { containerPort: 8080 },
         resources: {
-          limits: { cpu: "2", memory: "2Gi" },
+          limits: { cpu: "2", memory: "4Gi" },
         },
         volumeMounts: [cloudSqlMount],
         envs: [
