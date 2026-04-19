@@ -12,6 +12,8 @@ import { DiscoveryConfig } from "./types.js";
 const logger = createLogger({ service: "discovery-orchestrator" });
 const queueService = createQueueService();
 
+export const DISCOVERY_FEED_CHUNK_SIZE = 15;
+
 export interface DiscoveryStats {
   discovered: number;
   enqueued: number;
@@ -199,32 +201,41 @@ export class DiscoveryOrchestrator {
       return;
     }
 
-    const message: DiscoveryFeedMessage = {
-      urls: newUrls.map((u) => ({
-        url: u.url,
-        title: u.title,
-        discoveryMethod: u.discoveryMethod,
-        discoveredFrom: u.discoveredFrom,
-      })),
-      autoApprovalThreshold: this.config.autoApprovalThreshold,
-      timestamp: new Date().toISOString(),
-    };
+    // Chunk URLs into smaller messages so the feed worker doesn't exceed its
+    // ack deadline or run out of memory processing 100+ URLs sequentially.
+    const chunks: (typeof newUrls)[] = [];
+    for (let i = 0; i < newUrls.length; i += DISCOVERY_FEED_CHUNK_SIZE) {
+      chunks.push(newUrls.slice(i, i + DISCOVERY_FEED_CHUNK_SIZE));
+    }
 
-    try {
-      const queueUrl = getResource("DiscoveryFeedQueue").url;
+    const queueUrl = getResource("DiscoveryFeedQueue").url;
 
-      await queueService.sendMessage(queueUrl, JSON.stringify(message));
+    for (const chunk of chunks) {
+      const message: DiscoveryFeedMessage = {
+        urls: chunk.map((u) => ({
+          url: u.url,
+          title: u.title,
+          discoveryMethod: u.discoveryMethod,
+          discoveredFrom: u.discoveredFrom,
+        })),
+        autoApprovalThreshold: this.config.autoApprovalThreshold,
+        timestamp: new Date().toISOString(),
+      };
 
-      this.stats.enqueued += newUrls.length;
-      logger.info(`Enqueued ${newUrls.length} URLs to discovery feed`, {
-        count: newUrls.length,
-      });
-    } catch (error) {
-      logger.error("Failed to enqueue URLs to discovery feed", {
-        error: error instanceof Error ? error.message : String(error),
-        count: newUrls.length,
-      });
-      this.stats.errors++;
+      try {
+        await queueService.sendMessage(queueUrl, JSON.stringify(message));
+
+        this.stats.enqueued += chunk.length;
+        logger.info(`Enqueued ${chunk.length} URLs to discovery feed`, {
+          count: chunk.length,
+        });
+      } catch (error) {
+        logger.error("Failed to enqueue URLs to discovery feed", {
+          error: error instanceof Error ? error.message : String(error),
+          count: chunk.length,
+        });
+        this.stats.errors++;
+      }
     }
     this.notifyProgress();
   }
