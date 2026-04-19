@@ -11,6 +11,12 @@ const webRoot = resolve(__dirname, "..");
 
 const app = express();
 
+// Cloud Run terminates TLS at the frontend and forwards plain HTTP with
+// X-Forwarded-Proto: https. Without this, req.protocol returns "http" and
+// the OAuth redirect_uri sent to GitHub is http://…/api/auth/callback/github,
+// which doesn't match the https:// callback registered on the OAuth app.
+app.set("trust proxy", true);
+
 // ---------------------------------------------------------------------------
 // Security headers
 // ---------------------------------------------------------------------------
