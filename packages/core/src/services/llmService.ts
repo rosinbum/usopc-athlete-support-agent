@@ -3,9 +3,11 @@ import type { AIMessage, BaseMessage } from "@langchain/core/messages";
 import {
   CircuitBreaker,
   CircuitBreakerError,
+  isQuotaError,
   logger,
   type CircuitBreakerMetrics,
 } from "@usopc/shared";
+import { alertIfQuotaError, notifyOnCircuitOpen } from "./alerts.js";
 
 const log = logger.child({ service: "llm-circuit" });
 
@@ -27,14 +29,20 @@ const llmCircuit = new CircuitBreaker({
   requestTimeout: 30_000,
   successThreshold: 2,
   logger: log,
+  onOpen: notifyOnCircuitOpen("llm"),
 });
 
 /**
  * Returns true for errors that are likely transient and worth retrying:
  * network errors, timeouts, and HTTP 429/500/502/503/529.
+ *
+ * Quota/billing exhaustion is explicitly NOT transient — retrying a 429 with
+ * `insufficient_quota` just burns time — so we filter those out here and
+ * surface them via `alertIfQuotaError` instead.
  */
 export function isTransientError(error: unknown): boolean {
   if (error instanceof CircuitBreakerError) return false;
+  if (isQuotaError(error)) return false;
 
   if (error instanceof Error) {
     const msg = error.message.toLowerCase();
@@ -124,12 +132,17 @@ export async function invokeLlm(
   model: BaseChatModel,
   messages: BaseMessage[],
 ): Promise<AIMessage> {
-  return llmCircuit.execute(() =>
-    withSingleRetry(
-      () => model.invoke(messages) as Promise<AIMessage>,
-      "invokeLlm",
-    ),
-  );
+  try {
+    return await llmCircuit.execute(() =>
+      withSingleRetry(
+        () => model.invoke(messages) as Promise<AIMessage>,
+        "invokeLlm",
+      ),
+    );
+  } catch (error) {
+    alertIfQuotaError("anthropic", error);
+    throw error;
+  }
 }
 
 /**
@@ -149,7 +162,10 @@ export async function invokeLlmWithFallback(
       withSingleRetry(
         () => model.invoke(messages) as Promise<AIMessage>,
         "invokeLlm",
-      ),
+      ).catch((error) => {
+        alertIfQuotaError("anthropic", error);
+        throw error;
+      }),
     fallback,
   );
 }

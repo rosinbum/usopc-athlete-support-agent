@@ -30,6 +30,16 @@ export interface CircuitBreakerConfig {
 
   /** Optional filter to decide if an error should be recorded as a failure */
   shouldRecordFailure?: (error: Error) => boolean;
+
+  /**
+   * Optional callback fired when the circuit transitions to `open`. Receives
+   * the error that triggered the open (or `undefined` if tripped manually).
+   * Callback errors are swallowed so notifications never break request flow.
+   */
+  onOpen?: (error: Error | undefined) => void | Promise<void>;
+
+  /** Optional callback fired when the circuit transitions back to `closed`. */
+  onClose?: () => void | Promise<void>;
 }
 
 /**
@@ -139,6 +149,10 @@ export class CircuitBreaker {
   private readonly successThreshold: number;
   private readonly logger?: Logger | undefined;
   private readonly shouldRecordFailure: (error: Error) => boolean;
+  private readonly onOpen?:
+    | ((error: Error | undefined) => void | Promise<void>)
+    | undefined;
+  private readonly onClose?: (() => void | Promise<void>) | undefined;
 
   private state: CircuitBreakerState = "closed";
   private consecutiveFailures = 0;
@@ -160,6 +174,8 @@ export class CircuitBreaker {
     this.successThreshold = config.successThreshold ?? 2;
     this.logger = config.logger;
     this.shouldRecordFailure = config.shouldRecordFailure ?? (() => true);
+    this.onOpen = config.onOpen;
+    this.onClose = config.onClose;
   }
 
   /**
@@ -262,7 +278,7 @@ export class CircuitBreaker {
     this.consecutiveFailures = this.failureThreshold;
     this.lastFailureTime = Date.now();
     this.nextAttemptTime = Date.now() + this.resetTimeout;
-    this.transitionTo("open");
+    this.transitionTo("open", undefined);
   }
 
   private onSuccess(): void {
@@ -296,18 +312,21 @@ export class CircuitBreaker {
     if (this.state === "half-open") {
       // Any failure in half-open state reopens the circuit
       this.nextAttemptTime = Date.now() + this.resetTimeout;
-      this.transitionTo("open");
+      this.transitionTo("open", error);
     } else if (
       this.state === "closed" &&
       this.consecutiveFailures >= this.failureThreshold
     ) {
       // Threshold exceeded, open the circuit
       this.nextAttemptTime = Date.now() + this.resetTimeout;
-      this.transitionTo("open");
+      this.transitionTo("open", error);
     }
   }
 
-  private transitionTo(newState: CircuitBreakerState): void {
+  private transitionTo(
+    newState: CircuitBreakerState,
+    triggeringError?: Error | undefined,
+  ): void {
     if (this.state === newState) return;
 
     const oldState = this.state;
@@ -319,5 +338,41 @@ export class CircuitBreaker {
       to: newState,
       consecutiveFailures: this.consecutiveFailures,
     });
+
+    if (newState === "open" && this.onOpen) {
+      this.invokeCallback(() => this.onOpen!(triggeringError), "onOpen");
+    } else if (newState === "closed" && this.onClose) {
+      this.invokeCallback(() => this.onClose!(), "onClose");
+    }
+  }
+
+  /**
+   * Invokes a user-supplied state callback, swallowing any error it throws or
+   * rejects with. Callbacks must never be able to take down the request flow
+   * that tripped the circuit.
+   */
+  private invokeCallback(fn: () => void | Promise<void>, name: string): void {
+    try {
+      const result = fn();
+      if (result && typeof (result as Promise<void>).then === "function") {
+        (result as Promise<void>).catch((error) => {
+          this.logger?.warn(
+            `Circuit breaker '${this.name}' ${name} callback failed`,
+            {
+              circuit: this.name,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          );
+        });
+      }
+    } catch (error) {
+      this.logger?.warn(
+        `Circuit breaker '${this.name}' ${name} callback failed`,
+        {
+          circuit: this.name,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+    }
   }
 }

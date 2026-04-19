@@ -648,4 +648,126 @@ describe("CircuitBreaker", () => {
       expect(error.cause).toBe(cause);
     });
   });
+
+  describe("onOpen / onClose callbacks", () => {
+    it("fires onOpen with the triggering error when threshold is reached", async () => {
+      const onOpen = vi.fn();
+      const circuit = createCircuitBreaker({ failureThreshold: 2, onOpen });
+
+      const err = new Error("boom");
+      await expect(
+        circuit.execute(async () => {
+          throw err;
+        }),
+      ).rejects.toBe(err);
+      expect(onOpen).not.toHaveBeenCalled();
+
+      await expect(
+        circuit.execute(async () => {
+          throw err;
+        }),
+      ).rejects.toBe(err);
+
+      expect(circuit.getState()).toBe("open");
+      expect(onOpen).toHaveBeenCalledTimes(1);
+      expect(onOpen).toHaveBeenCalledWith(err);
+    });
+
+    it("fires onOpen with undefined when tripped manually", () => {
+      const onOpen = vi.fn();
+      const circuit = createCircuitBreaker({ onOpen });
+      circuit.trip();
+      expect(onOpen).toHaveBeenCalledTimes(1);
+      expect(onOpen).toHaveBeenCalledWith(undefined);
+    });
+
+    it("fires onOpen again when the circuit reopens from half-open", async () => {
+      const onOpen = vi.fn();
+      const circuit = createCircuitBreaker({
+        failureThreshold: 2,
+        resetTimeout: 1000,
+        successThreshold: 1,
+        onOpen,
+      });
+
+      const fail = async () => {
+        throw new Error("fail");
+      };
+
+      // Trip to open
+      await expect(circuit.execute(fail)).rejects.toThrow();
+      await expect(circuit.execute(fail)).rejects.toThrow();
+      expect(onOpen).toHaveBeenCalledTimes(1);
+
+      // Advance to half-open
+      vi.advanceTimersByTime(1001);
+      expect(circuit.getState()).toBe("half-open");
+
+      // Fail once in half-open → reopen
+      await expect(circuit.execute(fail)).rejects.toThrow();
+      expect(circuit.getState()).toBe("open");
+      expect(onOpen).toHaveBeenCalledTimes(2);
+    });
+
+    it("fires onClose when the circuit transitions back to closed", async () => {
+      const onClose = vi.fn();
+      const circuit = createCircuitBreaker({
+        failureThreshold: 2,
+        resetTimeout: 1000,
+        successThreshold: 1,
+        onClose,
+      });
+
+      // Open the circuit
+      const fail = async () => {
+        throw new Error("fail");
+      };
+      await expect(circuit.execute(fail)).rejects.toThrow();
+      await expect(circuit.execute(fail)).rejects.toThrow();
+      expect(onClose).not.toHaveBeenCalled();
+
+      // Advance to half-open, then succeed to close
+      vi.advanceTimersByTime(1001);
+      await circuit.execute(async () => "ok");
+      expect(circuit.getState()).toBe("closed");
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not fire onClose when manually reset from an already-closed state", () => {
+      const onClose = vi.fn();
+      const circuit = createCircuitBreaker({ onClose });
+      circuit.reset();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("swallows synchronous errors thrown from onOpen", async () => {
+      const onOpen = vi.fn(() => {
+        throw new Error("callback boom");
+      });
+      const circuit = createCircuitBreaker({ failureThreshold: 1, onOpen });
+
+      // Should not throw a callback error — the originating error propagates.
+      await expect(
+        circuit.execute(async () => {
+          throw new Error("underlying");
+        }),
+      ).rejects.toThrow("underlying");
+      expect(onOpen).toHaveBeenCalled();
+      expect(circuit.getState()).toBe("open");
+    });
+
+    it("swallows rejected promises from onOpen", async () => {
+      const onOpen = vi.fn(async () => {
+        throw new Error("async callback boom");
+      });
+      const circuit = createCircuitBreaker({ failureThreshold: 1, onOpen });
+
+      await expect(
+        circuit.execute(async () => {
+          throw new Error("underlying");
+        }),
+      ).rejects.toThrow("underlying");
+      expect(onOpen).toHaveBeenCalled();
+    });
+  });
 });

@@ -20,8 +20,10 @@ export {
   ValidationError,
   AuthenticationError,
   RateLimitError,
+  QuotaExceededError,
   ExternalServiceError,
   IngestionError,
+  isQuotaError,
 } from "./errors.js";
 export type { ApiError } from "./errors.js";
 
@@ -169,3 +171,16 @@ export {
   type SendToSourcesResult,
   type SendToSourcesOptions,
 } from "./services/discoveryPromotion.js";
+
+export {
+  NotificationService,
+  createNotificationService,
+  getDefaultNotificationService,
+  resetDefaultNotificationService,
+  type NotificationChannels,
+  type BudgetAlert,
+  type DiscoveryCompletionSummary,
+  type RuntimeAlert,
+  type RuntimeAlertKind,
+  type ThrottleOptions,
+} from "./notificationService.js";

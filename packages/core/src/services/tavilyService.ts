@@ -1,9 +1,11 @@
 import {
   CircuitBreaker,
+  isQuotaError,
   logger,
   type CircuitBreakerMetrics,
 } from "@usopc/shared";
 import type { TavilySearchLike } from "../agent/nodes/researcher.js";
+import { alertIfQuotaError, notifyOnCircuitOpen } from "./alerts.js";
 
 const log = logger.child({ service: "tavily-circuit" });
 
@@ -16,6 +18,9 @@ export type { TavilySearchLike };
  * - failureThreshold: 3 (opens after 3 consecutive failures)
  * - resetTimeout: 30s (web search is a supplementary source)
  * - requestTimeout: 15s (web search should be fast)
+ * - shouldRecordFailure: ignores quota errors — they're account-level and
+ *   won't recover until credits are topped up, so tripping the breaker just
+ *   adds noise. We alert on them separately.
  */
 const tavilyCircuit = new CircuitBreaker({
   name: "tavily",
@@ -24,6 +29,8 @@ const tavilyCircuit = new CircuitBreaker({
   requestTimeout: 15_000,
   successThreshold: 2,
   logger: log,
+  shouldRecordFailure: (error) => !isQuotaError(error),
+  onOpen: notifyOnCircuitOpen("tavily"),
 });
 
 /**
@@ -38,7 +45,12 @@ export async function searchWithTavily(
   search: TavilySearchLike,
   query: string,
 ): Promise<unknown> {
-  return tavilyCircuit.execute(() => search.invoke({ query }));
+  try {
+    return await tavilyCircuit.execute(() => search.invoke({ query }));
+  } catch (error) {
+    alertIfQuotaError("tavily", error);
+    throw error;
+  }
 }
 
 /**
@@ -55,7 +67,11 @@ export async function searchWithTavilyFallback(
   query: string,
 ): Promise<unknown> {
   return tavilyCircuit.executeWithFallback(
-    () => search.invoke({ query }),
+    () =>
+      Promise.resolve(search.invoke({ query })).catch((error: unknown) => {
+        alertIfQuotaError("tavily", error);
+        throw error;
+      }),
     "", // Empty result allows synthesizer to continue with documents only
   );
 }
