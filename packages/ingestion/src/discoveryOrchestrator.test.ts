@@ -35,7 +35,10 @@ vi.mock("./services/discoveryService.js", () => ({
 }));
 
 // Import after mocks
-import { DiscoveryOrchestrator } from "./discoveryOrchestrator.js";
+import {
+  DiscoveryOrchestrator,
+  DISCOVERY_FEED_CHUNK_SIZE,
+} from "./discoveryOrchestrator.js";
 import { DiscoveryService } from "./services/discoveryService.js";
 
 describe("DiscoveryOrchestrator", () => {
@@ -311,6 +314,111 @@ describe("DiscoveryOrchestrator", () => {
       expect(body.autoApprovalThreshold).toBe(0.9);
       expect(body.urls).toHaveLength(1);
       expect(body.timestamp).toBeDefined();
+    });
+  });
+
+  describe("Chunking", () => {
+    function makeUrls(count: number) {
+      return Array.from({ length: count }, (_, i) => ({
+        url: `https://usopc.org/doc-${i}`,
+        title: `Doc ${i}`,
+        method: "map" as const,
+      }));
+    }
+
+    it("publishes a single message when URL count is at or below the chunk size", async () => {
+      vi.mocked(DiscoveryService).mockImplementation(
+        () =>
+          ({
+            discoverFromMap: vi
+              .fn()
+              .mockResolvedValue(makeUrls(DISCOVERY_FEED_CHUNK_SIZE)),
+            discoverFromSearch: vi.fn().mockResolvedValue([]),
+            generateId: vi.fn(),
+          }) as any,
+      );
+
+      const orchestrator = new DiscoveryOrchestrator({
+        tavilyApiKey: "test-key",
+        autoApprovalThreshold: 0.85,
+      });
+
+      const stats = await orchestrator.discoverFromDomains(["usopc.org"], 100);
+
+      expect(stats.enqueued).toBe(DISCOVERY_FEED_CHUNK_SIZE);
+      expect(mockSendMessage).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(mockSendMessage.mock.calls[0]![1] as string);
+      expect(body.urls).toHaveLength(DISCOVERY_FEED_CHUNK_SIZE);
+    });
+
+    it("splits URLs into chunks when above the chunk size", async () => {
+      const total = DISCOVERY_FEED_CHUNK_SIZE * 3 + 2; // 47 URLs for chunk size 15
+      vi.mocked(DiscoveryService).mockImplementation(
+        () =>
+          ({
+            discoverFromMap: vi.fn().mockResolvedValue(makeUrls(total)),
+            discoverFromSearch: vi.fn().mockResolvedValue([]),
+            generateId: vi.fn(),
+          }) as any,
+      );
+
+      const orchestrator = new DiscoveryOrchestrator({
+        tavilyApiKey: "test-key",
+        autoApprovalThreshold: 0.85,
+      });
+
+      const stats = await orchestrator.discoverFromDomains(["usopc.org"], 100);
+
+      const expectedChunks = Math.ceil(total / DISCOVERY_FEED_CHUNK_SIZE);
+      expect(mockSendMessage).toHaveBeenCalledTimes(expectedChunks);
+      expect(stats.enqueued).toBe(total);
+
+      const sentCalls = mockSendMessage.mock.calls;
+      // Every chunk respects the chunk size ceiling
+      for (const call of sentCalls) {
+        const body = JSON.parse(call[1] as string);
+        expect(body.urls.length).toBeLessThanOrEqual(DISCOVERY_FEED_CHUNK_SIZE);
+        expect(body.urls.length).toBeGreaterThan(0);
+      }
+      // Last chunk holds the remainder
+      const lastBody = JSON.parse(
+        sentCalls[sentCalls.length - 1]![1] as string,
+      );
+      expect(lastBody.urls).toHaveLength(total % DISCOVERY_FEED_CHUNK_SIZE);
+
+      // URLs are partitioned, not duplicated
+      const flattened = sentCalls.flatMap(
+        (c) => JSON.parse(c[1] as string).urls as Array<{ url: string }>,
+      );
+      expect(flattened).toHaveLength(total);
+      expect(new Set(flattened.map((u) => u.url)).size).toBe(total);
+    });
+
+    it("continues publishing remaining chunks when one send fails", async () => {
+      const total = DISCOVERY_FEED_CHUNK_SIZE * 2;
+      vi.mocked(DiscoveryService).mockImplementation(
+        () =>
+          ({
+            discoverFromMap: vi.fn().mockResolvedValue(makeUrls(total)),
+            discoverFromSearch: vi.fn().mockResolvedValue([]),
+            generateId: vi.fn(),
+          }) as any,
+      );
+
+      mockSendMessage
+        .mockRejectedValueOnce(new Error("Pub/Sub unavailable"))
+        .mockResolvedValueOnce(undefined);
+
+      const orchestrator = new DiscoveryOrchestrator({
+        tavilyApiKey: "test-key",
+        autoApprovalThreshold: 0.85,
+      });
+
+      const stats = await orchestrator.discoverFromDomains(["usopc.org"], 100);
+
+      expect(mockSendMessage).toHaveBeenCalledTimes(2);
+      expect(stats.enqueued).toBe(DISCOVERY_FEED_CHUNK_SIZE);
+      expect(stats.errors).toBe(1);
     });
   });
 });
