@@ -58,3 +58,32 @@ describe("DiscoveredSourceEntityPg.create", () => {
     expect(sql).toMatch(/'pending_metadata'/);
   });
 });
+
+describe("DiscoveredSourceEntityPg.getStuckPending", () => {
+  it("selects pending_* rows whose updated_at is older than the threshold", async () => {
+    const { pool, query } = makePool();
+    const entity = new DiscoveredSourceEntityPg(pool);
+
+    const results = await entity.getStuckPending(10);
+
+    expect(query).toHaveBeenCalledTimes(1);
+    const [sql, params] = query.mock.calls[0]!;
+    expect(sql).toMatch(/status IN \('pending_metadata', 'pending_content'\)/);
+    expect(sql).toMatch(
+      /updated_at < NOW\(\) - \(\$1 \|\| ' minutes'\)::interval/,
+    );
+    expect(sql).toMatch(/ORDER BY updated_at ASC/);
+    expect(params).toEqual([10, 1000]);
+    expect(results).toHaveLength(1);
+  });
+
+  it("honors a custom limit", async () => {
+    const { pool, query } = makePool();
+    const entity = new DiscoveredSourceEntityPg(pool);
+
+    await entity.getStuckPending(30, { limit: 50 });
+
+    const [, params] = query.mock.calls[0]!;
+    expect(params).toEqual([30, 50]);
+  });
+});

@@ -398,6 +398,33 @@ export function DiscoveriesAdminClient() {
     }
   }
 
+  async function bulkReprocessStuck() {
+    setActionError(null);
+    try {
+      const data = await triggerBulk({
+        action: "reprocess_stuck",
+        olderThanMinutes: 10,
+      });
+      const parts: string[] = [];
+      if (data && data.found && data.found > 0)
+        parts.push(`${data.found} stuck`);
+      if (data && data.queued && data.queued > 0)
+        parts.push(`${data.queued} re-queued`);
+      if (data && data.failed && data.failed > 0)
+        parts.push(`${data.failed} failed`);
+      window.alert(
+        parts.length > 0
+          ? `Re-queue stuck: ${parts.join(", ")}`
+          : "No stuck discoveries found",
+      );
+      await mutate();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Re-queue stuck failed",
+      );
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Sort handler
   // -------------------------------------------------------------------------
@@ -591,7 +618,7 @@ export function DiscoveriesAdminClient() {
       {(stats.approvedUnlinked > 0 ||
         stats.pendingReview > 0 ||
         stats.withErrors > 0) && (
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
           {stats.approvedUnlinked > 0 && (
             <button
               onClick={() => bulkSendToSources()}
@@ -634,6 +661,19 @@ export function DiscoveriesAdminClient() {
               Retry Errored ({stats.withErrors})
             </button>
           )}
+          <button
+            onClick={bulkReprocessStuck}
+            disabled={bulkLoading}
+            className="px-4 py-2 text-sm rounded-lg font-medium bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2"
+            title="Republish pending rows whose worker delivery stalled (updated_at older than 10 minutes)"
+          >
+            {bulkLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            Re-queue Stuck
+          </button>
         </div>
       )}
 

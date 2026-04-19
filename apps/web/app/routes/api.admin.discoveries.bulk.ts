@@ -45,6 +45,10 @@ const bulkSchema = z.discriminatedUnion("action", [
     ids: z.array(z.string().min(1)).optional(),
     erroredOnly: z.boolean().optional(),
   }),
+  z.object({
+    action: z.literal("reprocess_stuck"),
+    olderThanMinutes: z.number().int().min(1).max(10_080).optional(),
+  }),
 ]);
 
 // ---------------------------------------------------------------------------
@@ -118,6 +122,22 @@ export async function action({ request }: Route.ActionArgs) {
         duplicateUrl,
         notApproved,
         failed,
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // reprocess_stuck — republish pending_* rows whose worker delivery
+    // crashed / timed out before completing evaluation.
+    // -----------------------------------------------------------------------
+    if (bulkAction === "reprocess_stuck") {
+      const olderThanMinutes = result.data.olderThanMinutes ?? 10;
+      const discoveries = await entity.getStuckPending(olderThanMinutes);
+      const { queued, failed } = await enqueueForReprocess(discoveries);
+      return Response.json({
+        found: discoveries.length,
+        queued,
+        failed,
+        olderThanMinutes,
       });
     }
 
