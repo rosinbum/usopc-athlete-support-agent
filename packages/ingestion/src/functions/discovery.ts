@@ -1,13 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { createLogger } from "@usopc/shared";
+import {
+  createLogger,
+  createNotificationService,
+  type DiscoveryCompletionSummary,
+  type BudgetAlert,
+} from "@usopc/shared";
 import { createDiscoveryOrchestrator } from "../discoveryOrchestrator.js";
 import { createCostTracker } from "../services/costTracker.js";
-import { createNotificationService } from "../services/notificationService.js";
-import type {
-  DiscoveryCompletionSummary,
-  BudgetAlert,
-} from "../services/notificationService.js";
 
 const logger = createLogger({ service: "discovery" });
 

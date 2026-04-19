@@ -5,8 +5,10 @@ import {
   ValidationError,
   AuthenticationError,
   RateLimitError,
+  QuotaExceededError,
   ExternalServiceError,
   IngestionError,
+  isQuotaError,
 } from "./errors.js";
 
 describe("AppError", () => {
@@ -214,5 +216,67 @@ describe("IngestionError", () => {
       documentId: "doc-123",
       source: "usada.org",
     });
+  });
+});
+
+describe("QuotaExceededError", () => {
+  it("has the QUOTA_EXCEEDED code and 429 status", () => {
+    const error = new QuotaExceededError();
+    expect(error.code).toBe("QUOTA_EXCEEDED");
+    expect(error.statusCode).toBe(429);
+    expect(error.isOperational).toBe(true);
+  });
+
+  it("carries cause and context", () => {
+    const cause = new Error("anthropic: insufficient_quota");
+    const error = new QuotaExceededError("anthropic out of credits", {
+      cause,
+      context: { provider: "anthropic" },
+    });
+    expect(error.cause).toBe(cause);
+    expect(error.context).toEqual({ provider: "anthropic" });
+  });
+});
+
+describe("isQuotaError", () => {
+  it("returns true for QuotaExceededError instances", () => {
+    expect(isQuotaError(new QuotaExceededError())).toBe(true);
+  });
+
+  it("detects OpenAI insufficient_quota 429", () => {
+    const err = Object.assign(
+      new Error("429 You exceeded your current quota, insufficient_quota"),
+      { status: 429 },
+    );
+    expect(isQuotaError(err)).toBe(true);
+  });
+
+  it("detects Anthropic billing/quota messages", () => {
+    const err = Object.assign(new Error("billing hard limit reached (429)"), {
+      status: 429,
+    });
+    expect(isQuotaError(err)).toBe(true);
+  });
+
+  it("detects Tavily out-of-credits messages", () => {
+    const err = new Error("Error: 429 Too Many Requests - out of credits");
+    expect(isQuotaError(err)).toBe(true);
+  });
+
+  it("is false for plain rate-limit errors without quota language", () => {
+    const err = Object.assign(new Error("429 Too Many Requests"), {
+      status: 429,
+    });
+    expect(isQuotaError(err)).toBe(false);
+  });
+
+  it("is false for generic network errors", () => {
+    expect(isQuotaError(new Error("ECONNRESET"))).toBe(false);
+  });
+
+  it("is false for non-Error values", () => {
+    expect(isQuotaError("boom")).toBe(false);
+    expect(isQuotaError(null)).toBe(false);
+    expect(isQuotaError(undefined)).toBe(false);
   });
 });

@@ -14,9 +14,13 @@ vi.mock("../services/costTracker.js", () => ({
   createCostTracker: vi.fn(),
 }));
 
-vi.mock("../services/notificationService.js", () => ({
-  createNotificationService: vi.fn(),
-}));
+vi.mock("@usopc/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@usopc/shared")>();
+  return {
+    ...actual,
+    createNotificationService: vi.fn(),
+  };
+});
 
 describe("Discovery handler", () => {
   let mockOrchestrator: {
@@ -84,8 +88,7 @@ describe("Discovery handler", () => {
       sendError: vi.fn(),
     };
 
-    const { createNotificationService } =
-      await import("../services/notificationService.js");
+    const { createNotificationService } = await import("@usopc/shared");
     vi.mocked(createNotificationService).mockReturnValue(
       mockNotificationService as any,
     );

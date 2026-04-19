@@ -1,10 +1,12 @@
 import { OpenAIEmbeddings } from "@langchain/openai";
 import {
   CircuitBreaker,
+  isQuotaError,
   logger,
   type CircuitBreakerMetrics,
 } from "@usopc/shared";
 import { MODEL_CONFIG } from "../config/index.js";
+import { alertIfQuotaError, notifyOnCircuitOpen } from "./alerts.js";
 
 const log = logger.child({ service: "embeddings-circuit" });
 
@@ -15,7 +17,9 @@ const log = logger.child({ service: "embeddings-circuit" });
  * - failureThreshold: 3 (opens after 3 consecutive failures)
  * - resetTimeout: 60s (longer because embeddings are critical for RAG)
  * - requestTimeout: 30s (batch embeddings can be slow)
- * - shouldRecordFailure: ignores quota errors (they're expected and handled elsewhere)
+ * - shouldRecordFailure: ignores quota errors — retrying won't help, and we
+ *   route those through `alertIfQuotaError` for proactive notification instead
+ *   of tripping the breaker.
  */
 const embeddingsCircuit = new CircuitBreaker({
   name: "openai-embeddings",
@@ -24,7 +28,8 @@ const embeddingsCircuit = new CircuitBreaker({
   requestTimeout: 30_000,
   successThreshold: 2,
   logger: log,
-  shouldRecordFailure: (error) => !error.message.includes("insufficient_quota"),
+  shouldRecordFailure: (error) => !isQuotaError(error),
+  onOpen: notifyOnCircuitOpen("openai-embeddings"),
 });
 
 /**
@@ -55,9 +60,14 @@ export class ProtectedOpenAIEmbeddings {
    * @throws The underlying error if embedding fails
    */
   async embedDocuments(texts: string[]): Promise<number[][]> {
-    return embeddingsCircuit.execute(() =>
-      this.embeddings.embedDocuments(texts),
-    );
+    try {
+      return await embeddingsCircuit.execute(() =>
+        this.embeddings.embedDocuments(texts),
+      );
+    } catch (error) {
+      alertIfQuotaError("openai-embeddings", error);
+      throw error;
+    }
   }
 
   /**
@@ -67,7 +77,14 @@ export class ProtectedOpenAIEmbeddings {
    * @throws The underlying error if embedding fails
    */
   async embedQuery(text: string): Promise<number[]> {
-    return embeddingsCircuit.execute(() => this.embeddings.embedQuery(text));
+    try {
+      return await embeddingsCircuit.execute(() =>
+        this.embeddings.embedQuery(text),
+      );
+    } catch (error) {
+      alertIfQuotaError("openai-embeddings", error);
+      throw error;
+    }
   }
 
   /**
@@ -76,7 +93,11 @@ export class ProtectedOpenAIEmbeddings {
    */
   async embedQueryWithFallback(text: string): Promise<number[]> {
     return embeddingsCircuit.executeWithFallback(
-      () => this.embeddings.embedQuery(text),
+      () =>
+        this.embeddings.embedQuery(text).catch((error: unknown) => {
+          alertIfQuotaError("openai-embeddings", error);
+          throw error;
+        }),
       [],
     );
   }

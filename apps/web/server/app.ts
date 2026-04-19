@@ -2,7 +2,14 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import express from "express";
 import { createRequestHandler } from "@react-router/express";
+import { logger } from "@usopc/shared";
 import { authHandler } from "./auth.js";
+import {
+  registerProcessCrashHandlers,
+  webErrorHandler,
+} from "./errorHandler.js";
+
+registerProcessCrashHandlers();
 
 // Resolve paths relative to this file so the server works regardless of
 // process.cwd() (Cloud Run runs `tsx apps/web/server/app.ts` from /app).
@@ -101,12 +108,19 @@ if (isDev) {
 }
 
 // ---------------------------------------------------------------------------
+// Global error handler — must be registered last so it catches unhandled
+// errors from every preceding route/middleware.
+// ---------------------------------------------------------------------------
+
+app.use(webErrorHandler);
+
+// ---------------------------------------------------------------------------
 // Start server
 // ---------------------------------------------------------------------------
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`Server listening on http://localhost:${port}`);
+  logger.info(`Server listening on http://localhost:${port}`);
 });
 
 export default app;

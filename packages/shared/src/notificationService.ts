@@ -1,5 +1,6 @@
-import { createLogger, getSecretValue } from "@usopc/shared";
 import { Resend } from "resend";
+import { getSecretValue } from "./env.js";
+import { createLogger } from "./logger.js";
 
 const logger = createLogger({ service: "notification-service" });
 
@@ -22,7 +23,7 @@ export interface DiscoveryCompletionSummary {
     tavilyCredits: number;
     anthropicCost: number;
   };
-  duration: number; // in milliseconds
+  duration: number;
   errors: string[];
 }
 
@@ -31,13 +32,49 @@ export interface BudgetAlert {
   usage: number;
   budget: number;
   percentage: number;
-  threshold: "warning" | "critical"; // warning = 80%, critical = 100%
+  threshold: "warning" | "critical";
+}
+
+/**
+ * Kinds of runtime alerts. Used for subject lines and for deduplication keys
+ * so that, for example, repeated quota errors from the same provider don't
+ * flood inboxes.
+ */
+export type RuntimeAlertKind =
+  | "quota_exceeded"
+  | "circuit_opened"
+  | "web_error"
+  | "runtime_error";
+
+export interface RuntimeAlert {
+  kind: RuntimeAlertKind;
+  /** The upstream service/component (e.g. "anthropic", "openai-embeddings", "web"). */
+  service: string;
+  /** Short human-readable message. */
+  message: string;
+  /** Optional underlying error (used for stack traces in email body). */
+  error?: Error | undefined;
+  /** Structured metadata included in the alert body. */
+  metadata?: Record<string, unknown> | undefined;
 }
 
 export interface NotificationChannels {
-  cloudWatch: boolean; // always enabled
-  slack?: string | undefined; // webhook URL
-  email?: string | undefined; // recipient email address
+  slack?: string | undefined;
+  email?: string | undefined;
+}
+
+/**
+ * Options controlling throttling/deduplication of repeated alerts.
+ */
+export interface ThrottleOptions {
+  /**
+   * Deduplication window in milliseconds. Repeat alerts with the same
+   * (kind, service) key inside this window are suppressed. Default: 3600000
+   * (1 hour). Set to 0 to disable throttling.
+   */
+  dedupWindowMs?: number;
+  /** Injected clock for tests. Default: Date.now. */
+  now?: () => number;
 }
 
 // ---------------------------------------------------------------------------
@@ -45,28 +82,35 @@ export interface NotificationChannels {
 // ---------------------------------------------------------------------------
 
 /**
- * Service for sending notifications about discovery runs and budget alerts.
+ * Sends notifications about discovery runs, budget alerts, and runtime errors.
  *
- * Features:
- * - CloudWatch Logs (always enabled via logger)
- * - Optional Slack webhook integration
- * - Optional Resend email notifications
- * - Discovery completion summaries
- * - Budget warnings and alerts
- * - Error notifications
+ * Channels:
+ * - Structured logs (always enabled)
+ * - Optional Slack webhook
+ * - Optional Resend email
+ *
+ * Runtime alerts are deduplicated by (kind, service) within a sliding window
+ * so that a persistent upstream failure doesn't produce hundreds of emails.
  */
 export class NotificationService {
-  private channels: NotificationChannels;
+  private readonly channels: NotificationChannels;
   private resend: Resend | null = null;
+  private readonly dedupWindowMs: number;
+  private readonly now: () => number;
+  private readonly lastSentAt = new Map<string, number>();
 
-  constructor(channels?: Partial<NotificationChannels>) {
+  constructor(
+    channels?: Partial<NotificationChannels>,
+    options: ThrottleOptions = {},
+  ) {
     this.channels = {
-      cloudWatch: true,
       slack: channels?.slack ?? process.env.SLACK_WEBHOOK_URL,
       email: channels?.email ?? process.env.NOTIFICATION_EMAIL,
     };
 
-    // Initialize Resend client if email is configured
+    this.dedupWindowMs = options.dedupWindowMs ?? 60 * 60 * 1000;
+    this.now = options.now ?? (() => Date.now());
+
     if (this.channels.email) {
       try {
         const apiKey = getSecretValue("RESEND_API_KEY");
@@ -81,30 +125,25 @@ export class NotificationService {
     logger.info("Notification service initialized", {
       slack: !!this.channels.slack,
       email: !!this.channels.email,
+      dedupWindowMs: this.dedupWindowMs,
     });
   }
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Discovery Notifications
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
 
-  /**
-   * Send discovery completion summary notification to all configured channels.
-   */
   async sendDiscoveryCompletion(
     summary: DiscoveryCompletionSummary,
   ): Promise<void> {
     const message = this.formatDiscoveryMessage(summary);
 
-    // CloudWatch (always enabled)
     logger.info("Discovery run completed", { summary });
 
-    // Slack
     if (this.channels.slack) {
       await this.sendSlackMessage(message, "Discovery Run Complete");
     }
 
-    // Email
     if (this.channels.email && this.resend) {
       await this.sendEmail(
         this.channels.email,
@@ -114,12 +153,8 @@ export class NotificationService {
     }
   }
 
-  /**
-   * Format discovery completion message for human consumption.
-   */
   private formatDiscoveryMessage(summary: DiscoveryCompletionSummary): string {
     const lines: string[] = [];
-
     lines.push("Source Discovery Run Complete");
     lines.push("============================");
     lines.push("");
@@ -153,44 +188,29 @@ export class NotificationService {
     return lines.join("\n");
   }
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Budget Notifications
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
 
-  /**
-   * Send budget alert notification to all configured channels.
-   */
   async sendBudgetAlert(alert: BudgetAlert): Promise<void> {
     const message = this.formatBudgetAlert(alert);
 
-    // CloudWatch (always enabled)
     const logLevel = alert.threshold === "critical" ? "error" : "warn";
     logger[logLevel]("Budget alert", { alert });
 
-    // Slack
+    const subject = `Budget ${alert.threshold === "critical" ? "CRITICAL" : "Warning"}: ${alert.service}`;
+
     if (this.channels.slack) {
-      await this.sendSlackMessage(
-        message,
-        `Budget ${alert.threshold === "critical" ? "CRITICAL" : "Warning"}: ${alert.service}`,
-      );
+      await this.sendSlackMessage(message, subject);
     }
 
-    // Email
     if (this.channels.email && this.resend) {
-      await this.sendEmail(
-        this.channels.email,
-        `Budget ${alert.threshold === "critical" ? "CRITICAL" : "Warning"}: ${alert.service}`,
-        message,
-      );
+      await this.sendEmail(this.channels.email, subject, message);
     }
   }
 
-  /**
-   * Format budget alert message for human consumption.
-   */
   private formatBudgetAlert(alert: BudgetAlert): string {
     const lines: string[] = [];
-
     lines.push(
       `Budget ${alert.threshold === "critical" ? "CRITICAL" : "Warning"}: ${alert.service}`,
     );
@@ -219,12 +239,13 @@ export class NotificationService {
     return lines.join("\n");
   }
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Error Notifications
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
 
   /**
-   * Send error notification to all configured channels.
+   * Send an unthrottled error notification. Prefer `sendRuntimeAlert` for
+   * runtime errors that may repeat — this method always fires.
    */
   async sendError(
     context: string,
@@ -234,33 +255,79 @@ export class NotificationService {
     const errorMessage = typeof error === "string" ? error : error.message;
     const stack = typeof error === "string" ? undefined : error.stack;
 
-    // CloudWatch (always enabled)
     logger.error(`Error in ${context}`, {
       error: errorMessage,
       stack,
       ...metadata,
     });
 
-    // Slack
     if (this.channels.slack) {
       const message = `Error in ${context}\n\n${errorMessage}${stack ? `\n\nStack:\n${stack}` : ""}`;
       await this.sendSlackMessage(message, `Error: ${context}`);
     }
 
-    // Email
     if (this.channels.email && this.resend) {
       const message = `Error in ${context}\n\n${errorMessage}${stack ? `\n\nStack:\n${stack}` : ""}\n\nMetadata:\n${JSON.stringify(metadata, null, 2)}`;
       await this.sendEmail(this.channels.email, `Error: ${context}`, message);
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Channel-Specific Methods
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Runtime Alerts (throttled)
+  // -------------------------------------------------------------------------
 
   /**
-   * Send message to Slack via webhook.
+   * Send a deduplicated runtime alert. Returns true if the alert was sent,
+   * false if it was suppressed by the dedup window.
+   *
+   * Dedup key is `${kind}:${service}`; the first call for a key sends, and
+   * subsequent calls within `dedupWindowMs` are suppressed but still logged.
    */
+  async sendRuntimeAlert(alert: RuntimeAlert): Promise<boolean> {
+    const key = `${alert.kind}:${alert.service}`;
+    const now = this.now();
+    const last = this.lastSentAt.get(key);
+
+    if (
+      this.dedupWindowMs > 0 &&
+      last !== undefined &&
+      now - last < this.dedupWindowMs
+    ) {
+      logger.debug("Runtime alert suppressed by dedup window", {
+        key,
+        ageMs: now - last,
+      });
+      return false;
+    }
+
+    this.lastSentAt.set(key, now);
+
+    const subject = formatRuntimeAlertSubject(alert);
+    const body = formatRuntimeAlertBody(alert);
+
+    logger.error(subject, {
+      kind: alert.kind,
+      service: alert.service,
+      message: alert.message,
+      stack: alert.error?.stack,
+      metadata: alert.metadata,
+    });
+
+    if (this.channels.slack) {
+      await this.sendSlackMessage(body, subject);
+    }
+
+    if (this.channels.email && this.resend) {
+      await this.sendEmail(this.channels.email, subject, body);
+    }
+
+    return true;
+  }
+
+  // -------------------------------------------------------------------------
+  // Channel-Specific Methods
+  // -------------------------------------------------------------------------
+
   private async sendSlackMessage(text: string, title?: string): Promise<void> {
     if (!this.channels.slack) return;
 
@@ -271,9 +338,7 @@ export class NotificationService {
 
       const response = await fetch(this.channels.slack, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -288,13 +353,9 @@ export class NotificationService {
       logger.error("Failed to send Slack notification", {
         error: error instanceof Error ? error.message : String(error),
       });
-      // Don't throw - notification failures shouldn't break the main flow
     }
   }
 
-  /**
-   * Send email via Resend.
-   */
   private async sendEmail(
     to: string,
     subject: string,
@@ -306,7 +367,7 @@ export class NotificationService {
       await this.resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL ?? "noreply@usopc.org",
         to: [to],
-        subject: `[USOPC Discovery] ${subject}`,
+        subject: `[USOPC] ${subject}`,
         text: body,
       });
 
@@ -317,24 +378,76 @@ export class NotificationService {
         to,
         subject,
       });
-      // Don't throw - notification failures shouldn't break the main flow
     }
   }
 
-  /**
-   * Check if any notifications are configured besides CloudWatch.
-   */
+  /** True if any external channel (Slack or email) is configured. */
   hasExternalChannels(): boolean {
     return !!(this.channels.slack || this.channels.email);
   }
 }
 
-/**
- * Create a NotificationService instance.
- * Useful for dependency injection and testing.
- */
+function formatRuntimeAlertSubject(alert: RuntimeAlert): string {
+  switch (alert.kind) {
+    case "quota_exceeded":
+      return `Quota Exceeded: ${alert.service}`;
+    case "circuit_opened":
+      return `Circuit Breaker Open: ${alert.service}`;
+    case "web_error":
+      return `Web Error: ${alert.service}`;
+    case "runtime_error":
+      return `Runtime Error: ${alert.service}`;
+  }
+}
+
+function formatRuntimeAlertBody(alert: RuntimeAlert): string {
+  const lines: string[] = [];
+  lines.push(formatRuntimeAlertSubject(alert));
+  lines.push("=".repeat(50));
+  lines.push("");
+  lines.push(alert.message);
+
+  if (alert.error?.stack) {
+    lines.push("");
+    lines.push("Stack:");
+    lines.push(alert.error.stack);
+  }
+
+  if (alert.metadata && Object.keys(alert.metadata).length > 0) {
+    lines.push("");
+    lines.push("Metadata:");
+    lines.push(JSON.stringify(alert.metadata, null, 2));
+  }
+
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Singleton / factory
+// ---------------------------------------------------------------------------
+
 export function createNotificationService(
   channels?: Partial<NotificationChannels>,
+  options?: ThrottleOptions,
 ): NotificationService {
-  return new NotificationService(channels);
+  return new NotificationService(channels, options);
+}
+
+let defaultInstance: NotificationService | null = null;
+
+/**
+ * Returns a lazily-initialised process-wide NotificationService. Used by
+ * runtime callers (circuit breakers, service wrappers, web error handler)
+ * that need a single dedup window across the process.
+ */
+export function getDefaultNotificationService(): NotificationService {
+  if (!defaultInstance) {
+    defaultInstance = new NotificationService();
+  }
+  return defaultInstance;
+}
+
+/** For tests: reset the singleton. */
+export function resetDefaultNotificationService(): void {
+  defaultInstance = null;
 }
