@@ -75,10 +75,16 @@ export function useDiscoveryAction(id: string) {
 }
 
 interface BulkDiscoveryActionArg {
-  action: "approve" | "reject" | "send_to_sources" | "reprocess";
+  action:
+    | "approve"
+    | "reject"
+    | "send_to_sources"
+    | "reprocess"
+    | "reprocess_stuck";
   ids?: string[] | undefined;
   reason?: string | undefined;
   erroredOnly?: boolean | undefined;
+  olderThanMinutes?: number | undefined;
 }
 
 interface BulkDiscoveryResponse {
@@ -89,6 +95,8 @@ interface BulkDiscoveryResponse {
   failed?: number;
   queued?: number;
   skipped?: number;
+  found?: number;
+  olderThanMinutes?: number;
 }
 
 export function useBulkDiscoveryAction() {

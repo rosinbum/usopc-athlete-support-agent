@@ -66,6 +66,28 @@ export class DiscoveredSourceEntityPg {
     return rows.map((r) => this.toExternal(r));
   }
 
+  /**
+   * Rows stuck in pending_* for longer than `olderThanMinutes`. These likely
+   * represent messages whose feed-worker delivery crashed or timed out — the
+   * worker already re-evaluates pending_* rows on redelivery, so republishing
+   * them is safe.
+   */
+  async getStuckPending(
+    olderThanMinutes: number,
+    options?: { limit?: number },
+  ): Promise<DiscoveredSource[]> {
+    const limit = options?.limit ?? 1000;
+    const { rows } = await this.pool.query(
+      `SELECT * FROM discovered_sources
+       WHERE status IN ('pending_metadata', 'pending_content')
+         AND updated_at < NOW() - ($1 || ' minutes')::interval
+       ORDER BY updated_at ASC
+       LIMIT $2`,
+      [olderThanMinutes, limit],
+    );
+    return rows.map((r) => this.toExternal(r));
+  }
+
   async update(
     id: string,
     updates: Partial<Omit<DiscoveredSource, "id" | "createdAt">>,
