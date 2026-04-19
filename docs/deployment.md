@@ -161,10 +161,10 @@ pulumi preview --stack staging
 
 Create two environments in **Settings > Environments**:
 
-| Environment  | Protection Rules                     |
-| ------------ | ------------------------------------ |
-| `staging`    | None (auto-deploy on push to `main`) |
-| `production` | Required reviewers                   |
+| Environment  | Protection Rules                              |
+| ------------ | --------------------------------------------- |
+| `staging`    | None (auto-deploy on `v*` tag push)           |
+| `production` | Required reviewers (manual workflow dispatch) |
 
 ### Secrets
 
@@ -180,24 +180,24 @@ Add these repository secrets (or environment-scoped secrets if using different v
 
 ## 5. First Deployment
 
-### Option A: Automatic (via CI)
+### Option A: Automatic staging deploy (via tag)
 
-Push to `main` to trigger a staging deploy:
-
-```bash
-git push origin main
-```
-
-Tag a release to trigger a production deploy:
+Tag a commit with `v*` to trigger a staging deploy:
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-### Option B: Manual Trigger
+Pushing to `main` on its own does **not** deploy — merges only run CI
+(tests, typecheck). Cut a tag when you want staging to move.
 
-Go to **Actions > Deploy to GCP > Run workflow** and select the environment.
+### Option B: Manual production deploy
+
+Go to **Actions > Deploy to GCP > Run workflow**, pick the ref (usually
+the tag you just promoted through staging), and select `production`.
+This is the only path that deploys production — there is no automatic
+prod trigger.
 
 ### What the Workflow Does
 
