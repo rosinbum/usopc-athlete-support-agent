@@ -2,14 +2,13 @@ name: Deploy to GCP
 
 on:
   push:
-    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       environment:
         description: "Target environment"
         required: true
-        default: "staging"
+        default: "production"
         type: choice
         options:
           - staging
@@ -38,10 +37,12 @@ jobs:
     steps:
       - id: env
         run: |
+          # Tag pushes → staging (automatic release cut).
+          # Production deploys are manual only, via workflow_dispatch.
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             ENV="${{ inputs.environment }}"
           elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            ENV="production"
+            ENV="staging"
           else
             ENV="staging"
           fi
