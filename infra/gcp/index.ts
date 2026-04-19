@@ -429,6 +429,18 @@ const workerService = new gcp.cloudrunv2.Service(`${prefix}-worker`, {
   },
 });
 
+// The shared service account is used as the OIDC identity for Pub/Sub push
+// subscriptions and Cloud Scheduler jobs that target the worker. Cloud Run
+// requires the caller to have run.invoker on the target service, so without
+// this binding every push/cron delivery 403s and ends up in the DLQ.
+new gcp.cloudrunv2.ServiceIamMember(`${prefix}-worker-invoker`, {
+  name: workerService.name,
+  location: region,
+  project,
+  role: "roles/run.invoker",
+  member: pulumi.interpolate`serviceAccount:${serviceAccount.email}`,
+});
+
 // ---------------------------------------------------------------------------
 // Pub/Sub Push Subscriptions (to worker)
 // ---------------------------------------------------------------------------
