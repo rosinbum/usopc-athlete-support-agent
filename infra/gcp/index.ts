@@ -277,6 +277,11 @@ const registryUrl = pulumi.interpolate`${region}-docker.pkg.dev/${project}/${reg
 const imageTag = process.env.IMAGE_TAG ?? "latest";
 const appImage = pulumi.interpolate`${registryUrl}/app:${imageTag}`;
 
+// Deploy-time version metadata surfaced in the running app (admin footer,
+// /api/health). Falls back to "dev" for local `pulumi up` without CI env.
+const appVersion = process.env.APP_VERSION ?? "dev";
+const appCommit = process.env.APP_COMMIT ?? "dev";
+
 // Helper: build a secret env var referencing Secret Manager
 function secretEnv(envName: string, secretName: string) {
   return {
@@ -333,6 +338,8 @@ const webService = new gcp.cloudrunv2.Service(`${prefix}-web`, {
           { name: "REQUIRE_AUTH", value: "false" },
           { name: "STORAGE_PROVIDER", value: "gcs" },
           { name: "QUEUE_PROVIDER", value: "pubsub" },
+          { name: "APP_VERSION", value: appVersion },
+          { name: "APP_COMMIT", value: appCommit },
           {
             name: "DOCUMENTS_BUCKET_NAME",
             value: documentsBucket.name,

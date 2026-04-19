@@ -2,8 +2,15 @@
 
 import { useState, useEffect } from "react";
 import type { AppSession } from "../../server/session.js";
+import type { AppVersion } from "../../server/version.js";
 
-export default function AdminNav({ session }: { session: AppSession }) {
+export default function AdminNav({
+  session,
+  version,
+}: {
+  session: AppSession;
+  version?: AppVersion;
+}) {
   const user = session.user;
   const [csrfToken, setCsrfToken] = useState("");
 
@@ -55,6 +62,24 @@ export default function AdminNav({ session }: { session: AppSession }) {
       </div>
 
       <div className="flex items-center gap-4">
+        {version && (
+          <a
+            href={
+              version.commit === "dev"
+                ? "#"
+                : `https://github.com/rosinbum/usopc-athlete-support-agent/commit/${version.commit}`
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`Deployed version ${version.version} at commit ${version.commit}`}
+            className="hidden sm:inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 font-mono"
+          >
+            <span>{version.version}</span>
+            <span>·</span>
+            <span>{version.commitShort}</span>
+          </a>
+        )}
+
         <div className="flex items-center gap-2">
           {user?.image && (
             <img
