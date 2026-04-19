@@ -180,6 +180,8 @@ jobs:
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
           IMAGE_TAG: ${{ github.sha }}
+          APP_VERSION: ${{ github.ref_name }}
+          APP_COMMIT: ${{ github.sha }}
 
       - name: Pulumi Up
         uses: pulumi/actions@v6
@@ -190,6 +192,8 @@ jobs:
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
           IMAGE_TAG: ${{ github.sha }}
+          APP_VERSION: ${{ github.ref_name }}
+          APP_COMMIT: ${{ github.sha }}
 
   # -----------------------------------------------------------------------
   # Smoke test
