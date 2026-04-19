@@ -9,9 +9,11 @@ export class DiscoveredSourceEntityPg {
   constructor(private pool: Pool) {}
 
   async create(input: CreateDiscoveredSourceInput): Promise<DiscoveredSource> {
+    // `status` is NOT NULL with no DB default; the feed worker transitions
+    // it to `pending_content` / `approved` / `rejected` as evaluation runs.
     const { rows } = await this.pool.query(
-      `INSERT INTO discovered_sources (id, url, title, discovery_method, discovered_at, discovered_from)
-       VALUES ($1, $2, $3, $4, NOW(), $5)
+      `INSERT INTO discovered_sources (id, url, title, discovery_method, discovered_at, discovered_from, status)
+       VALUES ($1, $2, $3, $4, NOW(), $5, 'pending_metadata')
        RETURNING *`,
       [
         input.id,
