@@ -59,6 +59,59 @@ describe("DiscoveredSourceEntityPg.create", () => {
   });
 });
 
+describe("DiscoveredSourceEntityPg.markContentEvaluated", () => {
+  const extracted = {
+    documentType: "policy",
+    topicDomains: ["governance"],
+    authorityLevel: "usopc_governance",
+    priority: "high" as const,
+    description: "Test doc",
+    ngbId: null,
+    format: "html" as const,
+  };
+
+  it("sets status='approved' when combined confidence meets threshold", async () => {
+    const { pool, query } = makePool();
+    const entity = new DiscoveredSourceEntityPg(pool);
+
+    await entity.markContentEvaluated(
+      "abc",
+      0.9,
+      0.85,
+      extracted,
+      "Looks good",
+      0.7,
+    );
+
+    const [, params] = query.mock.calls[0]!;
+    expect(params![1]).toBe("approved");
+    expect(params![12]).toBeNull(); // rejection_reason
+  });
+
+  // Regression for #706: below-threshold used to set status='pending_content',
+  // which put the row back into REPROCESSABLE_STATUSES and looped forever.
+  it("sets status='rejected' (not 'pending_content') when combined confidence is below threshold", async () => {
+    const { pool, query } = makePool();
+    const entity = new DiscoveredSourceEntityPg(pool);
+
+    await entity.markContentEvaluated(
+      "abc",
+      0.4,
+      0.5,
+      extracted,
+      "Low quality",
+      0.7,
+    );
+
+    const [sql, params] = query.mock.calls[0]!;
+    expect(params![1]).toBe("rejected");
+    expect(params![12]).toMatch(/below threshold/);
+    // Must stamp reviewed_at + reviewed_by='auto' so admin UI shows it as auto-reviewed
+    expect(sql).toMatch(/reviewed_at = NOW\(\)/);
+    expect(sql).toMatch(/reviewed_by = 'auto'/);
+  });
+});
+
 describe("DiscoveredSourceEntityPg.getStuckPending", () => {
   it("selects pending_* rows whose updated_at is older than the threshold", async () => {
     const { pool, query } = makePool();

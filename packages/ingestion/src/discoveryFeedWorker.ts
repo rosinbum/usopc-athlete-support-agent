@@ -140,12 +140,18 @@ async function processUrl(
     metadataEval.preliminaryDocumentType,
   );
 
-  // Reject if not relevant or low confidence
+  // Reject if not relevant or low confidence. markMetadataEvaluated leaves
+  // status at 'pending_content'; we must transition to 'rejected' here or the
+  // row re-enters the reprocess set forever (#706).
   if (!metadataEval.isRelevant || metadataEval.confidence < 0.5) {
+    const reason = metadataEval.isRelevant
+      ? `Auto-rejected: metadata confidence ${metadataEval.confidence.toFixed(2)} below 0.5`
+      : `Auto-rejected: not relevant — ${metadataEval.reasoning}`;
     logger.info(`URL rejected after metadata evaluation: ${normalized}`, {
       url: normalized,
       confidence: metadataEval.confidence,
     });
+    await entity.reject(id, "auto", reason);
     if (isReprocess) await entity.clearError(id);
     return;
   }

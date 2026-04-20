@@ -184,12 +184,14 @@ export class DiscoveredSourceEntityPg {
     reasoning: string,
     autoApprovalThreshold: number,
   ): Promise<void> {
-    const status =
-      combinedConfidence >= autoApprovalThreshold
-        ? "approved"
-        : "pending_content";
-    const reviewedAt =
-      combinedConfidence >= autoApprovalThreshold ? "NOW()" : "NULL";
+    // Every path through here transitions to a terminal state. Previously the
+    // below-threshold branch left status at 'pending_content', which leaked
+    // rejected URLs back into the reprocess set and piled up stuck rows (#706).
+    const approved = combinedConfidence >= autoApprovalThreshold;
+    const status = approved ? "approved" : "rejected";
+    const rejectionReason = approved
+      ? null
+      : `Auto-rejected: combined confidence ${combinedConfidence.toFixed(2)} below threshold ${autoApprovalThreshold.toFixed(2)}`;
 
     await this.pool.query(
       `UPDATE discovered_sources
@@ -197,7 +199,8 @@ export class DiscoveredSourceEntityPg {
            document_type = $5, topic_domains = $6, authority_level = $7,
            priority = $8, description = $9, ngb_id = $10, format = $11,
            content_reasoning = $12,
-           reviewed_at = ${reviewedAt}, reviewed_by = CASE WHEN $2 = 'approved' THEN 'auto' ELSE reviewed_by END,
+           reviewed_at = NOW(), reviewed_by = 'auto',
+           rejection_reason = $13,
            updated_at = NOW()
        WHERE id = $1`,
       [
@@ -213,6 +216,7 @@ export class DiscoveredSourceEntityPg {
         extracted.ngbId,
         extracted.format,
         reasoning,
+        rejectionReason,
       ],
     );
   }
