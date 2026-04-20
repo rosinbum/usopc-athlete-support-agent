@@ -207,12 +207,18 @@ export class DiscoveryCoordinator {
       metadataEval.preliminaryDocumentType,
     );
 
-    // If not relevant, reject and stop
+    // If not relevant, reject and stop. markMetadataEvaluated leaves status
+    // at 'pending_content' — transition to 'rejected' explicitly so the row
+    // isn't treated as stuck and re-queued forever (#706).
     if (!metadataEval.isRelevant || metadataEval.confidence < 0.5) {
+      const reason = metadataEval.isRelevant
+        ? `Auto-rejected: metadata confidence ${metadataEval.confidence.toFixed(2)} below 0.5`
+        : `Auto-rejected: not relevant — ${metadataEval.reasoning}`;
       logger.info(`URL rejected after metadata evaluation: ${url}`, {
         url,
         confidence: metadataEval.confidence,
       });
+      await this.discoveredSourceEntity.reject(id, "auto", reason);
       return;
     }
 

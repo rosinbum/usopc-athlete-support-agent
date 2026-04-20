@@ -233,6 +233,29 @@ describe("discoveryFeedWorker", () => {
     expect(mockEntity.markContentEvaluated).not.toHaveBeenCalled();
   });
 
+  // Regression for #706: metadata rejection used to just return, leaving
+  // status at 'pending_content' (set by markMetadataEvaluated) — which put
+  // the row back into REPROCESSABLE_STATUSES and looped forever.
+  it("marks row 'rejected' when metadata eval flags as not relevant", async () => {
+    mockEvalService.evaluateMetadata.mockResolvedValueOnce({
+      isRelevant: false,
+      confidence: 0.2,
+      reasoning: "Off-topic",
+      suggestedTopicDomains: [],
+      preliminaryDocumentType: "",
+    });
+
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
+
+    expect(mockEntity.reject).toHaveBeenCalledWith(
+      "test-id-hash",
+      "auto",
+      expect.stringContaining("not relevant"),
+    );
+  });
+
   it("stops at metadata eval when confidence < 0.5", async () => {
     mockEvalService.evaluateMetadata.mockResolvedValueOnce({
       isRelevant: true,
@@ -247,6 +270,35 @@ describe("discoveryFeedWorker", () => {
     );
 
     expect(mockLoadWeb).not.toHaveBeenCalled();
+  });
+
+  // Regression for #706: low-metadata-confidence also leaked as 'pending_content'.
+  it("marks row 'rejected' when metadata confidence is below 0.5", async () => {
+    mockEvalService.evaluateMetadata.mockResolvedValueOnce({
+      isRelevant: true,
+      confidence: 0.3,
+      reasoning: "Borderline",
+      suggestedTopicDomains: [],
+      preliminaryDocumentType: "",
+    });
+
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
+
+    expect(mockEntity.reject).toHaveBeenCalledWith(
+      "test-id-hash",
+      "auto",
+      expect.stringContaining("confidence"),
+    );
+  });
+
+  it("does not call reject() when metadata eval passes", async () => {
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/doc1" }]),
+    );
+
+    expect(mockEntity.reject).not.toHaveBeenCalled();
   });
 
   it("calls loadWeb, evaluateContent, markContentEvaluated for passing metadata", async () => {
