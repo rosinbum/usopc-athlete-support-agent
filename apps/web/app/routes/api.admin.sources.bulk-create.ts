@@ -90,10 +90,8 @@ export async function action({ request }: Route.ActionArgs) {
         await entity.create(source);
         results.push({ id: source.id, title: source.title, status: "created" });
       } catch (err) {
-        if (
-          err instanceof Error &&
-          err.name === "ConditionalCheckFailedException"
-        ) {
+        // Postgres unique-violation (SQLSTATE 23505) means duplicate ID.
+        if ((err as { code?: string }).code === "23505") {
           results.push({
             id: source.id,
             title: source.title,
