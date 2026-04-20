@@ -245,10 +245,38 @@ export class AgentRunner {
       });
       conversationId = undefined;
     }
+    // Output/derived fields use replace reducers, so the Postgres checkpointer
+    // would otherwise hand the next turn the prior turn's answer, citations,
+    // etc. Reset them explicitly so each turn starts with clean channels.
+    // `messages` accumulates correctly via the add-messages reducer.
     return {
       messages: input.messages,
       userSport: input.userSport,
       conversationId,
+      answer: undefined,
+      citations: [],
+      disclaimer: undefined,
+      escalation: undefined,
+      escalationReason: undefined,
+      qualityCheckResult: undefined,
+      qualityRetryCount: 0,
+      needsClarification: false,
+      clarificationQuestion: undefined,
+      retrievedDocuments: [],
+      webSearchResults: [],
+      webSearchResultUrls: [],
+      retrievalConfidence: 0,
+      retrievalStatus: "success",
+      topicDomain: undefined,
+      queryIntent: undefined,
+      detectedNgbIds: [],
+      emotionalState: "neutral",
+      emotionalSupportContext: undefined,
+      hasTimeConstraint: false,
+      expansionAttempted: false,
+      reformulatedQueries: [],
+      isComplexQuery: false,
+      subQueries: [],
     };
   }
 }
