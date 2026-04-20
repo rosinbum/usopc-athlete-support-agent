@@ -283,6 +283,35 @@ describe("AgentRunner", () => {
       );
     });
 
+    it("resets per-turn output fields so prior-turn checkpoint state can't leak (invoke)", async () => {
+      // Regression: multi-turn conversations were replaying the prior turn's
+      // answer/citations/disclaimer because those fields use replace reducers
+      // and the Postgres checkpointer loads them for the new turn. The new
+      // turn must start with clean output channels so the streamAdapter never
+      // sees stale values before nodes have run.
+      const graph = makeFakeGraph();
+      mockCreateAgentGraph.mockReturnValue(graph);
+
+      const runner = await AgentRunner.create(defaultConfig);
+      await runner.invoke({
+        messages: [new HumanMessage("follow-up question")],
+        conversationId: "conv-multi-turn",
+      });
+
+      const initialState = graph.invoke.mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      expect(initialState.answer).toBeUndefined();
+      expect(initialState.citations).toEqual([]);
+      expect(initialState.disclaimer).toBeUndefined();
+      expect(initialState.escalation).toBeUndefined();
+      expect(initialState.qualityCheckResult).toBeUndefined();
+      expect(initialState.qualityRetryCount).toBe(0);
+      expect(initialState.needsClarification).toBe(false);
+      expect(initialState.clarificationQuestion).toBeUndefined();
+    });
+
     it("passes metadata.session_id when conversationId is provided", async () => {
       const graph = makeFakeGraph();
       mockCreateAgentGraph.mockReturnValue(graph);

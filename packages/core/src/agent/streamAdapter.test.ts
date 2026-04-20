@@ -1022,4 +1022,52 @@ describe("agentStreamToEvents (dual-mode)", () => {
 
     expect(events[events.length - 1]!.type).toBe("done");
   });
+
+  it("streams a clean multi-turn response when runner resets per-turn fields", async () => {
+    // The runner's buildInitialState() resets per-turn output fields
+    // (answer, citations, disclaimer, qualityCheckResult, ...) before each
+    // graph run, so LangGraph emits an initial values chunk with those
+    // fields empty/undefined even on turn 2. This test verifies the adapter
+    // streams the new turn's answer cleanly without any prior-turn content.
+    const cleanInitialSnapshot = {
+      answer: undefined,
+      citations: [],
+      disclaimer: undefined,
+      qualityCheckResult: undefined,
+    };
+
+    const events = await collectEvents(
+      mockDualStream([
+        ["values", cleanInitialSnapshot],
+        ["messages", [{ content: "New" }, { langgraph_node: "synthesizer" }]],
+        [
+          "messages",
+          [{ content: " answer" }, { langgraph_node: "synthesizer" }],
+        ],
+        [
+          "values",
+          {
+            answer: "New answer",
+            qualityCheckResult: {
+              passed: true,
+              score: 0.95,
+              issues: [],
+              critique: "",
+            },
+          },
+        ],
+      ]),
+    );
+
+    const textDeltas = events
+      .filter((e) => e.type === "text-delta")
+      .map((e) => e.textDelta);
+    expect(textDeltas.join("")).toBe("New answer");
+
+    const citationEvents = events.filter((e) => e.type === "citations");
+    expect(citationEvents).toHaveLength(0);
+
+    const disclaimerEvents = events.filter((e) => e.type === "disclaimer");
+    expect(disclaimerEvents).toHaveLength(0);
+  });
 });
