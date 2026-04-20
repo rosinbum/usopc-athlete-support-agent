@@ -102,11 +102,8 @@ export async function action({ request }: Route.ActionArgs) {
 
     return Response.json({ source }, { status: 201 });
   } catch (error) {
-    // Unique constraint violation means ID already exists
-    if (
-      error instanceof Error &&
-      error.name === "ConditionalCheckFailedException"
-    ) {
+    // Postgres unique-violation (SQLSTATE 23505) means the ID already exists.
+    if ((error as { code?: string }).code === "23505") {
       return apiError("A source with this ID already exists", 409);
     }
 

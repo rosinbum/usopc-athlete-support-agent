@@ -67,6 +67,17 @@ const mockNormalizeUrl = vi.mocked(normalizeUrl);
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Shape of a PG unique-constraint error: `pg` attaches `.code` with
+// SQLSTATE 23505 when an INSERT collides on a primary/unique key.
+function pgUniqueViolation(): Error {
+  return Object.assign(
+    new Error(
+      'duplicate key value violates unique constraint "discovered_sources_pkey"',
+    ),
+    { code: "23505" },
+  );
+}
+
 function makeMessage(
   urls: Array<{ url: string; title?: string }>,
   opts?: { autoApprovalThreshold?: number },
@@ -264,10 +275,8 @@ describe("discoveryFeedWorker", () => {
     );
   });
 
-  it("skips existing URLs (conditional put failure)", async () => {
-    mockEntity.create.mockRejectedValueOnce(
-      new Error("Conditional check failed"),
-    );
+  it("skips existing URLs (duplicate-key on PG insert)", async () => {
+    mockEntity.create.mockRejectedValueOnce(pgUniqueViolation());
 
     await handleDiscoveryFeedMessage(
       makeMessage([{ url: "https://usopc.org/existing" }]),
@@ -275,6 +284,26 @@ describe("discoveryFeedWorker", () => {
 
     expect(mockEvalService.evaluateMetadata).not.toHaveBeenCalled();
     expect(mockLoadWeb).not.toHaveBeenCalled();
+  });
+
+  // Regression for #701: pre-fix code matched on `msg.includes("Conditional")`
+  // (DynamoDB-era), which never matched PG's "duplicate key" message — so
+  // re-queued stuck rows always rethrew, hit recordError, and after 3 attempts
+  // were rejected. Now the duplicate-key path is taken on `code === "23505"`,
+  // so `recordError` should NOT be called for that case.
+  it("does not record an error when PG duplicate-key triggers the re-evaluate path", async () => {
+    mockEntity.create.mockRejectedValueOnce(pgUniqueViolation());
+    mockEntity.getById.mockResolvedValueOnce({
+      id: "test-id-hash",
+      status: "pending_metadata",
+      url: "https://usopc.org/stuck",
+    });
+
+    await handleDiscoveryFeedMessage(
+      makeMessage([{ url: "https://usopc.org/stuck" }]),
+    );
+
+    expect(mockEntity.recordError).not.toHaveBeenCalled();
   });
 
   it("individual URL failures don't block others", async () => {
@@ -315,9 +344,7 @@ describe("discoveryFeedWorker", () => {
   });
 
   it("re-evaluates existing pending_metadata record instead of skipping", async () => {
-    mockEntity.create.mockRejectedValueOnce(
-      new Error("Conditional check failed"),
-    );
+    mockEntity.create.mockRejectedValueOnce(pgUniqueViolation());
     mockEntity.getById.mockResolvedValueOnce({
       id: "test-id-hash",
       status: "pending_metadata",
@@ -332,9 +359,7 @@ describe("discoveryFeedWorker", () => {
   });
 
   it("re-evaluates existing pending_content record instead of skipping", async () => {
-    mockEntity.create.mockRejectedValueOnce(
-      new Error("Conditional check failed"),
-    );
+    mockEntity.create.mockRejectedValueOnce(pgUniqueViolation());
     mockEntity.getById.mockResolvedValueOnce({
       id: "test-id-hash",
       status: "pending_content",
@@ -349,9 +374,7 @@ describe("discoveryFeedWorker", () => {
   });
 
   it("still skips existing approved record", async () => {
-    mockEntity.create.mockRejectedValueOnce(
-      new Error("Conditional check failed"),
-    );
+    mockEntity.create.mockRejectedValueOnce(pgUniqueViolation());
     mockEntity.getById.mockResolvedValueOnce({
       id: "test-id-hash",
       status: "approved",
@@ -366,9 +389,7 @@ describe("discoveryFeedWorker", () => {
   });
 
   it("clears error after successful re-evaluation of stuck URL", async () => {
-    mockEntity.create.mockRejectedValueOnce(
-      new Error("Conditional check failed"),
-    );
+    mockEntity.create.mockRejectedValueOnce(pgUniqueViolation());
     mockEntity.getById.mockResolvedValueOnce({
       id: "test-id-hash",
       status: "pending_metadata",

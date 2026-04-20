@@ -99,8 +99,10 @@ async function processUrl(
       discoveredFrom: urlEntry.discoveredFrom,
     });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes("Conditional")) {
+    // Postgres unique-violation on discovered_sources.id: the URL already
+    // exists. `pg` surfaces SQLSTATE 23505 on the error object's `code`.
+    const code = (error as { code?: string }).code;
+    if (code === "23505") {
       // Check if the existing record is stuck and should be re-evaluated
       const existing = await entity.getById(id);
       if (existing && REPROCESSABLE_STATUSES.has(existing.status)) {
